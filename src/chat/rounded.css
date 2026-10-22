@@ -328,3 +328,6 @@ html.vc-rounded .pe-banner { border-radius: var(--r-lg) var(--r-lg) 0 0; }
 @media (max-width: 700px) {
   html.vc-rounded .bf-sd { border-radius: 0; box-shadow: none; }
 }
+
+/* "Ember has an app" popup */
+html.vc-rounded .vc-app-promo-logo { border-radius: var(--r-xl); }

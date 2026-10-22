@@ -1833,6 +1833,11 @@ html.vc-radio .vc-main { background: transparent; }
 /* "This needs a new permission" / "Finish logging in" cards: their own top layer, above every dialog, pop-out, viewer, call UI,
    banner (3800), ask dialog (4000) and tooltip (4200). Rendered in a portal on <body> (Permissions.jsx). */
 .vc-upd.vc-perm-note { z-index: 5000; }
+/* "Ember has an app" popup for phones on the website (MobileAppPromo.jsx) */
+.vc-app-promo { text-align: center; }
+.vc-app-promo-logo { display: block; margin: 0 auto 14px; width: 72px; height: 72px; object-fit: cover; }
+.vc-app-promo .vc-dialog-btns { justify-content: center; }
+.vc-app-promo-note { z-index: 2200; }
 /* controls whose permission this login lacks: greyed, still clickable (shows the prompt) */
 .vc-scope-locked { opacity: .45; filter: grayscale(.6); cursor: not-allowed; }
 .vc-scope-locked:hover { filter: grayscale(.6); }

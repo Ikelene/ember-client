@@ -24,6 +24,7 @@ import { CrashGuard } from '../chat/Crash.jsx';
 import { EmojiInfoHost } from '../chat/EmojiInfo.jsx';
 import { ReactionPickerHost } from '../chat/Reactions.jsx';
 import { UpdatePopup } from '../chat/UpdatePopup.jsx';
+import { MobileAppPromo } from '../chat/MobileAppPromo.jsx';
 import RockEgg from '../chat/RockEgg.jsx';
 import { PermissionPrompts } from '../chat/Permissions.jsx';
 import { RadioHost } from '../chat/Radio.jsx';
@@ -619,6 +620,7 @@ function ChatPage() {
       <ReactionPickerHost />
       <RpcWarning />
       <UpdatePopup />
+      <MobileAppPromo />
       <RockEgg enabled={!!settings.rock_easter_egg} />
       <PermissionPrompts />
       <DesktopTitle />
