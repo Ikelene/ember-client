@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import{frequentReactions,recordReaction,DEFAULT_REACTIONS}from'../src/chat/reactionUsage.js';
+let values;test.beforeEach(()=>{values=new Map();globalThis.localStorage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v)};globalThis.dispatchEvent=()=>{}});
+test('new accounts start with six defaults',()=>assert.deepEqual(frequentReactions('one'),DEFAULT_REACTIONS));
+test('frequency outranks recency and quick choices change as use grows',()=>{recordReaction('one','🦊');recordReaction('one','🦊');recordReaction('one','🐈');assert.equal(frequentReactions('one')[0],'🦊');recordReaction('one','🐈');recordReaction('one','🐈');assert.equal(frequentReactions('one')[0],'🐈');assert.equal(frequentReactions('one').length,6)});
+test('accounts do not share rankings',()=>{recordReaction('one','🦊');assert.equal(frequentReactions('one')[0],'🦊');assert.deepEqual(frequentReactions('two'),DEFAULT_REACTIONS)});
+test('saved counts are read back and tolerate malformed entries',()=>{values.set('bonfire.reaction-usage.v1:one',JSON.stringify([{emoji:'🦊',count:8,last:1},{emoji:'bad',count:-1,last:2},null]));assert.equal(frequentReactions('one')[0],'🦊');values.set('bonfire.reaction-usage.v1:two','broken');assert.deepEqual(frequentReactions('two'),DEFAULT_REACTIONS)});
+test('unavailable storage never blocks reacting',()=>{globalThis.localStorage={getItem(){throw Error('blocked')},setItem(){throw Error('blocked')}};assert.doesNotThrow(()=>recordReaction('one','🦊'));assert.deepEqual(frequentReactions('one'),DEFAULT_REACTIONS)});
+test('custom emoji tokens are counted like standard emoji',()=>{recordReaction('one','<:fox:e1234567890>');assert.equal(frequentReactions('one')[0],'<:fox:e1234567890>')});
+test('the starboard star never counts toward quick reactions',()=>{for(let i=0;i<5;i++){recordReaction('one','⭐');recordReaction('one','⭐\uFE0F')}values.set('bonfire.reaction-usage.v1:two',JSON.stringify([{emoji:'⭐',count:9,last:1}]));assert.deepEqual(frequentReactions('one'),DEFAULT_REACTIONS);assert.deepEqual(frequentReactions('two'),DEFAULT_REACTIONS)});
