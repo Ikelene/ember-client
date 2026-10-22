@@ -11,6 +11,7 @@ import {
   Pencil, Trash2, Check, X, Circle, Moon, MinusCircle, EyeOff, Smile, UsersRound, Megaphone, FolderPlus, ShieldCheck, Download, Smartphone, Server, UserRound, Volume2, CircleArrowUp } from 'lucide-react';
 
 import { RetryIn } from './Gate.jsx';
+import { ServerIcon } from './ServerIcon.jsx';
 import { useChat, retryNow, isMobileDevice, go, keyOf, setStatus, setCustom, isMuted, effectiveNotify, ask, refreshServer, toast, errorText, setDetailLayout, patchState, saveSettings, getState, statusOf, presenceFor, useFace } from './store.js';
 import { P, has, ChannelIcon, useNameStyle, colorFrom, NameDecor } from './roles.jsx';
 import { serverMenu, instanceMenu, channelMenu, userMenu, openMenu, copy } from './Menu.jsx';
@@ -191,7 +192,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate }) {
     <RailItem key={s.sid} dnd={dnd(`v:${s.sid}`)} server={s.sid} active={view.sid === s.sid} unread={s.unread && view.sid !== s.sid && !isMuted(s.sid)} title={s.name} style={{ '--i': i }} onClick={() => go({ kind: 'server', sid: s.sid })}
       badge={isMuted(s.sid) ? 0 : (s.mentions || 0) + (srvMentions[s.sid] || 0)}
       onContextMenu={e => serverMenu(e, s, { onInvite: () => dialog('invite', s.sid), onSettings: () => dialog('settings', s.sid), onLeave: () => dialog('leave', s.sid) })}>
-      <span className="vc-srv-ico">{s.icon ? <img src={s.icon} alt="" /> : initials(s.name)}</span>
+      <span className="vc-srv-ico"><ServerIcon src={s.icon} name={s.name} /></span>
     </RailItem>
   );
   const instItem = (inst, i) => {
@@ -210,7 +211,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate }) {
           onReconnect: () => reconnectInstance(inst.origin),
           onLogin: () => (inst.needsVelora ? startSignIn() : dialog('add-instance', null, { url: inst.origin })),
         })}>
-        <span className="vc-srv-ico">{icon ? <img src={icon} alt="" /> : initials(name)}</span>
+        <span className="vc-srv-ico"><ServerIcon src={icon} name={name} /></span>
       </RailItem>
     );
   };

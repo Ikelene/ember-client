@@ -7,6 +7,7 @@ import { apiFetch, getToken } from '../api.js';
 import { BotTag, AddBotButton, TrustedIn } from './Bots.jsx';
 import { useChat, lookup, go, wantPresence, toast, errorText, getState, setCustom, ask, loadFriends, memberRef, faceOf, botPresenceOf, loadMembers } from './store.js';
 import { isInst } from './ids.js';
+import { ServerIcon } from './ServerIcon.jsx';
 // your own profile's "Edit profile": Ember's settings, Profile page (Chat.jsx listens for vc-dialog)
 export const openProfileEditor = () => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'chat-settings', page: 'profile' } }));
 import { elapsed, BioText } from './text.jsx';
@@ -201,7 +202,8 @@ function useMutualServers(extra, who, vid) {
     const hit = (members[s.sid] || []).find(m => (m.kind === 'velora' && veloraId && String(m.velora_id) === veloraId) || (who?.inst === s.inst && who.kind !== 'velora' && who.id != null && String(m.id) === String(who.id)));
     if (hit) here.push({ sid: s.sid, name: s.name, icon: s.icon || s.icon_url || null, role: hit.role });
   }
-  return [...(extra?.mutual_servers || []), ...here];
+  const seen = new Set();
+  return [...(extra?.mutual_servers || []), ...here].filter(s => !seen.has(s.sid) && seen.add(s.sid));
 }
 const isHex = c => /^#[0-9a-f]{6}$/i.test(c || '');
 
@@ -504,7 +506,7 @@ export function ProfileModal({ username: shown, from, sid, who, onClose }) {
               {tab === 'servers' && (mutual.length
                 ? <div className="vc-mutual">{mutual.map(s => (
                     <button type="button" key={s.sid} className="vc-mutual-row" onClick={() => { close(); go({ kind: 'server', sid: s.sid }); }}>
-                      <span className="vc-srv-ico sm">{s.icon ? <img src={s.icon} alt="" /> : s.name.slice(0, 2)}</span>
+                      <span className="vc-srv-ico sm"><ServerIcon src={s.icon} name={s.name} /></span>
                       <b>{s.name}</b><RoleChip role={s.role} />
                     </button>))}</div>
                 : <div className="vc-empty-note">No servers in common.</div>)}

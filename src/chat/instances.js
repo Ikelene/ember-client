@@ -190,7 +190,7 @@ function onFrame(c, m) {
       toast('Instance restarting…');
       return;
     case 'instance_update':
-      c.info = { ...c.info, ...(m.settings || {}) };
+      c.info = { ...c.info, ...fromInstance(c.origin, m.settings || {}, '/instance') };
       if (m.voice_quota !== undefined) c.voiceQuota = m.voice_quota;
 
       mirror();
