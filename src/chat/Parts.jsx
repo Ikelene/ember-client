@@ -260,7 +260,7 @@ function RailItem({ active, unread, title, onClick, children, style, badge, onCo
 export const initials = name => String(name || '?').split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase();
 
 // ── the server's sidebar: header (banner), categories, channels ─────────────
-export function ServerSidebar({ sid, onInvite, onSettings, onChannel, onLeave }) {
+export function ServerSidebar({ sid, onInvite, onSettings, onChannel, onLeave, onUser }) {
   const d = useChat(s => s.detail[sid]);
   const view = useChat(s => s.view);
   const unread = useChat(s => s.unread);
@@ -418,7 +418,7 @@ export function ServerSidebar({ sid, onInvite, onSettings, onChannel, onLeave })
                     {pings > 0 && !muted && <span className="vc-ping" key={pings}>{pings > 99 ? '99+' : pings}</span>}
                     {canChannels && <button type="button" className="vc-ch-gear" title="Edit channel" onClick={() => onChannel(c)}><Settings size={13} /></button>}
                   </div>
-                  {c.type === 'voice' && <VoiceChannelUsers cid={c.cid} />}
+                  {c.type === 'voice' && <VoiceChannelUsers cid={c.cid} onUser={onUser && ((name, el) => onUser(name, el, 'left', isInst(sid) ? getState().members[sid]?.find(x => x.username === name) : undefined))} />}
                   </Fragment>
                 );
               })}

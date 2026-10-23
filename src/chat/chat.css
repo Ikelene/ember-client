@@ -897,6 +897,8 @@ a.vc-embed-title { color: var(--accent); }
 .vc-vusers { display: flex; flex-direction: column; gap: 1px; margin: 0 0 4px 26px; }
 .vc-vuser { display: flex; align-items: center; gap: 7px; padding: 3px 6px; color: var(--muted); font-size: 13px; animation: vc-fade .25s both; }
 .vc-vuser svg { flex: none; color: #e07a7a; }
+.vc-vuser.clickable { cursor: pointer; border-radius: 6px; }
+.vc-vuser.clickable:hover, .vc-vuser.clickable:focus-visible { background: var(--hover, rgba(255,255,255,.06)); color: var(--text, inherit); outline: none; }
 .vc-vuser-av { flex: none; display: inline-flex; outline: 2px solid transparent; outline-offset: 1px; transition: outline-color .12s; }
 .vc-vuser.speaking .vc-vuser-av { outline-color: #6fcf8f; }
 .vc-vuser.speaking .vc-vuser-name { color: var(--text); }

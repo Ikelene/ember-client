@@ -101,14 +101,15 @@ function CameraBtn({ v, big }) {
 }
 
 // under a voice channel in the list: the people in it (speaking ring = how loud they are, while you're in a call)
-export function VoiceChannelUsers({ cid }) {
+export function VoiceChannelUsers({ cid, onUser }) {
   const users = useChat(s => s.voiceStates[cid]);
   if (!users?.length) return null;
   return (
     <div className="vc-vusers">
       {users.map(u => {
         return (
-          <div key={u.username} className="vc-vuser">
+          <div key={u.username} className={`vc-vuser${onUser ? ' clickable' : ''}`} role={onUser ? 'button' : undefined} tabIndex={onUser ? 0 : undefined}
+            onClick={onUser ? e => onUser(u.username, e.currentTarget) : undefined} onKeyDown={onUser ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onUser(u.username, e.currentTarget); } } : undefined}>
             <span className="vc-vuser-av vc-vlvl" data-vlevel={levelKey(u.username)}><Avatar user={{ username: u.username, pfp: pfpOf(u.username) }} size={20} /></span>
             <span className="vc-vuser-name">{u.username}</span>
             {u.deafened ? <HeadphoneOff size={13} /> : u.muted ? <MicOff size={13} /> : null}
