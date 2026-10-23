@@ -81,8 +81,9 @@ export function pollLevels() {
     const t = targetWidth(rms, m, now);
     m.w += (t - m.w) * (t > m.w ? 0.55 : 0.2); // quick attack, gentle release
     if (t === 0 && m.w < 0.25) m.w = 0;
-    const bucket = s.sound ? swidths : widths;
-    if (m.w > (bucket.get(s.key) || 0)) bucket.set(s.key, m.w);
+    // a sound stays lit for as long as it plays, even through quiet stretches of the clip
+    const bucket = s.sound ? swidths : widths, w = s.sound ? Math.max(m.w, MIN_W) : m.w;
+    if (w > (bucket.get(s.key) || 0)) bucket.set(s.key, w);
   }
   for (const id of [...meters.keys()]) if (!live.has(id)) dropMeter(id);
 }

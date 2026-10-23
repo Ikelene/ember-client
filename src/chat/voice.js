@@ -231,7 +231,7 @@ export function previewBoardSound(sound, heard = false, by = null) {
   const vol = heard ? (clamp(p.board ?? 60, 0, 100) / 100) * (clamp(p.outVol ?? 100, 0, 100) / 100) * own : .6;
   const key = heard && by ? levelKey(by) : '', n = ++boardN;
   const done = () => { boardNow.delete(n); };
-  if (key) { boardNow.set(n, { key, audio: null, gain: own }); setTimeout(done, Math.min(5500, (Number(sound.duration) || 3000) + 600)); }
+  if (key) { boardNow.set(n, { key, audio: null, gain: own }); const silent = vol <= 0 || getState().voice?.deafened && heard; setTimeout(done, silent ? Math.min(5500, (Number(sound.duration) || 3000) + 600) : 15000); } // a sound you hear lasts until it ends; a silent one by its length
   if (vol <= 0 || getState().voice?.deafened && heard) return;
   const a = new Audio(soundUrl(sound, heard ? by : null)); a.volume = vol; void applyOutput(a);
   if (key) { const e = boardNow.get(n); if (e) e.audio = a; a.addEventListener('ended', done); a.addEventListener('error', done); }
@@ -274,7 +274,7 @@ registerLevelSource(() => {
   for (const x of media.values()) if (x.audio?.srcObject && x.kind === 'audio') out.push({ key: levelKey(x.name), stream: x.audio.srcObject });
   for (const [n, b] of boardNow) { // soundboard sounds: measured from the sound itself when the browser lets us, else a steady glow at its volume
     let stream = null;
-    try { stream = b.audio ? (b.audio.captureStream?.() || b.audio.mozCaptureStream?.() || null) : null; } catch { /* fine */ }
+    try { if (b.stream === undefined && b.audio) b.stream = b.audio.captureStream?.() || b.audio.mozCaptureStream?.() || null; stream = b.stream || null; } catch { b.stream = null; }
     out.push({ key: b.key, sound: true, ...(stream?.getAudioTracks?.().length ? { stream, id: `sb${n}` } : { fixed: b.gain }) });
   }
   return out;
