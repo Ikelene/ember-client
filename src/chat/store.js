@@ -1409,7 +1409,7 @@ onAuthLost(authLost);
 export function init(me) {
   set({ me, signedIn: !!me });
   window.bonfireDesktop?.onSignIn?.(s => set({ reauth: s.state === 'failed' ? { state: 'failed', error: s.error } : { state: 'working' } }));
-  if (me) { checkPermissions(); loadSettings(); loadNotify(); connect(); }
+  if (me) { checkPermissions(); loadSettings(); loadNotify(); loadEmojis(); connect(); }
   window.bonfireDesktop?.isFocused?.().then(v => { desktopFocused = !!v; }).catch(() => {});
   window.bonfireDesktop?.onWindowFocus?.(v => { desktopFocused = v; if (v) markViewRead(); });
   startInstances();

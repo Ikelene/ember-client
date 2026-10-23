@@ -1,7 +1,7 @@
 // Message text: a little markdown (**bold**, *italic*, __underline__, ~~strike~~, `code`,
 // ```blocks```, ||spoilers||), links, @mentions, #channels, and picture links shown as pictures.
 import { useMemo, useState } from 'react';
-import { ask, customEmoji, useChat } from './store.js';
+import { ask, customEmoji, loadEmojis, useChat } from './store.js';
 import { UNI_EMOJI, Twemoji, nameOfChar } from './emoji.jsx';
 import { emojiDataSync } from './EmojiPicker.jsx';
 import { extractInvites } from './gameInvite.js';
@@ -61,9 +61,18 @@ function emojiInfo(e, what) {
   dispatchEvent(new CustomEvent('vc-emoji-info', { detail: { ...what, rect: e.currentTarget.getBoundingClientRect() } }));
 }
 // a custom emoji in a message; follows the emoji list so it fixes itself once the instance's pictures have loaded
+let emojiRetryAt = 0;
 function CustomEmojiImg({ eid, animated, name }) {
-  useChat(s => s.emojiUrls[eid]);
-  return <img className="vc-cemoji" src={customEmoji(eid, animated)} alt={`:${name}:`} title={`:${name}:`} draggable={false}
+  const known = useChat(s => s.emojiUrls[eid]);
+  const [tries, setTries] = useState(0);
+  const src = customEmoji(eid, animated);
+  // a picture that fails (address not known yet, or a hiccup) asks for the list again and tries a few more times
+  const retry = () => {
+    if (tries >= 3) return;
+    if (!known && Date.now() - emojiRetryAt > 3000) { emojiRetryAt = Date.now(); loadEmojis(); }
+    setTimeout(() => setTries(t => t + 1), 1500 * (tries + 1));
+  };
+  return <img className="vc-cemoji" src={tries ? `${src}${src.includes('?') ? '&' : '?'}r=${tries}` : src} onError={retry} alt={`:${name}:`} title={`:${name}:`} draggable={false}
     onClick={e => emojiInfo(e, { eid, name, animated: !!animated })} />;
 }
 const RULES = [
