@@ -117,10 +117,9 @@ body:has(.vc-sign-banner) .vc-notify-banner { top: 52px; } /* (the notifications
 .vc-st.console svg, .vc-st-sq.console svg { display: block; width: 100%; height: 100%; }
 .vc-st-sq.online { color: var(--st-online, #5bb37a); } .vc-st-sq.idle { color: var(--st-idle); } .vc-st-sq.dnd { color: var(--st-dnd); }
 /* seen by Manage users: invisible, but really online. A hollow dot in the status colour (not the grey of offline) */
-.vc-st.ghost, .vc-st-sq.ghost { background: transparent; box-shadow: inset 0 0 0 2.5px currentColor; }
-.vc-st-sq.ghost { box-shadow: inset 0 0 0 2px currentColor; }
-.vc-st.ghost { background: #111113; }
-.vc-me .vc-st.ghost { background: #0a0a0c; }
+.vc-st-sq.ghost { background: transparent; box-shadow: inset 0 0 0 2px currentColor; }
+/* the ring is the dot's own border, so it stays hollow on the small dots of the member list (the cut-out gap moves outside) */
+.vc-st.ghost { background: var(--st-cut); border: 2px solid currentColor; box-shadow: 0 0 0 2px var(--st-cut); }
 /* the client tag next to a message author, and the Client rows of a mini profile (Manage users only) */
 .vc-via { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 0 5px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; font-size: 11px; line-height: 16px; color: var(--muted); background: var(--surface-3); border: 1px solid var(--border); }
 .vc-via.official { color: var(--accent); }
