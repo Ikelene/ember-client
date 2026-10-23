@@ -12,6 +12,11 @@ export function ViaBadge({ via }) {
   if (!via) return null;
   return <span className={`vc-via${via.official ? ' official' : ''}`} title={`${viaTitle(via)} (only people with Manage users see this)`}><ViaMark via={via} size={12} />{viaLabel(via)}</span>;
 }
+// "Last login" alone, for an instance's members (their member row carries last_login; presence is Velora's)
+export function LastLoginFact({ at }) {
+  if (!at) return null;
+  return <div className="pe-fact vc-manage-fact"><b>Last login</b><span>{new Date(at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span></div>;
+}
 // the "Client" and "Last login" rows of a mini profile
 export function ManageFacts({ presence }) {
   if (!presence || (presence.sessions === undefined && presence.last_login === undefined)) return null;

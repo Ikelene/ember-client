@@ -20,7 +20,7 @@ export const PERM_LIST = [
   ['ADMIN', 'Administrator', 'Every permission, and can do anything in the server. Be careful who gets this.'],
   ['MANAGE_SERVER', 'Manage server', 'Change the name, description, icon, banner and server settings.'],
   ['MANAGE_ROLES', 'Manage roles', 'Create and edit roles below their own, and give them to people.'],
-  ['MANAGE_USERS', 'Manage users', 'See who is really online (invisible people show with a hollow dot), which client and device people use, and when they last logged in. Also shows a client tag next to their messages.'],
+  ['MANAGE_USERS', 'Manage users', 'See who is really online (invisible people show with a hollow dot), which client and device people use, and when they last logged in. Also shows a client tag next to their messages.', "Shows when people last logged in and which page each message was sent from. Invisible status and devices only show in Velora's own servers: this server doesn't see people's presence."],
   ['MANAGE_CHANNELS', 'Manage channels', 'Create, edit, delete and rearrange channels and categories.'],
   ['KICK', 'Kick members', 'Remove people from the server (they can come back with an invite).'],
   ['BAN', 'Ban members', 'Remove people for good.'],
@@ -351,8 +351,8 @@ export function RolesEditor({ sid }) {
               </>
             )}
           <div className="vc-sec-t" style={{ marginTop: 16 }}>Permissions</div>
-          {PERM_LIST.filter(([k]) => k !== 'MANAGE_USERS' || !isInst(sid)).map(([k, label, hint]) => ( // (Manage users is Velora's: instances don't relay presence)
-            <Toggle key={k} label={label} hint={hint} on={has(r.permissions, P[k])}
+          {PERM_LIST.map(([k, label, hint, instHint]) => (
+            <Toggle key={k} label={label} hint={isInst(sid) && instHint ? instHint : hint} on={has(r.permissions, P[k])}
               disabled={!editable || (!has(perms, P[k]) && !isOwner)}
               onChange={v => save({ permissions: v ? (r.permissions | P[k]) : (r.permissions & ~P[k]) })} />
           ))}

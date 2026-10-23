@@ -15,7 +15,7 @@ import { userMenu } from './Menu.jsx';
 import { RoleChips, modRights, moderate } from './roles.jsx';
 import { PlatformIcon, PLATFORM_NAMES } from './platforms.jsx';
 import StatusReply from './StatusReply.jsx';
-import { ManageFacts } from './ClientVia.jsx';
+import { ManageFacts, LastLoginFact } from './ClientVia.jsx';
 
 export const STATUS_LABEL = { online: 'Online', idle: 'Idle', dnd: 'Do not disturb', invisible: 'Invisible', offline: 'Offline' };
 const CONN_HOVER = { discord: '#5865F2', fluxer: '#7c78ee', github: '#ffffff', spotify: '#1DB954' };
@@ -320,6 +320,7 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
             {sid && <RoleChips sid={sid} username={username} />}
             {localTime && <div className="pe-fact"><b>Local time</b><span>{localTime}</span></div>}
             {!plain && <ManageFacts presence={presence} />}
+            {plain && <LastLoginFact at={member?.last_login} />}
             {member?.joined_at && <div className="pe-fact"><b>Joined this server</b><span>{new Date(member.joined_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span></div>}
             {!plain && p?.created_at && <div className="pe-fact"><b>Velora member since</b><span>{new Date(p.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span></div>}
           </>
