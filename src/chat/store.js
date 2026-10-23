@@ -14,6 +14,7 @@ import { attachmentRefs } from './signing-payload.js';
 import { spoilerName } from './spoiler.js';
 import { prepareInstanceAttachments } from './attachment-preparation.js';
 import { setupSigning, signMessage, canSign, watchSignature, normBody, refreshSigningKey } from './signing.js';
+import { SHORT } from '../version.js';
 
 let state = {
   me: null,                // { username, pfp, color, rank } - null while signed out of Velora (web Ember works without it)
@@ -260,7 +261,7 @@ export function connect() {
   set({ conn: 'connecting', connRetryAt: 0 });
   const s = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
   sock = s;
-  s.onopen = () => s.send(JSON.stringify({ type: 'auth_token', token: getToken(), mobile: isMobileDevice() }));
+  s.onopen = () => s.send(JSON.stringify({ type: 'auth_token', token: getToken(), mobile: isMobileDevice(), client: { version: SHORT } })); // (`client` is shown to people with Manage users)
   s.binaryType = 'arraybuffer';
   s.onmessage = e => {
     if (typeof e.data !== 'string') { voiceHook?.({ binary: e.data }); return; }
@@ -454,7 +455,7 @@ function onEvent(m, inst = VELORA) {
       set(s => ({ detail: upd(s.detail, m.server, d => d && { ...d, roles: m.roles }) }));
       break;
     case 'chat_perms_changed': // someone changed my roles there
-      refreshServer(m.server); if (inst === VELORA) loadServers(); else loadInstanceData(inst);
+      refreshServer(m.server); if (inst === VELORA) { loadServers(); loadMembers(m.server); } else loadInstanceData(inst); // (Manage users changes what the member list shows)
       break;
     case 'chat_members_stale':
       loadMembers(m.server);

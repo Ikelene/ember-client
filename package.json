@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test test/attachments.test.js tests/reaction-usage.mjs && node tests/composer-scope.mjs"
+    "test": "node --test test/attachments.test.js test/manage-users.test.js tests/reaction-usage.mjs && node tests/composer-scope.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.441.0",

@@ -15,6 +15,7 @@ import { userMenu } from './Menu.jsx';
 import { RoleChips, modRights, moderate } from './roles.jsx';
 import { PlatformIcon, PLATFORM_NAMES } from './platforms.jsx';
 import StatusReply from './StatusReply.jsx';
+import { ManageFacts } from './ClientVia.jsx';
 
 export const STATUS_LABEL = { online: 'Online', idle: 'Idle', dnd: 'Do not disturb', invisible: 'Invisible', offline: 'Offline' };
 const CONN_HOVER = { discord: '#5865F2', fluxer: '#7c78ee', github: '#ffffff', spotify: '#1DB954' };
@@ -68,17 +69,19 @@ const onPlatform = a => (a?.platform === '3ds' ? '3DS' : null);
 export function StatusSq({ status, username }) {
   const consoleOn = useChat(s => !!s.presence[username]?.console) && PHONE_OK.has(status);
   const mobile = useChat(s => !!s.presence[username]?.mobile) && PHONE_OK.has(status) && !consoleOn;
-  return <i className={`vc-st-sq ${status === 'invisible' ? 'offline' : status}${consoleOn ? ' console' : mobile ? ' mobile' : ''}`}>{consoleOn ? <ConsoleMark /> : mobile && <PhoneMark sq />}</i>;
+  const ghost = useChat(s => !!s.presence[username]?.invisible); // seen by Manage users: really online, but set to invisible
+  return <i title={ghost ? 'Invisible' : undefined} className={`vc-st-sq ${status === 'invisible' ? 'offline' : status}${consoleOn ? ' console' : mobile ? ' mobile' : ''}${ghost ? ' ghost' : ''}`}>{consoleOn ? <ConsoleMark /> : mobile && <PhoneMark sq />}</i>;
 }
 export function Avatar({ user, size = 32, status, className = '' }) {
   const [bad, setBad] = useState(false);
   const consoleOn = useChat(s => !!s.presence[user?.username]?.console) && PHONE_OK.has(status);
   const mobile = useChat(s => !!s.presence[user?.username]?.mobile) && PHONE_OK.has(status) && !consoleOn;
+  const ghost = useChat(s => !!s.presence[user?.username]?.invisible);
   const pfp = user?.pfp;
   return (
     <span className={`vc-av ${className}`} style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}>
       {pfp && !bad ? <img src={pfp} alt="" loading="lazy" onError={() => setBad(true)} /> : <span className="vc-av-l">{(user?.username || '?').charAt(0).toUpperCase()}</span>}
-      {status && <i className={`vc-st ${status === 'invisible' ? 'offline' : status}${consoleOn ? ' console' : mobile ? ' mobile' : ''}`} title={STATUS_LABEL[status] + (consoleOn ? ' (console)' : mobile ? ' (mobile)' : '')}>{consoleOn ? <ConsoleMark /> : mobile && <PhoneMark />}</i>}
+      {status && <i className={`vc-st ${status === 'invisible' ? 'offline' : status}${consoleOn ? ' console' : mobile ? ' mobile' : ''}${ghost ? ' ghost' : ''}`} title={ghost ? 'Invisible (really online)' : STATUS_LABEL[status] + (consoleOn ? ' (console)' : mobile ? ' (mobile)' : '')}>{consoleOn ? <ConsoleMark /> : mobile && <PhoneMark />}</i>}
     </span>
   );
 }
@@ -316,6 +319,7 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
             {plain && who?.bot && extra?.bot?.bot?.description ? <BioText text={extra.bot.bot.description} /> : null}
             {sid && <RoleChips sid={sid} username={username} />}
             {localTime && <div className="pe-fact"><b>Local time</b><span>{localTime}</span></div>}
+            {!plain && <ManageFacts presence={presence} />}
             {member?.joined_at && <div className="pe-fact"><b>Joined this server</b><span>{new Date(member.joined_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span></div>}
             {!plain && p?.created_at && <div className="pe-fact"><b>Velora member since</b><span>{new Date(p.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span></div>}
           </>
@@ -489,6 +493,7 @@ export function ProfileModal({ username: shown, from, sid, who, onClose }) {
                   <div className="vc-facts">
                     {p?.country_code && <div className="pe-fact"><b>Country</b><span className="pe-country"><img className="pe-flag" src={`/assets/flags/${p.country_code.toLowerCase()}.png`} alt="" onError={e => { e.currentTarget.style.display = 'none'; }} /> {regionName(p.country_code)}</span></div>}
                     {localTime && <div className="pe-fact"><b>Local time</b><span>{localTime}</span></div>}
+                    <ManageFacts presence={presence} />
                     {p?.created_at && <div className="pe-fact"><b>Velora member since</b><span>{new Date(p.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</span></div>}
                     {p?.website && <div className="pe-fact"><b>Website</b><span><a className="pe-link" href={/^https?:/i.test(p.website) ? p.website : `https://${p.website}`} target="_blank" rel="noopener noreferrer nofollow"><Globe size={13} /> {p.website.replace(/^https?:\/\/(www\.)?/i, '')}</a></span></div>}
                   </div>

@@ -15,6 +15,7 @@ import { inviteSummary } from './gameInvite.js';
 import { PlatformIcon, PLATFORM_NAMES } from './platforms.jsx';
 import { GameEventLine } from './GameServer.jsx';
 import { BotTag } from './Bots.jsx';
+import { ViaBadge } from './ClientVia.jsx';
 import { usePronouns } from './pronouns.js';
 import { Reactions, QuickReactions, openReactionPicker } from './Reactions.jsx';
 import MediaPicker, { GifBadge, StarButton } from './MediaPicker.jsx';
@@ -397,7 +398,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
           <div className="vc-msg-head">
             {hook ? <><span className="vc-msg-name hook">{name}</span>{m.author.staff ? <><span className="vc-app-tag staff">STAFF</span>{m.staffBy && <small className="vc-staff-by">sent by {m.staffBy} (only staff see this)</small>}</> : m.author.bridge === 'cloudlink' ? <><span className="vc-app-tag cl" title="This message came in over the channel's CloudLink bridge.">CLOUDLINK</span>{m.author.bridge_from && <span className="vc-game-tag" title="The chat it came from before CloudLink">{m.author.bridge_from}</span>}</> : m.author.bridge ? <><span className="vc-plat-tag" title={m.author.bridge === 'minecraft' ? 'Sent from the linked Minecraft server.' : `This message was sent from the linked ${PLATFORM_NAMES[m.author.bridge] || m.author.bridge} community.`}><PlatformIcon p={m.author.bridge} size={16} /></span>{m.author.bridge_from && <span className="vc-game-tag" title="The server it was sent from">{m.author.bridge_from}</span>}</> : <span className="vc-app-tag">APP</span>}</> : <>
             <button type="button" className="vc-msg-name" style={colorFrom(nameKey) && !distrust ? { color: colorFrom(nameKey) } : undefined} onClick={e => onUser(name, e.currentTarget)}>{name}</button>
-            <NameDecor sid={view.sid} user={author} />{m.author?.bot && <BotTag verified={!!m.author.verified} />}<SigBadge m={m} /></>}
+            <NameDecor sid={view.sid} user={author} />{m.author?.bot && <BotTag verified={!!m.author.verified} />}<SigBadge m={m} />{m.via && <ViaBadge via={m.via} />}</>}
             {pronouns && <span className="vc-pronouns" title="Pronouns">{pronouns}</span>}
             <span className="vc-time" title={new Date(m.created_at).toLocaleString()}>{stampOf(m.created_at)}</span>
             {m.pinned && <span className="vc-pinned-mark" title="Pinned"><Pin size={12} /></span>}
