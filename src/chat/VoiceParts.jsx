@@ -349,7 +349,8 @@ export function VoiceView({ channel, sid }) {
   const v = useChat(s => (s.voice?.room === room ? s.voice : null));
   const others = useChat(s => s.voiceStates[channel.cid]);
   const [startShare, picker] = useScreenShare(v);
-  const tiles = dedupeTiles(v ? v.users.map(u => ({ name: u.name, muted: u.muted, deafened: u.deafened, speaking: u.id === v.myId ? v.speaking : u.speaking, me: u.id === v.myId }))
+  const flags = name => (others || []).find(o => String(o.username).toLowerCase() === String(name).toLowerCase());
+  const tiles = dedupeTiles(v ? v.users.map(u => ({ name: u.name, muted: u.id === v.myId ? !!v.muted : !!flags(u.name)?.muted, deafened: u.id === v.myId ? !!v.deafened : !!flags(u.name)?.deafened, speaking: u.id === v.myId ? v.speaking : u.speaking, me: u.id === v.myId }))
     : (others || []).map(u => ({ name: u.username, muted: u.muted, deafened: u.deafened })));
   return (
     <div className="vc-voiceview">
