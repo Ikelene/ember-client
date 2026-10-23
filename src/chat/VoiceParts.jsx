@@ -151,8 +151,6 @@ export function VoicePanel() {
         </div>
       )}
       <div className="vc-vpanel-btns">
-        <MicBtn v={v} />
-        <DeafenBtn v={v} />
         <CameraBtn v={v} />
         <button type="button" className={`vc-vbtn${v.screen ? ' on' : ''}`} title={v.screen ? 'Stop sharing screen' : 'Share screen'} onClick={startShare}>{v.screen ? <MonitorUp size={17} /> : <MonitorOff size={17} />}</button>
         {v.info.kind === 'channel' && v.info.allowCallIn && <button type="button" className="vc-vbtn" title="Call someone in" onClick={() => setCallIn(true)}><UserPlus size={17} /></button>}
