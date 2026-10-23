@@ -1049,11 +1049,13 @@ export async function uploadAttachment(v, file, opts = {}) {
   return uploadExternal(file, opts);
 }
 // custom emojis of my Velora servers + every connected instance's (each listed under its own namespaced sid)
+let emojiLoad = 0;
 export async function loadEmojis() {
+  const mine = ++emojiLoad; // an older answer must not replace a newer one (instances connect while the first load is still running)
   const open = [...connections.values()].filter(c => c.session && c.status === 'open').map(c => c.origin);
   const [home, ...more] = await Promise.all([state.signedIn ? apiFetch('/chat/emojis').catch(() => null) : null, ...open.map(o => apiFetch('/chat/emojis', { inst: o }).catch(() => null))]);
   const lists = [...(home?.servers || []), ...more.flatMap(d => d?.servers || [])];
-  if (!home && !more.some(Boolean)) return;
+  if (mine !== emojiLoad || (!home && !more.some(Boolean))) return;
   const urls = {};
   for (const sv of lists) for (const e of sv.emojis || []) if (e.url && !urls[e.eid]) urls[e.eid] = e.url;
   set({ emojis: lists, emojiUrls: urls });

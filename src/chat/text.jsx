@@ -1,7 +1,7 @@
 // Message text: a little markdown (**bold**, *italic*, __underline__, ~~strike~~, `code`,
 // ```blocks```, ||spoilers||), links, @mentions, #channels, and picture links shown as pictures.
 import { useMemo, useState } from 'react';
-import { ask, customEmoji } from './store.js';
+import { ask, customEmoji, useChat } from './store.js';
 import { UNI_EMOJI, Twemoji, nameOfChar } from './emoji.jsx';
 import { emojiDataSync } from './EmojiPicker.jsx';
 import { extractInvites } from './gameInvite.js';
@@ -60,14 +60,19 @@ function emojiInfo(e, what) {
   e.stopPropagation();
   dispatchEvent(new CustomEvent('vc-emoji-info', { detail: { ...what, rect: e.currentTarget.getBoundingClientRect() } }));
 }
+// a custom emoji in a message; follows the emoji list so it fixes itself once the instance's pictures have loaded
+function CustomEmojiImg({ eid, animated, name }) {
+  useChat(s => s.emojiUrls[eid]);
+  return <img className="vc-cemoji" src={customEmoji(eid, animated)} alt={`:${name}:`} title={`:${name}:`} draggable={false}
+    onClick={e => emojiInfo(e, { eid, name, animated: !!animated })} />;
+}
 const RULES = [
   [/<t:(-?\d{1,13})(?::([tTdDfFR]))?>/, (m, ctx, k) => {
     const txt = stampText(Number(m[1]), m[2] || 'f');
     return txt ? <time key={k} className="vc-stamp" dateTime={new Date(Number(m[1]) * 1000).toISOString()} title={new Date(Number(m[1]) * 1000).toLocaleString()}>{txt}</time> : m[0];
   }],
   [/<(a?):([A-Za-z0-9_]{1,32}):(e[0-9a-f]{10})>/, (m, ctx, k) => (
-    <img key={k} className="vc-cemoji" src={customEmoji(m[3], m[1])} alt={`:${m[2]}:`} title={`:${m[2]}:`} draggable={false}
-      onClick={e => emojiInfo(e, { eid: m[3], name: m[2], animated: !!m[1] })} />
+    <CustomEmojiImg key={k} eid={m[3]} animated={m[1]} name={m[2]} />
   )],
   // standard emojis show as Twemoji (Discord's look); click one for its name
   [UNI_EMOJI, (m, ctx, k) => {
