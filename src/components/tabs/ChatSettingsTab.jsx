@@ -45,6 +45,23 @@ export const GROUPS = [
   ]],
 ];
 
+// The Android app: notification controls that open Android's own settings pages (native bridge: BonfireNotifications)
+const inAndroidApp = () => typeof window !== 'undefined' && !!window.BonfireNotifications?.postMessage;
+function AndroidNotifications() {
+  const send = type => { try { window.BonfireNotifications.postMessage(JSON.stringify({ type })); } catch { /* the app is older than this setting */ } };
+  return <div className="card" id="bf-android-notifications">
+    <div className="card-header"><span className="card-title">Android notifications</span></div>
+    <div className="card-body">
+      <p>Get message replies and incoming calls while Ember is in the background. This does not keep you online. The permanent "Background messages and calls" notification is its own Android category (Background connection). Open it below and switch it off to hide it; message and call alerts stay on.</p>
+      <div className="bf-notification-controls">
+        {[['Enable notifications', 'enable'], ['Hide the Background messages and calls notification', 'connection_settings'], ['Sounds & notification settings', 'settings'], ['Background battery settings', 'battery'], ['Disconnect background connection', 'disconnect']].map(([label, type]) => (
+          <button type="button" key={type} className="btn btn-surface" onClick={() => send(type)}>{label}</button>
+        ))}
+      </div>
+    </div>
+  </div>;
+}
+
 function DesktopNotifications() {
   const [notifications, setNotifications] = useState(null);
   const [err, setErr] = useState('');
@@ -283,7 +300,7 @@ export default function ChatSettingsTab({ embedded = false, onLogout, onLogin, w
         <div className="card vl-rise" style={{ '--i': gi }} key={title}>
           {!bare && <div className="card-header"><span className="card-title">{title}</span></div>}
           <div className="card-body cs-rows">
-            {(r => (r.length ? r : rows))(rows.filter(([, label, hint, ch]) => matches(query, title, label, hint, ...(ch || []).map(c => c[1])))).map(([key, label, hint, choices]) => (
+            {(r => (r.length ? r : rows))(rows.filter(([key, label, hint, ch]) => !(key === 'notifications' && inAndroidApp()) && matches(query, title, label, hint, ...(ch || []).map(c => c[1])))).map(([key, label, hint, choices]) => (
               <div className="cs-row" key={key}>
                 <div className="cs-text"><b>{label}{saved === key && <em> Saved</em>}</b><span>{hint}</span></div>
                 {choices ? (
@@ -301,7 +318,7 @@ export default function ChatSettingsTab({ embedded = false, onLogout, onLogin, w
           </div>
         </div>
       ))}
-      {s && category === 'Notifications' && (desktop ? <DesktopNotifications /> : <><PushPrompt /><NotificationsTab /></>)}
+      {s && category === 'Notifications' && (desktop ? <DesktopNotifications /> : inAndroidApp() ? <AndroidNotifications /> : <><PushPrompt /><NotificationsTab /></>)}
       {category === 'Messages' && <DesignSettings />}
       {s && category === 'Extras' && <MessageSoundsSettings />}
       {s && category === 'Extras' && <RadioSettings s={s} change={change} saving={saving} />}
