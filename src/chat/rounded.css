@@ -316,6 +316,7 @@ html.vc-rounded .vc-yt-stage,
 html.vc-rounded .vc-yt-ask { border-radius: var(--r-md); }
 html.vc-rounded .vc-start-ico { border-radius: var(--r-lg); }
 html.vc-rounded .vc-hook-av, html.vc-rounded .vc-profile-noav, html.vc-rounded .vc-dmcall-av { border-radius: 50%; }
+html.vc-rounded .vc-vuser-av, html.vc-rounded .vc-vlvl-av { border-radius: 50%; }
 html.vc-rounded .vc-game-console { border-radius: var(--r-md); overflow: hidden; }
 html.vc-rounded .vc-game-bar, html.vc-rounded .vc-game-bar i { border-radius: 99px; }
 html.vc-rounded .cs-note, html.vc-rounded .bf-settings-nav { border-radius: var(--r-md); }
