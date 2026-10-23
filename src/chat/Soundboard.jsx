@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { Play, Upload, Trash2, Volume2, AudioLines, Search } from 'lucide-react';
 import { apiFetch, uploadFetch } from '../api.js';
 import { toast, errorText, customEmoji, useChat } from './store.js';
-import { instOpt, isInst } from './ids.js';
+import { instOpt, isInst, registry } from './ids.js';
 import { playBoardSound, previewBoardSound, stopBoardSounds } from './voice.js';
 import { Twemoji } from './emoji.jsx';
 import { usePlan, PlanGate, PlanNotice, PlanUsage } from './PlanGate.jsx';
@@ -33,10 +33,17 @@ function SoundboardPicker({ rect, onClose }) {
   const [data, setData] = useState(null);
   const [q, setQ] = useState('');
   const box = useRef(null);
-  // a voice channel on an instance plays that instance's sounds (it can't play any others); Velora's calls play Velora's
+  // sounds from every server you're in (Velora's and each instance you're signed in to). The call's own server plays by id; another
+  // server's sound is sent as its public view and the call's server relays the URL (see "Cross-server sounds" in the Ember protocol)
   const room = useChat(st => st.voice?.room);
-  const inst = /^bf_/.test(room || '') ? instOpt(room.slice(3)) : undefined;
-  useEffect(() => { apiFetch('/chat/sounds', { inst }).then(setData).catch(() => setData({ servers: [] })); return () => stopBoardSounds({ previewsOnly: true }); }, [inst]); // closing the picker stops a preview
+  const here = /^bf_/.test(room || '') ? instOpt(room.slice(3)) : undefined;
+  const origins = [...registry.keys()].join(' ');
+  useEffect(() => {
+    let live = true;
+    const sources = [undefined, ...(origins ? origins.split(' ') : [])];
+    Promise.all(sources.map(inst => apiFetch('/chat/sounds', { inst }).then(d => (d.servers || []).map(sv => ({ ...sv, inst, key: `${inst || ''}|${sv.sid}` }))).catch(() => []))).then(all => live && setData({ servers: all.flat() }));
+    return () => { live = false; stopBoardSounds({ previewsOnly: true }); }; // closing the picker stops a preview
+  }, [origins]);
   useEffect(() => {
     const off = e => { if (box.current && !box.current.contains(e.target) && !e.target.closest('.vc-vbtn, .vc-ico-btn')) onClose(); };
     const key = e => { if (e.key === 'Escape') onClose(); };
@@ -57,12 +64,12 @@ function SoundboardPicker({ rect, onClose }) {
           const list = s.sounds.filter(x => !t || x.name.toLowerCase().includes(t));
           if (!list.length) return null;
           return (
-            <div key={s.sid}>
-              <div className="vc-em-sec">{s.name}</div>
+            <div key={s.key}>
+              <div className="vc-em-sec vc-sb-sec">{s.icon ? <img className="vc-sb-ico" src={s.icon} alt="" /> : <span className="vc-sb-ico">{(s.name || '?').trim().slice(0, 1).toUpperCase()}</span>}{s.name}</div>
               <div className="vc-sb-grid">
                 {list.map(x => (
                   <div key={x.id} className="vc-sb-item">
-                    <button type="button" className="vc-sb-play" title={`Play ${x.name} for everyone in the call`} onClick={() => playBoardSound(x.id)}>
+                    <button type="button" className="vc-sb-play" title={`Play ${x.name} for everyone in the call`} onClick={() => playBoardSound(s.inst === here ? x.id : x)}>
                       <SoundIcon s={x} /><span>{x.name}</span>
                     </button>
                     <button type="button" className="vc-sb-prev" title="Preview (only you hear it)" onClick={() => previewBoardSound(x)}><Volume2 size={13} /></button>

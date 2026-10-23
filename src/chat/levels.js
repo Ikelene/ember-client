@@ -9,6 +9,7 @@ let timer = null;
 let lastPoll = 0;
 const meters = new Map(); // `${key}|${stream.id}` -> { key, stream, src, an, buf, w, hold }
 const widths = new Map(); // key -> ring width in px (loudest of that person's tracks)
+const swidths = new Map(); // key -> ring width in px from a soundboard sound they played (shown blue)
 
 const THRESHOLD = 0.02; // RMS that counts as speaking (about -34 dBFS)
 const LOUD = 0.25;      // RMS that gets the thickest ring (about -12 dBFS)
@@ -62,10 +63,11 @@ export function pollLevels() {
   lastPoll = now;
   const list = source?.() || [];
   const live = new Set();
-  widths.clear();
+  widths.clear(); swidths.clear();
   for (const s of list) {
+    if (s?.fixed != null) { swidths.set(s.key, MIN_W + (MAX_W - MIN_W) * Math.max(0, Math.min(1, s.fixed))); continue; }
     if (!s?.stream) continue;
-    const id = `${s.key}|${s.stream.id}`;
+    const id = `${s.key}|${s.id || s.stream.id}`;
     live.add(id);
     const m = meterFor(id, s.key, s.stream);
     if (!m) continue;
@@ -79,7 +81,8 @@ export function pollLevels() {
     const t = targetWidth(rms, m, now);
     m.w += (t - m.w) * (t > m.w ? 0.55 : 0.2); // quick attack, gentle release
     if (t === 0 && m.w < 0.25) m.w = 0;
-    if (m.w > (widths.get(s.key) || 0)) widths.set(s.key, m.w);
+    const bucket = s.sound ? swidths : widths;
+    if (m.w > (bucket.get(s.key) || 0)) bucket.set(s.key, m.w);
   }
   for (const id of [...meters.keys()]) if (!live.has(id)) dropMeter(id);
 }
@@ -89,9 +92,10 @@ export const levelOf = key => widths.get(levelKey(key)) || 0;
 function paint() {
   if (typeof document === 'undefined' || document.hidden) return;
   for (const el of document.querySelectorAll('[data-vlevel]')) {
-    const w = widths.get(el.getAttribute('data-vlevel')) || 0;
+    const k = el.getAttribute('data-vlevel'), sw = swidths.get(k) || 0, w = sw || widths.get(k) || 0; // a sound they played wins, in blue
     const v = w ? `${w.toFixed(2)}px` : '0px';
     if (el.style.getPropertyValue('--vlvl') !== v) el.style.setProperty('--vlvl', v);
+    if (el.hasAttribute('data-vsnd') !== !!sw) el.toggleAttribute('data-vsnd', !!sw);
   }
 }
 function tick() { pollLevels(); paint(); }
@@ -105,7 +109,7 @@ export function stopLevels() {
   clearInterval(timer);
   timer = null;
   for (const id of [...meters.keys()]) dropMeter(id);
-  widths.clear();
+  widths.clear(); swidths.clear();
   paint();
   if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {}); // let go of the audio device between calls
 }

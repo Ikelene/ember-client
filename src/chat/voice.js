@@ -1,7 +1,7 @@
 // Ember voice uses Cloudflare Realtime SFU. Media never travels over Velora's WebSocket.
 import { apiFetch } from '../api.js';
 import { getState, patchState, send, onVoiceEvent, playSound, toast, errorText, timedOutIn, untilText } from './store.js';
-import { VELORA, instOf, isInst } from './ids.js';
+import { VELORA, instOf, isInst, registry } from './ids.js';
 import { connections } from './instances.js';
 import { registerOverlayVoice } from './overlay.js';
 import { sharedAudioContext, startLevels, stopLevels, registerLevelSource, levelKey } from './levels.js';
@@ -203,7 +203,29 @@ function updateDmCall(m) {
   });
   if (m.ended && room === m.room) leaveVoice(true);
 } export function callInto(username) { if (room) send({ type: 'voice_call', to: username, room }); } export function cancelCall(callId) { send({ type: 'voice_call_cancel', callId }); } export function answer(call, accept) { send({ type: 'voice_call_answer', callId: call.callId, accept }); patchState(s => ({ incoming: s.incoming.filter(c => c.callId !== call.callId) })); }
-export function playBoardSound(id) { if (!room) return toast('Join a voice channel first.'); send({ type: 'voice_sound', sound: id, room }); } export function previewBoardSound(sound, heard = false) { const p = prefs(), vol = heard ? (clamp(p.board ?? 60, 0, 100) / 100) * (clamp(p.outVol ?? 100, 0, 100) / 100) : .6; if (vol <= 0) return; const a = new Audio(sound.url); a.volume = vol; void applyOutput(a); a.play().catch(() => {}); } export function stopBoardSounds() {}
+// a sound is its id (one of the room's own server) or, from another server, its public view (the room's instance relays the URL)
+export function playBoardSound(sound) { if (!room) return toast('Join a voice channel first.'); send({ type: 'voice_sound', sound: typeof sound === 'object' ? { name: sound.name, emoji: sound.emoji, volume: sound.volume, duration: sound.duration, url: sound.url } : sound, room }); }
+// a sound another server's soundboard sent into this call is only played from an origin you already use (Velora, an instance you are signed in to, this call's instance)
+const trustedSoundOrigin = url => { try { const o = new URL(url).origin; return o === location.origin || o === 'https://velora.ikelene.net' || registry.has(o) || (isInst(String(room).slice(3)) && instOf(String(room).slice(3)) === o); } catch { return false; } };
+// sounds playing in the call right now: they light the player's avatar blue (levels.js reads them through the level source below)
+const boardNow = new Map(); // n -> { key, audio, gain }
+let boardN = 0;
+// a sound that is sent from this room's instance is fetched from that instance, whatever host it believes it has
+const soundUrl = (sound, by) => { if (by == null || sound.external || !room || roomInst(room) === VELORA) return sound.url; try { const o = roomInst(room); return registry.has(o) ? new URL(new URL(sound.url).pathname, o).href : sound.url; } catch { return sound.url; } };
+// heard = a sound the call is playing (volume from your soundboard / output settings; deafened = silent but still shown); by = who played it
+export function previewBoardSound(sound, heard = false, by = null) {
+  if (heard && sound.external && !trustedSoundOrigin(sound.url)) return;
+  const p = prefs(), own = heard ? Math.max(5, Math.min(100, Number(sound.volume) || 100)) / 100 : 1;
+  const vol = heard ? (clamp(p.board ?? 60, 0, 100) / 100) * (clamp(p.outVol ?? 100, 0, 100) / 100) * own : .6;
+  const key = heard && by ? levelKey(by) : '', n = ++boardN;
+  const done = () => { boardNow.delete(n); };
+  if (key) { boardNow.set(n, { key, audio: null, gain: own }); setTimeout(done, Math.min(5500, (Number(sound.duration) || 3000) + 600)); }
+  if (vol <= 0 || getState().voice?.deafened && heard) return;
+  const a = new Audio(soundUrl(sound, heard ? by : null)); a.volume = vol; void applyOutput(a);
+  if (key) { const e = boardNow.get(n); if (e) e.audio = a; a.addEventListener('ended', done); a.addEventListener('error', done); }
+  a.play().catch(() => { done(); });
+}
+export function stopBoardSounds() {}
 onVoiceEvent(m => { if (m.type === 'chat_error' && String(m.request || '').startsWith('chat_rtc')) return void settle(m, true); if (['chat_rtc_joined', 'chat_rtc_published', 'chat_rtc_offer', 'chat_rtc_ready'].includes(m.type)) return void settle(m); if (m.type === 'chat_rtc_room' && m.room === room) { setPeople(m.people); discardUnavailableMedia(m.people); queueSubscribe(m.people); return; } const v = getState().voice;
   if (m.type === 'voice_closed') {
     if (m.inst && m.inst !== VELORA) { if (room && roomInst(room) === m.inst) leaveVoice(true); return; } // an instance's socket went: only a call on it ends
@@ -227,7 +249,7 @@ onVoiceEvent(m => { if (m.type === 'chat_error' && String(m.request || '').start
     return;
   }
   if (m.type === 'voice_sound_failed') return void toast(m.reason === 'not_found' ? 'That sound is gone.' : errorText(m.reason));
-  if (m.type === 'voice_sound' && !v?.deafened) return void previewBoardSound(m.sound, true); if (m.type === 'chat_voice_state') return void patchState(s => ({ voiceStates: { ...s.voiceStates, [m.channel]: m.users } })); if (m.type === 'chat_call_state') return void updateDmCall(m); if (m.type === 'voice_call_incoming') { patchState(s => ({ incoming: [...s.incoming.filter(c => c.callId !== m.callId), { ...m, at: Date.now() }] })); setTimeout(() => patchState(s => ({ incoming: s.incoming.filter(c => c.callId !== m.callId) })), INCOMING_MAX_MS); return; } if (m.type === 'voice_call_accepted') return void joinVoice(m.room, /^bfc_/.test(m.room) ? { kind: 'call', with: m.from } : {}); if (m.type === 'voice_call_ringing' && v) { if (pendingRing?.room === m.room) pendingRing.callId = m.callId; setVoice(x => ({ ringing: [...(x.ringing || []).filter(c => c.callId !== m.callId), { callId: m.callId, to: m.to }] })); } if (m.type === 'voice_call_answered' && pendingRing?.room === room && m.accepted) pendingRing = null; });
+  if (m.type === 'voice_sound') return void previewBoardSound(m.sound, true, m.by); if (m.type === 'chat_voice_state') return void patchState(s => ({ voiceStates: { ...s.voiceStates, [m.channel]: m.users } })); if (m.type === 'chat_call_state') return void updateDmCall(m); if (m.type === 'voice_call_incoming') { patchState(s => ({ incoming: [...s.incoming.filter(c => c.callId !== m.callId), { ...m, at: Date.now() }] })); setTimeout(() => patchState(s => ({ incoming: s.incoming.filter(c => c.callId !== m.callId) })), INCOMING_MAX_MS); return; } if (m.type === 'voice_call_accepted') return void joinVoice(m.room, /^bfc_/.test(m.room) ? { kind: 'call', with: m.from } : {}); if (m.type === 'voice_call_ringing' && v) { if (pendingRing?.room === m.room) pendingRing.callId = m.callId; setVoice(x => ({ ringing: [...(x.ringing || []).filter(c => c.callId !== m.callId), { callId: m.callId, to: m.to }] })); } if (m.type === 'voice_call_answered' && pendingRing?.room === room && m.accepted) pendingRing = null; });
 addEventListener('beforeunload', () => { if (room) send({ type: 'chat_rtc_leave', room }); });
 // Ember desktop in-game overlay: the audio streams (speaking meters) + the buttons it offers in edit mode
 registerOverlayVoice({ setMute, setDeafen, watchStream, unwatchStream });
@@ -238,5 +260,10 @@ registerLevelSource(() => {
   const mine = mic ? mic.dest.stream : micStream;
   if (mine && st.me?.username) out.push({ key: levelKey(st.me.username), stream: mine, muted: !!v.muted });
   for (const x of media.values()) if (x.audio?.srcObject && x.kind === 'audio') out.push({ key: levelKey(x.name), stream: x.audio.srcObject });
+  for (const [n, b] of boardNow) { // soundboard sounds: measured from the sound itself when the browser lets us, else a steady glow at its volume
+    let stream = null;
+    try { stream = b.audio ? (b.audio.captureStream?.() || b.audio.mozCaptureStream?.() || null) : null; } catch { /* fine */ }
+    out.push({ key: b.key, sound: true, ...(stream?.getAudioTracks?.().length ? { stream, id: `sb${n}` } : { fixed: b.gain }) });
+  }
   return out;
 });
