@@ -72,11 +72,13 @@ export function StatusSq({ status, username }) {
   const ghost = useChat(s => !!s.presence[username]?.invisible); // seen by Manage users: really online, but set to invisible
   return <i title={ghost ? 'Invisible' : undefined} className={`vc-st-sq ${status === 'invisible' ? 'offline' : status}${consoleOn ? ' console' : mobile ? ' mobile' : ''}${ghost ? ' ghost' : ''}`}>{consoleOn ? <ConsoleMark /> : mobile && <PhoneMark sq />}</i>;
 }
-export function Avatar({ user, size = 32, status, className = '' }) {
+// `ghost`: pass it when the presence is not stored under user.username (an instance's Velora members); otherwise it is looked up
+export function Avatar({ user, size = 32, status, className = '', ghost: ghostProp }) {
   const [bad, setBad] = useState(false);
   const consoleOn = useChat(s => !!s.presence[user?.username]?.console) && PHONE_OK.has(status);
   const mobile = useChat(s => !!s.presence[user?.username]?.mobile) && PHONE_OK.has(status) && !consoleOn;
-  const ghost = useChat(s => !!s.presence[user?.username]?.invisible);
+  const looked = useChat(s => !!s.presence[user?.username]?.invisible);
+  const ghost = ghostProp ?? looked;
   const pfp = user?.pfp;
   return (
     <span className={`vc-av ${className}`} style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}>

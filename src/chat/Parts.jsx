@@ -572,7 +572,7 @@ export function MemberList({ sid, onUser }) {
             return (
               <button type="button" key={m.username} className={`vc-member vl-rise${p?.status === 'offline' ? ' off' : ''}`} style={{ '--i': Math.min(n, 14) }} onClick={e => onUser(m.username, e.currentTarget, 'left', isInst(sid) ? m : undefined)}
                 onContextMenu={e => { const el = e.currentTarget; userMenu(e, m.username, { sid, onProfile: () => onUser(m.username, el, 'left', isInst(sid) ? m : undefined) }); }}>
-                <MemberAvatar m={m} status={statusOf(sid, m) || undefined} />
+                <MemberAvatar m={m} status={statusOf(sid, m) || undefined} ghost={!!p?.invisible} />
                 <span className="vc-member-txt">
                   <MemberName sid={sid} m={m} />
                   {sub && <small>{sub}</small>}
@@ -720,7 +720,7 @@ function CustomStatus({ current, onClose }) {
 }
 
 // a member list name: their colour (accent or role), role icon, owner crown
-function MemberAvatar({ m, status }) { return <Avatar user={useFace(m)} size={34} status={status} />; }
+function MemberAvatar({ m, status, ghost }) { return <Avatar user={useFace(m)} size={34} status={status} ghost={ghost} />; }
 function MemberName({ sid, m: raw }) {
   const m = useFace(raw);
   const key = useNameStyle(sid, m);
