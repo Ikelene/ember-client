@@ -952,6 +952,7 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
           <button type="button" className="vc-ico-btn" title="Upload a file" onClick={uploadMenu}><Plus size={18} /></button>
         )}
         {mq && <MentionPicker items={mitems} sel={msel} setSel={setMsel} onPick={pickMention} sid={view.sid} />}
+        {slashQ === '' && cdata && !centries.length && <div className="vc-mentions vc-cmd-picker vc-cmd-empty">No bot commands in this server yet. Bots can add slash commands, and they will show up here.</div>}
         {citems.length > 0 && <CommandPicker items={citems} sel={csel} setSel={setCsel} onPick={startCommand} />}
         {cmd && <CommandBar key={cmd.key} view={view} entry={cmd} submitRef={cmdSubmit} onCancel={() => { setCmd(null); ta.current?.focus(); }} onSent={() => { setCmd(null); setReplyTo?.(null); ta.current?.focus(); }} />}
         <input ref={file} type="file" multiple hidden onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />

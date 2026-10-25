@@ -65,3 +65,4 @@
 .vc-field em { color: #f87171; font-style: normal; margin-left: 3px; }
 .vc-field small { color: var(--muted); font-size: 12px; }
 .vc-field textarea { resize: vertical; }
+.vc-cmd-empty { padding: 12px 14px; color: var(--muted); font-size: 13px; }
