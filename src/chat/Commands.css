@@ -1,0 +1,67 @@
+.vc-cmd-picker { max-height: 340px; }
+.vc-cmd-bot { display: flex; align-items: center; gap: 6px; text-transform: none; letter-spacing: 0; font-size: 12.5px; color: var(--dim); }
+.vc-cmd-bot small { margin-left: auto; color: var(--muted); font-size: 11px; }
+.vc-cmd-row { flex-wrap: wrap; row-gap: 0; }
+.vc-cmd-row.on { background: var(--flat-hover, #1c1c1f); border-left-color: var(--accent); }
+.vc-cmd-row.off { opacity: .55; }
+.vc-cmd-row small { margin-left: auto; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vc-cmd-sig { display: flex; gap: 4px; min-width: 0; overflow: hidden; }
+.vc-cmd-sig i { font-style: normal; font-size: 11.5px; color: var(--muted); padding: 0 5px; border: 1px solid var(--border-2); }
+.vc-cmd-sig i.req { color: var(--dim); }
+
+.vc-cmdbar { position: relative; flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 2px; }
+.vc-cmd-hint { position: absolute; left: -6px; right: -6px; bottom: calc(100% + 9px); padding: 6px 10px; background: var(--flat-box, #151517); border: 1px solid var(--border-2); font-size: 12.5px; color: var(--dim); }
+.vc-cmd-hint b { color: var(--text); }
+.vc-cmd-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; background: color-mix(in srgb, var(--accent) 22%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); font-weight: 700; font-size: 14px; color: var(--text); }
+.vc-cmd-opt { display: inline-flex; align-items: stretch; background: var(--flat-box, #101012); border: 1px solid var(--border-2); min-width: 0; }
+.vc-cmd-opt.on { border-color: var(--accent); }
+.vc-cmd-name { display: flex; align-items: center; padding: 3px 8px; background: var(--flat-on, #222226); font-size: 12.5px; font-weight: 600; color: var(--dim); }
+.vc-cmd-name em { color: #f87171; font-style: normal; margin-left: 2px; }
+.vc-cmd-field { position: relative; display: flex; }
+.vc-cmd-field input, .vc-cmd-ghost { min-width: 90px; width: 150px; padding: 3px 8px; background: none; border: 0; outline: none; color: var(--text); font: inherit; font-size: 14px; }
+.vc-cmd-ghost { width: 1px; min-width: 1px; padding: 0; opacity: 0; position: absolute; }
+.vc-cmd-sug { position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 30; min-width: 200px; max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; padding: 4px; background: var(--flat-box, #151517); border: 1px solid var(--border-2); box-shadow: 0 -12px 30px rgba(0, 0, 0, .5); }
+.vc-cmd-sug button { padding: 5px 8px; background: none; border: 0; color: var(--text); text-align: left; cursor: pointer; white-space: nowrap; }
+.vc-cmd-sug button.on { background: var(--flat-hover, #222226); }
+.vc-cmd-bool { display: flex; outline: none; }
+.vc-cmd-bool:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
+.vc-cmd-bool button, .vc-cmd-file button { padding: 3px 10px; background: none; border: 0; color: var(--muted); cursor: pointer; font: inherit; font-size: 13.5px; display: inline-flex; align-items: center; gap: 6px; }
+.vc-cmd-bool button.on { color: var(--text); background: var(--flat-on, #2a2a30); }
+.vc-cmd-x { margin-left: auto; display: grid; place-items: center; padding: 4px; background: none; border: 0; color: var(--muted); cursor: pointer; }
+.vc-cmd-x:hover { color: #fff; }
+
+.vc-interaction { cursor: default; }
+.vc-cmd-used { color: var(--accent); font-weight: 600; }
+.vc-thinking { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 14px; padding: 2px 0; }
+.vc-thinking i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: vc-think 1.2s infinite ease-in-out; }
+.vc-thinking i:nth-child(2) { animation-delay: .15s; }
+.vc-thinking i:nth-child(3) { animation-delay: .3s; }
+.vc-thinking span { margin-left: 6px; }
+@keyframes vc-think { 0%, 80%, 100% { opacity: .25; transform: scale(.8); } 40% { opacity: 1; transform: scale(1); } }
+.vc-eph-note { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; color: var(--muted); }
+.vc-eph-note button { background: none; border: 0; padding: 0; color: #8ab4f8; cursor: pointer; font: inherit; }
+.vc-eph-note button:hover { text-decoration: underline; }
+.vc-msg:has(.vc-eph-note) { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+
+.vc-comps { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.vc-comp-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.vc-cbtn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; min-height: 32px; border: 1px solid transparent; color: #fff; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; }
+.vc-cbtn:disabled { opacity: .5; cursor: not-allowed; }
+.vc-cbtn.s1 { background: #5865f2; }
+.vc-cbtn.s2, .vc-cbtn.s5 { background: #2f3037; border-color: #3b3c44; }
+.vc-cbtn.s3 { background: #248046; }
+.vc-cbtn.s4 { background: #da373c; }
+.vc-cbtn:not(:disabled):hover { filter: brightness(1.12); }
+.vc-csel { position: relative; min-width: 220px; max-width: 100%; }
+.vc-csel > button { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 7px 10px; background: var(--flat-box, #151517); border: 1px solid var(--border-2); color: var(--text); font: inherit; font-size: 14px; cursor: pointer; text-align: left; }
+.vc-csel > button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vc-csel-list { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px); max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; padding: 4px; background: var(--flat-box, #151517); border: 1px solid var(--border-2); box-shadow: 0 12px 30px rgba(0, 0, 0, .5); }
+.vc-csel-list button { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; background: none; border: 0; color: var(--text); text-align: left; cursor: pointer; font: inherit; font-size: 14px; }
+.vc-csel-list button:hover, .vc-csel-list button.on { background: var(--flat-hover, #222226); }
+.vc-csel-list small { display: block; color: var(--muted); font-size: 12px; }
+.vc-csel-done { justify-content: center !important; margin-top: 4px; font-weight: 700; border-top: 1px solid var(--border-2) !important; }
+.vc-csel-done:disabled { opacity: .5; }
+.vc-cbtn-emoji { font-size: 15px; }
+.vc-field em { color: #f87171; font-style: normal; margin-left: 3px; }
+.vc-field small { color: var(--muted); font-size: 12px; }
+.vc-field textarea { resize: vertical; }

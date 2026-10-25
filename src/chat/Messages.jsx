@@ -15,6 +15,8 @@ import { inviteSummary } from './gameInvite.js';
 import { PlatformIcon, PLATFORM_NAMES } from './platforms.jsx';
 import { GameEventLine } from './GameServer.jsx';
 import { BotTag } from './Bots.jsx';
+import { CommandPicker, CommandBar, MessageComponents, InteractionLine, Thinking, EphemeralNote } from './Commands.jsx';
+import { slashEntries, matchEntries } from './commands.js';
 import { ViaBadge } from './ClientVia.jsx';
 import { usePronouns } from './pronouns.js';
 import { Reactions, QuickReactions, openReactionPicker } from './Reactions.jsx';
@@ -34,7 +36,7 @@ function GifIcon() {
     </svg>
   );
 }
-import { loadEmojis, loadMembers, clearStatusReply, useTimedOut, untilText } from './store.js';
+import { loadEmojis, loadMembers, loadCommands, clearStatusReply, useTimedOut, untilText, dismissEphemeral } from './store.js';
 import { takeJump, fileKind, uploadMedia, saveToMedia, isMineMsg, loadUploadLimits, getUploadLimits } from './store.js';
 import { useStarboardFor, starredByMe, STAR } from './Starboard.jsx';
 import { CALL_LINE, callLineText } from './callText.js';
@@ -303,9 +305,9 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
   const replyAuthor = useFace(useMemo(() => (m.reply?.author && m.inst ? { ...m.reply.author, inst: m.inst } : m.reply?.author), [m.reply?.author, m.inst]));
   useEffect(() => { if (m.inst && m.author?.kind === 'velora') wantVeloraFaces([m.author]); }, [m.inst, m.author?.velora_id]); // eslint-disable-line react-hooks/exhaustive-deps
   // replies work in channels you can post in, DMs (not Velora's notices) and group chats
-  const canReplyHere = !m.system && (view.kind === 'channel' ? ctx.canPost : view.kind === 'group' ? !!m.gid : view.username !== 'System' && !!m.imId);
+  const canReplyHere = !m.system && !m.ephemeral && (view.kind === 'channel' ? ctx.canPost : view.kind === 'group' ? !!m.gid : view.username !== 'System' && !!m.imId);
   // reactions: server channels, real (saved) messages
-  const canReact = !m.pending && !m.system && ((view.kind === 'channel' && /^\d+$/.test(String(m.id))) || (view.kind === 'dm' && view.username !== 'System' && !!m.imId));
+  const canReact = !m.pending && !m.system && !m.ephemeral && ((view.kind === 'channel' && /^\d+$/.test(String(m.id))) || (view.kind === 'dm' && view.username !== 'System' && !!m.imId));
   const reactId = m.imId ? `dm:${m.imId}` : m.id;
   const starHere = useStarboardFor(view.sid, view.cid) && canReact && view.kind === 'channel';
   const starred = starHere && starredByMe(m, ctx.me);
@@ -341,7 +343,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
   }
   // Ember Link: joins / leaves / deaths / advancements from Minecraft are compact rows
   if (m.author?.bridge === 'minecraft' && /^mc_/.test(m.sys_kind || '')) return <GameEventLine m={m} />;
-  if (m.ephemeral) {
+  if (m.ephemeral && !m.interaction_id) {
     return (
       <div className="vc-msg vc-sys vc-eph vl-in">
         <span className="vc-sys-ico"><Coins size={15} /></span>
@@ -363,6 +365,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
       onContextMenu={e => {
         if (e.target.closest('textarea, input, [contenteditable]') || m.pending) return;
         if (!hook && e.target.closest('.vc-msg-av, .vc-msg-name')) { const el = e.target.closest('.vc-msg-av, .vc-msg-name'); userMenu(e, name, { sid: view.sid, onProfile: () => onUser(name, el) }); return; }
+        if (m.ephemeral) { openMenu(e, [{ label: 'Dismiss message', icon: X, onClick: () => dismissEphemeral(view, m) }]); return; }
         const reactionAnchor = e.currentTarget.getBoundingClientRect();
         messageMenu(e, m, view, {
           canReply: canReplyHere, onReply: () => onReply(m), onEdit: () => setEditing(m.id), onForward: forward,
@@ -387,6 +390,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
           <ReplyText body={m.reply.body} ctx={ctx} />
         </div>
       )}
+      <InteractionLine m={m} />
       {head ? (
         hook ? <span className="vc-msg-av hook">{m.author.pfp ? <img src={m.author.pfp} alt="" /> : m.author.bridge ? <span className="vc-av-l">{(m.author.username || '?')[0].toUpperCase()}</span> : <Webhook size={20} />}</span>
           : <button type="button" className="vc-msg-av" onClick={e => onUser(name, e.currentTarget)}><Avatar user={distrust ? { ...author, pfp: null } : author} size={40} /></button>
@@ -404,7 +408,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
             {m.pinned && <span className="vc-pinned-mark" title="Pinned"><Pin size={12} /></span>}
           </div>
         )}
-        {editing ? <EditMessageInput m={m} view={view} onSave={saveEdit} onCancel={() => setEditing(null)} /> : (
+        {m.interaction?.thinking ? <Thinking m={m} /> : editing ? <EditMessageInput m={m} view={view} onSave={saveEdit} onCancel={() => setEditing(null)} /> : (
           (nodes.length > 0) && <div className={`vc-text${jumbo ? ' jumbo' : ''}`}>{nodes}{!head && <SigBadge m={m} inStack />}{m.edited_at && <span className="vc-edited" title={stampOf(m.edited_at)}>(edited)</span>}</div>
         )}
         <GameInvites invites={invites} />
@@ -413,6 +417,8 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
         <Attachments list={[...(m.attachments || []), ...media]} extra={images} m={m} />
         {m.uploading && <UploadBar m={m} view={view} />}
         <Reactions m={m} me={ctx.me} canReact={canReact} />
+        <MessageComponents m={m} view={view} />
+        {m.ephemeral && <EphemeralNote m={m} view={view} />}
         {m.failed && (
           <div className="vc-fail"><AlertCircle size={13} /> {errorText(m.failed)}
             <button type="button" onClick={() => { dropFailed(view, m.nonce); sendMessage(view, m.body, m.uploads ? { replyTo: m.replyTo, attachments: m.ready, uploads: m.uploads } : { replyTo: m.reply, attachments: m.attachments }); }}>Try again</button>
@@ -420,7 +426,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
           </div>
         )}
       </div>
-      {!m.pending && !m.failed && !editing && (
+      {!m.pending && !m.failed && !editing && !m.ephemeral && (
         <div className="vc-tools">
           {canReact && <><QuickReactions id={reactId} inst={instOpt(m.channel)} selected={(m.reactions || []).filter(r => r.users?.includes(ctx.me)).map(r => r.emoji)} onDone={() => {}} limit={3} className="vc-tools-react" sid={view.kind === 'channel' ? view.sid : null} /><button type="button" title="Add reaction" onClick={e => openReactionPicker(reactId, e.currentTarget, instOpt(m.channel))}><SmilePlus size={16} /></button><span className="vc-tools-sep" aria-hidden="true" /></>}
           {starHere && <button type="button" title={starred ? 'Take your star back' : 'Star it (for the starboard)'} className={`vc-star-tool${starred ? ' on' : ''}`} onClick={() => setReaction(m.id, STAR, !starred, instOpt(m.channel))}><Star size={15} fill={starred ? 'currentColor' : 'none'} /></button>}
@@ -574,7 +580,7 @@ export function MessageList({ view, onUser, onReply, canPost, canMod, channels, 
   for (const m of list) {
     const day = new Date(m.created_at).toDateString();
     if (!prev || new Date(prev.created_at).toDateString() !== day) rows.push(<div className="vc-day" key={`d${day}`}><span>{dayOf(m.created_at)}</span></div>);
-    const head = !prev || m.system || prev.system || /^mc_/.test(prev.sys_kind || '') || m.reply || m.statusReply || authorKey(prev.author) !== authorKey(m.author) || isUnsigned(prev) !== isUnsigned(m) || m.created_at - prev.created_at > GROUP_MS || new Date(prev.created_at).toDateString() !== day;
+    const head = !prev || m.system || prev.system || /^mc_/.test(prev.sys_kind || '') || m.reply || m.interaction || m.statusReply || authorKey(prev.author) !== authorKey(m.author) || isUnsigned(prev) !== isUnsigned(m) || m.created_at - prev.created_at > GROUP_MS || new Date(prev.created_at).toDateString() !== day;
     if (newFrom && m.id === newFrom) rows.push(<div className="vc-new-line" key="new-line"><span>New</span></div>);
     rows.push(<Message key={m.nonce || m.id} fresh={isFresh(m)} m={m} head={head} ctx={ctx} canMod={canMod} onReply={onReply} onUser={onUser} editing={editing === m.id} setEditing={setEditing} view={view} />);
     prev = m;
@@ -662,6 +668,18 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
   const sid = view.kind === 'channel' ? view.sid : null;
   const canAttach = useChat(s => (view.kind === 'channel' ? canAttachInChannel(s.detail[view.sid], view.cid, s.members[view.sid], isInst(view.sid) ? s.instances.find(i => i.origin === instOf(view.sid))?.user?.username : s.me?.username) : true));
   const [mq, setMq] = useState(null); // the @word being typed
+  const [cmd, setCmd] = useState(null); // the slash command being filled in
+  const [csel, setCsel] = useState(0);
+  const cmdSubmit = useRef(null);
+  const cdata = useChat(s => (sid && isInst(sid) ? s.commands[sid] : null));
+  useEffect(() => { if (sid && isInst(sid)) loadCommands(sid, view.cid); }, [sid, view.cid]); // eslint-disable-line react-hooks/exhaustive-deps
+  const centries = useMemo(() => slashEntries(cdata), [cdata]);
+  const slashQ = !cmd && text.startsWith('/') && !/\n|^\/\s/.test(text) ? text.slice(1) : null;
+  const citems = useMemo(() => (slashQ == null ? [] : matchEntries(centries, slashQ)), [slashQ, centries]);
+  function startCommand(entry) {
+    if (ta.current) ta.current.textContent = '';
+    setText(''); setDraft(key, ''); setCmd(entry); setCsel(0); setMq(null);
+  }
   const [dropping, setDropping] = useState(false); // a file is being dragged over the window
   const saveFile = useRef(null);
   const [picker, setPicker] = useState(false);
@@ -709,6 +727,7 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
     const saved = draftsAll()[key] || '';
     if (el) { fill(el, saved, view); styleMarkdown(el, view); }
     setText(saved);
+    setCmd(null);
     setAtts(x => { x.forEach(a => a.preview && URL.revokeObjectURL(a.preview)); return []; }); setBusy(0);
     setTimeout(() => { if (ta.current && !mobileTextInput()) { ta.current.focus(); caretToEnd(ta.current); } }, 30);
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -740,6 +759,10 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
     }
     if (!mobileTextInput()) styleMarkdown(el, view);
     const v = sync();
+    if (e.nativeEvent.inputType === 'insertText' && e.nativeEvent.data === ' ' && /^\/\S+( \S+){0,2} $/.test(v)) {
+      const hit = centries.find(en => en.label.toLowerCase() === v.slice(1).trim().toLowerCase());
+      if (hit) { startCommand(hit); return; }
+    }
     const c = caretText(el);
     setMq(c ? suggestQuery(c.before, c.before.length) : null); setMsel(0);
     if (v.trim()) setTyping(view, true);
@@ -929,10 +952,12 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
           <button type="button" className="vc-ico-btn" title="Upload a file" onClick={uploadMenu}><Plus size={18} /></button>
         )}
         {mq && <MentionPicker items={mitems} sel={msel} setSel={setMsel} onPick={pickMention} sid={view.sid} />}
+        {citems.length > 0 && <CommandPicker items={citems} sel={csel} setSel={setCsel} onPick={startCommand} />}
+        {cmd && <CommandBar key={cmd.key} view={view} entry={cmd} submitRef={cmdSubmit} onCancel={() => { setCmd(null); ta.current?.focus(); }} onSent={() => { setCmd(null); setReplyTo?.(null); ta.current?.focus(); }} />}
         <input ref={file} type="file" multiple hidden onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
         <input ref={saveFile} type="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm,video/quicktime,audio/*" onChange={e => { addSavedFiles(e.target.files); e.target.value = ''; }} />
         <div
-          ref={ta} className="vc-input" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true"
+          ref={ta} className="vc-input" style={cmd ? { display: 'none' } : undefined} contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true"
           data-placeholder={placeholder} spellCheck autoCorrect="on" autoCapitalize="sentences" inputMode="text"
           onInput={onInput}
           onCompositionStart={() => { composing.current = true; }}
@@ -957,6 +982,11 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
             if (composing.current || e.nativeEvent.isComposing || e.keyCode === 229) return;
             const marker = markdownMarker(e);
             if (marker) { e.preventDefault(); markdownShortcut(ta.current, view, marker); styleMarkdown(ta.current, view); sync(); return; }
+            if (citems.length) {
+              if (e.key === 'ArrowDown') { e.preventDefault(); setCsel(x => (x + 1) % citems.length); return; }
+              if (e.key === 'ArrowUp') { e.preventDefault(); setCsel(x => (x - 1 + citems.length) % citems.length); return; }
+              if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); startCommand(citems[csel] || citems[0]); return; }
+            }
             if (mq && mitems.length) {
               if (e.key === 'ArrowDown') { e.preventDefault(); setMsel(x => (x + 1) % mitems.length); return; }
               if (e.key === 'ArrowUp') { e.preventDefault(); setMsel(x => (x - 1 + mitems.length) % mitems.length); return; }
@@ -974,7 +1004,7 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
         <button type="button" className={`vc-ico-btn vc-gif-btn${picker ? ' on' : ''}`} title="GIFs and Saved Media" onClick={() => { setPicker(p => !p); setEmoji(false); }}><GifIcon /></button>
         <button type="button" className={`vc-ico-btn vc-emoji-btn${emoji ? ' on' : ''}`} title="Emoji" onClick={() => { setEmoji(x => !x); setPicker(false); }}><Smile size={19} /></button>
         {emoji && <EmojiPicker onClose={() => setEmoji(false)} onPick={t => { insertText(t); setEmoji(false); }} />}
-        <button type="button" className="vc-ico-btn send" title="Send" disabled={!text.trim() && !atts.length} onPointerDown={e => e.preventDefault()} onMouseDown={e => e.preventDefault()} onClick={() => submit()}><SendHorizontal size={18} /></button>
+        <button type="button" className="vc-ico-btn send" title="Send" disabled={!cmd && !text.trim() && !atts.length} onPointerDown={e => e.preventDefault()} onMouseDown={e => e.preventDefault()} onClick={() => (cmd ? cmdSubmit.current?.() : submit())}><SendHorizontal size={18} /></button>
         {picker && <MediaPicker onClose={() => setPicker(false)} onPick={a => { setPicker(false); sendMessage(view, '', { replyTo, attachments: [a] }); setReplyTo?.(null); }} />}
       </div>
       <Typing view={view} />

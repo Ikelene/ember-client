@@ -45,6 +45,7 @@ import { InstanceGate, SignInPrompt, SignedOutSidebar, RetryIn } from '../chat/G
 import { finishSignIn, SIGNIN_TEXT } from '../chat/session.js';
 import { SetupWizard } from '../chat/Setup.jsx';
 import { MenuHost, openMenu, copy } from '../chat/Menu.jsx';
+import { InteractionModalHost } from '../chat/Commands.jsx';
 import { stampOf } from '../chat/text.jsx';
 import { pushSupported, browserSubscribed, enablePush } from '../push.js';
 import { BootScreen } from '../chat/Boot.jsx';
@@ -614,6 +615,7 @@ function ChatPage() {
 
       {error && <div className={`vc-toast${toastOk ? ' ok' : ''}`} key={error}>{error}</div>}
       <MenuHost />
+      <InteractionModalHost />
       <TooltipHost />
       <MediaViewerHost />
       <EmojiInfoHost />

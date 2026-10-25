@@ -18,6 +18,7 @@ import { viewPicture, copyImage, downloadImage } from './MediaViewer.jsx';
 import { saveToMedia } from './store.js';
 import { QuickReactions } from './Reactions.jsx';
 import { userScrolled } from './userscroll.js';
+import { appsItems } from './commands.js';
 
 // Track the full press, rather than timing out while the finger is still down.
 let menuTouch = null;
@@ -236,6 +237,7 @@ export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, 
     mediaUrl && { label: 'Save to Saved Media', icon: BookmarkPlus, onClick: () => saveToMedia(mediaUrl, mediaName) },
     (sel || link || img || mediaUrl) && 'sep',
     canReply && { label: 'Reply', icon: Reply, onClick: onReply },
+    view.kind === 'channel' && !m.system && !m.ephemeral && /^\d+$/.test(String(m.id)) && appsItems({ sid: view.sid, cid: view.cid, type: 3, target: m.id }),
     onReact && { label: 'Add reaction', icon: SmilePlus, onClick: onReact },
     onForward && { label: 'Forward', icon: Forward, onClick: onForward },
     canPin && { label: m.pinned ? 'Unpin message' : 'Pin message', icon: Pin, onClick: onPin },
@@ -261,6 +263,7 @@ export function userMenu(e, username, { onProfile, sid, extra = [] } = {}) {
     !isMe && !local && { label: 'Message', icon: MessageCircle, onClick: () => go({ kind: 'dm', username }) },
     !isMe && !friend && !local && { label: 'Add friend', icon: UserPlus, onClick: () => apiFetch('/friends/request', { method: 'POST', body: JSON.stringify({ username }) }).then(d => toast(d.status === 'accepted' ? `You and ${username} are friends now!` : `Friend request sent to ${username}.`, true)).catch(er => toast(er.message === 'already_friends' ? "You're already friends." : "Couldn't send that request.")) },
     { label: 'Copy username', icon: Copy, onClick: () => copy(username, 'Username copied') },
+    sid && !isMe && getState().view?.kind === 'channel' && member && appsItems({ sid, cid: getState().view.cid, type: 2, target: member.id }),
     ...roleMenuItems(sid, username),
     ...modMenuItems(sid, username),
     sid && isInst(sid) && !isMe && member && !member.bot && { label: 'Report', icon: Flag, danger: true, onClick: () => reportTo(sid, { user_id: member.id }, `@${username}`, { target: member }) },

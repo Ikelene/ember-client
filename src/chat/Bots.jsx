@@ -152,6 +152,66 @@ export function AddBotButton({ username, info, onDone, className = 'btn btn-prim
   );
 }
 
+
+function CommandAccess({ sid }) {
+  const [data, setData] = useState(null);
+  const [open, setOpen] = useState('');
+  const [err, setErr] = useState('');
+  const load = () => apiFetch(`/chat/servers/${sid}/commands/manage`).then(setData).catch(() => setErr("Couldn't load the commands."));
+  useEffect(() => { load(); }, [sid]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (err) return <div className="inline-msg error">{err}</div>;
+  if (!data || !data.bots.some(b => b.commands.length)) return null;
+  async function setRole(bot, cmd, perms, rid, value) {
+    const rest = perms.filter(x => !(x.type === 'role' && x.id === rid));
+    const next = value === 'default' ? rest : [...rest, { type: 'role', id: rid, allow: value === 'allow' }];
+    try { await apiFetch(`/chat/servers/${sid}/commands/permissions`, { method: 'PUT', body: JSON.stringify({ bot: bot.id, command: cmd?.id || null, permissions: next }) }); await load(); }
+    catch (e) { setErr(errText(e)); }
+  }
+  const editor = (bot, cmd) => {
+    const perms = (cmd || bot).perms;
+    return (
+      <div className="bm-perms">
+        {data.roles.map(r => {
+          const cur = perms.find(x => x.type === 'role' && x.id === r.rid);
+          return (
+            <label key={r.rid}>
+              <span>{r.is_default ? '@everyone' : r.name}</span>
+              <select className="form-input" value={cur ? (cur.allow ? 'allow' : 'deny') : 'default'} onChange={e => setRole(bot, cmd, perms, r.rid, e.target.value)}>
+                <option value="default">Default</option>
+                <option value="allow">Allowed</option>
+                <option value="deny">Blocked</option>
+              </select>
+            </label>
+          );
+        })}
+      </div>
+    );
+  };
+  return (
+    <div className="bm-cmds">
+      <div className="bm-cmds-head"><b>Command access</b><small>Choose which roles can use each bot's slash commands and message menu commands.</small></div>
+      {data.bots.filter(b => b.commands.length).map(b => (
+        <div className="bm-cmd-bot" key={b.id}>
+          <button type="button" className="bm-cmd-toggle" onClick={() => setOpen(open === b.id ? '' : b.id)}>
+            <ChevronDown size={14} style={{ transform: open === b.id ? 'none' : 'rotate(-90deg)' }} /> {b.username} <small>{b.commands.length} {b.commands.length === 1 ? 'command' : 'commands'}</small>
+          </button>
+          {open === b.id && (
+            <div className="bm-cmd-body">
+              <div className="bm-cmd-row"><b>All commands</b>{editor(b, null)}</div>
+              {b.commands.map(c => (
+                <div className="bm-cmd-row" key={c.id}>
+                  <b>{c.type === 1 ? '/' : ''}{c.name}</b>{c.type !== 1 && <small>{c.type === 2 ? 'user menu' : 'message menu'}</small>}
+                  {editor(b, c)}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── My Account > Chat > Bots (Velora), or Server settings > Bots (inst = the instance's origin, sid = its community) ──
 export function BotsManager({ inst, sid }) {
   const o = inst ? { inst } : {}; // every bot route of an instance goes to that instance
@@ -245,6 +305,7 @@ export function BotsManager({ inst, sid }) {
             </div>
           ))}
         </div>
+        {inst && sid && <CommandAccess sid={sid} />}
         <form className="bm-new" onSubmit={create}>
           <input className="form-input" maxLength={32} placeholder="Bot name" value={name} onChange={e => setName(e.target.value)} />
           <input className="form-input grow" maxLength={300} placeholder="What does it do? (optional)" value={desc} onChange={e => setDesc(e.target.value)} />

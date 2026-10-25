@@ -128,3 +128,15 @@ h2 .vc-bot-tag, .pe-name .vc-bot-tag { vertical-align: 0; }
 .bt-adv summary { cursor: pointer; color: var(--dim); font-size: 13px; }
 .bt-adv textarea { width: 100%; margin: 2px 0 6px; }
 .bt-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+
+.bm-cmds { margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
+.bm-cmds-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; }
+.bm-cmds-head small, .bm-cmd-toggle small, .bm-cmd-row small { color: var(--muted); font-size: 12px; }
+.bm-cmd-bot { border: 1px solid var(--border); overflow: hidden; }
+.bm-cmd-toggle { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; background: none; border: 0; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+.bm-cmd-body { display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+.bm-cmd-row { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.bm-cmd-row + .bm-cmd-row { border-top: 1px solid var(--border); }
+.bm-perms { display: flex; flex-wrap: wrap; gap: 8px; }
+.bm-perms label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--dim); }
+.bm-perms select { width: auto; padding: 4px 8px; }

@@ -37,6 +37,8 @@ let state = {
   staff: false,            // Velora owner / admin: can write as Velora Administrator
   view: { kind: 'home' },  // home | channel {sid, cid} | dm {username} | group {room} | instance {inst, then?} (a server that isn't connected yet)
   menu: null,              // the open right-click menu
+  commands: {},            // sid -> { bots, commands, cid }: bot slash commands I can run
+  interactionModal: null,  // a form a bot asked me to fill: { server, channel, interaction, modal }
   savedMedia: null,
   emojis: null,            // custom emojis from my servers: [{ sid, name, icon, emojis: [...] }]        // Saved Media (starred GIFs + files on the account), loaded on first use
   mentions: {},            // cid -> mentions that came in live (on top of the server's count)
@@ -291,7 +293,7 @@ setInterval(() => send({ type: 'ping' }), 25000);
 
 // one event from the home socket (inst = velora) or from an instance's (already in Ember's shapes, ids namespaced)
 // an instance may only say what PROTOCOL.md §7 lets it: nothing that is Velora's own (DMs, kicks, presence, calls...)
-const INSTANCE_EVENTS = new Set(['chat_message', 'chat_message_update', 'chat_message_delete', 'chat_reactions', 'chat_typing', 'chat_pins_update', 'chat_server_update', 'chat_server_removed', 'chat_roles_update', 'chat_perms_changed', 'chat_channels_update', 'chat_member_update', 'chat_presence', 'chat_members_stale', 'chat_emojis_update', 'chat_identity_update', 'chat_ack', 'chat_error', 'chat_ephemeral', 'chat_join_request', 'chat_join_result', 'chat_report', 'chat_timeout', 'chat_server_added', 'chat_starboard', 'chat_shop_update', 'game_status', 'game_console', 'game_linked', 'game_unlinked', 'voice_sound', 'voice_sound_failed']);
+const INSTANCE_EVENTS = new Set(['chat_message', 'chat_message_update', 'chat_message_delete', 'chat_reactions', 'chat_typing', 'chat_pins_update', 'chat_server_update', 'chat_server_removed', 'chat_roles_update', 'chat_perms_changed', 'chat_channels_update', 'chat_member_update', 'chat_presence', 'chat_members_stale', 'chat_emojis_update', 'chat_identity_update', 'chat_ack', 'chat_error', 'chat_ephemeral', 'chat_join_request', 'chat_join_result', 'chat_report', 'chat_timeout', 'chat_server_added', 'chat_starboard', 'chat_shop_update', 'chat_commands_update', 'chat_interaction_message', 'chat_interaction_modal', 'game_status', 'game_console', 'game_linked', 'game_unlinked', 'voice_sound', 'voice_sound_failed']);
 const INSTANCE_VOICE = /^(chat_rtc_|chat_voice_state$)/;
 export function handleEvent(m, inst = VELORA) {
   if (inst !== VELORA && !INSTANCE_EVENTS.has(m?.type) && !INSTANCE_VOICE.test(String(m?.type))) return;
@@ -339,6 +341,18 @@ function onEvent(m, inst = VELORA) {
       const key = `c:${m.channel}`;
       const b = state.msgs[key];
       if (b?.loaded) set(s => ({ msgs: { ...s.msgs, [key]: { ...b, list: [...b.list, { id: `eph${Date.now()}`, ephemeral: true, system: true, sys_kind: m.kind, body: m.body, amount: m.amount, created_at: Date.now() }] } } }));
+      break;
+    }
+    case 'chat_commands_update': loadCommands(m.server); break;
+    case 'chat_interaction_modal': set({ interactionModal: m }); break;
+    case 'chat_interaction_message': {
+      const msg = m.message;
+      set(s => ({ msgs: upd(s.msgs, `c:${msg.channel}`, b => {
+        if (!b?.loaded) return b;
+        if (m.op === 'delete') return { ...b, list: b.list.filter(x => x.id !== msg.id) };
+        if (b.list.some(x => x.id === msg.id)) return { ...b, list: b.list.map(x => (x.id === msg.id ? msg : x)) };
+        return { ...b, list: ordered([...b.list, msg]) };
+      }) }));
       break;
     }
     case 'chat_message_update':
@@ -455,6 +469,7 @@ function onEvent(m, inst = VELORA) {
       set(s => ({ detail: upd(s.detail, m.server, d => d && { ...d, roles: m.roles }) }));
       break;
     case 'chat_perms_changed': // someone changed my roles there
+      if (state.commands[m.server]) loadCommands(m.server);
       refreshServer(m.server); if (inst === VELORA) { loadServers(); loadMembers(m.server); } else loadInstanceData(inst); // (Manage users changes what the member list shows)
       break;
     case 'chat_members_stale':
@@ -462,13 +477,17 @@ function onEvent(m, inst = VELORA) {
       break;
     case 'chat_presence': // an instance bot went online / offline (only instances send this; Velora's own is a request). Matched by server (instance-namespaced) + principal id
       if (inst === VELORA || (m.presence !== 'online' && m.presence !== 'offline') || m.user_id == null) break;
-      set(s => ({ members: upd(s.members, m.server, list => (list ? list.map(x => (x.kind === 'bot' && String(x.id) === String(m.user_id) ? { ...x, presence: m.presence } : x)) : list)) }));
+      set(s => ({
+        members: upd(s.members, m.server, list => (list ? list.map(x => (x.kind === 'bot' && String(x.id) === String(m.user_id) ? { ...x, presence: m.presence } : x)) : list)),
+        commands: s.commands[m.server] ? { ...s.commands, [m.server]: { ...s.commands[m.server], bots: s.commands[m.server].bots.map(b => (String(b.id) === String(m.user_id) ? { ...b, online: m.presence === 'online' } : b)) } } : s.commands,
+      }));
       break;
     case 'chat_server_removed':
       set(s => ({ servers: s.servers.filter(x => x.sid !== m.server), detail: Object.fromEntries(Object.entries(s.detail).filter(([k]) => k !== m.server)) }));
       if (state.view.sid === m.server) { go({ kind: 'home' }); toast(m.reason === 'deleted' ? 'That server was deleted.' : m.reason === 'left' ? 'You left the server.' : `You were ${m.reason === 'banned' ? 'banned' : 'removed'} from that server.`); }
       break;
     case 'chat_member_update':
+      if (inst !== VELORA && state.commands[m.server] && String(m.user_id || '').startsWith('b:')) loadCommands(m.server);
       set(s => ({
         servers: s.servers.map(x => (x.sid === m.server ? { ...x, member_count: m.member_count } : x)),
         members: upd(s.members, m.server, list => {
@@ -1111,6 +1130,20 @@ export async function loadMembers(sid) {
   const pres = Object.fromEntries(d.members.map(m => [m.username, localizePresence(m.presence)]));
   set(s => ({ members: { ...s.members, [sid]: d.members }, presence: { ...s.presence, ...pres } }));
 }
+export async function loadCommands(sid, cid) {
+  if (!isInst(sid)) return;
+  const want = cid || state.commands[sid]?.cid || null;
+  const d = await apiFetch(`/chat/servers/${sid}/commands${want ? `?channel=${encodeURIComponent(bare(want))}` : ''}`).catch(() => null);
+  if (d) set(s => ({ commands: { ...s.commands, [sid]: { ...d, cid: want } } }));
+}
+export const sendInteraction = (sid, body) => {
+  return apiFetch(`/chat/servers/${sid}/interactions`, { method: 'POST', body: JSON.stringify({ ...body, channel: bare(body.channel) }) });
+};
+export function dismissEphemeral(view, m) {
+  set(s => ({ msgs: upd(s.msgs, keyOf(view), b => b && { ...b, list: b.list.filter(x => x.id !== m.id) }) }));
+  apiFetch(`/chat/servers/${view.sid}/interactions/messages/${m.id}`, { method: 'DELETE' }).catch(() => {});
+}
+export const closeInteractionModal = () => set({ interactionModal: null });
 // online / idle / dnd / offline for a member list row; null = this account has no presence (an instance's own accounts and bots, or signed out of Velora)
 // an instance bot's presence ('online' | 'offline', set by the instance from its bot gateway connections); null when the instance doesn't say
 export const botPresenceOf = m => (m?.kind === 'bot' && (m.presence === 'online' || m.presence === 'offline') ? m.presence : null);
@@ -1356,6 +1389,7 @@ export function errorText(code) {
     console_needs_bonfire: 'Commands can only be run from Ember itself.', bad_purpose: 'Pick what the channel is for.', not_linked: "That server isn't linked any more.", claim_not_found: 'That code is gone - get a new one.',
     plan_feature: "Not included in this server's plan - upgrade the plan or self-host to get it.", plan_limit: "This server's plan limit is reached - upgrade the plan or self-host for more.", member_cap_reached: "This server is full for its plan.", read_only: 'This server is read-only right now.',
     password_required: 'This server needs a password to join.', wrong_password: "That password isn't right.", invite_only: 'This server only lets people in with an invite link.', not_on_allowlist: "You're not on this server's list of people who can join.", server_full: 'This server is full.',
+    bot_offline: "That bot isn't online right now.", unknown_command: "That command isn't available here (any more).", unknown_component: "That button doesn't work any more.", unknown_interaction: 'That form expired - run the command again.',
     timed_out: "You're timed out here for now - try again later.", automod_blocked: "AutoMod blocked that message: it has a word this server doesn't allow.", slow_down: "You're sending messages too fast - wait a moment.",
     upload_rate_limited: "You're uploading too fast - wait a minute.", upload_quota: "You've stored as many files as this server lets each member keep. Delete some first.", file_type_not_allowed: "This server doesn't take that kind of file.", storage_full: "This server's storage is full.", image_too_large: 'That picture is too big to process.',
     instance_admin_only: 'Only the instance admins can change that setting.', join_password_required: 'Set a password first.', invalid_join_password: 'Passwords are 4-200 characters.', cannot_report_yourself: "You can't report yourself.", nothing_to_report: 'Pick a message or a member to report.', report_not_found: "That report doesn't exist any more.",
