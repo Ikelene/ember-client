@@ -7,9 +7,9 @@
 // Developer mode (Chat settings) adds "Copy ... ID" items at the bottom (dev: true).
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronRight, Check, Hash, Copy, Link2, BellOff, Bell, CheckCheck, UserPlus, Settings, LogOut, Pencil, Trash2, Reply, User, MessageCircle, ExternalLink, Image as ImageIcon, Code2, Forward, Pin, Download, SmilePlus, BookmarkPlus, RefreshCw, LogIn, ShieldCheck, BellRing, Flag } from 'lucide-react';
+import { ChevronRight, Check, Hash, Copy, Link2, BellOff, Bell, CheckCheck, UserPlus, Settings, LogOut, Pencil, Trash2, Reply, User, MessageCircle, ExternalLink, Image as ImageIcon, Code2, Forward, Pin, Download, SmilePlus, BookmarkPlus, RefreshCw, LogIn, ShieldCheck, BellRing, Flag, Ban } from 'lucide-react';
 import { apiFetch } from '../api.js';
-import { useChat, getState, setMenu, toast, setNotify, notifyOf, go, markServerRead, markChannelRead, linkFor, isMineMsg } from './store.js';
+import { useChat, getState, setMenu, toggleBlock, toast, setNotify, notifyOf, go, markServerRead, markChannelRead, linkFor, isMineMsg } from './store.js';
 import { bare, instOpt, isInst } from './ids.js';
 import { reportTo } from './report.js';
 import { setInstancePrefs } from './instances.js';
@@ -257,6 +257,7 @@ export function userMenu(e, username, { onProfile, sid, extra = [] } = {}) {
   const member = sid ? st.members[sid]?.find(x => x.username === username) : null;
   const friend = st.friends.some(f => f.friend_username === username);
   const uid = member?.id || st.people[username]?.id;
+  const blocked = !!st.blocks?.some(b => b.username === username);
   const local = !!member?.kind && member.kind !== 'velora'; // an account that only exists on a self-hosted instance (a person or a bot): no Velora profile, DM or friend request
   openMenu(e, [
     onProfile && { label: 'Profile', icon: User, onClick: onProfile },
@@ -267,6 +268,7 @@ export function userMenu(e, username, { onProfile, sid, extra = [] } = {}) {
     ...roleMenuItems(sid, username),
     ...modMenuItems(sid, username),
     sid && isInst(sid) && !isMe && member && !member.bot && { label: 'Report', icon: Flag, danger: true, onClick: () => reportTo(sid, { user_id: member.id }, `@${username}`, { target: member }) },
+    !isMe && !local && username !== 'System' && { label: blocked ? 'Unblock' : 'Block', icon: Ban, danger: !blocked, onClick: () => toggleBlock(username, blocked) },
     ...extra,
     'sep',
     { label: 'Copy account ID', icon: Code2, dev: true, disabled: !uid, hint: uid ? '' : 'Open their profile first', onClick: () => copy(uid, 'Account ID copied') },

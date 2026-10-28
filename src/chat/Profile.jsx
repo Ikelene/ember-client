@@ -2,10 +2,10 @@
 // profile editor's preview) and the large profile it expands into.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { MessageCircle, Maximize2, X, UserPlus, Check, Clock, ExternalLink, Globe, Gamepad2, Music, Tv, Trophy, Radio, MoreHorizontal, Pencil, ShieldCheck, Crown, UserMinus, Link as LinkIcon } from 'lucide-react';
+import { MessageCircle, Maximize2, X, UserPlus, Check, Clock, ExternalLink, Globe, Gamepad2, Music, Tv, Trophy, Radio, MoreHorizontal, Pencil, ShieldCheck, Crown, UserMinus, Ban, Link as LinkIcon } from 'lucide-react';
 import { apiFetch, getToken } from '../api.js';
 import { BotTag, AddBotButton, TrustedIn } from './Bots.jsx';
-import { useChat, lookup, go, wantPresence, toast, errorText, getState, setCustom, ask, loadFriends, memberRef, faceOf, botPresenceOf, loadMembers } from './store.js';
+import { useChat, lookup, go, wantPresence, toast, errorText, getState, setCustom, ask, loadFriends, toggleBlock, memberRef, faceOf, botPresenceOf, loadMembers } from './store.js';
 import { isInst } from './ids.js';
 import { ServerIcon } from './ServerIcon.jsx';
 // your own profile's "Edit profile": Ember's settings, Profile page (Chat.jsx listens for vc-dialog)
@@ -419,6 +419,8 @@ export function ProfileModal({ username: shown, from, sid, who, onClose }) {
   }
   // already friends: the Friends button turns red on hover ("Remove friend"), asks, then unfriends
   const [removing, setRemoving] = useState(false);
+  const blocks = useChat(s => s.blocks);
+  const blocked = blocks ? blocks.some(b => b.username === username) : !!extra?.blocked_by_me;
   async function removeFriend() {
     if (!(await ask({ title: `Remove ${username} as a friend?`, text: "They won't be told. You can send them a friend request again later.", confirm: 'Remove friend', danger: true }))) return;
     setRemoving(true);
@@ -454,6 +456,7 @@ export function ProfileModal({ username: shown, from, sid, who, onClose }) {
             {!isMe && friend === 'pending_outgoing' && <span className="vc-chip">Request sent</span>}
             {!isMe && friend === 'pending_incoming' && <a className="btn btn-surface" href="/me#people">Answer their request</a>}
             {!isMe && friend === 'friends' && <button type="button" className="btn btn-surface vc-friend-btn" onClick={removeFriend} disabled={removing} aria-label={`Remove ${username} as a friend`}><span className="is"><Check size={14} /> Friends</span><span className="rm"><UserMinus size={14} /> Remove friend</span></button>}
+            {!isMe && !extra?.bot && getToken() && <button type="button" className="btn btn-surface" onClick={() => toggleBlock(username, blocked)}><Ban size={14} /> {blocked ? 'Unblock' : 'Block'}</button>}
             {isMe && <button type="button" className="btn btn-surface" onClick={() => { close(); openProfileEditor(); }}><Pencil size={15} /> Edit profile</button>}
             <a className="btn btn-surface" href={`/u/${encodeURIComponent(username)}`} target="_blank" rel="noopener"><ExternalLink size={15} /> Profile page</a>
           </div>

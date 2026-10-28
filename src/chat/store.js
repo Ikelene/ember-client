@@ -32,6 +32,7 @@ let state = {
   dms: [],                 // IM conversations
   groups: [],              // group chats
   friends: [],
+  blocks: null, // people I blocked ({username, ...}); null until loaded
   unread: {},              // key -> true
   modmail: { messages: [], unread: 0 }, // Velora Moderator Chat (to me)
   staff: false,            // Velora owner / admin: can write as Velora Administrator
@@ -531,6 +532,7 @@ function onEvent(m, inst = VELORA) {
     case 'group_update': case 'group_removed': loadGroups(); break;
     case 'chat_pins_update': set(s => ({ pinsVersion: { ...s.pinsVersion, [m.channel]: (s.pinsVersion[m.channel] || 0) + 1 } })); break;
     case 'friend_request': case 'friend_request_accepted': loadFriends(); break;
+    case 'blocks_changed': loadBlocks(); break; // I blocked / unblocked someone (here or on another device)
     case 'kicked': if (isWebBonfire()) authLost(); else location.href = '/login'; break;
     default: break;
   }
@@ -1193,6 +1195,24 @@ export async function loadFriends() {
   set({ friends: d.friends });
   d.friends.forEach(f => wantPresence(f.friend_username));
 }
+export async function loadBlocks() {
+  const d = await apiFetch('/account/blocks').catch(() => null);
+  if (d?.blocks) set({ blocks: d.blocks });
+}
+// Block / unblock a Velora account, asking first; returns true when it went through
+export async function toggleBlock(username, blocked) {
+  const ok = await ask(blocked
+    ? { title: `Unblock ${username}?`, text: 'They will be able to message you, send you credits and send friend requests again.', confirm: 'Unblock' }
+    : { title: `Block ${username}?`, text: "They won't be able to message you, call you, send you credits or friend requests, and your profile will look missing to them. They aren't told.", confirm: 'Block', danger: true });
+  if (!ok) return false;
+  try {
+    await apiFetch(blocked ? `/account/blocks/${encodeURIComponent(username)}` : '/account/blocks', blocked ? { method: 'DELETE' } : { method: 'POST', body: JSON.stringify({ username }) });
+    await loadBlocks();
+    if (!blocked) loadFriends();
+    toast(blocked ? `Unblocked ${username}.` : `Blocked ${username}.`, true);
+    return true;
+  } catch (e) { toast(errorText(e.message)); return false; }
+}
 
 // ── where you are (also in the address: /chat#/s/<sid>/<cid>, #/dm/<name>, #/g/<room>) ──
 // #/s/<sid>/<cid> for Velora's own servers, #/i/<instance>/s/<sid>/<cid> and #/i/<instance>/invite/<code> for instances
@@ -1371,6 +1391,7 @@ export function clearStatusReply() { if (state.statusReplyDraft) set({ statusRep
 export function errorText(code) {
   if (code === 'server_creation_paused') return `${serverCreationPolicy.title}. ${serverCreationPolicy.notice.join(' ')}`;
   return ({
+    user_blocked: "You can't do that with this person - one of you has blocked the other.", cannot_block_self: "You can't block yourself.", cannot_block_staff: "Velora staff can't be blocked.",
     channel_locked: 'Only admins can post in this channel.', channel_full: 'That voice channel is full.', not_in_server: "They're not in this server.", voice_not_connected: 'Voice is not connected.', need_a_category: 'Every channel has to be in a category.', category_required: 'Pick a category for the channel.', insufficient_balance: "You don't have enough credits for that.", price_changed: 'The price just changed - have another look.', shop_admin_role: "Roles with Administrator can't go in a shop.", bad_link: "That link doesn't look right (it needs https://).", no_webhooks_here: 'Webhooks only work in text and logs channels.', too_many_webhooks: 'A server can have up to 30 webhooks.', not_a_shop: "That channel isn't a roles shop.", purchase_failed: "That didn't go through - you weren't charged.", webhook_not_found: "That webhook doesn't exist any more.", rate_limited: 'Slow down a little!', not_a_member: "You're not in that server.",
     too_many_servers: "You've made as many servers as you can.", too_many_joined: "You're in too many servers.", invalid_invite: "That invite doesn't work.",
     invite_required: 'That server needs an invite.', banned_from_server: "You're banned from that server.", owner_cannot_leave: "You own this server - delete it instead of leaving.",
@@ -1448,7 +1469,7 @@ export function init(me) {
   window.bonfireDesktop?.isFocused?.().then(v => { desktopFocused = !!v; }).catch(() => {});
   window.bonfireDesktop?.onWindowFocus?.(v => { desktopFocused = v; if (v) markViewRead(); });
   startInstances();
-  if (me) { loadServers(); setupSigning(); loadDMs(); loadGroups(); loadFriends(); loadModmail(); loadMedia(); }
+  if (me) { loadServers(); setupSigning(); loadDMs(); loadGroups(); loadFriends(); loadBlocks(); loadModmail(); loadMedia(); }
   try { if (me && Notification.permission === 'default') setTimeout(() => Notification.requestPermission().catch(() => {}), 8000); } catch { /* fine */ }
   window.addEventListener('popstate', () => open(readHash()));
   const markFocusedViewRead = () => {
