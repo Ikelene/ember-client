@@ -41,7 +41,7 @@ import { takeJump, fileKind, uploadMedia, saveToMedia, isMineMsg, loadUploadLimi
 import { useStarboardFor, starredByMe, STAR } from './Starboard.jsx';
 import { CALL_LINE, callLineText } from './callText.js';
 import { setReaction } from './Reactions.jsx';
-import { getState, useChat, keyOf, loadMessages, sendMessage, setTyping, editMessage, deleteMessage, dropFailed, toast, errorText, go, openLink, ask, askStripTracking } from './store.js';
+import { getState, useChat, keyOf, loadMessages, sendMessage, setTyping, editMessage, deleteMessage, dropFailed, toast, errorText, dmErrorText, go, openLink, ask, askStripTracking } from './store.js';
 import { cleanText, hasTracking } from './cleanLinks.js';
 import { isSpoiler, spoilerName, shownName, nameInLink } from './spoiler.js';
 import { renderBody, timeOf, stampOf, dayOf } from './text.jsx';
@@ -420,7 +420,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
         <MessageComponents m={m} view={view} />
         {m.ephemeral && <EphemeralNote m={m} view={view} />}
         {m.failed && (
-          <div className="vc-fail"><AlertCircle size={13} /> {errorText(m.failed)}
+          <div className="vc-fail"><AlertCircle size={13} /> {view.kind === 'dm' ? dmErrorText(m.failed) : errorText(m.failed)}
             <button type="button" onClick={() => { dropFailed(view, m.nonce); sendMessage(view, m.body, m.uploads ? { replyTo: m.replyTo, attachments: m.ready, uploads: m.uploads } : { replyTo: m.reply, attachments: m.attachments }); }}>Try again</button>
             <button type="button" onClick={() => dropFailed(view, m.nonce)}>Remove</button>
           </div>
