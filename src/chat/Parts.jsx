@@ -12,14 +12,14 @@ import {
 
 import { RetryIn } from './Gate.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
-import { useChat, retryNow, isMobileDevice, go, keyOf, setStatus, setCustom, isMuted, effectiveNotify, ask, refreshServer, toast, errorText, setDetailLayout, patchState, saveSettings, getState, statusOf, presenceFor, useFace } from './store.js';
+import { useChat, retryNow, isMobileDevice, go, keyOf, setStatus, setCustom, isMuted, effectiveNotify, ask, refreshServer, toast, errorText, setDetailLayout, patchState, saveSettings, getState, statusOf, presenceFor, useFace, isBlockedPerson, isBlockedName, blockedFace, BLOCKED_NAME } from './store.js';
 import { P, has, ChannelIcon, useNameStyle, colorFrom, NameDecor } from './roles.jsx';
 import { serverMenu, instanceMenu, channelMenu, userMenu, openMenu, copy } from './Menu.jsx';
 import { apiFetch, getToken } from '../api.js';
 import { VELORA, instOf, isInst } from './ids.js';
 import { removeInstance, reorderInstances, reconnect as reconnectInstance } from './instances.js';
 import { startSignIn } from './session.js';
-import { Avatar, subtitle, RoleChip, STATUS_LABEL } from './Profile.jsx';
+import { Avatar, subtitle, RoleChip, STATUS_LABEL, BlockedMark } from './Profile.jsx';
 import { MePopout } from './ProfilePopout.jsx';
 import Logo from '../components/Logo.jsx';
 
@@ -29,12 +29,16 @@ export function typersOf(typing, key) {
   return Object.entries(typing[key] || {}).filter(([, until]) => until > now).map(([n]) => n);
 }
 // little pictures of whoever's typing + the bouncing squares (channel / DM rows)
-function TypingMark({ names, people }) {
+// (sid: a server channel - somebody I blocked there is "Blocked User" with the default picture)
+function TypingMark({ names, people, sid }) {
   const show = useChat(s => s.settings.show_typing);
+  const blocked = useChat(s => (sid ? names.filter(n => isBlockedName(sid, n, s)).join('\n') : ''));
   if (!names.length || !show) return null;
+  const masked = n => !!blocked && blocked.split('\n').includes(n);
+  const shown = names.map(n => (masked(n) ? BLOCKED_NAME : n));
   return (
-    <span className="vc-ch-typing" title={`${names.join(', ')} ${names.length === 1 ? 'is' : 'are'} typing`}>
-      <span className="vc-ch-typing-avs">{names.slice(0, 3).map(u => <Avatar key={u} user={{ username: u, pfp: people[u]?.pfp }} size={16} />)}</span>
+    <span className="vc-ch-typing" title={`${shown.join(', ')} ${names.length === 1 ? 'is' : 'are'} typing`}>
+      <span className="vc-ch-typing-avs">{names.slice(0, 3).map(u => <Avatar key={u} user={masked(u) ? { username: BLOCKED_NAME, pfp: null } : { username: u, pfp: people[u]?.pfp }} size={16} />)}</span>
       <span className="vc-dots"><i /><i /><i /></span>
     </span>
   );
@@ -414,11 +418,11 @@ export function ServerSidebar({ sid, onInvite, onSettings, onChannel, onLeave, o
                     <button type="button" className="vc-ch-btn" onClick={() => { if (c.type === 'link') { openLinkChannel(c); return; } if (c.type === 'voice') joinVoice(`bf_${c.cid}`, { kind: 'channel', sid, cid: c.cid }); go({ kind: 'channel', sid, cid: c.cid }); }} title={c.type === 'link' ? c.config?.url : (c.topic || c.name)}>
                       <ChannelIcon c={c} /> <span>{c.name}</span>{c.type === 'game' && !c.config?.setup && <i className="vc-game-setup-dot" title="Needs setup (only admins see it)" />}
                     </button>
-                    {!on && <TypingMark names={typersOf(typing, `c:${c.cid}`)} people={people} />}
+                    {!on && <TypingMark names={typersOf(typing, `c:${c.cid}`)} people={people} sid={sid} />}
                     {pings > 0 && !muted && <span className="vc-ping" key={pings}>{pings > 99 ? '99+' : pings}</span>}
                     {canChannels && <button type="button" className="vc-ch-gear" title="Edit channel" onClick={() => onChannel(c)}><Settings size={13} /></button>}
                   </div>
-                  {c.type === 'voice' && <VoiceChannelUsers cid={c.cid} onUser={onUser && ((name, el) => onUser(name, el, 'left', isInst(sid) ? getState().members[sid]?.find(x => x.username === name) : undefined))} />}
+                  {c.type === 'voice' && <VoiceChannelUsers cid={c.cid} sid={sid} onUser={onUser && ((name, el) => onUser(name, el, 'left', isInst(sid) ? getState().members[sid]?.find(x => x.username === name) : undefined))} />}
                   </Fragment>
                 );
               })}
@@ -538,6 +542,7 @@ export function MemberList({ sid, onUser }) {
   const signedIn = useChat(s => s.signedIn);
   const [shown, setShown] = useState(60);
   const roles = useChat(s => s.detail[sid]?.roles);
+  const blocks = useChat(s => s.blocks); // people I blocked: masked below
   const groups = useMemo(() => {
     if (!members) return [];
     const st = m => statusOf(sid, m) || 'offline';
@@ -568,13 +573,14 @@ export function MemberList({ sid, onUser }) {
             n++;
             if (title === 'Offline' && n > shown) return null;
             const p = presenceFor(sid, m);
-            const sub = subtitle(p);
+            const blocked = !!blocks?.length && isBlockedPerson(m, isInst(sid) ? instOf(sid) : VELORA); // somebody I blocked: no name, picture or status line
+            const sub = blocked ? null : subtitle(p);
             return (
               <button type="button" key={m.username} className={`vc-member vl-rise${p?.status === 'offline' ? ' off' : ''}`} style={{ '--i': Math.min(n, 14) }} onClick={e => onUser(m.username, e.currentTarget, 'left', isInst(sid) ? m : undefined)}
                 onContextMenu={e => { const el = e.currentTarget; userMenu(e, m.username, { sid, onProfile: () => onUser(m.username, el, 'left', isInst(sid) ? m : undefined) }); }}>
-                <MemberAvatar m={m} status={statusOf(sid, m) || undefined} ghost={!!p?.invisible} />
+                <MemberAvatar m={m} status={statusOf(sid, m) || undefined} ghost={!!p?.invisible} blocked={blocked} />
                 <span className="vc-member-txt">
-                  <MemberName sid={sid} m={m} />
+                  {blocked ? <b className="vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={12} /></b> : <MemberName sid={sid} m={m} />}
                   {sub && <small>{sub}</small>}
                 </span>
               </button>
@@ -720,7 +726,7 @@ function CustomStatus({ current, onClose }) {
 }
 
 // a member list name: their colour (accent or role), role icon, owner crown
-function MemberAvatar({ m, status, ghost }) { return <Avatar user={useFace(m)} size={34} status={status} ghost={ghost} />; }
+function MemberAvatar({ m, status, ghost, blocked }) { const f = useFace(m); return <Avatar user={blocked ? blockedFace(f) : f} size={34} status={status} ghost={ghost} />; }
 function MemberName({ sid, m: raw }) {
   const m = useFace(raw);
   const key = useNameStyle(sid, m);

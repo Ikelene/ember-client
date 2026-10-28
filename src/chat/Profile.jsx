@@ -87,6 +87,10 @@ export function Avatar({ user, size = 32, status, className = '', ghost: ghostPr
     </span>
   );
 }
+// next to "Blocked User" in a server: you blocked this person (only you see it)
+export function BlockedMark({ size = 13 }) {
+  return <span className="vc-blocked-mark" title="You blocked this person" aria-label="Blocked by you"><Ban size={size} /></span>;
+}
 // "Playing Hyperfocus", or their custom status
 export function subtitle(p) {
   const a = p?.activities?.[0];

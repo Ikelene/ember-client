@@ -1199,6 +1199,42 @@ export async function loadBlocks() {
   const d = await apiFetch('/account/blocks').catch(() => null);
   if (d?.blocks) set({ blocks: d.blocks });
 }
+// the people I blocked as { ids, names } (names lowercased), built once per loaded list. Velora gives their ids (older servers only names).
+const blockSetCache = new WeakMap();
+function blockSets(list) {
+  let b = blockSetCache.get(list);
+  if (!b) {
+    b = { ids: new Set(list.filter(x => x.id != null).map(x => String(x.id))), names: new Set(list.map(x => String(x.username || '').toLowerCase())) };
+    blockSetCache.set(list, b);
+  }
+  return b;
+}
+// Is this person (a message / reply author, a member) somebody I blocked? Only for people I blocked, never the other way round.
+// inst: the instance the person is shown on (falsy / VELORA = Velora's own servers). On an instance only its Velora people count,
+// by their Velora id (a local account or bot there with the same name is somebody else). Webhooks / bridged names never count.
+export function isBlockedPerson(u, inst, s = state) {
+  if (!u || !s.blocks?.length || u.webhook || u.bridge) return false;
+  const b = blockSets(s.blocks);
+  if (inst && inst !== VELORA) {
+    if (u.kind !== 'velora' || !u.velora_id) return false;
+    const vid = String(u.velora_id);
+    return b.ids.has(vid) || b.names.has(String(s.veloraNames[vid] || '').toLowerCase());
+  }
+  if (u.id != null && b.ids.size) return b.ids.has(String(u.id));
+  return b.names.has(String(u.username || '').toLowerCase());
+}
+// the same for a bare name in a server (typing, @mentions): looked up among that server's members, so an instance's names work
+export function isBlockedName(sid, username, s = state) {
+  if (!username || !s.blocks?.length) return false;
+  const inst = sid && isInst(sid) ? instOf(sid) : VELORA;
+  const m = sid ? s.members[sid]?.find(x => x.username === username) : null;
+  if (m) return isBlockedPerson(m, inst, s);
+  return inst === VELORA && blockSets(s.blocks).names.has(String(username).toLowerCase());
+}
+export const useBlocked = (u, inst) => useChat(s => isBlockedPerson(u, inst, s));
+// how somebody I blocked is shown in a server: no name, no picture (the default letter one), no colour
+export const BLOCKED_NAME = 'Blocked User';
+export const blockedFace = u => ({ ...u, username: BLOCKED_NAME, pfp: null, pfp_url: null, color: null });
 // Block / unblock a Velora account, asking first; returns true when it went through
 export async function toggleBlock(username, blocked) {
   const ok = await ask(blocked

@@ -2160,3 +2160,12 @@ html.bf-mobile #bf-sheet-scrim { display: none !important; }
 .vc-upload-track { height: 4px; overflow: hidden; background: rgba(255, 255, 255, .08); }
 .vc-upload-track span { display: block; height: 100%; background: var(--accent); transition: width .15s linear; }
 .vc-stb-pic.spoiler img { filter: blur(30px); }
+
+/* somebody I blocked, in a server: "Blocked User" + the ban mark, and their messages under a cover until clicked (only for me) */
+.vc-blocked-name { display: inline-flex; align-items: center; gap: 4px; color: var(--dim) !important; font-style: italic; }
+.vc-blocked-mark { display: inline-flex; align-items: center; margin-left: 4px; color: #e07a7a; vertical-align: middle; }
+.vc-blocked-name .vc-blocked-mark { margin-left: 0; }
+.vc-blocked-quote { font-style: italic; }
+.vc-blocked-cover { display: block; width: fit-content; max-width: 100%; margin: 2px 0; padding: 6px 12px; background: #2c2c33; border: 0; color: var(--dim); font: inherit; font-size: 13px; cursor: pointer; }
+.vc-blocked-cover:hover { background: #34343c; color: var(--text); }
+.vc-mention.blocked { background: rgba(255, 255, 255, .07); color: var(--dim); font-style: italic; }

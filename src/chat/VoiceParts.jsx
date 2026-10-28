@@ -3,8 +3,8 @@
 // the mic (input), deafen (output + soundboard) and camera buttons. Speaking rings: data-vlevel (levels.js).
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Mic, MicOff, Headphones, HeadphoneOff, PhoneOff, Phone, PhoneIncoming, UserPlus, Volume2, Search, AudioLines, Video, VideoOff, MonitorUp, MonitorOff, MonitorPlay, Eye, Maximize2, X } from 'lucide-react';
-import { useChat, getState, go, syncRing } from './store.js';
-import { Avatar } from './Profile.jsx';
+import { useChat, getState, go, syncRing, isBlockedName, BLOCKED_NAME } from './store.js';
+import { Avatar, BlockedMark } from './Profile.jsx';
 import { joinVoice, leaveVoice, setMute, setDeafen, answer, callDm, callInto, cancelCall, prefs, setPrefs, toggleCamera, toggleScreen, desktopScreenSources, canSelectOutput, watchStream, unwatchStream, refreshDevices, knownDevices, micMeter, micProcessing, sensLabel } from './voice.js';
 import { levelKey } from './levels.js';
 import { openMenu } from './Menu.jsx';
@@ -14,6 +14,9 @@ import { SoundboardButton } from './Soundboard.jsx';
 const roomOf = cid => `bf_${cid}`;
 // your own picture comes from `me` (nothing puts you in `people` until a message of yours is seen, e.g. right after a reload);
 // the components below subscribe to `people` so a picture that arrives late still shows
+// in a server's voice channel, somebody I blocked shows as "Blocked User" with the default picture (sid null = a DM call: as is)
+const maskedIn = (sid, name) => !!sid && isBlockedName(sid, name);
+const faceIn = (sid, name) => (maskedIn(sid, name) ? { username: BLOCKED_NAME, pfp: null } : { username: name, pfp: pfpOf(name) });
 const pfpOf = name => { const s = getState(); return s.people[name]?.pfp || (s.me?.username === name ? s.me.pfp : null) || null; };
 
 // ── voice control menus ──
@@ -103,8 +106,9 @@ function CameraBtn({ v, big }) {
 }
 
 // under a voice channel in the list: the people in it (speaking ring = how loud they are, while you're in a call)
-export function VoiceChannelUsers({ cid, onUser }) {
+export function VoiceChannelUsers({ cid, sid, onUser }) {
   useChat(s => s.people);
+  useChat(s => s.blocks);
   const users = useChat(s => s.voiceStates[cid]);
   if (!users?.length) return null;
   return (
@@ -113,8 +117,8 @@ export function VoiceChannelUsers({ cid, onUser }) {
         return (
           <div key={u.username} className={`vc-vuser${onUser ? ' clickable' : ''}`} role={onUser ? 'button' : undefined} tabIndex={onUser ? 0 : undefined}
             onClick={onUser ? e => onUser(u.username, e.currentTarget) : undefined} onKeyDown={onUser ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onUser(u.username, e.currentTarget); } } : undefined}>
-            <span className="vc-vuser-av vc-vlvl" data-vlevel={levelKey(u.username)}><Avatar user={{ username: u.username, pfp: pfpOf(u.username) }} size={20} /></span>
-            <span className="vc-vuser-name">{u.username}</span>
+            <span className="vc-vuser-av vc-vlvl" data-vlevel={levelKey(u.username)}><Avatar user={faceIn(sid, u.username)} size={20} /></span>
+            {maskedIn(sid, u.username) ? <span className="vc-vuser-name vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={11} /></span> : <span className="vc-vuser-name">{u.username}</span>}
             {u.deafened ? <HeadphoneOff size={13} /> : u.muted ? <MicOff size={13} /> : null}
           </div>
         );
@@ -244,8 +248,9 @@ function StreamViewers({ watchers, mine, names }) {
 
 // Discord-style stage: people as tiles, each screen share is its own "click to watch" card.
 // Watching one pops it into a big focus area with everybody else in a strip below.
-function CallStage({ v, tiles, compact }) {
+function CallStage({ v, tiles, compact, sid }) {
   useChat(s => s.people);
+  useChat(s => s.blocks);
   const flash = useChat(s => s.boardFlash);
   const p = useChat(s => s.voicePrefs);
   const [focused, setFocused] = useState(null);
@@ -278,7 +283,7 @@ function CallStage({ v, tiles, compact }) {
       return (
         <div key={`s${e.userId}`} className="vc-vtile vc-stream-thumb" onClick={() => setFocused(e.userId)} role="button" tabIndex={0}>
           {e.stream ? <Vid stream={e.stream} muted /> : <span className="vc-stream-wait">Connecting...</span>}
-          <b className="vc-vtile-name"><MonitorPlay size={12} /> {e.mine ? 'Your stream' : `${e.name}'s stream`}</b>
+          <b className="vc-vtile-name"><MonitorPlay size={12} /> {e.mine ? 'Your stream' : `${maskedIn(sid, e.name) ? BLOCKED_NAME : e.name}'s stream`}</b>
         </div>
       );
     }
@@ -299,8 +304,8 @@ function CallStage({ v, tiles, compact }) {
     return (
       <button key={`s${e.userId}`} type="button" className="vc-vtile vc-stream-card" onClick={() => { watchStream(e.userId); setFocused(e.userId); }}>
         <span className="vc-stream-live">LIVE</span>
-        <Avatar user={{ username: e.name, pfp: pfpOf(e.name) }} size={compact ? 44 : 60} />
-        <b>{e.name}'s stream</b>
+        <Avatar user={faceIn(sid, e.name)} size={compact ? 44 : 60} />
+        <b>{maskedIn(sid, e.name) ? BLOCKED_NAME : e.name}'s stream</b>
         <span className="vc-stream-cta"><MonitorPlay size={15} /> Click to watch</span>
         <StreamViewers watchers={e.watchers} />
       </button>
@@ -312,11 +317,11 @@ function CallStage({ v, tiles, compact }) {
     return (
       <div key={t.name} className={`vc-vtile${cam ? ' vc-video vc-vlvl' : ''}${flash && flash.by === t.name ? ' sb-flash' : ''}`} data-vlevel={cam && v ? levelKey(t.name) : undefined}>
         {flash && flash.by === t.name && <span className="vc-vtile-sound" key={flash.at}><AudioLines size={12} /><span>{flash.name}</span></span>}
-        {cam ? <Vid stream={cam.stream} muted={!!cam.mine} /> : <span className="vc-vlvl-av vc-vlvl" data-vlevel={v ? levelKey(t.name) : undefined}><Avatar user={{ username: t.name, pfp: pfpOf(t.name) }} size={compact ? 48 : 72} /></span>}
-        <b className="vc-vtile-name">{t.name}{t.me ? ' (you)' : ''}</b>
+        {cam ? <Vid stream={cam.stream} muted={!!cam.mine} /> : <span className="vc-vlvl-av vc-vlvl" data-vlevel={v ? levelKey(t.name) : undefined}><Avatar user={t.me ? { username: t.name, pfp: pfpOf(t.name) } : faceIn(sid, t.name)} size={compact ? 48 : 72} /></span>}
+        {!t.me && maskedIn(sid, t.name) ? <b className="vc-vtile-name vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={12} /></b> : <b className="vc-vtile-name">{t.name}{t.me ? ' (you)' : ''}</b>}
         <span className="vc-vtile-state">{t.deafened ? <HeadphoneOff size={15} /> : t.muted ? <MicOff size={15} /> : null}</span>
         {v && !t.me && (
-          <label className="vc-vtile-vol" title={`${t.name}'s volume`}>
+          <label className="vc-vtile-vol" title={`${maskedIn(sid, t.name) ? BLOCKED_NAME : t.name}'s volume`}>
             <Volume2 size={13} />
             <input type="range" min={0} max={200} value={vols[t.name] ?? 100} onChange={ev => setPrefs({ volumes: { ...vols, [t.name]: Number(ev.target.value) } })} />
           </label>
@@ -359,7 +364,7 @@ export function VoiceView({ channel, sid }) {
     : (others || []).map(u => ({ name: u.username, muted: u.muted, deafened: u.deafened })));
   return (
     <div className="vc-voiceview">
-      <CallStage v={v} tiles={tiles} />
+      <CallStage v={v} tiles={tiles} sid={sid} />
       <div className="vc-vview-foot">
         {v ? (
           <>

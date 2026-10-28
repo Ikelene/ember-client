@@ -106,7 +106,8 @@ const RULES = [
   [URL_RE, (m, ctx, k) => <a key={k} href={m[0]} target="_blank" rel="noopener noreferrer nofollow" onClick={e => { if (inAppLink(m[0], ctx, e.currentTarget)) e.preventDefault(); }}>{m[0]}</a>],
   [/(?:^|(?<=[\s(]))@([A-Za-z0-9_.-]{2,32})/, (m, ctx, k) => {
     const me = ctx?.me && m[1].toLowerCase() === ctx.me.toLowerCase();
-    return <button type="button" key={k} className={`vc-mention${me ? ' me' : ''}`} onClick={e => ctx?.onUser?.(m[1], e.currentTarget)}>@{m[1]}</button>;
+    const blocked = !me && !!ctx?.isBlocked?.(m[1]); // somebody I blocked, in a server: no name
+    return <button type="button" key={k} className={`vc-mention${me ? ' me' : ''}${blocked ? ' blocked' : ''}`} onClick={e => ctx?.onUser?.(m[1], e.currentTarget)}>@{blocked ? 'Blocked User' : m[1]}</button>;
   }],
   [/(?:^|(?<=[\s(]))#([a-z0-9_-]{1,40})/, (m, ctx, k) => {
     const c = ctx?.channels?.find(x => x.name === m[1]);
