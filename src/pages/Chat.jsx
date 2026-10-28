@@ -25,6 +25,7 @@ import { EmojiInfoHost } from '../chat/EmojiInfo.jsx';
 import { ReactionPickerHost } from '../chat/Reactions.jsx';
 import { UpdatePopup } from '../chat/UpdatePopup.jsx';
 import { MobileAppPromo } from '../chat/MobileAppPromo.jsx';
+import { AccountNotices } from '../chat/AccountNotices.jsx';
 import RockEgg from '../chat/RockEgg.jsx';
 import { PermissionPrompts } from '../chat/Permissions.jsx';
 import { RadioHost } from '../chat/Radio.jsx';
@@ -625,6 +626,7 @@ function ChatPage() {
       <RpcWarning />
       <UpdatePopup />
       <MobileAppPromo />
+      {signedIn && <AccountNotices onOpenSettings={page => setDialog({ kind: 'chat-settings', page })} />}
       <RockEgg enabled={!!settings.rock_easter_egg} />
       <PermissionPrompts />
       <DesktopTitle />

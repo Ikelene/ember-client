@@ -1855,6 +1855,12 @@ html.vc-radio .vc-main { background: transparent; }
 .vc-app-promo-logo { display: block; margin: 0 auto 14px; width: 72px; height: 72px; object-fit: cover; }
 .vc-app-promo .vc-dialog-btns { justify-content: center; }
 .vc-app-promo-note { z-index: 2200; }
+/* one-time account notices (AccountNotices.jsx) */
+.vc-notice h3 { display: flex; align-items: center; gap: 8px; }
+.vc-notice h3 svg { flex: none; color: var(--accent); }
+.vc-notice-list { display: grid; gap: 10px; margin: 12px 0 0; padding: 0; list-style: none; }
+.vc-notice-list li { display: flex; align-items: flex-start; gap: 10px; color: var(--dim); font-size: 13.5px; line-height: 1.5; }
+.vc-notice-list li svg { flex: none; margin-top: 2px; color: var(--muted); }
 /* controls whose permission this login lacks: greyed, still clickable (shows the prompt) */
 .vc-scope-locked { opacity: .45; filter: grayscale(.6); cursor: not-allowed; }
 .vc-scope-locked:hover { filter: grayscale(.6); }
