@@ -258,3 +258,5 @@ button.bf-sr-tile:hover { border-color: var(--border-2); }
 .vc-role-menu .vc-role-ico { width: 14px; height: 14px; object-fit: contain; }
 .bf-la-form { flex: 1 1 100%; flex-wrap: wrap; }
 .bf-la-form .form-input { flex: 1 1 160px; }
+/* the Help links (Report a bug / Get support): open outside, so a small arrow instead of the chevron */
+.bf-sd-group > button .bf-sd-ext { margin-left: auto; color: var(--muted); }
