@@ -12,7 +12,9 @@ import { Dialog } from './Dialogs.jsx';
 import { SoundboardButton } from './Soundboard.jsx';
 
 const roomOf = cid => `bf_${cid}`;
-const pfpOf = name => getState().people[name]?.pfp || null;
+// your own picture comes from `me` (nothing puts you in `people` until a message of yours is seen, e.g. right after a reload);
+// the components below subscribe to `people` so a picture that arrives late still shows
+const pfpOf = name => { const s = getState(); return s.people[name]?.pfp || (s.me?.username === name ? s.me.pfp : null) || null; };
 
 // ── voice control menus ──
 const coarse = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
@@ -102,6 +104,7 @@ function CameraBtn({ v, big }) {
 
 // under a voice channel in the list: the people in it (speaking ring = how loud they are, while you're in a call)
 export function VoiceChannelUsers({ cid, onUser }) {
+  useChat(s => s.people);
   const users = useChat(s => s.voiceStates[cid]);
   if (!users?.length) return null;
   return (
@@ -228,6 +231,7 @@ const Vid = ({ stream, muted = false }) => <video autoPlay playsInline muted={mu
 
 // who is watching a stream (the streamer sees this on their own card)
 function StreamViewers({ watchers, mine, names }) {
+  useChat(s => s.people);
   if (!watchers?.length) return mine ? <span className="vc-stream-viewers none"><Eye size={13} /> Nobody is watching yet</span> : null;
   return (
     <span className="vc-stream-viewers">
@@ -241,6 +245,7 @@ function StreamViewers({ watchers, mine, names }) {
 // Discord-style stage: people as tiles, each screen share is its own "click to watch" card.
 // Watching one pops it into a big focus area with everybody else in a strip below.
 function CallStage({ v, tiles, compact }) {
+  useChat(s => s.people);
   const flash = useChat(s => s.boardFlash);
   const p = useChat(s => s.voicePrefs);
   const [focused, setFocused] = useState(null);
@@ -375,6 +380,7 @@ export function VoiceView({ channel, sid }) {
 
 // top of a DM: start a call / join the one going on / who's in it
 export function DmCallBar({ username }) {
+  useChat(s => s.people);
   const call = useChat(s => s.dmCalls[String(username).toLowerCase()]);
   const v = useChat(s => s.voice);
   const inIt = v && call && v.room === call.room;
@@ -419,6 +425,7 @@ export function DmCallButton({ username }) {
 
 // a call ringing me (top of the window)
 export function IncomingCalls() {
+  useChat(s => s.people);
   const list = useChat(s => s.incoming);
   const ringIds = list.map(c => c.callId).join('|');
   useEffect(() => { syncRing(ringIds ? ringIds.split('|') : []); return () => syncRing([]); }, [ringIds]);
