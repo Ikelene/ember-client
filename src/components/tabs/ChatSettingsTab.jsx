@@ -62,25 +62,47 @@ function AndroidNotifications() {
   </div>;
 }
 
+// The desktop app's system: true on macOS. Guessed from the browser straight away, then taken from the app itself
+// (bonfireDesktop.info() gives { platform, rpcAvailable, overlayAvailable }); cached for the page's life.
+let desktopInfo = null;
+const guessMac = () => { try { return /mac/i.test(navigator.userAgentData?.platform || navigator.platform || ''); } catch { return false; } };
+export function useDesktopMac() {
+  const [mac, setMac] = useState(() => (desktopInfo ? desktopInfo.platform === 'darwin' : guessMac()));
+  useEffect(() => {
+    const info = window.bonfireDesktop?.info;
+    if (desktopInfo || typeof info !== 'function') return undefined;
+    let live = true;
+    Promise.resolve(info()).then(v => { if (v?.platform) { desktopInfo = v; if (live) setMac(v.platform === 'darwin'); } }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+  return mac;
+}
+// the desktop app's settings page is 'Windows app' inside (its page id); on a Mac it's called this
+export const desktopAppTitle = mac => (mac ? 'macOS app' : 'Windows app');
+const pageTitle = (title, mac) => (title === 'Windows app' ? desktopAppTitle(mac) : title);
+
 function DesktopNotifications() {
+  const mac = useDesktopMac();
+  const osName = mac ? 'macOS' : 'Windows';
   const [notifications, setNotifications] = useState(null);
   const [err, setErr] = useState('');
   useEffect(() => {
-    window.bonfireDesktop.notificationStatus?.().then(setNotifications).catch(() => setErr('Could not load Windows notification settings.'));
-  }, []);
+    window.bonfireDesktop.notificationStatus?.().then(setNotifications).catch(() => setErr(`Could not load ${osName} notification settings.`));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return <div className="card">
     <div className="card-header"><span className="card-title">Desktop notifications</span></div>
     <div className="card-body cs-rows">
       {err && <div className="inline-msg error" role="alert">{err}</div>}
       <div className="cs-row">
-        <div className="cs-text"><b><Bell size={15} /> Windows notifications</b><span>Show native Ember notifications for DMs and incoming calls while the app is inactive.</span></div>
-        <button type="button" className="btn btn-surface btn-sm" disabled={!notifications?.supported || notifications?.enabled} onClick={async () => { try { await window.bonfireDesktop.enableNotifications(); setNotifications(await window.bonfireDesktop.notificationStatus()); } catch { setErr("Windows notifications couldn't be enabled."); } }}>{notifications?.enabled ? 'Enabled' : 'Enable'}</button>
+        <div className="cs-text"><b><Bell size={15} /> {osName} notifications</b><span>Show native Ember notifications for DMs and incoming calls while the app is inactive.</span></div>
+        <button type="button" className="btn btn-surface btn-sm" disabled={!notifications?.supported || notifications?.enabled} onClick={async () => { try { await window.bonfireDesktop.enableNotifications(); setNotifications(await window.bonfireDesktop.notificationStatus()); } catch { setErr(`${osName} notifications couldn't be enabled.`); } }}>{notifications?.enabled ? 'Enabled' : 'Enable'}</button>
       </div>
     </div>
   </div>;
 }
 
 function DesktopSettings() {
+  const mac = useDesktopMac(); // the Mac app: its own words, and no Discord RPC capture (Windows named pipes only)
   const desktop = typeof window !== 'undefined' && window.bonfireDesktop?.isDesktop;
   const canDetectGames = typeof window !== 'undefined' && typeof window.bonfireDesktop?.detectState === 'function';
   const [rpc, setRpc] = useState(null);
@@ -124,25 +146,29 @@ function DesktopSettings() {
   }
 
   return <div className="card">
-    <div className="card-header"><span className="card-title">Windows app</span></div>
+    <div className="card-header"><span className="card-title">{desktopAppTitle(mac)}</span></div>
     <div className="card-body cs-rows">
       {err && <div className="inline-msg error">{err}</div>}
-      {desktop && <div className="cs-row">
+      {desktop && !mac && <div className="cs-row">
         <div className="cs-text"><b><Gamepad2 size={15} /> Capture Discord game status</b><span>Let Ember receive game activity sent through Discord RPC when Discord is closed.</span></div>
         <button type="button" role="switch" aria-checked={!!rpc?.enabled} className={`cs-switch${rpc?.enabled ? ' on' : ''}`} disabled={!rpc} onClick={() => setRpcEnabled(!rpc.enabled)}><i /></button>
       </div>}
-      {hasApp && app && [
+      {hasApp && app && (mac ? [
+        ['openAtLogin', Power, 'Open at login', 'Open Ember when you log in to your Mac.'],
+        ['startMinimized', Minimize2, 'Start hidden', 'When Ember opens, keep it in the menu bar instead of opening the window.'],
+        ['closeToTray', PanelBottomClose, 'Keep running in the menu bar when closed', 'Closing the window keeps Ember running in the menu bar, so calls and messages still reach you. Quit from the menu bar icon or with Cmd+Q.'],
+      ] : [
         ['openAtLogin', Power, 'Start with Windows', 'Open Ember when you sign in to Windows.'],
         ['startMinimized', Minimize2, 'Start minimized', 'When Ember starts with Windows, keep it in the tray instead of opening the window.'],
         ['closeToTray', PanelBottomClose, 'Minimize to tray when closed', 'Closing the window keeps Ember running in the tray, so calls and messages still reach you. Quit from the tray icon.'],
-      ].map(([key, Icon, label, hint]) => (
+      ]).map(([key, Icon, label, hint]) => (
         <div className="cs-row" key={key}>
           <div className="cs-text"><b><Icon size={15} /> {label}</b><span>{hint}</span></div>
           <button type="button" role="switch" aria-label={label} aria-checked={!!app[key]} className={`cs-switch${app[key] ? ' on' : ''}`} onClick={() => setAppSetting(key, !app[key])}><i /></button>
         </div>
       ))}
       {canDetectGames && <div className="cs-row">
-        <div className="cs-text"><b>Detect games I play</b><span>Detect supported games directly on this Windows computer for your Ember activity.</span></div>
+        <div className="cs-text"><b>Detect games I play</b><span>Detect supported games directly on this {mac ? 'Mac' : 'Windows computer'} for your Ember activity.</span></div>
         <button type="button" role="switch" aria-checked={!!detect?.enabled} className={`cs-switch${detect?.enabled ? ' on' : ''}`} disabled={!detect} onClick={() => setDetectEnabled(!detect.enabled)}><i /></button>
       </div>}
     </div>
@@ -260,6 +286,7 @@ export default function ChatSettingsTab({ embedded = false, onLogout, onLogin, w
   const [saving, setSaving] = useState(false);
   const contentRef = useRef(null);
   const desktop = !!window.bonfireDesktop?.isDesktop || typeof window.bonfireDesktop?.getAppSettings === 'function';
+  const mac = useDesktopMac();
   const categories = [...GROUPS.map(([title]) => title), 'About', 'Bots', ...(desktop ? ['Windows app'] : []), ...(onLogout || onLogin ? ['Account'] : [])];
   useEffect(() => { if (contentRef.current) contentRef.current.scrollTop = 0; }, [category]);
   const [saved, setSaved] = useState('');
@@ -290,10 +317,10 @@ export default function ChatSettingsTab({ embedded = false, onLogout, onLogin, w
       <div className={bare ? 'bf-settings-bare' : 'bf-settings-layout'}>
         {!bare && <nav className="bf-settings-nav" aria-label="Ember settings categories">
           <span className="bf-settings-nav-label">Settings</span>
-          {categories.map(title => <button type="button" key={title} aria-current={category === title ? 'page' : undefined} className={category === title ? 'active' : ''} onClick={() => setCategory(title)}>{title}</button>)}
+          {categories.map(title => <button type="button" key={title} aria-current={category === title ? 'page' : undefined} className={category === title ? 'active' : ''} onClick={() => setCategory(title)}>{pageTitle(title, mac)}</button>)}
         </nav>}
-        <section className={bare ? 'bf-settings-bare-content' : 'bf-settings-content'} aria-label={category} ref={bare ? undefined : contentRef}>
-          {!bare && <h4 className="bf-settings-title">{category}</h4>}
+        <section className={bare ? 'bf-settings-bare-content' : 'bf-settings-content'} aria-label={pageTitle(category, mac)} ref={bare ? undefined : contentRef}>
+          {!bare && <h4 className="bf-settings-title">{pageTitle(category, mac)}</h4>}
           {err && category !== 'About' && <div className="inline-msg error" role="alert">{err}</div>}
       {!s && !err && !onLogin && category !== 'About' && <div className="card"><div className="card-body">Loading...</div></div>}
       {s && GROUPS.filter(([title]) => title === category).map(([title, rows], gi) => (

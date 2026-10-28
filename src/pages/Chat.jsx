@@ -29,6 +29,7 @@ import RockEgg from '../chat/RockEgg.jsx';
 import { PermissionPrompts } from '../chat/Permissions.jsx';
 import { RadioHost } from '../chat/Radio.jsx';
 import SettingsDialog from '../chat/SettingsDialog.jsx';
+import { useDesktopMac } from '../components/tabs/ChatSettingsTab.jsx';
 import { ServerSettings } from '../chat/ServerSettings.jsx';
 import { ChannelSettings } from '../chat/ChannelSettings.jsx';
 import { CreateServer, HostingNote } from '../chat/Hosting.jsx';
@@ -99,6 +100,7 @@ function NotificationBanner() {
   const [blocked, setBlocked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const macDesktop = useDesktopMac(); // the Mac app: say macOS, not Windows
   useEffect(() => {
     if (/(?:^|; )bonfire_notifications_dismissed=1(?:;|$)/.test(document.cookie)) return;
     // Old desktop shells do not have Ember's notification bridge yet. Put
@@ -117,7 +119,7 @@ function NotificationBanner() {
   }, []);
   if (!show) return null;
   const turnOn = async () => {
-    if (unsupported) { setError(desktop ? 'Desktop notifications are not supported by this installation or are disabled by Windows.' : "This browser doesn't support background push notifications. Try a current Chrome, Edge, Firefox, or Safari browser."); return; }
+    if (unsupported) { setError(desktop ? `Desktop notifications are not supported by this installation or are disabled by ${macDesktop ? 'macOS' : 'Windows'}.` : "This browser doesn't support background push notifications. Try a current Chrome, Edge, Firefox, or Safari browser."); return; }
     if (blocked) { setError('Notifications are blocked in this browser. Allow notifications for velora.ikelene.net in your browser settings, then reload Ember.'); return; }
     setBusy(true); setError('');
     try {
@@ -131,7 +133,7 @@ function NotificationBanner() {
   return (
     <div className="vc-notify-banner" role="status">
       <Bell size={18} />
-      <span><b>{desktopUpdate ? 'Enable desktop notifications' : unsupported ? 'Notifications unavailable' : blocked ? 'Notifications are blocked' : desktop ? 'Enable desktop notifications' : 'Turn on notifications?'}</b> {desktopUpdate ? 'Update Ember, then restart it to receive DMs and incoming-call actions.' : unsupported ? (desktop ? 'Enable Windows notifications for Ember, then restart the app.' : "This browser can't receive background push notifications.") : blocked ? 'Allow notifications for Velora in your browser settings, then reload Ember.' : desktop ? 'Get DM reply boxes and incoming-call actions while Ember is inactive.' : 'Get DMs, calls and mentions even when Ember is closed.'}</span>
+      <span><b>{desktopUpdate ? 'Enable desktop notifications' : unsupported ? 'Notifications unavailable' : blocked ? 'Notifications are blocked' : desktop ? 'Enable desktop notifications' : 'Turn on notifications?'}</b> {desktopUpdate ? 'Update Ember, then restart it to receive DMs and incoming-call actions.' : unsupported ? (desktop ? `Enable ${macDesktop ? 'macOS' : 'Windows'} notifications for Ember, then restart the app.` : "This browser can't receive background push notifications.") : blocked ? 'Allow notifications for Velora in your browser settings, then reload Ember.' : desktop ? 'Get DM reply boxes and incoming-call actions while Ember is inactive.' : 'Get DMs, calls and mentions even when Ember is closed.'}</span>
       {error && <small>{error}</small>}
       {!blocked && !unsupported && <button type="button" onClick={() => desktopUpdate ? window.bonfireDesktop?.checkForUpdates?.() : turnOn()} disabled={busy}>{desktopUpdate ? 'Check for update' : busy ? 'Turning on…' : desktop ? 'Enable & test' : 'Turn on'}</button>}
       <button type="button" className="dismiss" title="Not now" onClick={() => { document.cookie = 'bonfire_notifications_dismissed=1; Max-Age=2592000; Path=/; SameSite=Lax'; setShow(false); }}><X size={15} /></button>

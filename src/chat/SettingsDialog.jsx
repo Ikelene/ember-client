@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, Search, UserRound, CircleUser, Shield, Bell, MessageSquare, Monitor, Sparkles, SlidersHorizontal, Bot, Info, Bug, LifeBuoy, ExternalLink } from 'lucide-react';
-import ChatSettingsTab, { GROUPS, matches } from '../components/tabs/ChatSettingsTab.jsx';
+import ChatSettingsTab, { GROUPS, matches, useDesktopMac, desktopAppTitle } from '../components/tabs/ChatSettingsTab.jsx';
 import ProfileEditor from './ProfileEditor.jsx';
 import { useChat, ask, getState } from './store.js';
 import { isWebBonfire } from '../api.js';
@@ -22,7 +22,7 @@ const PAGES = [
     ['Privacy', 'Privacy', Shield, rowText('Privacy')],
   ]],
   ['App settings', [
-    ['Notifications', 'Notifications', Bell, [...rowText('Notifications'), 'Push notifications', 'Windows notifications', 'Browser notifications']],
+    ['Notifications', 'Notifications', Bell, [...rowText('Notifications'), 'Push notifications', 'Windows notifications', 'macOS notifications', 'Browser notifications']],
     ['Messages', 'Messages', MessageSquare, [...rowText('Messages'), 'Design', 'Look', 'Rounded', 'Square', 'Corners', 'Theme']],
     ['Windows app', 'Windows app', Monitor, ['Desktop app', 'Start with Windows', 'Start minimized', 'Minimize to tray', 'Discord game status', 'RPC', 'Detect games I play'], 'desktop'],
     ['Extras', 'Extras', Sparkles, [...rowText('Extras'), 'Radio', 'Stream address', 'Volume']],
@@ -34,6 +34,8 @@ const PAGES = [
   ]],
 ];
 
+// the desktop app page on a Mac: its name and words (no Discord RPC there)
+const MAC_APP_WORDS = ['Desktop app', 'Mac', 'Open at login', 'Start hidden', 'Menu bar', 'Detect games I play'];
 // help links at the bottom of the sidebar: they open in the browser (the desktop app hands them to the system's browser)
 const HELP = [
   ['Report a bug', Bug, 'https://velora.ikelene.net/bug-report', ['Bug report', 'Bug', 'Problem', 'Broken', 'Feedback', 'Help']],
@@ -68,6 +70,7 @@ export default function SettingsDialog({ page: startPage, onClose }) {
   const me = useChat(s => s.me);
   const signedIn = useChat(s => s.signedIn);
   const desktop = !!window.bonfireDesktop?.isDesktop || typeof window.bonfireDesktop?.getAppSettings === 'function';
+  const mac = useDesktopMac();
   const [page, setPage] = useState(startPage || (signedIn ? 'profile' : 'Account'));
   const [q, setQ] = useState('');
   const [closing, setClosing] = useState(false);
@@ -77,7 +80,8 @@ export default function SettingsDialog({ page: startPage, onClose }) {
 
   // pages that exist here, and the ones that match the search
   // signed out of Velora (web Ember): only the pages that don't need an account
-  const groups = useMemo(() => PAGES.map(([g, items]) => [g, items.filter(it => (it[4] !== 'desktop' || desktop) && (signedIn || ['Account', 'About'].includes(it[0])))]).filter(([, items]) => items.length), [desktop, signedIn]);
+  const groups = useMemo(() => PAGES.map(([g, items]) => [g, items.filter(it => (it[4] !== 'desktop' || desktop) && (signedIn || ['Account', 'About'].includes(it[0])))
+    .map(it => (it[4] === 'desktop' && mac ? [it[0], desktopAppTitle(true), it[2], MAC_APP_WORDS, it[4]] : it))]).filter(([, items]) => items.length), [desktop, signedIn, mac]);
   const shown = useMemo(() => groups.map(([g, items]) => [g, items.filter(([, label, , words]) => matches(q, label, ...words))]).filter(([, items]) => items.length), [groups, q]);
   const help = useMemo(() => HELP.filter(([label, , , words]) => matches(q, label, ...words)), [q]);
   const all = shown.flatMap(([, items]) => items);
