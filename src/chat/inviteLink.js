@@ -41,15 +41,26 @@ export function paymentRef(href) {
   if (/^\/pay\/[A-Za-z0-9_.-]{2,32}\/?$/.test(u.pathname)) return { kind: 'user', sure: true };
   return null;
 }
+// Glint clips, shown as a clip card with Ember's player (LinkEmbeds.jsx GlintEmbed; unfurl.js reads the clip page):
+//   https://ikelene.net/glint/c/<10-char id>
+// -> { id, sure: true } or null
+export function glintRef(href) {
+  let u;
+  try { u = new URL(href); } catch { return null; }
+  if (u.protocol !== 'https:' || u.port || !/^(www\.)?ikelene\.net$/i.test(u.hostname)) return null;
+  const m = /^\/glint\/c\/([A-Za-z0-9]{10})\/?$/.exec(u.pathname);
+  return m ? { id: m[1], sure: true } : null;
+}
 // what a link to a card is called where the card itself isn't shown (a reply preview)
 export function embedLabel(href) {
   if (inviteRef(href)?.sure) return 'Server Invite';
   if (paymentRef(href)) return 'Payment';
+  if (glintRef(href)) return 'Glint Clip';
   return null;
 }
-// a line that is only an invite / payment link: the link hides (the card replaces it)
+// a line that is only an invite / payment / Glint clip link: the link hides (the card replaces it)
 export function isHiddenInviteLine(line) {
   const t = String(line || '').trim();
   if (!/^https?:\/\/\S+$/.test(t)) return false;
-  return !!(inviteRef(t)?.sure || paymentRef(t));
+  return !!(inviteRef(t)?.sure || paymentRef(t) || glintRef(t));
 }

@@ -2175,3 +2175,33 @@ html.bf-mobile #bf-sheet-scrim { display: none !important; }
 .vc-blocked-cover { display: block; width: fit-content; max-width: 100%; margin: 2px 0; padding: 6px 12px; background: #2c2c33; border: 0; color: var(--dim); font: inherit; font-size: 13px; cursor: pointer; }
 .vc-blocked-cover:hover { background: #34343c; color: var(--text); }
 .vc-mention.blocked { background: rgba(255, 255, 255, .07); color: var(--dim); font-style: italic; }
+
+/* Glint clip cards (LinkEmbeds.jsx GlintEmbed) */
+.vc-glint { display: block; max-width: 540px; margin: 6px 0 2px; background: #141417; border: 1px solid #26262c; border-left: 3px solid var(--accent); transition: border-color .15s, box-shadow .2s; }
+.vc-glint:hover { border-color: #33333b; border-left-color: var(--accent); box-shadow: 0 6px 20px rgba(0, 0, 0, .28); }
+.vc-glint-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+.vc-glint-av { flex: none; width: 34px; height: 34px; object-fit: cover; background: #1c1c20; }
+.vc-glint-av.none { display: grid; place-items: center; color: var(--accent); border: 1px solid var(--border); }
+.vc-glint-titles { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.vc-glint-line { color: var(--dim); font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; }
+.vc-glint-line b { color: var(--text); font-weight: 700; }
+.vc-glint-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; color: var(--muted); font-size: 12.5px; }
+.vc-glint-meta > span { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.vc-glint-game { color: var(--dim); font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vc-glint-game img { flex: none; width: 16px; height: 16px; object-fit: cover; }
+.vc-glint-badge { flex: none; align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px; background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); font-size: 10.5px; font-weight: 800; letter-spacing: .08em; }
+.vc-glint-stage { aspect-ratio: 16 / 9; max-height: 360px; margin: 0 auto; }
+.vc-glint-stage > img { filter: brightness(.9); transition: filter .2s, transform .35s; }
+.vc-glint:hover .vc-glint-stage > img { filter: brightness(1); transform: scale(1.015); }
+.vc-glint-nothumb { position: absolute; inset: 0; display: grid; place-items: center; color: #33333b; background: #0d0d0f; }
+.vc-glint-play { position: absolute; left: 50%; top: 50%; width: 62px; height: 62px; transform: translate(-50%, -50%); display: grid; place-items: center; background: rgba(10, 10, 12, .7); border: 1px solid rgba(255, 255, 255, .25); color: #fff; cursor: pointer; backdrop-filter: blur(2px); transition: transform .15s, background .15s, border-color .15s; }
+.vc-glint-play:hover { transform: translate(-50%, -50%) scale(1.06); background: var(--accent); border-color: var(--accent); }
+.vc-glint-len { position: absolute; right: 8px; bottom: 8px; padding: 2px 6px; background: rgba(0, 0, 0, .75); color: #fff; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; pointer-events: none; }
+.vc-glint-err { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: 80%; padding: 8px 12px; background: rgba(10, 10, 12, .85); color: var(--dim); font-size: 13px; text-align: center; }
+.vc-glint-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border-top: 1px solid #26262c; }
+.vc-glint-site { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.vc-glint-site svg { color: var(--accent); }
+.vc-glint-open, a.vc-glint-open { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; background: #1c1c20; border: 1px solid var(--border-2); color: var(--dim); font-size: 13px; font-weight: 600; text-decoration: none; transition: color .12s, border-color .12s, background .12s; }
+.vc-glint-open:hover { color: #fff; border-color: var(--accent); background: var(--accent-dim); text-decoration: none; }
+@media (max-width: 600px) { .vc-glint-head { padding: 9px 10px; } .vc-glint-foot { padding: 7px 10px; } .vc-glint-badge { height: 18px; padding: 0 5px; font-size: 10px; } .vc-glint-line { font-size: 13.5px; } }
+@media (prefers-reduced-motion: reduce) { .vc-glint, .vc-glint-stage > img { transition: none; } .vc-glint:hover .vc-glint-stage > img { transform: none; } }

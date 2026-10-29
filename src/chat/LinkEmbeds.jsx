@@ -1,14 +1,14 @@
 // Link previews under messages. The server makes them (GET /chat/unfurl: Velora, or the instance a message is on) - the
 // browser never visits the linked site; pictures come from that server too. YouTube gets Ember's own player (YouTube's
 // embed, or streamed through the instance / Velora), Ember invites + Velora profiles get their own cards.
-import { VideoPlayer } from './MediaPlayer.jsx';
+import { VideoPlayer, fmtTime } from './MediaPlayer.jsx';
 import { viewPicture } from './MediaViewer.jsx';
 import { useEffect, useState } from 'react';
-import { Play, Download, ShieldCheck, Eye, Loader2, Users, ExternalLink, BookmarkPlus, BookmarkCheck, Coins } from 'lucide-react';
+import { Play, Download, ShieldCheck, Eye, Loader2, Users, ExternalLink, BookmarkPlus, BookmarkCheck, Coins, Heart, Clock } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { useChat, getState, toast, errorText, openLink, saveSettings, loadMedia, hashFor } from './store.js';
 import { K } from './ids.js';
-import { inviteRef, paymentRef } from './inviteLink.js';
+import { inviteRef, paymentRef, glintRef } from './inviteLink.js';
 
 const cache = new Map(); // inst|url -> promise of the embed
 function useUnfurl(url, inst) {
@@ -34,11 +34,12 @@ export function LinkEmbeds({ urls, inst }) {
   return urls.slice(0, 3).map(u => <OneEmbed key={u} url={u} inst={inst} />);
 }
 function OneEmbed({ url, inst }) {
-  const ref = inviteRef(url) || paymentRef(url);
-  // invite + payment cards are made by Velora even for a message on an instance (an invite asks the invited instance, see unfurl.js)
+  const ref = inviteRef(url) || paymentRef(url) || glintRef(url);
+  // invite + payment + Glint cards are made by Velora even for a message on an instance (an invite asks the invited instance, see unfurl.js)
   const e = useUnfurl(url, ref ? undefined : inst);
   if (!e) return e === null && ref?.sure ? <a className="vc-invite-fallback" href={url} target="_blank" rel="noopener noreferrer nofollow">{url}</a> : null; // (its link hides in the text, so show it if there is no card)
   if (e.type === 'youtube') return <YouTubeEmbed e={e} inst={inst} />;
+  if (e.type === 'glint') return <GlintEmbed e={e} />;
   if (e.type === 'invite') return <InviteEmbed e={e} />;
   if (e.type === 'profile') return <ProfileEmbed e={e} />;
   if (e.type === 'payment') return <PaymentEmbed e={e} url={url} />;
@@ -181,6 +182,71 @@ function VeloraPlayer({ id, via }) {
     );
   }
   return <VideoPlayer src={src} autoPlay className="vc-yt-video" onError={() => setErr('That video stopped working - try playing it again.')} />;
+}
+
+// ── Glint clips (ikelene.net/glint/c/<id>) ──
+// Velora reads the clip page (its glint:* meta, or just its OpenGraph video) and re-hosts the pictures; the video itself is a
+// file on Velora / ikelene.net and plays in Ember's player only after a click (nothing loads before that).
+const GLINT_MEDIA = /^https:\/\/(velora\.ikelene\.net|(www\.)?ikelene\.net)\//i;
+const compact = n => (n >= 1e6 ? `${(n / 1e6).toFixed(n < 1e7 ? 1 : 0).replace(/\.0$/, '')}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n < 1e4 ? 1 : 0).replace(/\.0$/, '')}K` : String(n));
+function GlintMark({ size = 14 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden="true">
+      <rect x="16" y="20" width="38" height="16" fill="currentColor" />
+      <rect x="16" y="42" width="38" height="16" fill="currentColor" fillOpacity=".7" />
+      <rect x="16" y="64" width="38" height="16" fill="currentColor" fillOpacity=".4" />
+      <polygon points="60,20 88,50 60,80" fill="currentColor" />
+    </svg>
+  );
+}
+function openOutside(ev, url) {
+  const d = window.bonfireDesktop;
+  if (d?.openExternal) { ev.preventDefault(); Promise.resolve(d.openExternal(url)).catch(() => {}); } // the desktop app opens https links in the browser
+}
+function GlintEmbed({ e }) {
+  const [playing, setPlaying] = useState(false);
+  const [err, setErr] = useState(false);
+  const video = GLINT_MEDIA.test(e.video || '') ? e.video : null;
+  const ratio = e.width && e.height ? Math.min(2.4, Math.max(0.5, e.width / e.height)) : 16 / 9;
+  const stats = [
+    e.duration != null && <span key="d" title="Length"><Clock size={13} />{fmtTime(e.duration)}</span>,
+    e.views != null && <span key="v" title={`${e.views.toLocaleString()} view${e.views === 1 ? '' : 's'}`}><Eye size={13} />{compact(e.views)}</span>,
+    e.likes != null && <span key="l" title={`${e.likes.toLocaleString()} like${e.likes === 1 ? '' : 's'}`}><Heart size={13} />{compact(e.likes)}</span>,
+  ].filter(Boolean);
+  return (
+    <div className="vc-glint vl-rise">
+      <div className="vc-glint-head">
+        {e.avatar ? <img className="vc-glint-av" src={e.avatar} alt="" loading="lazy" onError={ev => { ev.currentTarget.style.visibility = 'hidden'; }} />
+          : <span className="vc-glint-av none"><GlintMark size={18} /></span>}
+        <div className="vc-glint-titles">
+          <span className="vc-glint-line">{e.user ? <><b>{e.user}</b> shared <b>{e.title}</b>!</> : <b>{e.title}</b>}</span>
+          {(e.game || stats.length > 0) && (
+            <span className="vc-glint-meta">
+              {e.game && <span className="vc-glint-game">{e.game_icon && <img src={e.game_icon} alt="" loading="lazy" onError={ev => { ev.currentTarget.remove(); }} />}{e.game}</span>}
+              {stats}
+            </span>
+          )}
+        </div>
+        <span className="vc-glint-badge" title="Glint clip"><GlintMark size={12} />CLIP</span>
+      </div>
+      <div className="vc-yt-stage vc-glint-stage" style={{ aspectRatio: String(ratio) }}>
+        {playing && video && !err ? (
+          <VideoPlayer src={video} poster={e.thumb || undefined} autoPlay className="vc-glint-video" onError={() => setErr(true)} />
+        ) : (
+          <>
+            {e.thumb ? <img src={e.thumb} alt="" loading="lazy" /> : <span className="vc-glint-nothumb"><GlintMark size={40} /></span>}
+            {err ? <span className="vc-glint-err">This clip can't be played here - open it in the browser.</span>
+              : video && <button type="button" className="vc-glint-play" title="Play clip" onClick={() => setPlaying(true)}><Play size={24} fill="currentColor" /></button>}
+            {e.duration != null && <span className="vc-glint-len">{fmtTime(e.duration)}</span>}
+          </>
+        )}
+      </div>
+      <div className="vc-glint-foot">
+        <span className="vc-glint-site"><GlintMark size={12} />Glint</span>
+        <a className="vc-glint-open" href={e.url} target="_blank" rel="noopener noreferrer nofollow" onClick={ev => openOutside(ev, e.url)}><ExternalLink size={14} />Open in browser</a>
+      </div>
+    </div>
+  );
 }
 
 // ── Ember invites ──
