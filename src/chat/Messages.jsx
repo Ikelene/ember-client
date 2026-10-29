@@ -682,6 +682,8 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
   const uploadContext = useRef({ key, pending: 0 });
   if (uploadContext.current.key !== key) uploadContext.current = { key, pending: 0 };
   const srDraft = useChat(s => s.statusReplyDraft);
+  const barRoles = useChat(s => (view.sid ? s.detail[view.sid]?.roles : null));
+  const barCtx = useMemo(() => ({ roles: barRoles, linkImages: false }), [barRoles]); // (the quote in the "Replying to" bar)
   const srActive = !!srDraft && view.kind === 'dm' && String(view.username).toLowerCase() === srDraft.username.toLowerCase() ? srDraft : null;
   useEffect(() => { if (!srActive) clearStatusReply(); }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (srActive) ta.current?.focus(); }, [srActive]);
@@ -945,7 +947,7 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
         , document.body)}
       {replyTo && (
         <div className="vc-replybar">
-          <span>Replying to <b>{replyTo.author?.username || 'Velora'}</b></span>
+          <span className="vc-replybar-main">Replying to <b>{replyTo.author?.username || 'Velora'}</b>{replyTo.body ? <ReplyText body={replyTo.body} ctx={barCtx} /> : null}</span>
           <button type="button" onClick={() => setReplyTo(null)} title="Cancel reply"><X size={14} /></button>
         </div>
       )}

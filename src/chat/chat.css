@@ -268,6 +268,9 @@ body:has(.vc-sign-banner) .vc-notify-banner { top: 52px; } /* (the notifications
 .vc-composer.locked.timed-out > svg { color: #e5c27a; flex: none; }
 .vc-replybar { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: #101012; border: 1px solid var(--border); border-bottom: 0; font-size: 12.5px; color: var(--dim); animation: vc-up .2s cubic-bezier(.2, .8, .2, 1); }
 .vc-replybar b { color: var(--text); }
+.vc-replybar-main { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.vc-replybar-main > b { flex: none; }
+.vc-replybar-main > .vc-reply-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 .vc-replybar button { display: grid; place-items: center; padding: 2px; background: none; border: 0; color: var(--muted); cursor: pointer; }
 .vc-replybar button:hover { color: #fff; }
 .vc-pending-atts { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; background: #101012; border: 1px solid var(--border); border-bottom: 0; }
