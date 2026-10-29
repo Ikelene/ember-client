@@ -1,9 +1,12 @@
-// The GIF + media picker (the GIF button by Send): search Klipy GIFs, star them into Saved Media,
-// and Saved Media = starred GIFs + every picture / video / audio file on your Velora account.
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Search, Star, X, Upload, Music, Play, Loader2 } from 'lucide-react';
+// The media picker (the GIF button by Send, and "Attach a Glint clip" in the + menu): search Klipy GIFs, star them into Saved
+// Media, Saved Media = starred GIFs + every picture / video / audio file on your Velora account (minus Glint clip videos), and
+// Game Clips = your Glint clips (only when you have some) - picking one sends its link, which shows as the Glint clip card.
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Search, Star, X, Upload, Music, Play, Loader2, Eye, Lock, ExternalLink } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { useChat, getState, toast, errorText, ask, loadMedia, saveGif, unsaveGif, deleteMedia, saveFilesToMedia, getUploadLimits } from './store.js';
+import { useMyClips, liveClips, glintMediaMatcher, glintLink, loadMyClips, GlintMark, NewTag, openOutside, GLINT_BROWSE } from './glint.jsx';
+import { fmtTime } from './MediaPlayer.jsx';
 
 export function GifBadge() { return <span className="vc-gif-badge">GIF</span>; }
 
@@ -18,8 +21,11 @@ export function StarButton({ gif }) {
   );
 }
 
-export default function MediaPicker({ onPick, onClose }) {
-  const [tab, setTab] = useState('saved'); // Saved Media opens first
+// onPick(attachment) for GIFs + Saved Media, onSendLink(url) for a Glint clip; tab = the tab to open on ('clips' from the + menu)
+export default function MediaPicker({ onPick, onSendLink, onClose, tab: tab0 }) {
+  const [tab, setTab] = useState(tab0 || 'saved'); // Saved Media opens first
+  const clips = useMyClips();
+  const hasClips = liveClips(clips).length > 0;
   const box = useRef(null);
   // a file dragged onto the picker is saved to Saved Media (your Velora account), not sent to the conversation: the picker lights up
   // as the target and the window-wide "Drop to upload" overlay (Messages.jsx) stays out of the way because of data-drop-own.
@@ -57,8 +63,9 @@ export default function MediaPicker({ onPick, onClose }) {
       <div className="vc-picker-tabs">
         <button type="button" className={tab === 'saved' ? 'on' : ''} onClick={() => setTab('saved')}>Saved Media</button>
         <button type="button" className={tab === 'gifs' ? 'on' : ''} onClick={() => setTab('gifs')}>GIFs</button>
+        {(hasClips || tab === 'clips') && <button type="button" className={`vc-picker-clips-tab${tab === 'clips' ? ' on' : ''}`} onClick={() => setTab('clips')}>Game Clips <NewTag /></button>}
       </div>
-      <div className="vc-picker-body" key={tab}>{tab === 'gifs' ? <Gifs onPick={onPick} /> : <Saved onPick={onPick} add={add} uploading={uploading} />}</div>
+      <div className="vc-picker-body" key={tab}>{tab === 'gifs' ? <Gifs onPick={onPick} /> : tab === 'clips' ? <Clips clips={clips} onSendLink={onSendLink} /> : <Saved onPick={onPick} add={add} uploading={uploading} clips={clips} />}</div>
     </div>
   );
 }
@@ -112,8 +119,10 @@ function Gifs({ onPick }) {
 }
 
 const fmtSize = n => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
-function Saved({ onPick, add, uploading }) {
-  const items = useChat(s => s.savedMedia);
+function Saved({ onPick, add, uploading, clips }) {
+  const all = useChat(s => s.savedMedia);
+  const isClip = useMemo(() => glintMediaMatcher(clips), [clips]); // Glint clip videos live in the same uploads: they show under Game Clips instead
+  const items = useMemo(() => (all ? all.filter(m => m.kind !== 'video' || !isClip(m)) : all), [all, isClip]);
   const [filter, setFilter] = useState('all');
   const file = useRef(null);
   useEffect(() => { loadMedia(); }, []);
@@ -147,6 +156,52 @@ function Saved({ onPick, add, uploading }) {
               <button type="button" className="vc-saved-x" title={m.upload ? 'Delete from your Velora storage' : 'Remove from Saved Media'} onClick={() => remove(m)}><X size={12} /></button>
             </div>
           ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Game Clips: your Glint clips. Hover plays a muted preview; a click sends the clip's link (drafts have to be published first). ──
+const VIS = { draft: 'Draft', unlisted: 'Unlisted' };
+function Clips({ clips, onSendLink }) {
+  useEffect(() => { loadMyClips(); }, []);
+  const list = liveClips(clips);
+  return (
+    <>
+      <div className="vc-picker-bar vc-clips-bar">
+        <span className="vc-clips-title"><GlintMark size={14} />Your Glint clips</span>
+        <span className="grow" />
+        <a className="vc-picker-up" href={GLINT_BROWSE} target="_blank" rel="noopener noreferrer" onClick={e => { if (window.bonfireDesktop?.openExternal) { e.preventDefault(); openOutside(GLINT_BROWSE); } }}><ExternalLink size={14} /> Open Glint</a>
+      </div>
+      <div className="vc-picker-scroll">
+        {clips === undefined && <div className="vc-loading"><i /><i /><i /></div>}
+        {clips === null && <div className="vc-empty-note">Couldn't reach Glint right now.</div>}
+        {clips && !list.length && <div className="vc-empty-note">No clips yet. Clip a game with Glint (Alt+C) and it shows up here.</div>}
+        <div className="vc-clip-grid">
+          {list.map((c, i) => {
+            const why = c.visibility === 'draft' ? 'Draft - publish it first' : c.status === 'rendering' ? 'Still rendering - try again in a moment' : null;
+            return (
+              <button type="button" key={c.id} className={`vc-clip vl-rise${why ? ' off' : ''}`} style={{ '--i': Math.min(i, 12) }} aria-disabled={!!why}
+                title={why || `Send "${c.title}"`}
+                onClick={() => { if (why) { toast(why); return; } onSendLink?.(glintLink(c.id)); }}
+                onMouseEnter={e => { if (!why) e.currentTarget.querySelector('video')?.play().catch(() => {}); }}
+                onMouseLeave={e => { const v = e.currentTarget.querySelector('video'); if (v) { v.pause(); try { v.currentTime = 0; } catch { /* not loaded */ } } }}>
+                <span className="vc-clip-thumb">
+                  {c.thumbnail ? <img src={c.thumbnail} alt="" loading="lazy" /> : <span className="vc-clip-nothumb"><GlintMark size={28} /></span>}
+                  {!why && c.videoUrl && <video src={c.videoUrl} muted loop playsInline preload="none" />}
+                  {c.durationSec != null && <span className="vc-clip-len">{fmtTime(c.durationSec)}</span>}
+                  {VIS[c.visibility] && <span className={`vc-clip-vis ${c.visibility}`}>{c.visibility === 'draft' ? <Lock size={10} /> : <Eye size={10} />}{VIS[c.visibility]}</span>}
+                  {why && <span className="vc-clip-why">{why}</span>}
+                  {!why && <span className="vc-clip-play"><Play size={14} fill="currentColor" /></span>}
+                </span>
+                <span className="vc-clip-info">
+                  <b>{c.title || 'Untitled clip'}</b>
+                  <small>{c.gameIcon && <img src={c.gameIcon} alt="" loading="lazy" onError={e => { e.currentTarget.remove(); }} />}{c.game || 'Other'}</small>
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
     </>

@@ -3,12 +3,13 @@
 // embed, or streamed through the instance / Velora), Ember invites + Velora profiles get their own cards.
 import { VideoPlayer, fmtTime } from './MediaPlayer.jsx';
 import { viewPicture } from './MediaViewer.jsx';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Play, Download, ShieldCheck, Eye, Loader2, Users, ExternalLink, BookmarkPlus, BookmarkCheck, Coins, Heart, Clock } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { useChat, getState, toast, errorText, openLink, saveSettings, loadMedia, hashFor } from './store.js';
 import { K } from './ids.js';
 import { inviteRef, paymentRef, glintRef } from './inviteLink.js';
+import { GlintMark, GLINT_DOWNLOAD, clipLikes, setClipLike, openOutside } from './glint.jsx';
 
 const cache = new Map(); // inst|url -> promise of the embed
 function useUnfurl(url, inst) {
@@ -186,22 +187,47 @@ function VeloraPlayer({ id, via }) {
 
 // ── Glint clips (ikelene.net/glint/c/<id>) ──
 // Velora reads the clip page (its glint:* meta, or just its OpenGraph video) and re-hosts the pictures; the video itself is a
-// file on Velora / ikelene.net and plays in Ember's player only after a click (nothing loads before that).
+// file on Velora / ikelene.net and plays in Ember's player only after a click (nothing loads before that). Likes go to
+// Glint's API with Ember's token; whether I liked it is asked once the card scrolls into view.
 const GLINT_MEDIA = /^https:\/\/(velora\.ikelene\.net|(www\.)?ikelene\.net)\//i;
 const compact = n => (n >= 1e6 ? `${(n / 1e6).toFixed(n < 1e7 ? 1 : 0).replace(/\.0$/, '')}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n < 1e4 ? 1 : 0).replace(/\.0$/, '')}K` : String(n));
-function GlintMark({ size = 14 }) {
+const outside = url => ev => { if (window.bonfireDesktop?.openExternal) { ev.preventDefault(); openOutside(url); } }; // the desktop app opens https links in the browser
+function GlintLike({ id, initial }) {
+  const box = useRef(null);
+  const [st, setSt] = useState({ liked: false, likes: initial ?? 0, known: false });
+  const [pop, setPop] = useState(0);
+  const [tip, setTip] = useState(null);
+  const signedIn = useChat(s => s.signedIn);
+  useEffect(() => {
+    const el = box.current;
+    if (!el || !id) return undefined;
+    let live = true;
+    const io = new IntersectionObserver(es => {
+      if (!es.some(x => x.isIntersecting)) return;
+      io.disconnect();
+      clipLikes(id).then(v => { if (live && v) setSt(s => (s.known ? s : { ...v, known: true })); });
+    }, { rootMargin: '200px' });
+    io.observe(el);
+    return () => { live = false; io.disconnect(); };
+  }, [id]);
+  async function toggle() {
+    if (!signedIn) { setTip('Sign in to like clips'); return; }
+    const was = st;
+    const on = !was.liked;
+    setSt({ liked: on, likes: Math.max(0, was.likes + (on ? 1 : -1)), known: true });
+    if (on) setPop(p => p + 1);
+    setTip(null);
+    try { const v = await setClipLike(id, on); setSt({ ...v, known: true }); }
+    catch (er) { setSt(was); setTip(er.status === 401 ? 'Sign in again to like clips' : er.status === 429 ? 'Slow down a little' : "Couldn't like that right now"); }
+  }
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden="true">
-      <rect x="16" y="20" width="38" height="16" fill="currentColor" />
-      <rect x="16" y="42" width="38" height="16" fill="currentColor" fillOpacity=".7" />
-      <rect x="16" y="64" width="38" height="16" fill="currentColor" fillOpacity=".4" />
-      <polygon points="60,20 88,50 60,80" fill="currentColor" />
-    </svg>
+    <button ref={box} type="button" className={`vc-glint-like${st.liked ? ' on' : ''}`} onClick={toggle} title={tip || (st.liked ? 'Unlike' : 'Like')} aria-pressed={st.liked}
+      onMouseLeave={() => tip && setTimeout(() => setTip(null), 1500)}>
+      <Heart key={pop} size={15} fill={st.liked ? 'currentColor' : 'none'} className={pop ? 'pop' : undefined} />
+      <span>{compact(st.likes)}</span>
+      {tip && <small className="vc-glint-tip" role="status">{tip}</small>}
+    </button>
   );
-}
-function openOutside(ev, url) {
-  const d = window.bonfireDesktop;
-  if (d?.openExternal) { ev.preventDefault(); Promise.resolve(d.openExternal(url)).catch(() => {}); } // the desktop app opens https links in the browser
 }
 function GlintEmbed({ e }) {
   const [playing, setPlaying] = useState(false);
@@ -211,7 +237,6 @@ function GlintEmbed({ e }) {
   const stats = [
     e.duration != null && <span key="d" title="Length"><Clock size={13} />{fmtTime(e.duration)}</span>,
     e.views != null && <span key="v" title={`${e.views.toLocaleString()} view${e.views === 1 ? '' : 's'}`}><Eye size={13} />{compact(e.views)}</span>,
-    e.likes != null && <span key="l" title={`${e.likes.toLocaleString()} like${e.likes === 1 ? '' : 's'}`}><Heart size={13} />{compact(e.likes)}</span>,
   ].filter(Boolean);
   return (
     <div className="vc-glint vl-rise">
@@ -227,7 +252,7 @@ function GlintEmbed({ e }) {
             </span>
           )}
         </div>
-        <span className="vc-glint-badge" title="Glint clip"><GlintMark size={12} />CLIP</span>
+        <a className="vc-glint-badge" href={GLINT_DOWNLOAD} target="_blank" rel="noopener noreferrer" onClick={outside(GLINT_DOWNLOAD)} title="Glint clip - get Glint"><GlintMark size={12} />CLIP</a>
       </div>
       <div className="vc-yt-stage vc-glint-stage" style={{ aspectRatio: String(ratio) }}>
         {playing && video && !err ? (
@@ -242,8 +267,10 @@ function GlintEmbed({ e }) {
         )}
       </div>
       <div className="vc-glint-foot">
-        <span className="vc-glint-site"><GlintMark size={12} />Glint</span>
-        <a className="vc-glint-open" href={e.url} target="_blank" rel="noopener noreferrer nofollow" onClick={ev => openOutside(ev, e.url)}><ExternalLink size={14} />Open in browser</a>
+        <a className="vc-glint-site" href={GLINT_DOWNLOAD} target="_blank" rel="noopener noreferrer" onClick={outside(GLINT_DOWNLOAD)} title="Get Glint"><GlintMark size={12} />Glint</a>
+        <span className="grow" />
+        {e.id && <GlintLike id={e.id} initial={e.likes} />}
+        <a className="vc-glint-open" href={e.url} target="_blank" rel="noopener noreferrer nofollow" onClick={outside(e.url)}><ExternalLink size={14} />Open in browser</a>
       </div>
     </div>
   );

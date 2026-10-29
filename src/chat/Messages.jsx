@@ -21,6 +21,8 @@ import { ViaBadge } from './ClientVia.jsx';
 import { usePronouns } from './pronouns.js';
 import { Reactions, QuickReactions, openReactionPicker } from './Reactions.jsx';
 import MediaPicker, { GifBadge, StarButton } from './MediaPicker.jsx';
+import GlintIntro from './GlintIntro.jsx';
+import { GlintMark, NewTag, loadMyClips, liveClips } from './glint.jsx';
 import EmojiPicker, { loadEmojiData } from './EmojiPicker.jsx';
 import { TriangleAlert, Shield, Clock } from 'lucide-react';
 import { BookmarkPlus, Smile, File as FileIcon, FileArchive, FileCode, FileText, Download, Coins, MessageSquareQuote } from 'lucide-react';
@@ -701,7 +703,8 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
   }
   const [dropping, setDropping] = useState(false); // a file is being dragged over the window
   const saveFile = useRef(null);
-  const [picker, setPicker] = useState(false);
+  const [picker, setPicker] = useState(false); // false | 'saved' | 'clips' (the tab it opens on)
+  const [glintIntro, setGlintIntro] = useState(false);
   const [emoji, setEmoji] = useState(false);
   useEffect(() => {
     const keep = () => {
@@ -917,9 +920,12 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
   function uploadMenu(e) {
     const r = e.currentTarget.getBoundingClientRect();
     const lim = getUploadLimits();
-    openMenu({ clientX: r.left, clientY: Math.max(6, r.top - 96), preventDefault() {}, stopPropagation() {} }, [
+    loadMyClips(); // (cached for the session) so the Glint choice below knows straight away
+    openMenu({ clientX: r.left, clientY: Math.max(6, r.top - 150), preventDefault() {}, stopPropagation() {} }, [
       { label: 'Upload to server', hint: `Sent here - up to ${uploadCap()} MB`, icon: Upload, onClick: () => file.current?.click() },
       { label: 'Upload to my Velora account', hint: `Kept in Saved Media and attached - up to ${lim.saved_mb} MB`, icon: CloudUpload, onClick: () => saveFile.current?.click() },
+      { label: <span className="vc-ctx-newlabel">Attach a Glint clip <NewTag /></span>, hint: 'One of your game clips', icon: GlintMark,
+        onClick: async () => { const list = liveClips(await loadMyClips()); setEmoji(false); if (list.length) setPicker('clips'); else setGlintIntro(true); } },
     ]);
   }
   if (timedOut) return <div className="vc-composer locked timed-out" role="status"><Clock size={15} /> <span><b>You're timed out</b> until {untilText(timedOut)}. You can read messages, but can't send any, react or join voice until then.</span></div>;
@@ -1021,11 +1027,13 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
             if (e.key === 'Escape' && replyTo) setReplyTo(null);
           }}
         />
-        <button type="button" className={`vc-ico-btn vc-gif-btn${picker ? ' on' : ''}`} title="GIFs and Saved Media" onClick={() => { setPicker(p => !p); setEmoji(false); }}><GifIcon /></button>
+        <button type="button" className={`vc-ico-btn vc-gif-btn${picker ? ' on' : ''}`} title="Media (GIFs, Saved Media, Game Clips)" onClick={() => { setPicker(p => (p ? false : 'saved')); setEmoji(false); }}><GifIcon /></button>
         <button type="button" className={`vc-ico-btn vc-emoji-btn${emoji ? ' on' : ''}`} title="Emoji" onClick={() => { setEmoji(x => !x); setPicker(false); }}><Smile size={19} /></button>
         {emoji && <EmojiPicker onClose={() => setEmoji(false)} onPick={t => { insertText(t); setEmoji(false); }} />}
         <button type="button" className="vc-ico-btn send" title="Send" disabled={!cmd && !text.trim() && !atts.length} onPointerDown={e => e.preventDefault()} onMouseDown={e => e.preventDefault()} onClick={() => (cmd ? cmdSubmit.current?.() : submit())}><SendHorizontal size={18} /></button>
-        {picker && <MediaPicker onClose={() => setPicker(false)} onPick={a => { setPicker(false); sendMessage(view, '', { replyTo, attachments: [a] }); setReplyTo?.(null); }} />}
+        {picker && <MediaPicker key={picker} tab={picker === 'clips' ? 'clips' : undefined} onClose={() => setPicker(false)} onPick={a => { setPicker(false); sendMessage(view, '', { replyTo, attachments: [a] }); setReplyTo?.(null); }}
+          onSendLink={url => { setPicker(false); sendMessage(view, url, { replyTo }); setReplyTo?.(null); }} />}
+        {glintIntro && <GlintIntro onClose={() => setGlintIntro(false)} />}
       </div>
       <Typing view={view} />
     </div>
