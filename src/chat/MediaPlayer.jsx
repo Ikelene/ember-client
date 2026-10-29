@@ -125,7 +125,14 @@ export function VideoPlayer({ src, poster, autoPlay, className = '', onError }) 
     if (fn) { try { await fn.call(el); return; } catch { /* try the video itself */ } }
     if (v.requestFullscreen) { try { await v.requestFullscreen(); return; } catch { /* next */ } }
     if (v.webkitRequestFullscreen) { try { v.webkitRequestFullscreen(); return; } catch { /* next */ } }
-    try { v.webkitEnterFullscreen?.(); } catch { /* the video has nothing loaded yet */ }
+    if (!v.webkitEnterFullscreen) return;
+    try { v.webkitEnterFullscreen(); return; } catch { /* iPhone: nothing loaded yet (it ignores preload), see below */ }
+    // iPhone Safari throws until the video has its metadata, and it only starts loading on play: start it (we're inside the tap),
+    // then go fullscreen the moment the size is known
+    const go = () => { clearTimeout(t); v.removeEventListener('loadedmetadata', go); try { v.webkitEnterFullscreen(); } catch { /* give up */ } };
+    const t = setTimeout(() => v.removeEventListener('loadedmetadata', go), 10000);
+    v.addEventListener('loadedmetadata', go);
+    v.play().catch(() => {});
   };
   const pip = () => { const v = ref.current; if (!v) return; if (document.pictureInPictureElement) document.exitPictureInPicture().catch(() => {}); else v.requestPictureInPicture?.().catch(() => {}); };
   const hide = st.playing && idle && !st.waiting;
