@@ -1,6 +1,6 @@
 // Discover > Bots: the bot gallery (approved, Verified bots), with search, tags, a detail view and Add to server.
 import { useEffect, useState } from 'react';
-import { Search, Bot, ArrowLeft, ExternalLink, Link2, ShieldCheck, Tag } from 'lucide-react';
+import { Search, Bot, ArrowLeft, ExternalLink, Link2, ShieldCheck, Tag, Flag } from 'lucide-react';
 import { useChat } from './store.js';
 import { BotTag, AddBotButton, TrustedIn } from './Bots.jsx';
 import { GALLERY_PERMS } from './BotGalleryDev.jsx';
@@ -108,6 +108,8 @@ function BotDetail({ id, signedIn, onBack }) {
               </div></div>
           )}
           <p className="vc-hint">After adding it, connect the bot to that server's address with its token. Its developer's page or the support link explains how.</p>
+          {/* spam, scams or rule-breaking: Velora staff see it in Admin > Apps */}
+          <p className="vc-hint"><a href={`https://velora.ikelene.net/report?bot=${encodeURIComponent(b.id)}`} target="_blank" rel="noopener noreferrer"><Flag size={12} style={{ verticalAlign: '-2px' }} /> Report this bot to Velora</a></p>
         </>
       )}
     </div>
