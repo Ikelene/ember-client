@@ -21,6 +21,7 @@ import { removeInstance, reorderInstances, reconnect as reconnectInstance } from
 import { startSignIn } from './session.js';
 import { Avatar, subtitle, RoleChip, STATUS_LABEL, BlockedMark } from './Profile.jsx';
 import { MePopout } from './ProfilePopout.jsx';
+import { NotificationBell } from './Notifications.jsx';
 import Logo from '../components/Logo.jsx';
 
 // who's typing in a conversation right now
@@ -693,6 +694,7 @@ export function UserPanel({ onSettings, onEditProfile }) {
         </span>
       </button>
       <QuickVoiceBtns />
+      <NotificationBell />
       <button type="button" className="vc-ico-btn" onClick={onSettings} title="Settings"><Settings size={17} /></button>
       {pop && <MePopout anchor={pop} onClose={() => setPop(null)} onEditProfile={onEditProfile} onCustomStatus={() => { setPop(null); setCustomOpen(true); }} />}
       {custom && <CustomStatus current={p?.custom || ''} onClose={() => setCustomOpen(false)} />}

@@ -2260,3 +2260,31 @@ a.vc-glint-site:hover { color: var(--text); text-decoration: none; }
 .vc-glint-intro-browse:hover { color: var(--text); }
 @media (max-width: 600px) { .vc-clip-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; } .vc-glint-open { padding: 0 8px; } .vc-glint-intro-actions .grow { flex-basis: 100%; height: 0; } }
 @media (prefers-reduced-motion: reduce) { .vc-new-tag, .vc-glint-like svg.pop { animation: none; } }
+/* ── the notifications bell (UserPanel) + its unread popup (Notifications.jsx) ── */
+.vc-bell { position: relative; }
+.vc-bell-n { position: absolute; top: 2px; right: 0; min-width: 16px; height: 16px; padding: 0 4px; display: grid; place-items: center; background: var(--red); color: #fff; font-size: 10px; font-weight: 700; line-height: 1; box-shadow: 0 0 0 2px #0a0a0c; pointer-events: none; }
+.vc-notifs { position: fixed; z-index: 2000; display: flex; flex-direction: column; background: var(--surface-2); border: 1px solid var(--border-2); box-shadow: 0 24px 60px rgba(0, 0, 0, .65); color: var(--text); font-size: 13.5px; animation: vc-pop .16s cubic-bezier(.2, .8, .2, 1); transform-origin: bottom left; }
+.vc-notifs button { font-family: inherit; }
+.vc-notifs-head { flex: none; display: flex; align-items: center; gap: 6px; padding: 8px 8px 8px 14px; border-bottom: 1px solid var(--border); }
+.vc-notifs-head > b { font-size: 14px; }
+.vc-notifs-head .grow { flex: 1; }
+.vc-notifs-all { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px; background: none; border: 1px solid var(--border-2); color: var(--dim); font-size: 12px; cursor: pointer; }
+.vc-notifs-all:hover:not(:disabled) { color: #fff; border-color: var(--accent); background: var(--accent-dim); }
+.vc-notifs-all:disabled { opacity: .4; cursor: default; }
+.vc-notifs-list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #2a2a30 transparent; }
+.vc-notif { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 10px 14px 10px 12px; background: none; border: 0; border-left: 2px solid transparent; border-bottom: 1px solid var(--border); color: var(--text); text-align: left; cursor: pointer; }
+.vc-notif:hover { background: var(--accent-dim); border-left-color: var(--accent); }
+.vc-notif-av { flex: none; width: 34px; height: 34px; display: grid; place-items: center; overflow: hidden; background: var(--surface-3); }
+.vc-notif-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vc-notif-av.ico { background: var(--accent-dim); color: var(--accent); border: 1px solid var(--border); }
+.vc-notif-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vc-notif-top { display: flex; align-items: baseline; gap: 8px; }
+.vc-notif-top > b { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.vc-notif-top small { flex: none; font-size: 11.5px; color: var(--muted); }
+.vc-notif-body { color: var(--dim); font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-line; }
+.vc-notif-body b { color: var(--text); }
+.vc-notifs-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 16px; color: var(--muted); text-align: center; }
+.vc-notifs-more { display: block; width: 100%; padding: 10px; background: none; border: 0; color: var(--accent); font-size: 13px; cursor: pointer; }
+.vc-notifs-more:hover { background: var(--accent-dim); }
+.vc-notifs-foot { flex: none; display: block; padding: 10px; border-top: 1px solid var(--border); color: var(--dim); font-size: 13px; text-align: center; text-decoration: none; }
+.vc-notifs-foot:hover { background: var(--accent-dim); color: #fff; }

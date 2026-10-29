@@ -69,6 +69,8 @@ let state = {
   veloraNames: {},         // Velora id -> current username (instance members are v:<id>; their presence comes from the home socket by name)
   veloraFaces: {},         // Velora id -> their live public face on Velora { id, username, pfp, color, rank } (v: people on instances)
   emojiUrls: {},           // eid -> picture of an instance's custom emoji
+  notifUnread: 0,          // Velora notifications not read yet (the bell's badge)
+  notifs: null,            // the bell's popup while it's open: { list (unread only, newest first), cursor, loading, error }
 };
 const subs = new Set();
 let desktopFocused = true;
@@ -330,6 +332,7 @@ function onEvent(m, inst = VELORA) {
     case 'chat_ready':
       set(s => ({ conn: 'open', presence: { ...s.presence, [m.you.username]: localizePresence(m.you.presence) } }));
       catchUp();
+      loadNotifCount(); // (anything that happened while the socket was down)
       break;
     case 'chat_message': addMessage(`c:${m.message.channel}`, m.message); break;
     case 'chat_identity_update':
@@ -533,6 +536,8 @@ function onEvent(m, inst = VELORA) {
     case 'chat_pins_update': set(s => ({ pinsVersion: { ...s.pinsVersion, [m.channel]: (s.pinsVersion[m.channel] || 0) + 1 } })); break;
     case 'friend_request': case 'friend_request_accepted': loadFriends(); break;
     case 'blocks_changed': loadBlocks(); break; // I blocked / unblocked someone (here or on another device)
+    case 'notification_new': notificationNew(m); break;
+    case 'notifications_updated': notificationsUpdated(m); break; // read / deleted somewhere else (another tab, the site, a phone)
     case 'kicked': if (isWebBonfire()) authLost(); else location.href = '/login'; break;
     default: break;
   }
@@ -1493,6 +1498,97 @@ export function openLink(hash) {
   open(readHash());
 }
 
+// ── Velora notifications (the bell next to your name; they replaced the DMs from "System") ──
+// GET /account/notifications(?unread=1) + /unread-count, POST /account/notifications/read; live over the home socket as
+// notification_new / notifications_updated. The popup only ever lists unread ones: the full history is /me#notifications.
+const notifKey = id => String(id);
+const byNewest = (a, b) => (Number(b.id) - Number(a.id)) || (new Date(b.created_at) - new Date(a.created_at));
+export const notifPlain = t => String(t || '').replace(/\*\*/g, '');
+export async function loadNotifCount() {
+  const d = await apiFetch('/account/notifications/unread-count').catch(() => null);
+  if (typeof d?.unread === 'number') set({ notifUnread: d.unread });
+}
+// the popup opened (more = "Load more" with the cursor); anything that arrived live while loading is kept
+export async function loadNotifs({ more = false } = {}) {
+  const cur = state.notifs;
+  if (cur?.loading || (more && !cur?.cursor)) return;
+  set(s => ({ notifs: { list: [], cursor: null, ...(s.notifs || {}), loading: true, error: false } }));
+  try {
+    const d = await apiFetch(`/account/notifications?unread=1&limit=20${more ? `&cursor=${encodeURIComponent(cur.cursor)}` : ''}`);
+    set(s => {
+      if (!s.notifs) return {}; // closed meanwhile
+      const seen = new Set(s.notifs.list.map(n => notifKey(n.id)));
+      const list = [...s.notifs.list, ...(d.notifications || []).filter(n => !n.read && !seen.has(notifKey(n.id)))].sort(byNewest);
+      return { notifs: { list, cursor: d.next_cursor ?? null, loading: false, error: false }, notifUnread: typeof d.unread === 'number' ? d.unread : s.notifUnread };
+    });
+  } catch { set(s => (s.notifs ? { notifs: { ...s.notifs, loading: false, error: true } } : {})); }
+}
+export const closeNotifs = () => set({ notifs: null });
+// ids = [id, ...] or 'all': gone from the popup straight away, the server's count wins after
+export async function readNotifs(ids) {
+  const all = ids === 'all';
+  const drop = new Set(all ? [] : ids.map(notifKey));
+  set(s => ({ notifs: s.notifs && { ...s.notifs, list: all ? [] : s.notifs.list.filter(n => !drop.has(notifKey(n.id))) }, notifUnread: all ? 0 : Math.max(0, s.notifUnread - drop.size) }));
+  try {
+    const d = await apiFetch('/account/notifications/read', { method: 'POST', body: JSON.stringify(all ? { all: true } : { ids }) });
+    if (typeof d?.unread === 'number') set({ notifUnread: d.unread });
+  } catch { loadNotifCount(); }
+}
+// a notification's link: /chat#... stays in Ember, other site paths load in this tab (the desktop app keeps /me inside
+// and sends anything else to the browser itself), a full https link opens a new tab
+export function followNotifLink(link) {
+  const l = typeof link === 'string' ? link.trim() : '';
+  if (!l) return;
+  if (l.startsWith('/chat#')) openLink(l.slice(5));
+  else if (l.startsWith('/') && !l.startsWith('//')) location.assign(l);
+  else if (/^https?:\/\//i.test(l)) window.open(l, '_blank', 'noopener,noreferrer');
+}
+function notificationNew(m) {
+  const n = m.notification;
+  if (!n || n.id == null) return;
+  set(s => ({
+    notifUnread: typeof m.unread === 'number' ? m.unread : s.notifUnread + (n.read ? 0 : 1),
+    notifs: s.notifs && !n.read && !s.notifs.list.some(x => notifKey(x.id) === notifKey(n.id)) ? { ...s.notifs, list: [n, ...s.notifs.list].sort(byNewest) } : s.notifs,
+  }));
+  if (!n.read) notifPing(n);
+}
+function notificationsUpdated(m) {
+  const read = m.read === 'all' ? 'all' : new Set((m.read || []).map(notifKey));
+  const gone = new Set((m.deleted || []).map(notifKey));
+  const stillUnread = new Set((m.unread_ids || []).map(notifKey));
+  set(s => {
+    const patch = typeof m.unread === 'number' ? { notifUnread: m.unread } : {};
+    if (!s.notifs) return patch;
+    const list = s.notifs.list.filter(n => { const k = notifKey(n.id); return !gone.has(k) && (stillUnread.has(k) || (read === 'all' ? false : !read.has(k))); });
+    return { ...patch, notifs: { ...s.notifs, list } };
+  });
+  // something became unread again that the open popup doesn't have: fetch the list again
+  if (state.notifs && [...stillUnread].some(k => !state.notifs.list.some(n => notifKey(n.id) === k))) { set(s => ({ notifs: s.notifs && { ...s.notifs, list: [], cursor: null } })); loadNotifs(); }
+}
+// a new one: the DM sound, and a system notification while Ember is in the background (same rules as a DM: not in
+// Do Not Disturb, not with Notifications set to "Nothing"). The desktop app's own notify() only knows DMs and calls, so this
+// uses the web Notification API there too, behind the app's "notifications" switch.
+function notifPing(n) {
+  if (state.presence[state.me?.username]?.status === 'dnd') return;
+  if (packActive()) { if (state.settings.sounds) playPackSound('receive'); } else playSound('message');
+  if (pageFocused() || state.settings.notifications === 'none') return;
+  const show = () => {
+    try {
+      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+      const note = new Notification(notifPlain(n.title) || 'Velora', { body: notifPlain(n.body).slice(0, 140), icon: n.actor?.pfp_url || '/assets/icon.png', tag: `notif${n.id}` });
+      note.onclick = () => {
+        try { window.focus(); } catch { /* fine */ }
+        note.close();
+        readNotifs([n.id]);
+        followNotifLink(n.link);
+      };
+    } catch { /* no notifications */ }
+  };
+  const d = window.bonfireDesktop;
+  if (d?.isDesktop && d.notificationStatus) d.notificationStatus().then(st => { if (st?.enabled) show(); }).catch(() => {});
+  else show();
+}
+
 // Velora's token is no good any more (web Ember): start over signed out, with a note about it
 export function authLost() {
   if (!isWebBonfire() || authLost.done) return;
@@ -1508,7 +1604,7 @@ export function init(me) {
   window.bonfireDesktop?.isFocused?.().then(v => { desktopFocused = !!v; }).catch(() => {});
   window.bonfireDesktop?.onWindowFocus?.(v => { desktopFocused = v; if (v) markViewRead(); });
   startInstances();
-  if (me) { loadServers(); setupSigning(); loadDMs(); loadGroups(); loadFriends(); loadBlocks(); loadModmail(); loadMedia(); }
+  if (me) { loadServers(); setupSigning(); loadDMs(); loadGroups(); loadFriends(); loadBlocks(); loadModmail(); loadMedia(); loadNotifCount(); }
   try { if (me && Notification.permission === 'default') setTimeout(() => Notification.requestPermission().catch(() => {}), 8000); } catch { /* fine */ }
   window.addEventListener('popstate', () => open(readHash()));
   const markFocusedViewRead = () => {
