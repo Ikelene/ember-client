@@ -128,11 +128,11 @@ export function VoiceChannelUsers({ cid, sid, onUser }) {
 }
 
 // the mute / deafen pair in your user bar (next to the settings cog): always there, in a call or not; out of a call they set what you join with
+// only while in a voice channel or call: outside one they just squeezed your name next to the bell + settings
 export function QuickVoiceBtns() {
   const v = useChat(s => s.voice);
-  const p = useChat(s => s.voicePrefs) || prefs();
-  const st = v || { muted: !!(p.muted || p.deafened), deafened: !!p.deafened };
-  return <><MicBtn v={st} bar /><DeafenBtn v={st} bar /></>;
+  if (!v) return null;
+  return <><MicBtn v={v} bar /><DeafenBtn v={v} bar /></>;
 }
 
 // bottom left, above your name: where you're connected + mute / deafen / hang up
