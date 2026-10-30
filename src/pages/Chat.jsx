@@ -55,6 +55,8 @@ import { applyDesign, clearDesign } from '../chat/design.js';
 import '../chat/chat.css';
 import '../chat/rounded.css';
 import '../chat/boot.css';
+import { MaskIcon } from '../chat/Alias.jsx';
+import { aliasOf, shownName } from '../chat/aliases.js';
 
 function meFrom(d) {
   return { id: d.account.id != null ? String(d.account.id) : undefined, username: d.account.username, pfp: d.profile.pfp || null, color: d.profile.color || null, rank: d.account.rank };
@@ -588,7 +590,7 @@ function ChatPage() {
                   <div className="vc-results-tip">Filters: <code>from:name</code> <code>in:channel</code> <code>has:image</code> <code>has:file</code> <code>has:link</code></div>
                   {search.results?.map(m => (
                     <button type="button" key={m.id} className="vc-result" onClick={() => jumpToMessage({ kind: 'channel', sid: view.sid, cid: m.channel }, m.id)}>
-                      <span>{m.channel_name && <em className="vc-result-ch">#{m.channel_name}</em>}<b>{m.author?.username || 'Velora'}</b> <small>{stampOf(m.created_at)}</small></span>
+                      <span>{m.channel_name && <em className="vc-result-ch">#{m.channel_name}</em>}<b>{shownName(m)}</b>{aliasOf(m) && <span className="vc-alias-mark" title={`Alias - posted by ${m.author.username}`}><MaskIcon size={12} /></span>} <small>{stampOf(m.created_at)}</small></span>
                       <span>{m.body || (m.attachments?.length ? `[${m.attachments.length} attachment${m.attachments.length === 1 ? '' : 's'}]` : '')}</span>
                     </button>
                   ))}

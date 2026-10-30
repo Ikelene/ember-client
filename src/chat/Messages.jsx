@@ -15,6 +15,7 @@ import { inviteSummary } from './gameInvite.js';
 import { PlatformIcon, PLATFORM_NAMES } from './platforms.jsx';
 import { GameEventLine } from './GameServer.jsx';
 import { BotTag } from './Bots.jsx';
+import { AliasMark, aliasOf, replyAliasOf, aliasKey, aliasFace } from './Alias.jsx';
 import { CommandPicker, CommandBar, MessageComponents, InteractionLine, Thinking, EphemeralNote } from './Commands.jsx';
 import { slashEntries, matchEntries } from './commands.js';
 import { ViaBadge } from './ClientVia.jsx';
@@ -302,8 +303,11 @@ function SigBadge({ m, inStack }) {
 function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, setEditing, view, fresh }) {
   const hook = !!m.author?.webhook;
   // on an instance: Velora people get their Velora profile, local accounts / bots a plain card (never a Velora lookup by name)
-  const onUser = (name, el) => openUser(name, el, 'right', m.inst ? m.author : undefined);
+  // an aliased bot message: the card is the real bot's, with a "Posting as alias" line
+  const alias = aliasOf(m);
+  const onUser = (name, el) => openUser(name, el, 'right', m.inst ? (alias ? { ...m.author, alias_name: alias.name } : m.author) : undefined);
   const author = useFace(m.author); // a Velora person on an instance: their live Velora picture / colour / rank
+  const replyAlias = replyAliasOf(m.reply);
   const replyAuthor = useFace(useMemo(() => (m.reply?.author && m.inst ? { ...m.reply.author, inst: m.inst } : m.reply?.author), [m.reply?.author, m.inst]));
   useEffect(() => { if (m.inst && m.author?.kind === 'velora') wantVeloraFaces([m.author]); }, [m.inst, m.author?.velora_id]); // eslint-disable-line react-hooks/exhaustive-deps
   // somebody I blocked, in a server: "Blocked User" with the default picture, and the whole message under a cover until clicked
@@ -393,17 +397,18 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
       {m.reply && (
         <div className="vc-reply-to" onClick={() => document.querySelector(`.vc-msg[data-id="${m.reply.id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
           <span className="vc-reply-line" />
-          {replyAuthor ? <Avatar user={replyBlocked ? blockedFace(replyAuthor) : replyAuthor} size={16} /> : null}
+          {replyAuthor ? <Avatar user={replyBlocked ? blockedFace(replyAuthor) : aliasFace(replyAlias, replyAuthor)} size={16} /> : null}
           {replyBlocked
             ? <><b className="vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={11} /></b><span className="vc-reply-text vc-blocked-quote">Message from someone you blocked</span></>
-            : <><b style={replyAuthor?.color ? { color: replyAuthor.color } : undefined}>{replyAuthor?.username || 'Velora'}</b>
+            : <><b style={replyAuthor?.color ? { color: replyAuthor.color } : undefined}>{replyAlias ? replyAlias.name : replyAuthor?.username || 'Velora'}</b>
+              {replyAlias && <AliasMark alias={replyAlias} by={replyAuthor} size={12} />}
               <ReplyText body={m.reply.body} ctx={ctx} /></>}
         </div>
       )}
       <InteractionLine m={m} />
       {head ? (
         hook ? <span className="vc-msg-av hook">{m.author.pfp ? <img src={m.author.pfp} alt="" /> : m.author.bridge ? <span className="vc-av-l">{(m.author.username || '?')[0].toUpperCase()}</span> : <Webhook size={20} />}</span>
-          : <button type="button" className="vc-msg-av" onClick={e => onUser(name, e.currentTarget)}><Avatar user={blockedAuthor ? blockedFace(author) : distrust ? { ...author, pfp: null } : author} size={40} /></button>
+          : <button type="button" className="vc-msg-av" onClick={e => onUser(name, e.currentTarget)}><Avatar user={blockedAuthor ? blockedFace(author) : distrust ? { ...author, pfp: null } : aliasFace(alias, author)} size={40} /></button>
       ) : (
         <span className="vc-msg-gut">{timeOf(m.created_at)}</span>
       )}
@@ -413,8 +418,8 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
             {hook ? <><span className="vc-msg-name hook">{name}</span>{m.author.staff ? <><span className="vc-app-tag staff">STAFF</span>{m.staffBy && <small className="vc-staff-by">sent by {m.staffBy} (only staff see this)</small>}</> : m.author.bridge === 'cloudlink' ? <><span className="vc-app-tag cl" title="This message came in over the channel's CloudLink bridge.">CLOUDLINK</span>{m.author.bridge_from && <span className="vc-game-tag" title="The chat it came from before CloudLink">{m.author.bridge_from}</span>}</> : m.author.bridge ? <><span className="vc-plat-tag" title={m.author.bridge === 'minecraft' ? 'Sent from the linked Minecraft server.' : `This message was sent from the linked ${PLATFORM_NAMES[m.author.bridge] || m.author.bridge} community.`}><PlatformIcon p={m.author.bridge} size={16} /></span>{m.author.bridge_from && <span className="vc-game-tag" title="The server it was sent from">{m.author.bridge_from}</span>}</> : <span className="vc-app-tag">APP</span>}</> : <>
             {blockedAuthor
               ? <><button type="button" className="vc-msg-name vc-blocked-name" onClick={e => onUser(name, e.currentTarget)}>{BLOCKED_NAME}</button><BlockedMark /></>
-              : <><button type="button" className="vc-msg-name" style={colorFrom(nameKey) && !distrust ? { color: colorFrom(nameKey) } : undefined} onClick={e => onUser(name, e.currentTarget)}>{name}</button>
-                <NameDecor sid={view.sid} user={author} /></>}{m.author?.bot && <BotTag verified={!!m.author.verified} />}<SigBadge m={m} />{m.via && <ViaBadge via={m.via} />}</>}
+              : <><button type="button" className="vc-msg-name" style={colorFrom(nameKey) && !distrust ? { color: colorFrom(nameKey) } : undefined} onClick={e => onUser(name, e.currentTarget)}>{alias ? alias.name : name}</button>
+                {alias ? <AliasMark alias={alias} by={author} /> : <NameDecor sid={view.sid} user={author} />}</>}{m.author?.bot && <BotTag verified={!!m.author.verified} />}<SigBadge m={m} />{m.via && <ViaBadge via={m.via} />}</>}
             {pronouns && <span className="vc-pronouns" title="Pronouns">{pronouns}</span>}
             <span className="vc-time" title={new Date(m.created_at).toLocaleString()}>{stampOf(m.created_at)}</span>
             {m.pinned && <span className="vc-pinned-mark" title="Pinned"><Pin size={12} /></span>}
@@ -597,7 +602,7 @@ export function MessageList({ view, onUser, onReply, canPost, canMod, channels, 
   for (const m of list) {
     const day = new Date(m.created_at).toDateString();
     if (!prev || new Date(prev.created_at).toDateString() !== day) rows.push(<div className="vc-day" key={`d${day}`}><span>{dayOf(m.created_at)}</span></div>);
-    const head = !prev || m.system || prev.system || /^mc_/.test(prev.sys_kind || '') || m.reply || m.interaction || m.statusReply || authorKey(prev.author) !== authorKey(m.author) || isUnsigned(prev) !== isUnsigned(m) || m.created_at - prev.created_at > GROUP_MS || new Date(prev.created_at).toDateString() !== day;
+    const head = !prev || m.system || prev.system || /^mc_/.test(prev.sys_kind || '') || m.reply || m.interaction || m.statusReply || authorKey(prev.author) !== authorKey(m.author) || aliasKey(prev) !== aliasKey(m) || isUnsigned(prev) !== isUnsigned(m) || m.created_at - prev.created_at > GROUP_MS || new Date(prev.created_at).toDateString() !== day;
     if (newFrom && m.id === newFrom) rows.push(<div className="vc-new-line" key="new-line"><span>New</span></div>);
     rows.push(<Message key={m.nonce || m.id} fresh={isFresh(m)} m={m} head={head} ctx={ctx} canMod={canMod} onReply={onReply} onUser={onUser} editing={editing === m.id} setEditing={setEditing} view={view} />);
     prev = m;
@@ -947,7 +952,7 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
         , document.body)}
       {replyTo && (
         <div className="vc-replybar">
-          <span className="vc-replybar-main">Replying to <b>{replyTo.author?.username || 'Velora'}</b>{replyTo.body ? <ReplyText body={replyTo.body} ctx={barCtx} /> : null}</span>
+          <span className="vc-replybar-main">Replying to <b>{aliasOf(replyTo)?.name || replyTo.author?.username || 'Velora'}</b>{replyTo.body ? <ReplyText body={replyTo.body} ctx={barCtx} /> : null}</span>
           <button type="button" onClick={() => setReplyTo(null)} title="Cancel reply"><X size={14} /></button>
         </div>
       )}

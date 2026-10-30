@@ -11,6 +11,7 @@
 import { getState, onOverlayToast } from './store.js';
 import { pollLevels, levelOf } from './levels.js';
 import { inviteSummary } from './gameInvite.js';
+import { shownName, shownPfp } from './aliases.js';
 
 const D = typeof window !== 'undefined' ? window.bonfireDesktop?.overlay : null;
 let voiceApi = null; // voice.js hands us its mute / deafen / watch functions
@@ -196,7 +197,7 @@ if (D) {
       const g = (s.groups || []).find(x => `g:${x.room}` === key);
       where = g?.name || g?.title || 'Group chat';
     }
-    D.post({ type: 'toast', toast: { kind, title: msg.author?.username || 'Velora', body: cleanText(inviteSummary(msg.body)) || 'sent an attachment', where, icon: abs(msg.author?.pfp) } });
+    D.post({ type: 'toast', toast: { kind, title: shownName(msg), body: cleanText(inviteSummary(msg.body)) || 'sent an attachment', where, icon: abs(shownPfp(msg)) } });
     return true;
   });
 }

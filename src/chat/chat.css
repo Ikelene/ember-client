@@ -1162,6 +1162,23 @@ ol.vc-list > li::marker { color: var(--accent); font-weight: 700; }
 .vc-tip-server small { display: flex; align-items: center; gap: 4px; color: #f0a5a5; font-size: 11.5px; }
 .vc-rail-item .vc-tip { display: none; }
 
+/* aliases (Alias.jsx): a bot posting under another name - the mask after the name, its tooltip, the profile card line */
+.vc-alias-mark { display: inline-flex; align-items: center; align-self: center; flex: none; padding: 1px; color: var(--muted); cursor: default; outline: none; }
+.vc-alias-mark:hover, .vc-alias-mark:focus-visible { color: var(--text); }
+.vc-alias-mark:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+.vc-reply-to .vc-alias-mark { padding: 0; }
+.vc-result .vc-alias-mark { display: inline-flex; vertical-align: -1px; margin-left: 4px; }
+.vc-tooltip.alias { padding: 7px 10px; max-width: 320px; }
+.vc-tip-alias { display: flex; flex-direction: column; gap: 3px; }
+.vc-tip-alias > b { font-size: 13px; font-weight: 700; color: #fff; }
+.vc-tip-alias > span { display: block; color: #c9c9d1; font-size: 12px; font-weight: 500; line-height: 16px; }
+.vc-tip-alias strong { font-weight: 600; color: #ececf0; }
+.vc-tip-alias-av { display: inline-grid; place-items: center; width: 14px; height: 14px; margin: 0 4px 0 3px; vertical-align: -3px; overflow: hidden; background: var(--surface-3); color: var(--dim); font-size: 9px; font-style: normal; font-weight: 700; }
+.vc-tip-alias-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vc-card-alias { display: flex; align-items: center; gap: 5px; }
+.vc-card-alias svg { flex: none; }
+.vc-card-alias b { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* ── forwarding ── */
 .vc-fwd-preview { margin-bottom: 10px; padding: 8px 10px; background: #0f0f11; border: 1px solid var(--border); border-left: 3px solid var(--accent); max-height: 120px; overflow: hidden; }
 .vc-fwd-from { display: flex; align-items: center; gap: 5px; margin-bottom: 4px; color: var(--muted); font-size: 12px; }

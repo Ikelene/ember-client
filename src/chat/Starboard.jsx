@@ -14,6 +14,7 @@ import { VideoPlayer, AudioPlayer } from './MediaPlayer.jsx';
 import { FileCard } from './Messages.jsx';
 import { K, bare, instOf, instOpt, isInst } from './ids.js';
 import { isSpoiler } from './spoiler.js';
+import { aliasOf, aliasFace, shownName } from './aliases.js';
 
 // the star, drawn (never the emoji)
 const StarIco = () => <Star size={13} className="vc-stb-inline" fill="currentColor" />;
@@ -76,7 +77,7 @@ function Post({ m, sid, ctx, onVote, big, label, rank }) {
   const atts = [...(m.attachments || []), ...(media || [])];
   const pics = [...atts.filter(a => a.type === 'image' || a.type === 'gif'), ...images.map(u => ({ url: u, type: /\.gif(\?|#|$)/i.test(u) ? 'gif' : 'image' }))];
   const other = atts.filter(a => a.type !== 'image' && a.type !== 'gif');
-  const name = m.author?.username || 'Velora';
+  const name = shownName(m);
   return (
     <article className={`vc-stb-post vl-rise${big ? ' big' : ''}${pics.length ? ' has-pic' : ''}`} style={{ '--i': Math.min(rank ?? 0, 10) }}>
       {label && <div className="vc-stb-label">{label}</div>}
@@ -88,7 +89,7 @@ function Post({ m, sid, ctx, onVote, big, label, rank }) {
       )}
       <div className="vc-stb-body">
         <header>
-          <Avatar user={m.author || { username: name }} size={28} />
+          <Avatar user={m.author ? aliasFace(aliasOf(m), m.author) : { username: name }} size={28} />
           <span className="vc-stb-who"><b style={m.author?.color ? { color: m.author.color } : undefined}>{name}</b><small>#{m.channel_name} - {stampOf(m.created_at)}</small></span>
           {rank != null && <span className="vc-stb-rank">#{rank + 1}</span>}
         </header>

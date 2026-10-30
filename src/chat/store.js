@@ -15,6 +15,7 @@ import { spoilerName } from './spoiler.js';
 import { prepareInstanceAttachments } from './attachment-preparation.js';
 import { setupSigning, signMessage, canSign, watchSignature, normBody, refreshSigningKey } from './signing.js';
 import { SHORT } from '../version.js';
+import { shownName, shownPfp } from './aliases.js';
 
 let state = {
   me: null,                // { username, pfp, color, rank } - null while signed out of Velora (web Ember works without it)
@@ -712,7 +713,7 @@ function ping(key, msg, everyMessage = false, quiet = false) {
   try {
     if (key.startsWith('d:') && desktopNotify({ type: 'dm', from: msg.author?.username || 'Velora', to: key.slice(2), body: inviteSummary(String(msg.body || 'sent a picture')).slice(0, 140), icon: msg.author?.pfp || '/assets/icon.png', tag: msg.id })) return;
     if (Notification.permission === 'granted') {
-      new Notification(msg.author?.username || 'Velora', { body: inviteSummary(String(msg.body || 'sent a picture')).slice(0, 140), icon: msg.author?.pfp || '/assets/icon.png', tag: msg.id });
+      new Notification(shownName(msg), { body: inviteSummary(String(msg.body || 'sent a picture')).slice(0, 140), icon: shownPfp(msg) || '/assets/icon.png', tag: msg.id });
     }
   } catch { /* no notifications */ }
 }
@@ -879,7 +880,7 @@ export function sendMessage(v, text, { replyTo, attachments, uploads } = {}) {
     id: n, nonce: n, pending: true, body: text, attachments: attachments || [], system: false,
     ...(instUser ? { inst: instOf(v.cid), unsigned: !!instUser.velora_id && !signingInfo(v.sid).can } : {}),
     author: instUser ? { id: instUser.id, username: me.username, pfp: me.pfp, color: instUser.velora_id ? (state.me?.color || me.color) : me.color, rank: me.rank, kind: instUser.kind || (instUser.velora_id ? 'velora' : 'local'), velora_id: instUser.velora_id } : { username: me.username, pfp: me.pfp, color: me.color, rank: me.rank }, created_at: Date.now(),
-    reply: replyTo ? { id: replyTo.id, author: replyTo.author, body: String(replyTo.body || '').slice(0, 200) } : null,
+    reply: replyTo ? { id: replyTo.id, author: replyTo.author, alias: replyTo.alias || null, body: String(replyTo.body || '').slice(0, 200) } : null,
   };
   if (v.kind !== 'group') {
     set(s => ({ msgs: upd(s.msgs, key, b => ({ list: [], hasMore: false, loaded: true, ...(b || {}), list: [...(b?.list || []), temp] })) }));
@@ -940,7 +941,7 @@ function sendAfterUpload(v, text, { replyTo, attachments = [], uploads }) {
     id: n, nonce: n, pending: true, uploading: { sent: 0, total }, uploads, ready: attachments, body: text, attachments: [...attachments, ...previews], system: false,
     ...(instUser ? { inst: instOf(v.cid) } : {}),
     author: instUser ? { id: instUser.id, username: me.username, pfp: me.pfp, color: instUser.velora_id ? (state.me?.color || me.color) : me.color, rank: me.rank, kind: instUser.kind || (instUser.velora_id ? 'velora' : 'local'), velora_id: instUser.velora_id } : { username: me.username, pfp: me.pfp, color: me.color, rank: me.rank }, created_at: Date.now(),
-    reply: replyTo ? { id: replyTo.id, author: replyTo.author, body: String(replyTo.body || '').slice(0, 200) } : null, replyTo,
+    reply: replyTo ? { id: replyTo.id, author: replyTo.author, alias: replyTo.alias || null, body: String(replyTo.body || '').slice(0, 200) } : null, replyTo,
   };
   const patch = f => set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? f(x) : x)) }) }));
   set(s => ({ msgs: upd(s.msgs, key, b => ({ list: [], hasMore: false, loaded: true, ...(b || {}), list: [...(b?.list || []), temp] })) }));

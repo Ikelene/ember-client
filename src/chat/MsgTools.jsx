@@ -10,6 +10,7 @@ import { ChannelIcon, P, has } from './roles.jsx';
 import { decodeRoleMentions } from './Mentions.jsx';
 import { renderBody, stampOf } from './text.jsx';
 import { GameInvites } from './GameInvite.jsx';
+import { AliasMark, aliasOf, aliasFace, shownName } from './Alias.jsx';
 
 // ── forwarding ──
 // the forwarded copy says where it came from; @everyone / @here inside it never ping again
@@ -118,8 +119,8 @@ function PinsPanel({ channel, sid, onClose }) {
         {list?.map((m, i) => (
           <div key={m.id} className="vc-pin vl-rise" style={{ '--i': Math.min(i, 10) }}>
             <div className="vc-pin-top">
-              {m.author && <Avatar user={m.author} size={22} />}
-              <b>{m.author?.username || 'Velora'}</b>
+              {m.author && <Avatar user={aliasFace(aliasOf(m), m.author)} size={22} />}
+              <b>{shownName(m)}</b>{aliasOf(m) && <AliasMark alias={aliasOf(m)} by={m.author} size={12} />}
               <small>{stampOf(m.created_at)}</small>
               <span className="grow" />
               <button type="button" className="vc-pin-jump" onClick={() => jump(m)}>Jump</button>

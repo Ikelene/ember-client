@@ -16,6 +16,7 @@ import { RoleChips, modRights, moderate } from './roles.jsx';
 import { PlatformIcon, PLATFORM_NAMES } from './platforms.jsx';
 import StatusReply from './StatusReply.jsx';
 import { ManageFacts, LastLoginFact } from './ClientVia.jsx';
+import { MaskIcon } from './Alias.jsx';
 
 export const STATUS_LABEL = { online: 'Online', idle: 'Idle', dnd: 'Do not disturb', invisible: 'Invisible', offline: 'Offline' };
 const CONN_HOVER = { discord: '#5865F2', fluxer: '#7c78ee', github: '#ffffff', spotify: '#1DB954' };
@@ -305,6 +306,7 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
         <div className="pe-name" data-vpb-protect="" style={color ? { color } : undefined}>{plain ? username : p?.username || vname}{(extra?.bot || (plain && who?.bot)) && <BotTag verified={!!(extra?.bot?.bot?.verified || (plain && who?.verified))} />}</div>
         {!plain && p?.pronouns && !p.private && <div className="vc-pronouns">{p.pronouns}</div>}
         {!plain && vname !== username && <div className="vc-card-sub">{username} on this server</div>}
+        {who?.alias_name && <div className="vc-card-sub vc-card-alias"><MaskIcon size={13} /> Posting as alias: <b>{who.alias_name}</b></div>}
         {extra?.bot?.bot?.owner && <div className="vc-card-sub">Bot made by @{extra.bot.bot.owner}</div>}
         {extra?.bot?.bot && extra.bot.bot.trusted_in != null && <TrustedIn n={extra.bot.bot.trusted_in} verified={!!extra.bot.bot.verified} />}
         {sub && <div className="vc-card-sub">{sub}</div>}

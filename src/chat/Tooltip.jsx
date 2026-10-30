@@ -1,16 +1,19 @@
 // Ember's own hover tooltips, for everything: any element with a title (or data-tip) gets this
 // instead of the browser's. The title moves into data-tip on first hover, so the browser one never
-// shows. data-tip-side="right" puts it beside the element; data-tip-server="<sid>" shows a server card.
+// shows. data-tip-side="right" puts it beside the element; data-tip-server="<sid>" shows a server card; data-tip-alias='{json}'
+// shows who really posted an aliased message (Alias.jsx) - that one also shows on keyboard focus.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AtSign, Globe } from 'lucide-react';
 import { useChat, statusOf, loadMembers } from './store.js';
+import { AliasTip } from './Alias.jsx';
 
 export function TooltipHost() {
   const [tip, setTip] = useState(null); // { el, text, side, server, rect }
   useEffect(() => {
     let cur = null, timer = null, shownAt = 0;
-    const find = t => (t instanceof Element ? t.closest('[title], [data-tip], [data-tip-server]') : null);
+    const find = t => (t instanceof Element ? t.closest('[title], [data-tip], [data-tip-server], [data-tip-alias]') : null);
+    const aliasOf = el => { try { return JSON.parse(el.getAttribute('data-tip-alias') || 'null'); } catch { return null; } };
     const over = e => {
       const el = find(e.target);
       if (el === cur) return;
@@ -27,26 +30,40 @@ export function TooltipHost() {
       }
       const text = el.getAttribute('data-tip');
       const server = el.getAttribute('data-tip-server');
-      if (!text && !server) { setTip(null); return; }
+      const alias = aliasOf(el);
+      if (!text && !server && !alias) { setTip(null); return; }
       // moving from one tip straight to the next shows it right away
       const quick = Date.now() - shownAt < 400;
       timer = setTimeout(() => {
         if (cur !== el || !document.contains(el)) return;
         shownAt = Date.now();
-        setTip({ el, text, server, side: el.getAttribute('data-tip-side') || 'top', rect: el.getBoundingClientRect() });
+        setTip({ el, text, server, alias, side: el.getAttribute('data-tip-side') || 'top', rect: el.getBoundingClientRect() });
       }, quick ? 40 : 380);
     };
     const hide = () => { cur = null; clearTimeout(timer); setTip(null); };
+    // keyboard: an alias mark shows its tip while it has focus
+    const focusIn = e => {
+      const el = e.target instanceof Element && e.target.matches('[data-tip-alias]') ? e.target : null;
+      const alias = el && aliasOf(el);
+      if (!alias) return;
+      cur = el; clearTimeout(timer); shownAt = Date.now();
+      setTip({ el, alias, side: 'top', rect: el.getBoundingClientRect() });
+    };
+    const focusOut = e => { if (e.target === cur && e.target.matches?.('[data-tip-alias]')) hide(); };
     document.addEventListener('mouseover', over, true);
     document.addEventListener('mousedown', hide, true);
     document.addEventListener('keydown', hide, true);
     document.addEventListener('scroll', hide, true);
+    document.addEventListener('focusin', focusIn, true);
+    document.addEventListener('focusout', focusOut, true);
     addEventListener('blur', hide);
     return () => {
       document.removeEventListener('mouseover', over, true);
       document.removeEventListener('mousedown', hide, true);
       document.removeEventListener('keydown', hide, true);
       document.removeEventListener('scroll', hide, true);
+      document.removeEventListener('focusin', focusIn, true);
+      document.removeEventListener('focusout', focusOut, true);
       removeEventListener('blur', hide);
     };
   }, []);
@@ -83,9 +100,9 @@ function Tip({ tip }) {
     setPos({ left: clampedLeft, top: Math.max(pad, Math.min(innerHeight - h - pad, top)), side, arrow: side === 'right' ? null : r.left + r.width / 2 - clampedLeft });
   }, [tip]);
   return (
-    <div ref={ref} className={`vc-tooltip side-${pos?.side || tip.side}${tip.server ? ' rich' : ''}`} role="tooltip"
+    <div ref={ref} className={`vc-tooltip side-${pos?.side || tip.side}${tip.server ? ' rich' : ''}${tip.alias ? ' alias' : ''}`} role="tooltip"
       style={pos ? { left: pos.left, top: pos.top, '--ax': pos.arrow != null ? `${pos.arrow}px` : undefined } : { left: -9999, top: -9999 }}>
-      {tip.server ? <ServerTip sid={tip.server} /> : tip.text}
+      {tip.server ? <ServerTip sid={tip.server} /> : tip.alias ? <AliasTip a={tip.alias} /> : tip.text}
     </div>
   );
 }
