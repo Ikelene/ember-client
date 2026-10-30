@@ -24,6 +24,7 @@ export const instView = c => ({
   serverInfo: c.isAdmin ? (c.serverInfo || null) : null, // its admins: /instance/info (build, runtime, stats, update)
   managed: c.info?.managed || null, // hosted by Velora: { plan, limits, host }
   readOnly: !!(c.info?.read_only || c.info?.community?.read_only), // hosted by Velora and its paid time ran out
+  previousUrls: Array.isArray(c.info?.previous_urls) ? c.info.previous_urls.map(normOrigin).filter(Boolean) : [], // addresses it had before (old signatures name them)
 
 });
 const mirror = () => patchState({ instances: [...connections.values()].map(instView) });
@@ -38,7 +39,9 @@ async function plain(origin, path, body, method = 'POST') {
   if (!res.ok) throw Object.assign(new Error(data.error || 'request_failed'), { status: res.status, ...data });
   return data;
 }
-// what an address is: the instance's public face, or why it isn't one
+// what an address is: the instance's public face, or why it isn't one.
+// A Nookara-hosted server that moved (e_<name>.nookara.cc) redirects its old address for two weeks: then the answer is the new
+// origin plus movedFrom, and callers keep the new one (the server says the same in public_url).
 export async function discover(input) {
   const origin = normOrigin(input);
   if (!origin) throw new Error('bad_instance_url');
@@ -46,6 +49,9 @@ export async function discover(input) {
   try { res = await fetch(`${origin}/.well-known/bonfire`, { cache: 'no-store', signal: AbortSignal.timeout(10000) }); } catch { throw new Error('instance_unreachable'); }
   const info = await res.json().catch(() => null);
   if (!res.ok || info?.software !== 'bonfire-server' || !info.accounts_mode) throw new Error('not_an_instance');
+  const landed = res.redirected ? normOrigin(res.url) : null;
+  const moved = landed && landed !== origin && normOrigin(info.public_url) === landed ? landed : null;
+  if (moved) return { origin: moved, movedFrom: origin, info: fromInstance(moved, info, '/instance') };
   return { origin, info: fromInstance(origin, info, '/instance') };
 }
 
@@ -230,17 +236,60 @@ export async function connect(origin) {
   if (!c || c.busy) return;
   c.busy = true;
   clearTimeout(c.timer); c.retryAt = 0;
+  let movedTo = null;
   try {
     if (c.ws && c.ws.readyState <= 1) return;
     setStatus(c, 'connecting');
     const hung = new Promise((_, no) => setTimeout(() => no(new Error('instance_unreachable')), 25000)); // a request that never answers is a failed try
-    c.info = (await Promise.race([discover(origin), hung])).info;
+    const found = await Promise.race([discover(origin), hung]);
+    if (found.movedFrom) { movedTo = found.origin; return; } // (followed below, once this try is over)
+    c.info = found.info;
     if (await Promise.race([ensureSession(c), hung])) openSocket(c); else mirror();
   } catch (e) {
+    if (e.message === 'instance_moved' && e.moved_to) { movedTo = normOrigin(e.moved_to); return; } // Velora: that address moved
+
     c.failed = true;
     setStatus(c, e.message === 'insufficient_scope' ? 'error' : 'closed', e.message);
     scheduleRetry(c);
-  } finally { c.busy = false; }
+  } finally { c.busy = false; if (movedTo) moveInstance(origin, movedTo); }
+}
+// A server moved to a new address: the rail entry, its session (same server, same database) and the saved list follow, and the
+// old address is dropped. Velora rewrote the synced list already; this is for this device's copy (and an open tab).
+const moved = new Set();
+export async function moveInstance(from, to) {
+  const c = connections.get(from);
+  if (!c || !to || from === to || moved.has(from)) return;
+  moved.add(from);
+  try {
+    const session = loadSessions()[from], tag = loadSessionTags()[from];
+    clearTimeout(c.timer);
+    const ws = c.ws; c.ws = null; try { ws?.close(); } catch { /* gone */ }
+    instanceVoiceClosed(from);
+    registry.delete(from); saveSession(from, null);
+    const view = getState().view;
+    const wasHere = (view.sid && parseK(view.sid).inst === from) || view.inst === from;
+    const order = [...connections.keys()];
+    const old = new Map(connections);
+    connections.clear();
+    for (const o of order) {
+      if (o === from) { if (!old.has(to)) connections.set(to, { ...newConn(to), session: session || null, prefs: c.prefs }); }
+      else connections.set(o, old.get(o));
+    }
+    if (session && !old.has(to)) saveSession(to, session, tag);
+    const gone = k => parseK(k).inst === from;
+    patchState(s => {
+      const pick = o => Object.fromEntries(Object.entries(o).filter(([k]) => !gone(k.replace(/^(c|d|g|mm):/, ''))));
+      return {
+        servers: s.servers.filter(x => x.inst !== from), detail: pick(s.detail), members: pick(s.members), msgs: pick(s.msgs), unread: pick(s.unread), unreadN: pick(s.unreadN), typing: pick(s.typing),
+        mentions: pick(s.mentions), srvMentions: pick(s.srvMentions), notify: pick(s.notify), voiceStates: pick(s.voiceStates), lastCid: pick(s.lastCid),
+        emojis: (s.emojis || []).filter(x => !gone(x.sid)), instances: [...connections.values()].map(instView),
+      };
+    });
+    toast(`${hostOf(from)} moved to ${hostOf(to)}.`, true);
+    await saveList();
+    await connect(to);
+    if (wasHere) go({ kind: 'instance', inst: to });
+  } finally { moved.delete(from); }
 }
 // the instance refused something for a missing permission (e.g. signing): trade a fresh instance token from the current
 // Ember sign-in (which may have been approved for more since) and reconnect. -> the new session's scopes, or null
@@ -276,8 +325,12 @@ const readList = () => { try { const v = JSON.parse(localStorage.getItem(LIST_CA
 const saveList = () => {
   const urls = [...connections.keys()];
   try { localStorage.setItem(LIST_CACHE(), JSON.stringify(urls)); } catch { /* fine */ }
-  return getToken() ? apiFetch('/bonfire/instances', { method: 'PUT', body: JSON.stringify({ instances: urls.map(url => ({ url })) }) }).then(applyPrefs).catch(() => {}) : Promise.resolve();
+  return getToken() ? apiFetch('/bonfire/instances', { method: 'PUT', body: JSON.stringify({ instances: urls.map(url => ({ url })) }) }).then(d => { applyPrefs(d); followMoves(d); }).catch(() => {}) : Promise.resolve();
 };
+// Velora saw an old address of a server that moved (PUT /bonfire/instances answers { moved: { old: new } })
+function followMoves(d) {
+  for (const [from, to] of Object.entries(d?.moved || {})) { const f = normOrigin(from), t = normOrigin(to); if (f && t && connections.has(f)) moveInstance(f, t); }
+}
 function applyPrefs(d) {
   for (const i of d?.instances || []) { const c = connections.get(normOrigin(i.url)); if (c) c.prefs = { muted: !!i.muted, push: i.push !== false }; }
   mirror();

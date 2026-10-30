@@ -4,16 +4,28 @@
 // Plus is prepaid weeks and never renews by itself: when the time is up the server is overdue for 2 days, then read-only,
 // and a week later Velora keeps a backup in your account and shuts it down. Velora's side: /bonfire/hosting/* (PROTOCOL §19).
 import { useEffect, useRef, useState } from 'react';
-import { INSTANCE_DOMAIN } from './hosts.js';
-import { Check, Globe, Rocket, Sparkles, Users, Volume2, Upload, Smile, Bot, ArrowLeftRight, KeyRound, TriangleAlert, RefreshCw, Trash2, Coins, Server, ShieldCheck, Archive, Download, CalendarClock, X, Lock, HardDrive } from 'lucide-react';
+import { Check, Globe, Rocket, Sparkles, Users, Volume2, Upload, Smile, Bot, ArrowLeftRight, KeyRound, TriangleAlert, RefreshCw, Trash2, Coins, Server, ShieldCheck, Archive, Download, CalendarClock, X, Lock, HardDrive, Clock, Pencil } from 'lucide-react';
 import { apiFetch, getToken } from '../api.js';
 import { Dialog } from './Dialogs.jsx';
 import { useChat, patchState, toast, errorText, ask, go } from './store.js';
-import { discover, veloraSession, addInstance } from './instances.js';
+import { discover, veloraSession, addInstance, moveInstance } from './instances.js';
 import { normOrigin, instOf, isInst } from './ids.js';
 import { hasVelora, startSignIn } from './session.js';
 
-const SLUG = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$/;
+// a hosted server's address is e_<slug>.nookara.cc (the host template from /bonfire/hosting/plans); choosing <slug> is a Nookara Pro perk
+const DEFAULT_TEMPLATE = 'e_{slug}.nookara.cc';
+const tplParts = cfg => (cfg?.host_template || DEFAULT_TEMPLATE).split('{slug}');
+// the same rules Nookara checks (bonfire-hosting-slugs.js), so most mistakes show before asking it
+export function slugIssue(s) {
+  if (s.length < 3) return 'too_short';
+  if (s.length > 32) return 'too_long';
+  if (!/^[a-z0-9-]+$/.test(s)) return 'invalid_chars';
+  if (s.startsWith('-') || s.endsWith('-')) return 'hyphen_edge';
+  if (s.includes('--')) return 'double_hyphen';
+  return null;
+}
+const SLUG_DETAIL = { too_short: 'At least 3 characters.', too_long: 'At most 32 characters.', invalid_chars: 'Only lowercase letters, numbers and dashes.', hyphen_edge: "It can't start or end with a dash.", double_hyphen: "Two dashes in a row aren't allowed." };
+const until = ms => { const h = Math.floor(ms / 3600000), m = Math.max(1, Math.ceil((ms % 3600000) / 60000)); return h ? `${h} h ${m} min` : `${m} min`; };
 const DAY = 86400000;
 const slugFrom = name => name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32);
 const plural = (n, w) => `${n.toLocaleString()} ${w}${n === 1 ? '' : 's'}`;
@@ -23,12 +35,13 @@ const daysLeft = t => Math.max(0, Math.ceil((t - Date.now()) / DAY));
 const sizeOf = b => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 export const HOSTING_TEXT = {
   hosting_unavailable: "Nookara can't host servers right now - try again later.", slug_taken: 'That address is taken.', slug_reserved: "That address can't be used.",
-  invalid_slug: 'Use 3-32 letters, numbers or dashes (not at the start or end).', insufficient_balance: "You don't have enough credits for that.", insufficient_credits: "You don't have enough credits for that.",
+  invalid_slug: 'Use 3-32 letters, numbers or dashes (not at the start or end).', pro_required: 'Choosing your own address needs Nookara Pro.',
+  address_cooldown: 'You can change the address once every 24 hours.', address_locked: 'This address stays yours, but changing it needs Nookara Pro again.', nothing_to_change: "That's already its address.", insufficient_balance: "You don't have enough credits for that.", insufficient_credits: "You don't have enough credits for that.",
   starter_limit_reached: 'You already have a free Starter server. Pick Plus for another one.', use_weeks: 'Buy weeks of Plus to upgrade.', suspended: "Nookara's staff have suspended this server.",
   hosting_failed: "Nookara couldn't do that on the server right now - try again in a bit.", backup_failed: "The backup didn't work, so nothing was deleted - try again in a bit.",
   insufficient_scope: 'Ember needs the "Spend Credits" permission for that. Sign out of Ember and sign in again, and tick it on the approval screen.', not_owner: "You aren't this server's owner.", backup_not_found: 'That backup is gone.',
 };
-const hostingError = e => (e?.error === 'insufficient_balance' && e.cost ? `That costs ${Number(e.cost).toLocaleString()} credits - you have ${Number(e.balance || 0).toLocaleString()}.` : HOSTING_TEXT[e?.message || e] || errorText(e?.message || e));
+const hostingError = e => (e?.error === 'insufficient_balance' && e.cost ? `That costs ${Number(e.cost).toLocaleString()} credits - you have ${Number(e.balance || 0).toLocaleString()}.` : (e?.detail && SLUG_DETAIL[e.detail]) || HOSTING_TEXT[e?.message || e] || errorText(e?.message || e));
 
 // ── your hosted servers, shared by the settings page and the note at the bottom left (refreshed now and then) ──
 let hostedAt = 0;
@@ -123,23 +136,27 @@ export function CreateServer({ onClose, onSetup, onAddByAddress }) {
   const starters = mine.filter(s => s.plan === 'starter' && s.billing !== 'archived').length;
   const starterFull = cfg?.starter_limit_per_account != null && starters >= cfg.starter_limit_per_account;
   useEffect(() => { if (starterFull && plan === 'starter') setPlan('plus'); }, [starterFull]); // eslint-disable-line react-hooks/exhaustive-deps
-  const urlFor = s => (cfg?.url_template ? cfg.url_template.replace('{slug}', s || 'your-server') : `https://e_${s || 'your-server'}.${cfg?.domain || INSTANCE_DOMAIN}`);
-  // the address follows the name until it's edited; availability is checked as you type
-  useEffect(() => { if (!touched) setSlug(slugFrom(name)); }, [name]); // eslint-disable-line react-hooks/exhaustive-deps
+  const urlFor = s => (cfg?.url_template ? cfg.url_template.replace('{slug}', s || 'your-server') : `https://${(cfg?.host_template || DEFAULT_TEMPLATE).replace('{slug}', s || 'your-server')}`);
+  const [pre, post] = tplParts(cfg);
+  // Nookara Pro: the address follows the name until it's edited (empty = a random one); availability is checked as you type.
+  // Everyone else gets a random address.
+  useEffect(() => { if (!touched && pro) setSlug(slugFrom(name)); }, [name, pro]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     clearTimeout(timer.current);
-    if (!slug) { setCheck(null); return undefined; }
-    if (!SLUG.test(slug)) { setCheck({ slug, available: false, reason: 'invalid_slug' }); return undefined; }
+    if (!slug || !pro) { setCheck(null); return undefined; }
+    const issue = slugIssue(slug);
+    if (issue) { setCheck({ slug, available: false, reason: 'invalid_slug', detail: issue }); return undefined; }
     setCheck({ slug, checking: true });
     timer.current = setTimeout(() => apiFetch(`/bonfire/hosting/slug/${encodeURIComponent(slug)}`).then(d => setCheck({ slug, ...d, reason: d.reason && ({ invalid: 'invalid_slug', reserved: 'slug_reserved', taken: 'slug_taken' }[d.reason] || d.reason) })).catch(e => setCheck({ slug, available: false, reason: e.message })), 350);
     return () => clearTimeout(timer.current);
-  }, [slug]);
-  function pickBackup(b) { setRestore(b); setName(b.name || b.slug); setTouched(true); setSlug(b.slug); setStep('address'); }
+  }, [slug, pro]);
+  function pickBackup(b) { setRestore(b); setName(b.name || b.slug); setTouched(true); setSlug(pro && b.slug && !slugIssue(b.slug) ? b.slug : ''); setStep('address'); }
+  const addressOk = !pro || !slug || !!check?.available;
 
   async function create() {
     setStep('work'); setErr(''); setProgress(0);
     try {
-      const d = await apiFetch('/bonfire/hosting/servers', { method: 'POST', body: JSON.stringify({ slug, name: name.trim(), plan, ...(chosen?.price_credits > 0 ? { weeks } : {}), ...(restore ? { restore_backup: restore.id } : {}) }) });
+      const d = await apiFetch('/bonfire/hosting/servers', { method: 'POST', body: JSON.stringify({ ...(pro && slug ? { host_slug: slug } : {}), name: name.trim(), plan, ...(chosen?.price_credits > 0 ? { weeks } : {}), ...(restore ? { restore_backup: restore.id } : {}) }) });
       const origin = normOrigin(d.url || d.server?.url);
       loadHosted(true);
       setProgress(1);
@@ -197,23 +214,28 @@ export function CreateServer({ onClose, onSetup, onAddByAddress }) {
             </>
           )}
           {cfg?.available && step === 'address' && (
-            <form onSubmit={e => { e.preventDefault(); if (check?.available && name.trim()) create(); }}>
+            <form onSubmit={e => { e.preventDefault(); if (addressOk && name.trim()) create(); }}>
               {restore && (
                 <div className="bf-plans">{plans.map(p => <PlanCard key={p.id} plan={p} pro={pro} on={plan === p.id} onPick={() => setPlan(p.id)} disabled={p.id === 'starter' && starterFull} />)}</div>
               )}
               <label className="vc-field"><span>Server name</span><input className="form-input" autoFocus maxLength={60} placeholder="My server" value={name} onChange={e => setName(e.target.value)} /></label>
-              <label className="vc-field"><span>Address</span>
-                <div className="bf-slug"><input className="form-input" maxLength={32} value={slug} spellCheck={false} onChange={e => { setTouched(true); setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')); }} aria-label="Address" />
-                  <span className="bf-slug-rest">{urlFor('').replace(/^https?:\/\/your-server/, '')}</span></div>
-                <small className={`vc-hint${check && !check.checking && !check.available ? ' vc-err' : ''}`}>
-                  {!check ? 'Letters, numbers and dashes.' : check.checking ? 'Checking...' : check.available ? <><Check size={12} className="vc-inline-ico" /> <Globe size={12} className="vc-inline-ico" /> {urlFor(slug)} is free.</> : hostingError(check.reason || 'slug_taken')}
-                </small></label>
+              {pro ? (
+                <label className="vc-field"><span>Address</span>
+                  <div className="bf-slug">{pre && <span className="bf-slug-pre">{pre}</span>}<input className="form-input" maxLength={32} value={slug} placeholder="random" spellCheck={false} onChange={e => { setTouched(true); setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')); }} aria-label="Address" />
+                    <span className="bf-slug-rest">{post}</span></div>
+                  <small className={`vc-hint${check && !check.checking && !check.available ? ' vc-err' : ''}`}>
+                    {!slug ? <><Sparkles size={12} className="vc-inline-ico" /> Nookara Pro: pick the address, or leave it empty for a random one. You can change it once a day.</> : !check ? 'Letters, numbers and dashes.' : check.checking ? 'Checking...' : check.available ? <><Check size={12} className="vc-inline-ico" /> <Globe size={12} className="vc-inline-ico" /> {urlFor(slug)} is free.</> : hostingError({ message: check.reason || 'slug_taken', detail: check.detail })}
+                  </small></label>
+              ) : (
+                <div className="vc-field"><span>Address</span>
+                  <small className="vc-hint"><Globe size={12} className="vc-inline-ico" /> It gets a random address like {urlFor('x7k2m9qp').replace(/^https?:\/\//, '')}. <a href="/upgrade" target="_blank" rel="noreferrer">Nookara Pro</a> lets you choose your own (e.g. {(pre || '') + 'yourname' + (post || '')}) and change it once a day.</small></div>
+              )}
               {chosen?.price_credits > 0 && !(pro && chosen.free_with_pro) ? <WeeksPicker plan={chosen} weeks={weeks} setWeeks={setWeeks} />
                 : chosen && <p className="vc-note">{chosen.price_credits > 0 ? <><Sparkles size={14} /> {chosen.name}: free with your Nookara Pro, for as long as you have it.</> : <><Rocket size={14} /> {chosen.name}: free.</>}</p>}
 
               {err && <p className="vc-err"><TriangleAlert size={14} /> {err}</p>}
               <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" onClick={() => { setRestore(null); setStep('plan'); }}>Back</button><span className="grow" />
-                <button type="submit" className="btn btn-primary" disabled={!check?.available || !name.trim()}>{restore ? <><RefreshCw size={15} /> Restore server</> : <><Rocket size={15} /> Create server</>}</button></div>
+                <button type="submit" className="btn btn-primary" disabled={!addressOk || !name.trim()}>{restore ? <><RefreshCw size={15} /> Restore server</> : <><Rocket size={15} /> Create server</>}</button></div>
             </form>
           )}
           {step === 'work' && (
@@ -275,6 +297,71 @@ async function downloadBackup(b) {
   } catch (e) { toast(hostingError(e)); }
 }
 
+// ── Server settings > Hosting > Address: e_<slug>.nookara.cc. Nookara Pro owners pick <slug> and change it once per 24 hours
+// (the old address redirects for 14 days); without Pro the address is random; after Pro ends a chosen one stays, frozen ──
+function AddressCard({ h, cfg, origin }) {
+  const a = h.address || { state: 'pro_only', url: h.url, host_slug: h.host_slug };
+  const [pre, post] = tplParts(cfg || { host_template: a.template });
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(a.host_slug || '');
+  const [check, setCheck] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [, tick] = useState(0);
+  const timer = useRef(null);
+  useEffect(() => { if (a.state !== 'cooldown') return undefined; const t = setInterval(() => tick(n => n + 1), 30000); return () => clearInterval(t); }, [a.state]);
+  useEffect(() => {
+    clearTimeout(timer.current);
+    if (!editing || !val || val === a.host_slug) { setCheck(null); return undefined; }
+    const issue = slugIssue(val);
+    if (issue) { setCheck({ available: false, reason: 'invalid_slug', detail: issue }); return undefined; }
+    setCheck({ checking: true });
+    timer.current = setTimeout(() => apiFetch(`/bonfire/hosting/slug/${encodeURIComponent(val)}?server=${encodeURIComponent(h.slug)}`).then(d => setCheck({ ...d, reason: d.reason && ({ invalid: 'invalid_slug', reserved: 'slug_reserved', taken: 'slug_taken' }[d.reason] || d.reason) })).catch(e => setCheck({ available: false, reason: e.message })), 350);
+    return () => clearTimeout(timer.current);
+  }, [val, editing]); // eslint-disable-line react-hooks/exhaustive-deps
+  const left = a.next_change_at ? a.next_change_at - Date.now() : 0;
+  async function save() {
+    if (!(await ask({ title: `Move to ${pre}${val}${post}?`, text: `People reach the server at the new address right away. The old one, ${(a.url || '').replace(/^https?:\/\//, '')}, redirects for 14 days, then stops working. You can change it again in 24 hours.`, confirm: 'Change address' }))) return;
+    setBusy(true);
+    try {
+      const d = await apiFetch(`/bonfire/hosting/servers/${h.slug}/address`, { method: 'PUT', body: JSON.stringify({ host_slug: val }) });
+      setEditing(false);
+      await loadHosted(true);
+      toast('Address changed. The old one redirects for 14 days.', true);
+      const to = normOrigin(d.server?.url), from = normOrigin(d.old_url) || origin;
+      if (to && from && to !== from) moveInstance(from, to); // this device follows right away (everyone else on their next connect)
+    } catch (e) { setCheck({ available: false, reason: e.message, detail: e.detail }); }
+    setBusy(false);
+  }
+  return (
+    <div className="card bf-ss-card">
+      <div className="card-header"><span className="card-title"><Globe size={15} /> Address</span></div>
+      <div className="card-body">
+        {!editing && (
+          <div className="cs-row"><div className="cs-text"><b>{(a.url || h.url || '').replace(/^https?:\/\//, '')}</b>
+            <span>{a.state === 'editable' ? 'Your own address, with Nookara Pro. You can change it once every 24 hours.'
+              : a.state === 'cooldown' ? <><Clock size={12} className="vc-inline-ico" /> Changed recently - you can change it again in {until(left)}{a.next_change_at ? ` (${new Date(a.next_change_at).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })})` : ''}.</>
+              : a.state === 'locked' ? <><Lock size={12} className="vc-inline-ico" /> You chose this address with Nookara Pro. It stays yours, but changing it needs <a href="/upgrade" target="_blank" rel="noreferrer">Nookara Pro</a> again.</>
+              : <>A random address. With <a href="/upgrade" target="_blank" rel="noreferrer">Nookara Pro</a> you choose your own ({pre}yourname{post}) and can change it once a day.</>}</span></div>
+            {(a.state === 'editable' || a.state === 'cooldown') && <button type="button" className="btn btn-surface" disabled={a.state !== 'editable'} onClick={() => { setVal(a.host_slug || ''); setEditing(true); }}><Pencil size={14} /> Change</button>}
+          </div>
+        )}
+        {editing && (
+          <form onSubmit={e => { e.preventDefault(); if (check?.available && !busy) save(); }}>
+            <div className="bf-addr-row">
+              <div className="bf-slug">{pre && <span className="bf-slug-pre">{pre}</span>}<input className="form-input" autoFocus maxLength={32} value={val} spellCheck={false} aria-label="New address" onChange={e => setVal(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} /><span className="bf-slug-rest">{post}</span></div>
+            </div>
+            <small className={`vc-hint${check && !check.checking && !check.available ? ' vc-err' : ''}`}>
+              {!check ? '3-32 lowercase letters, numbers and dashes.' : check.checking ? 'Checking...' : check.available ? <><Check size={12} className="vc-inline-ico" /> {pre}{val}{post} is free.</> : hostingError({ message: check.reason || 'slug_taken', detail: check.detail })}
+            </small>
+            <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" disabled={busy} onClick={() => { setEditing(false); setCheck(null); }}>Cancel</button><span className="grow" />
+              <button type="submit" className="btn btn-primary" disabled={busy || !check?.available}>{busy ? 'Moving...' : 'Change address'}</button></div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Server settings > Hosting (the owner of a Velora-hosted server) ──
 export function HostingPage({ origin }) {
   const h = useHostedFor(origin);
@@ -329,8 +416,9 @@ export function HostingPage({ origin }) {
     setBusy('');
   }
   async function del() {
-    if (!(await ask({ title: `Delete ${h.name || h.slug}?`, text: 'Nookara saves a backup to your account first, then shuts the server down and deletes it. You can restore the backup later from Create a server.', match: h.slug, confirm: 'Delete server', danger: true }))) return;
-    try { await apiFetch(`/bonfire/hosting/servers/${h.slug}`, { method: 'DELETE', body: JSON.stringify({ confirm: h.slug }) }); loadHosted(true); toast('Deleted. A backup is in your account.', true); go({ kind: 'home' }); } catch (e) { toast(hostingError(e)); }
+    const word = h.host_slug || h.slug;
+    if (!(await ask({ title: `Delete ${h.name || word}?`, text: 'Nookara saves a backup to your account first, then shuts the server down and deletes it. You can restore the backup later from Create a server.', match: word, confirm: 'Delete server', danger: true }))) return;
+    try { await apiFetch(`/bonfire/hosting/servers/${h.slug}`, { method: 'DELETE', body: JSON.stringify({ confirm: word }) }); loadHosted(true); toast('Deleted. A backup is in your account.', true); go({ kind: 'home' }); } catch (e) { toast(hostingError(e)); }
   }
   async function dropBackup(b) {
     if (!(await ask({ title: 'Delete this backup?', text: "It's gone for good - download it first if you might want it.", confirm: 'Delete backup', danger: true }))) return;
@@ -346,6 +434,7 @@ export function HostingPage({ origin }) {
             <button type="button" className="btn btn-surface" disabled={!!busy} onClick={restart}><RefreshCw size={14} /> Restart</button></div>
         </div>
       </div>
+      <AddressCard h={h} cfg={cfg} origin={origin} />
       <div className="card bf-ss-card">
         <div className="card-header"><span className="card-title"><Sparkles size={15} /> Plan</span></div>
         <div className="card-body">

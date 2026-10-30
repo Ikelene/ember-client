@@ -99,8 +99,14 @@ export async function checkMessage(m) {
     if (!vid || String(key.user_id) !== String(vid)) return 'bad';
     if (key.revoked_at != null && Number(key.revoked_at) < Number(sig.ts)) return 'bad';
     const pub = await importKey(key.public_key);
+    // the signature names the account issuer (pinned, see SIG_ISS) and the server's address when it was sent: try the
+    // current address, then the ones it had before a move
+    const insts = [m.inst, ...(getState().instances?.find(i => i.origin === m.inst)?.previousUrls || [])];
     for (const iss of SIG_ISS_ALL) {
-      if (await crypto.subtle.verify({ name: 'Ed25519' }, pub, unb64u(sig.sig), bytesOf(receivedPayload(m, iss)))) return 'ok';
+      const payload = receivedPayload(m, iss);
+      for (const instance of insts) {
+        if (await crypto.subtle.verify({ name: 'Ed25519' }, pub, unb64u(sig.sig), bytesOf({ ...payload, instance }))) return 'ok';
+      }
     }
     return 'bad';
   } catch (e) {
