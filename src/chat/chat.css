@@ -1387,7 +1387,7 @@ img.vc-sug-emoji { width: 20px; height: 20px; object-fit: contain; }
 .vc-new-line { position: relative; display: flex; align-items: center; margin: 8px 16px 4px 16px; height: 0; border-top: 1px solid #e05858; }
 .vc-new-line span { position: absolute; right: 0; top: -9px; padding: 0 6px; background: #e05858; color: #fff; font-size: 10px; font-weight: 700; letter-spacing: .05em; line-height: 17px; text-transform: uppercase; }
 
-/* catbox file cards */
+/* file cards (DM files in Velora storage, old catbox links, instance files) */
 .vc-filecard { display: flex; align-items: center; gap: 12px; width: 100%; max-width: 420px; margin-top: 4px; padding: 10px 12px; background: #111113; border: 1px solid var(--border); border-left: 3px solid var(--accent); }
 .vc-filecard.vc-att-expired { opacity: .7; font-style: italic; border-left-color: var(--border-2); }
 .vc-filecard-ico { position: relative; width: 40px; height: 44px; color: var(--accent); flex: none; display: grid; place-items: center; }
@@ -2326,3 +2326,18 @@ a.vc-glint-site:hover { color: var(--text); text-decoration: none; }
 .vc-notifs-more:hover { background: var(--accent-dim); }
 .vc-notifs-foot { flex: none; display: block; padding: 10px; border-top: 1px solid var(--border); color: var(--dim); font-size: 13px; text-align: center; text-decoration: none; }
 .vc-notifs-foot:hover { background: var(--accent-dim); color: #fff; }
+/* where DM files go (UploadDest.jsx) */
+.vc-updest-cards { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 12px; }
+.vc-updest-card { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; background: #151517; border: 1px solid var(--border-2); color: var(--dim); text-align: left; cursor: pointer; transition: border-color .12s, background .12s; }
+.vc-updest-card svg { flex: none; margin-top: 2px; color: var(--accent); }
+.vc-updest-card span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.vc-updest-card b { color: var(--text); font-size: 14px; }
+.vc-updest-card small { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.vc-updest-card small.why { color: #f0c674; }
+.vc-updest-card:hover:not(:disabled) { border-color: var(--accent); background: #1b1b1f; }
+.vc-updest-card:disabled { opacity: .55; cursor: not-allowed; }
+.vc-updest-remember { display: flex; align-items: flex-start; gap: 8px; }
+/* temporary-storage files: how long they have left (shown on hover) */
+.vc-filecard-exp { color: var(--muted); opacity: 0; transition: opacity .15s; }
+.vc-filecard:hover .vc-filecard-exp, .vc-filecard:focus-within .vc-filecard-exp { opacity: 1; }
+.vc-patt-dest { position: absolute; right: 3px; bottom: 3px; display: grid; place-items: center; width: 17px; height: 17px; background: rgba(0, 0, 0, .7); color: #fff; pointer-events: auto; }

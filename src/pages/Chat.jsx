@@ -40,6 +40,7 @@ import { isInst, instOf } from '../chat/ids.js';
 
 
 import { Discover, Invite, JoinInvite, ChannelEditor, NewDM, NewGroup, QuickSwitcher, AskHost } from '../chat/Dialogs.jsx';
+import { UploadDestHost } from '../chat/UploadDest.jsx';
 import Home from '../chat/Home.jsx';
 import { TestBotDialog } from '../chat/BotTest.jsx';
 import { AddInstance } from '../chat/Instances.jsx';
@@ -656,6 +657,7 @@ function ChatPage() {
       {dialog?.kind === 'chat-settings' && <SettingsDialog key={dialog.page || 'settings'} page={dialog.page} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'forward' && <ForwardDialog message={dialog.message} from={dialog.from} onClose={() => setDialog(null)} />}
       <AskHost />
+      <UploadDestHost />
     </div>
   );
 }

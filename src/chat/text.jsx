@@ -10,8 +10,20 @@ import { isHiddenInviteLine } from './inviteLink.js';
 const IMG = /^https:\/\/\S+\.(png|jpe?g|gif|webp)(\?\S*)?(#\S*)?$/i;
 const VID = /^https:\/\/(velora\.ikelene\.net\/uploads|files\.catbox\.moe)\/\S+\.(mp4|webm|mov)$/i;
 const AUD = /^https:\/\/(velora\.ikelene\.net\/uploads|files\.catbox\.moe)\/\S+\.(mp3|ogg|wav|m4a|aac|flac|weba|opus)$/i;
-// a catbox link (where Ember's uploads live): pictures / videos / sounds play in Velora's viewer, anything else is a file card
-// (#n=<name> on the end = the file's real name - catbox only knows its id)
+// Files sent in DMs live on Velora: temporary storage (/t/<id>/<name>, the name is in the path) or account storage
+// (/uploads/..., #n=<name> on the end = the real name). Pictures show as pictures, videos / sounds play, the rest is a file card.
+const TMP = /^https:\/\/velora\.ikelene\.net\/t\/[A-Za-z0-9]{22}\/[^\s?#]+$/i;
+const VUP = /^https:\/\/velora\.ikelene\.net\/uploads\/(images|videos|audio|files)\/[^\s?#]+(#n=[^\s#]*)?$/i;
+const isVel = u => TMP.test(u) || VUP.test(u);
+const velItem = full => {
+  const [u, frag] = full.split('#');
+  let name = u.split('/').pop();
+  try { name = decodeURIComponent(/^n=(.+)$/.exec(frag || '')?.[1] || name).slice(0, 150); } catch { /* as it is */ }
+  const type = /\.(mp4|webm|mov)$/i.test(u) ? 'video' : /\.(mp3|ogg|wav|m4a|aac|flac|weba|opus)$/i.test(u) ? 'audio' : 'file';
+  return { url: u, type, name, ...(TMP.test(u) ? { host: 'velora-temp' } : {}) };
+};
+// an old catbox link (where Ember's DM uploads went before Velora's own storage): pictures / videos / sounds play in Velora's
+// viewer, anything else is a file card (#n=<name> on the end = the file's real name - catbox only knows its id)
 const CB = /^https:\/\/(files|litter)\.catbox\.moe\/[\w-]+\.[a-z0-9]{1,8}(#n=[^\s#]*)?$/i;
 const cbItem = full => {
   const [u, frag] = full.split('#');
@@ -181,6 +193,7 @@ export function renderBody(body, ctx) {
       if (IMG.test(t) && ctx?.linkImages !== false) { images.push(noFrag(t)); continue; } // a picture on its own line shows as the picture
       if (/^https:\/\/(?:www\.)?klipy\.com\/(gifs|stickers|clips)\/[\w-]{1,160}\/?(?:\?\S*)?$/i.test(t) && ctx?.linkImages !== false) { images.push(t); continue; } // a Klipy GIF page link shows as the GIF
       if (!ctx?.bio && CB.test(t) && !IMG.test(t)) { media.push(cbItem(t)); continue; } // catbox videos / sounds / files (the link hides)
+      if (!ctx?.bio && isVel(t) && !IMG.test(t)) { media.push(velItem(t)); continue; } // Velora-stored videos / sounds / files, the same
       if (!ctx?.bio && VID.test(t)) { media.push({ url: t, type: 'video' }); continue; } // so do videos / audio files uploaded to Velora
       if (!ctx?.bio && AUD.test(t)) { media.push({ url: t, type: 'audio', name: decodeURIComponent(t.split('/').pop()) }); continue; }
       const item = /^(\s*)([-*]|(\d{1,3})[.)])\s+(.+)$/.exec(line);
@@ -222,7 +235,9 @@ export function renderBody(body, ctx) {
       if (text[m.index - 1] === '<' && text[m.index + u.length] === '>') continue;
       // catbox links in the middle of a sentence keep their text, and still get shown underneath
       if (CB.test(u)) { const it = cbItem(u); if (!images.includes(it.url) && !media.some(x => x.url === it.url)) { if (IMG.test(u)) images.push(it.url); else media.push(it); } continue; }
-      if (IMG.test(u) || VID.test(u) || AUD.test(u) || /^https:\/\/([a-z0-9-]+\.)*klipy\.com\//i.test(u) || /^https:\/\/velora\.ikelene\.net\/uploads\//i.test(u)) continue;
+      // so do Velora-stored DM files (never unfurled: Velora fetching its own temporary file would count as someone opening it)
+      if (isVel(u)) { const it = velItem(u); if (!images.includes(u) && !images.includes(it.url) && !media.some(x => x.url === it.url)) { if (IMG.test(u)) images.push(u); else media.push(it); } continue; }
+      if (IMG.test(u) || VID.test(u) || AUD.test(u) || /^https:\/\/([a-z0-9-]+\.)*klipy\.com\//i.test(u) || /^https:\/\/velora\.ikelene\.net\/(uploads|t)\//i.test(u)) continue;
       if (!links.includes(u)) links.push(u);
     }
   });

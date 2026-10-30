@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import serverCreationPolicy from '../server-creation-policy.json';
 import { apiFetch, getToken, onScopeError, onAuthLost, isWebBonfire, uploadFetch } from '../api.js';
 import { endSession, startSignIn } from './session.js';
+import { rememberedDest, TEMP_LINK, tempId } from './upload-dest.js';
 import { callLinePlain } from './callText.js';
 import { inviteSummary } from './gameInvite.js';
 import { applyIdentity } from './identity.js';
@@ -49,7 +50,7 @@ let state = {
   srvMentions: {},         // sid -> the same, per server
   notify: {},              // target (cid / sid) -> { level, muted_until, push }
   toastOk: false,
-  settings: { show_typing: true, share_typing: true, share_activity: true, sounds: true, notify_sound: 'short', notifications: 'mentions', dm_privacy: 'everyone', compact: false, animations: true, link_images: true, developer_mode: false, allow_vc_calls: true, yt_mode: 'ask', radio_enabled: false, radio_url: 'https://www.clubfmserver.be/pink.mp3', strip_tracking: null },
+  settings: { show_typing: true, share_typing: true, share_activity: true, sounds: true, notify_sound: 'short', notifications: 'mentions', dm_privacy: 'everyone', compact: false, animations: true, link_images: true, developer_mode: false, allow_vc_calls: true, yt_mode: 'ask', dm_upload_dest: 'ask', radio_enabled: false, radio_url: 'https://www.clubfmserver.be/pink.mp3', strip_tracking: null },
   lastCid: {},             // sid -> cid
   error: null,
   voice: null,             // the voice channel / call I'm in: { room, info, status, users, muted, deafened, speaking, ringing }
@@ -870,8 +871,9 @@ export async function catchUp(inst = VELORA) {
   [...names].slice(0, 150).forEach(username => send({ type: 'chat_presence', username }));
 }
 
-// an attachment as a link (DMs / group chats are plain text): catbox files keep their real name as #n=<name>
-const attLink = a => (/^https:\/\/(files|litter)\.catbox\.moe\//.test(a.url) && a.name && a.name !== a.url.split('/').pop() ? `${a.url}#n=${encodeURIComponent(a.name)}` : a.url);
+// an attachment as a link (DMs / group chats are plain text). Files in Velora account storage (and old catbox ones) keep
+// their real name as #n=<name>; a temporary-storage link (/t/<id>/<name>) already carries it in the path.
+const attLink = a => (/^https:\/\/((files|litter)\.catbox\.moe|velora\.ikelene\.net\/uploads)\//.test(a.url) && a.name && a.name !== decodeURIComponent(a.url.split('/').pop()) ? `${a.url}#n=${encodeURIComponent(a.name)}` : a.url);
 // my own accent colour is known right now: put it in the face cache an instance reads names through, so a message that is still
 // sending shows the accent straight away (not the role colour until my Velora face loads, then a flip)
 function seedMyFace(instUser) {
@@ -967,13 +969,14 @@ function sendAfterUpload(v, text, { replyTo, attachments = [], uploads }) {
     for (const u of uploads) {
       const file = u.spoiler ? new File([u.file], spoilerName(u.file.name, true), { type: u.file.type }) : u.file;
       const a = await uploadAttachment(v, file, {
+        dest: u.dest,
         signal: ctrl.signal,
         onProgress: sent => {
           const pct = Math.floor(((before + Math.min(sent, u.file.size)) / total) * 100);
           if (pct !== shown) { shown = pct; patch(x => ({ ...x, uploading: { sent: before + sent, total } })); }
         },
       });
-      // Velora keeps the name it's told (catbox only knows an id): make sure the marker survives
+      // the spoiler marker is in the name the server was told: make sure it survives whatever the server did to it
       done.push(u.spoiler ? { ...a, name: spoilerName(a.name || u.file.name, true) } : a);
       before += u.file.size;
     }
@@ -1065,12 +1068,73 @@ export async function saveToMedia(url, name) {
     loadMedia();
   } catch (e) { toast(SAVE_ERR[e.message] || errorText(e.message)); }
 }
-// a file sent in Ember: Velora passes it on to catbox.moe (pictures / videos / sounds show inline, the rest is a download card)
-export async function uploadExternal(file, opts = {}) {
+// A file sent in a DM / group chat (anything not on an Ember instance) goes to one of two places on Velora:
+//   'temp'    Velora's temporary storage (/t/<id>/<name>): free, deleted after a while nobody opens it (every load resets the clock)
+//   'account' your Velora account storage: counts toward your storage, stays until you delete it
+// (pictures / videos / sounds show inline, the rest is a download card). Which one: the chat setting dm_upload_dest
+// ('ask' | 'account' | 'temp', synced to the account) with a copy in localStorage, or the picker below when it's 'ask'.
+export async function uploadTemp(file, opts = {}) {
   const fd = new FormData();
   fd.append('file', file);
-  const d = await uploadFetch('/chat/media/external', fd, opts);
+  const d = await uploadFetch('/chat/media/temp', fd, opts);
   return d.attachment;
+}
+export async function uploadAccount(file, opts = {}) {
+  const fd = new FormData();
+  fd.append('file', file);
+  const d = await uploadFetch('/chat/media/account', fd, opts);
+  if (state.savedMedia && /^(image|gif|video|audio)$/.test(d.attachment?.type)) loadMedia();
+  return d.attachment;
+}
+export const uploadExternal = uploadTemp; // (old name)
+const DEST_KEY = 'ember.dmUploadDest';
+const readLocalDest = () => { try { const v = localStorage.getItem(DEST_KEY); return v === 'account' || v === 'temp' ? v : null; } catch { return null; } };
+// the remembered destination ('account' | 'temp'), or null = ask
+export function rememberedUploadDest() {
+  return rememberedDest({ fromServer: !!state.settingsFromServer, setting: state.settings.dm_upload_dest, local: readLocalDest() });
+}
+export async function setUploadDest(v) {
+  const dest = v === 'account' || v === 'temp' ? v : 'ask';
+  try { await saveSettings({ dm_upload_dest: dest }); } catch (e) { toast(errorText(e.message)); } // (saveSettings keeps this device's copy too)
+}
+// what the picker shows (space left in account storage, the temporary storage rules); cached for a minute
+let destInfo = null, destInfoAt = 0;
+export function loadUploadDestinations(force) {
+  if (!force && destInfo && Date.now() - destInfoAt < 60e3) return destInfo;
+  destInfoAt = Date.now();
+  destInfo = apiFetch('/chat/media/destinations').catch(() => { destInfoAt = 0; return null; });
+  return destInfo;
+}
+// where these files go: the remembered choice, else the picker (resolves 'account' | 'temp', or null = cancelled).
+// files: the File list (the picker greys out account storage when they don't fit)
+export function chooseUploadDest(files) {
+  const known = rememberedUploadDest();
+  if (known) return Promise.resolve(known);
+  if (state.uploadAsk) state.uploadAsk.resolve(null);
+  const list = [...files];
+  return new Promise(resolve => set({ uploadAsk: { total: list.reduce((t, f) => t + (f.size || 0), 0), biggest: list.reduce((m, f) => Math.max(m, f.size || 0), 0), count: list.length, resolve } }));
+}
+export function answerUploadAsk(dest, remember) {
+  const a = state.uploadAsk;
+  if (!a) return;
+  set({ uploadAsk: null });
+  if (dest && remember) setUploadDest(dest);
+  a.resolve(dest || null);
+}
+// a temporary-storage link: { expires_in (seconds), ttl_days, ... }, or 'gone' when it expired / was deleted, or null
+// when that couldn't be found out. Asked once per file per page load (it doesn't count as opening the file).
+export { TEMP_LINK };
+const tempInfos = new Map();
+export function tempFileInfo(url) {
+  const id = tempId(url);
+  if (!id) return Promise.resolve(null);
+  if (!tempInfos.has(id)) {
+    tempInfos.set(id, fetch(`/t/info/${id}`, { credentials: 'omit' })
+      .then(r => (r.status === 404 ? 'gone' : r.ok ? r.json().then(d => ({ ...d, at: Date.now() })) : null))
+      .catch(() => null)
+      .then(v => { if (v === null) tempInfos.delete(id); return v; }));
+  }
+  return tempInfos.get(id);
 }
 async function prepareAttachments(v, attachments) {
   return prepareInstanceAttachments(attachments, instOf(v.sid), location.origin, a =>
@@ -1087,7 +1151,9 @@ export async function uploadAttachment(v, file, opts = {}) {
     const d = await uploadFetch(`/chat/media/upload?sid=${v.sid}&cid=${v.cid}`, fd, opts);
     return { url: d.url, type: d.type, name: d.name, size: d.size, width: d.width, height: d.height, sha256: d.sha256 };
   }
-  return uploadExternal(file, opts);
+  // DMs / group chats: opts.dest picked in the composer (a file without one, e.g. a command option, follows the setting)
+  const dest = opts.dest || rememberedUploadDest() || 'temp';
+  return dest === 'account' ? uploadAccount(file, opts) : uploadTemp(file, opts);
 }
 // custom emojis of my Velora servers + every connected instance's (each listed under its own namespaced sid)
 let emojiLoad = 0;
@@ -1454,7 +1520,7 @@ export function errorText(code) {
     too_many_servers: "You've made as many servers as you can.", too_many_joined: "You're in too many servers.", invalid_invite: "That invite doesn't work.",
     invite_required: 'That server needs an invite.', banned_from_server: "You're banned from that server.", owner_cannot_leave: "You own this server - delete it instead of leaving.",
     storage_limit_exceeded: 'Your Velora storage is full.', images_only: 'Only pictures (PNG, JPG, GIF, WebP) can be attached.', upload_suspended: 'Uploads are suspended on your account.',
-    media_import_failed: "Couldn't download that media. Try downloading it and attaching the file.", invalid_media_url: 'Media links must use HTTPS without login credentials.', upload_failed: "Couldn't upload that file. Please try again.", external_upload_failed: "The file host didn't take that file. Please try again.", file_type_blocked: "That kind of file can't be uploaded.", uploads_disabled: 'File uploads are disabled in this server.',
+    media_import_failed: "Couldn't download that media. Try downloading it and attaching the file.", invalid_media_url: 'Media links must use HTTPS without login credentials.', upload_failed: "Couldn't upload that file. Please try again.", external_upload_failed: "The file host didn't take that file. Please try again.", file_type_blocked: "That kind of file can't be uploaded.", temp_daily_quota: "You've sent as much to temporary storage as you can today - try again tomorrow, or use your account storage.", temp_storage_full: "Velora's temporary storage is full right now - try again later, or use your account storage.", uploads_disabled: 'File uploads are disabled in this server.',
     file_too_large: 'That file exceeds the upload size limit.', dms_friends_only: 'They only take messages from friends.', status_changed: 'Their status changed - take another look.', cannot_reply_own_status: "That's your own status.", cannot_dm_bot: "Bots can't be messaged.", unsupported_file: 'Only pictures, videos (MP4, WebM, MOV) and audio files can be saved.', gifs_not_configured: "GIF search isn't set up yet.", too_many_saved: 'Saved Media is full (500 GIFs).', too_many_emojis: 'This server has as many emojis as it can have (50).', bad_gif: "That GIF can't be saved.", no_send_permission: "You don't have permission to send messages here.", no_attach_permission: "You can't attach files here.", role_too_high: "That role is above your own highest role.", role_not_found: "That role doesn't exist any more.", too_many_roles: 'A server can have up to 100 roles.', user_not_found: "That person doesn't exist.", mailbox_full: 'Their inbox is full.', message_too_long: 'That message is too long.',
     last_channel: "A server needs at least one channel.", not_allowed: "You can't do that here.", owner_only: 'Only the owner can do that.', offline: "You're offline - it wasn't sent.",
     scope_disabled: 'An admin has turned this off for your account.', insufficient_scope: SCOPE_TEXT, name_required: 'It needs a name.',
@@ -1480,10 +1546,16 @@ export function errorText(code) {
 
 export async function loadSettings() {
   const d = await apiFetch('/chat/settings').catch(() => null);
-  if (d) set({ settings: d.settings });
+  if (!d) return;
+  // the account's upload destination is the real one; this device's copy follows it (it only counts while the account
+  // can't say, e.g. before the settings load or on a Velora that doesn't have the setting)
+  const dest = d.settings?.dm_upload_dest;
+  if (dest !== undefined) { try { if (dest === 'account' || dest === 'temp') localStorage.setItem(DEST_KEY, dest); else localStorage.removeItem(DEST_KEY); } catch { /* private mode */ } }
+  set({ settings: d.settings, settingsFromServer: dest !== undefined });
 }
 export async function saveSettings(patch) {
   set(s => ({ settings: { ...s.settings, ...patch } }));
+  if (patch.dm_upload_dest !== undefined) { try { if (patch.dm_upload_dest === 'account' || patch.dm_upload_dest === 'temp') localStorage.setItem(DEST_KEY, patch.dm_upload_dest); else localStorage.removeItem(DEST_KEY); } catch { /* private mode */ } }
   const d = await apiFetch('/chat/settings', { method: 'PATCH', body: JSON.stringify(patch) });
   set({ settings: d.settings });
   return d.settings;
@@ -1627,7 +1699,12 @@ export function init(me) {
   document.addEventListener('visibilitychange', markFocusedViewRead);
   window.addEventListener('focus', markFocusedViewRead);
   // settings saved from My Account > Chat (or another tab/device) apply live
-  window.addEventListener('vc-settings', e => { if (e.detail) set({ settings: e.detail }); });
+  window.addEventListener('vc-settings', e => {
+    if (!e.detail) return;
+    set({ settings: e.detail, ...(e.detail.dm_upload_dest !== undefined ? { settingsFromServer: true } : {}) });
+    const dest = e.detail.dm_upload_dest; // (this device's copy of the upload destination follows the account)
+    if (dest !== undefined) { try { if (dest === 'account' || dest === 'temp') localStorage.setItem(DEST_KEY, dest); else localStorage.removeItem(DEST_KEY); } catch { /* private mode */ } }
+  });
   let settingsAt = Date.now();
   const refreshSettings = () => { if (document.visibilityState !== 'visible' || Date.now() - settingsAt < 30000) return; settingsAt = Date.now(); loadSettings(); };
   document.addEventListener('visibilitychange', refreshSettings);

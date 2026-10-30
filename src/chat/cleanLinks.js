@@ -10,7 +10,7 @@ const GENERIC = /^(utm_[a-z0-9_]*|fbclid|gclid|dclid|gbraid|wbraid|msclkid|mc_ci
 const isHost = (h, d) => h === d || h.endsWith(`.${d}`);
 const anyHost = (h, list) => list.some(d => isHost(h, d));
 
-// our own links (invites, signed / uploaded files, catbox #n= names): only the utm_* junk may go
+// our own links (invites, signed / uploaded files, /t/ temporary files, old catbox #n= names): only the utm_* junk may go
 const OWN_HOSTS = ['velora.ikelene.net', 'ikelene.net', 'ikelene.dev', 'catbox.moe'];
 
 // per site: extra parameter names (regex on the lower-cased name) that are junk there

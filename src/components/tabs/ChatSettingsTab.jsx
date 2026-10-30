@@ -32,6 +32,7 @@ export const GROUPS = [
     ['strip_tracking', 'Remove tracking from links', 'Cleans tracking junk (like ?utm_source=, ?si= or fbclid) off links you paste or send. Only the junk goes; the link still works the same.'],
     ['link_images', 'Show pictures from links', 'Links to pictures show as the picture instead of a link.'],
     ['yt_mode', 'Play YouTube videos', "Through Velora: Velora streams the video for you - no ads, no trackers. YouTube's player: starts instantly, but YouTube can track you and show ads.", [['ask', 'Ask each time'], ['velora', 'Through Velora'], ['youtube', "YouTube's player"]]],
+    ['dm_upload_dest', 'Where files in DMs go', "Velora account storage: kept until you delete them, counts toward your storage. Temporary storage: free, deleted after a while nobody opens them (pictures about 30 days, videos and sounds 14, other files 7). The + button can always pick once.", [['ask', 'Ask every time'], ['account', 'Account storage'], ['temp', 'Temporary storage']]],
     ['compact', 'Compact message layout', 'Smaller pictures and tighter spacing, so more messages fit.'],
     ['animations', 'Animations', 'Messages, menus and pop-ups slide and fade in. Off = everything changes instantly.'],
   ]],

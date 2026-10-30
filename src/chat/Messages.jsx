@@ -40,7 +40,7 @@ function GifIcon() {
   );
 }
 import { loadEmojis, loadMembers, loadCommands, clearStatusReply, useTimedOut, untilText, dismissEphemeral } from './store.js';
-import { takeJump, fileKind, uploadMedia, saveToMedia, isMineMsg, loadUploadLimits, getUploadLimits } from './store.js';
+import { takeJump, fileKind, uploadMedia, saveToMedia, isMineMsg, loadUploadLimits, getUploadLimits, chooseUploadDest, rememberedUploadDest, tempFileInfo, TEMP_LINK } from './store.js';
 import { useStarboardFor, starredByMe, STAR } from './Starboard.jsx';
 import { CALL_LINE, callLineText } from './callText.js';
 import { setReaction } from './Reactions.jsx';
@@ -97,23 +97,44 @@ const RISKY = /^(exe|msi|bat|cmd|com|scr|ps1|vbs|vbe|js|jse|wsf|hta|jar|apk|dll|
 const KIND_OF = ext => (/^(zip|rar|7z|tar|gz|xz|bz2)$/.test(ext) ? 'Archive' : /^(exe|msi|msix|appx|apk|dmg|deb|appimage)$/.test(ext) ? 'Program'
   : /^(pdf)$/.test(ext) ? 'PDF' : /^(txt|md|rtf|log)$/.test(ext) ? 'Text' : /^(doc|docx|odt)$/.test(ext) ? 'Document' : /^(sb3|pmp|sb2)$/.test(ext) ? 'Scratch project'
   : /^(js|ts|jsx|tsx|py|json|html|css|c|cpp|cs|java|lua|sh|bat|cmd|ps1)$/.test(ext) ? 'Code' : 'File');
+// a file in Velora's temporary storage: { left: 'N days' } while it's there, 'gone' once it expired, null = don't know (yet)
+const leftText = s => (s < 3600 ? 'under an hour' : s < 86400 ? `${Math.round(s / 3600)} hours` : `${Math.round(s / 86400)} days`);
+export function useTempFile(url) {
+  const temp = TEMP_LINK.test(String(url || ''));
+  const [info, setInfo] = useState(null);
+  useEffect(() => {
+    if (!temp) return undefined;
+    let live = true;
+    tempFileInfo(url).then(v => { if (live) setInfo(v); });
+    return () => { live = false; };
+  }, [url, temp]);
+  if (!temp || !info) return null;
+  if (info === 'gone') return 'gone';
+  return { left: leftText(Math.max(0, info.expires_in - (Date.now() - info.at) / 1000)), ttl: info.ttl_days };
+}
+export function ExpiredFile({ name }) {
+  return <div className="vc-filecard vc-att-expired"><FileIcon size={18} /><span><b>{shownName(name) || 'File'}</b><small>This file expired. Temporary files are deleted after a while nobody opens them.</small></span></div>;
+}
 export function FileCard({ a }) {
   const name = shownName((() => { try { return decodeURIComponent(a.name || a.url.split('/').pop()); } catch { return a.name || 'file'; } })());
   const ext = (/\.([a-z0-9]{1,10})$/i.exec(name)?.[1] || /\.([a-z0-9]{1,10})$/i.exec(a.url)?.[1] || '').toLowerCase();
   const risky = RISKY.test(ext);
-  const dl = /^https:\/\/files\.catbox\.moe\/[\w-]+\.[a-z0-9]{1,8}$/i.test(a.url) ? `/chat/dl?u=${encodeURIComponent(a.url)}&n=${encodeURIComponent(name)}` : a.url;
+  const temp = useTempFile(a.url);
+  const dl = /^https:\/\/files\.catbox\.moe\/[\w-]+\.[a-z0-9]{1,8}$/i.test(a.url) ? `/chat/dl?u=${encodeURIComponent(a.url)}&n=${encodeURIComponent(name)}`
+    : TEMP_LINK.test(a.url) ? `${a.url.split(/[?#]/)[0]}?dl=1` : a.url;
   const open = async e => {
     if (!risky) return; // the link just downloads
     e.preventDefault();
     if (await ask({ title: 'Download this program?', text: `${name} can run code on your computer. Only open files from people you trust.`, confirm: 'Download' })) location.href = dl;
   };
+  if (temp === 'gone') return <ExpiredFile name={name} />;
   const Ico = /^(zip|rar|7z|tar|gz|xz|bz2)$/.test(ext) ? FileArchive : /^(js|ts|jsx|tsx|py|json|html|css|c|cpp|cs|java|lua|sb3|pmp|sh|ps1)$/.test(ext) ? FileCode : /^(txt|md|pdf|doc|docx|rtf|odt|log)$/.test(ext) ? FileText : FileIcon;
   return (
     <div className="vc-filecard">
       <span className="vc-filecard-ico"><Ico size={26} />{ext && <b>{ext.slice(0, 4)}</b>}</span>
       <div className="vc-filecard-txt">
         <a className="vc-filecard-name" href={dl} download={name} onClick={open} title={name}>{name}</a>
-        <small>{[KIND_OF(ext), fmtSize(a.size)].filter(Boolean).join(' - ')}</small>
+        <small>{[KIND_OF(ext), fmtSize(a.size)].filter(Boolean).join(' - ')}{temp?.left && <span className="vc-filecard-exp" title={`Temporary file: deleted ${temp.left} from now unless someone opens it (opening it starts the clock over)`}> - expires in {temp.left}</span>}</small>
       </div>
       <a className="vc-filecard-dl" href={dl} download={name} onClick={open} title={`Download ${name}`}><Download size={16} /><span>Download</span></a>
     </div>
@@ -124,6 +145,9 @@ function Attachments({ list: all, extra = [], m }) {
   const gone = all.filter(a => a.expired), list = all.filter(a => !a.expired);
   // spoilered files stay covered until clicked (once per file)
   const [revealed, setRevealed] = useState(() => new Set());
+  // temporary-storage pictures that didn't load: checked, and shown as expired when they are
+  const [deadPics, setDeadPics] = useState(() => new Set());
+  const picFailed = a => { if (TEMP_LINK.test(a.url)) tempFileInfo(a.url).then(v => { if (v === 'gone') setDeadPics(x => new Set(x).add(a.url)); }); };
   const hidden = a => isSpoiler(a) && !revealed.has(a.url);
   const reveal = a => setRevealed(x => new Set(x).add(a.url));
   // picture links in the text count too (a Klipy link = a GIF; a DM's catbox link carries its name, so its spoiler mark too)
@@ -138,20 +162,20 @@ function Attachments({ list: all, extra = [], m }) {
       {gone.map(a => <div key={a.url} className="vc-filecard vc-att-expired"><FileIcon size={18} /><span><b>{a.name || 'File'}</b><small>This file expired and was deleted.</small></span></div>)}
       {pics.length > 0 && (
         <div className={`vc-atts n${Math.min(pics.length, 4)}`}>
-          {pics.map((a, i) => (KLIPY_PAGE.test(a.url) ? <KlipyPageGif key={a.url} url={a.url} /> :
+          {pics.map((a, i) => (KLIPY_PAGE.test(a.url) ? <KlipyPageGif key={a.url} url={a.url} /> : deadPics.has(a.url) ? <ExpiredFile key={a.url} name={a.name || nameInLink(a.url)} /> :
             <a key={a.url} href={a.url} target="_blank" rel="noopener noreferrer" data-media-url={a.url} data-media-name={shownName(a.name)} className={`vc-att${a.type === 'gif' ? ' gif' : ''}${hidden(a) ? ' spoiler' : ''}`}
               onClick={e => { if (hidden(a)) { e.preventDefault(); reveal(a); return; } if (e.ctrlKey || e.metaKey || e.shiftKey || e.button) return; if (e.target.closest('.vc-star')) return; e.preventDefault(); viewMedia({ items: pics.filter(p => !hidden(p) || p === a), index: pics.filter(p => !hidden(p) || p === a).indexOf(a), author: m?.author, at: m?.created_at }); }}>
-              <img src={a.url} alt={hidden(a) ? 'Spoiler' : shownName(a.name)} loading="lazy" />
+              <img src={a.url} alt={hidden(a) ? 'Spoiler' : shownName(a.name)} loading="lazy" onError={() => picFailed(a)} />
               {cover(a)}
               {a.type === 'gif' && !hidden(a) && <GifBadge />}
               {hidden(a) ? null : KLIPY.test(a.url) ? <StarButton gif={{ url: a.url, preview: a.url, title: a.name, width: a.width, height: a.height }} />
-                : /^https:\/\/(velora\.ikelene\.net\/uploads|files\.catbox\.moe)\//.test(a.url) && <button type="button" className="vc-att-save" title="Save to Saved Media" onClick={e => { e.preventDefault(); e.stopPropagation(); saveToMedia(a.url, a.name); }}><BookmarkPlus size={15} /></button>}
+                : /^https:\/\/(velora\.ikelene\.net\/(uploads|t)|files\.catbox\.moe)\//.test(a.url) && <button type="button" className="vc-att-save" title="Save to Saved Media" onClick={e => { e.preventDefault(); e.stopPropagation(); saveToMedia(a.url, a.name); }}><BookmarkPlus size={15} /></button>}
             </a>
           ))}
         </div>
       )}
       {others.map(a => {
-        const inner = a.type === 'file' ? <FileCard a={a} /> : a.type === 'video'
+        const inner = a.type === 'file' ? <FileCard a={a} /> : TEMP_LINK.test(a.url) ? <TempMedia a={a} /> : a.type === 'video'
           ? <div className="vc-media-wrap" data-media-url={a.url} data-media-name={shownName(a.name)}><VideoPlayer className="vc-att-video" src={a.url} /></div>
           : a.type === 'audio'
             ? <div className="vc-media-wrap" data-media-url={a.url} data-media-name={shownName(a.name)}><AudioPlayer src={a.url} name={shownName(a.name)} /></div>
@@ -160,6 +184,14 @@ function Attachments({ list: all, extra = [], m }) {
       })}
     </div>
   );
+}
+// a video / sound in temporary storage: the player, or the placeholder once it expired
+function TempMedia({ a }) {
+  const temp = useTempFile(a.url);
+  if (temp === 'gone') return <ExpiredFile name={a.name} />;
+  return a.type === 'video'
+    ? <div className="vc-media-wrap" data-media-url={a.url} data-media-name={shownName(a.name)}><VideoPlayer className="vc-att-video" src={a.url} /></div>
+    : <div className="vc-media-wrap" data-media-url={a.url} data-media-name={shownName(a.name)}><AudioPlayer src={a.url} name={shownName(a.name)} /></div>;
 }
 // a message whose files are still on their way up: how far along, and a way to stop it
 function UploadBar({ m, view }) {
@@ -754,6 +786,7 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
   }
   const [dropping, setDropping] = useState(false); // a file is being dragged over the window
   const saveFile = useRef(null);
+  const destOnce = useRef(null); // the + menu's "Upload to ... storage": where the next picked files go
   const [picker, setPicker] = useState(false); // false | 'saved' | 'clips' (the tab it opens on)
   const [glintIntro, setGlintIntro] = useState(false);
   const [emoji, setEmoji] = useState(false);
@@ -852,33 +885,44 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
     if (t.length > maxLen) { toast(maxLen < 4000 ? `Messages here can be up to ${maxLen.toLocaleString()} characters (this one is ${t.length.toLocaleString()}).` : errorText('message_too_long')); return; }
     // files picked here upload now, after the message is sent: the composer is free again straight away
     const queued = atts.filter(a => a.local);
-    sendMessage(view, sid ? encodeRoleMentions(t, sid) : t, { replyTo, attachments: atts.filter(a => !a.local), uploads: queued.map(a => ({ file: a.file, spoiler: a.spoiler })) });
+    sendMessage(view, sid ? encodeRoleMentions(t, sid) : t, { replyTo, attachments: atts.filter(a => !a.local), uploads: queued.map(a => ({ file: a.file, spoiler: a.spoiler, dest: a.dest })) });
     queued.forEach(a => a.preview && URL.revokeObjectURL(a.preview));
     setMq(null);
     if (ta.current) ta.current.textContent = '';
     setText(''); setDraft(key, ''); setAtts([]); setReplyTo?.(null);
     ta.current?.focus({ preventScroll: true });
   }
-  // the biggest file this conversation takes (MB): an instance community says so itself, the rest is Velora's limit
-  function uploadCap() {
-    return view.kind === 'channel' && isInst(view.sid) ? (getState().detail[view.sid]?.server.my_upload_max_mb || getState().detail[view.sid]?.server.upload_max_mb || 25) : getUploadLimits().server_mb; // (my_: with my roles)
+  // DMs, group chats and Velora-hosted channels send files to Velora (account or temporary storage); instance communities keep their own
+  const onVelora = !(view.kind === 'channel' && isInst(view.sid));
+  // the biggest file this conversation takes (MB): an instance community says so itself; on Velora it depends on where it goes
+  function uploadCap(dest) {
+    if (!onVelora) return getState().detail[view.sid]?.server.my_upload_max_mb || getState().detail[view.sid]?.server.upload_max_mb || 25; // (my_: with my roles)
+    return dest === 'account' ? getUploadLimits().saved_mb : getUploadLimits().server_mb;
   }
   // dropped / pasted / picked files wait in the tray (checked against the size limit now) and only upload when the message is
-  // sent - see sendMessage's uploads. Everything goes to catbox.moe through Velora (catbox never sees you), or to the instance.
-  function addFiles(files) {
+  // sent - see sendMessage's uploads. On Velora each file goes where you picked: the remembered choice (chat setting
+  // dm_upload_dest), the "Where should this go?" picker the first time, or destOnce from the + menu (just these files).
+  async function addFiles(fileList, destOnce) {
     const context = uploadContext.current;
     if (locked || (view.kind === 'channel' && !canAttach) || view.username === 'System') return;
-    const cap = uploadCap();
+    const files = [...fileList]; // (copied now: a file input is emptied straight after this is called)
+    if (!files.length) return;
+    let dest = null;
+    if (onVelora) {
+      dest = destOnce || await chooseUploadDest(files);
+      if (!dest || uploadContext.current !== context) return; // picker closed, or the conversation changed meanwhile
+    }
+    const cap = uploadCap(dest);
     const fits = [];
     for (const f of files) {
-      if (f.size > cap * 1024 * 1024) toast(`${f.name} is too big (${fmtSize(f.size)}) - files here go up to ${cap} MB.`);
+      if (f.size > cap * 1024 * 1024) toast(`${f.name} is too big (${fmtSize(f.size)}) - ${dest === 'account' ? 'files kept on your account' : dest === 'temp' ? 'temporary files' : 'files here'} go up to ${cap} MB.`);
       else if (!f.size) toast(`${f.name} is empty.`);
       else fits.push(f);
     }
     if (fits.length > Math.max(0, 4 - atts.length - context.pending)) toast('A message can carry up to 4 files.');
     if (!fits.length) return;
     // (counted again inside the update: two drops in a row can come before a re-render)
-    setAtts(x => [...x, ...fits.slice(0, Math.max(0, 4 - x.length - context.pending)).map((f, i) => ({ local: true, id: `q${Date.now()}_${i}_${f.name}`, file: f, name: f.name, size: f.size, kind: fileKind(f), spoiler: false, preview: /^image\//.test(f.type) ? URL.createObjectURL(f) : null }))]);
+    setAtts(x => [...x, ...fits.slice(0, Math.max(0, 4 - x.length - context.pending)).map((f, i) => ({ local: true, id: `q${Date.now()}_${i}_${f.name}`, file: f, name: f.name, size: f.size, kind: fileKind(f), spoiler: false, dest, preview: /^image\//.test(f.type) ? URL.createObjectURL(f) : null }))]);
     // a drop never focuses the box by itself: put the caret there so typing + Enter just work
     const el = ta.current;
     if (el && document.activeElement !== el && !mobileTextInput()) { el.focus({ preventScroll: true }); caretToEnd(el); }
@@ -972,9 +1016,16 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
     const r = e.currentTarget.getBoundingClientRect();
     const lim = getUploadLimits();
     loadMyClips(); // (cached for the session) so the Glint choice below knows straight away
+    const pickOnce = dest => { destOnce.current = dest; file.current?.click(); };
+    const mine = rememberedUploadDest();
     openMenu({ clientX: r.left, clientY: Math.max(6, r.top - 150), preventDefault() {}, stopPropagation() {} }, [
-      { label: 'Upload to server', hint: `Sent here - up to ${uploadCap()} MB`, icon: Upload, onClick: () => file.current?.click() },
-      { label: 'Upload to my Velora account', hint: `Kept in Saved Media and attached - up to ${lim.saved_mb} MB`, icon: CloudUpload, onClick: () => saveFile.current?.click() },
+      ...(onVelora ? [ // DMs / group chats: pick where these files go (just this once - the remembered choice stays)
+        { label: 'Upload to temporary storage', hint: `Free, deleted after a while unopened - up to ${lim.server_mb} MB${mine === 'temp' ? ' (your default)' : ''}`, icon: Clock, onClick: () => pickOnce('temp') },
+        { label: 'Upload to account storage', hint: `Kept on your Velora account - up to ${lim.saved_mb} MB${mine === 'account' ? ' (your default)' : ''}`, icon: CloudUpload, onClick: () => pickOnce('account') },
+      ] : [
+        { label: 'Upload to server', hint: `Sent here - up to ${uploadCap()} MB`, icon: Upload, onClick: () => file.current?.click() },
+        { label: 'Upload to my Velora account', hint: `Kept in Saved Media and attached - up to ${lim.saved_mb} MB`, icon: CloudUpload, onClick: () => saveFile.current?.click() },
+      ]),
       { label: <span className="vc-ctx-newlabel">Attach a Glint clip <NewTag /></span>, hint: 'One of your game clips', icon: GlintMark,
         onClick: async () => { const list = liveClips(await loadMyClips()); setEmoji(false); if (list.length) setPicker('clips'); else setGlintIntro(true); } },
     ]);
@@ -1012,9 +1063,10 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
             const type = a.local ? a.kind : a.type, src = a.local ? a.preview : a.url;
             const spoiler = a.local ? a.spoiler : isSpoiler(a);
             return (
-              <span key={a.local ? a.id : a.url} className={`vc-patt${spoiler ? ' spoiler' : ''}`} title={`${shownName(a.name) || ''}${a.size ? ` (${fmtSize(a.size)})` : ''}`}>
+              <span key={a.local ? a.id : a.url} className={`vc-patt${spoiler ? ' spoiler' : ''}`} title={`${shownName(a.name) || ''}${a.size ? ` (${fmtSize(a.size)})` : ''}${a.local && a.dest ? (a.dest === 'account' ? ' - account storage' : ' - temporary storage') : ''}`}>
                 {type === 'video' ? <Film size={22} /> : type === 'audio' ? <Music size={22} /> : type === 'file' || !src ? <span className="vc-patt-file"><FileIcon size={20} /><small>{shownName(a.name)}</small></span> : <img src={src} alt="" />}
                 {spoiler && <span className="vc-patt-spoiler-tag">Spoiler</span>}
+                {a.local && a.dest && <span className="vc-patt-dest" title={a.dest === 'account' ? 'Goes to your Velora account storage' : "Goes to Velora's temporary storage"}>{a.dest === 'account' ? <CloudUpload size={11} /> : <Clock size={11} />}</span>}
                 <button type="button" className="vc-patt-spoiler" title={spoiler ? 'Remove spoiler' : 'Mark as spoiler'} aria-pressed={spoiler} onClick={() => toggleSpoiler(a)}>{spoiler ? <Eye size={12} /> : <EyeOff size={12} />}</button>
                 <button type="button" title="Remove" onClick={() => removeAtt(a)}><X size={12} /></button>
               </span>
@@ -1031,7 +1083,7 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
         {slashQ === '' && cdata && !centries.length && <div className="vc-mentions vc-cmd-picker vc-cmd-empty">No bot commands in this server yet. Bots can add slash commands, and they will show up here.</div>}
         {cpicker && <CommandPicker items={citems} sel={csel} setSel={setCsel} onPick={startCommand} bots={cbots} bot={cbotOn} onBot={pickBot} />}
         {cmd && <CommandBar key={cmd.key} view={view} entry={cmd} submitRef={cmdSubmit} onCancel={() => { setCmd(null); ta.current?.focus(); }} onSent={() => { setCmd(null); setReplyTo?.(null); ta.current?.focus(); }} />}
-        <input ref={file} type="file" multiple hidden onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
+        <input ref={file} type="file" multiple hidden onChange={e => { const once = destOnce.current; destOnce.current = null; addFiles(e.target.files, once); e.target.value = ''; }} />
         <input ref={saveFile} type="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm,video/quicktime,audio/*" onChange={e => { addSavedFiles(e.target.files); e.target.value = ''; }} />
         <div
           ref={ta} className="vc-input" style={cmd ? { display: 'none' } : undefined} contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true"
