@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom';
 import { Copy, Pencil, ChevronRight, Check, Circle, Moon, MinusCircle, EyeOff, Smile, X, Users, IdCard, UserPlus, Crown, Globe, LogOut } from 'lucide-react';
 import { isWebBonfire, getToken } from '../api.js';
 import { signOutVelora, startSignIn, savedBonfireAccounts, rememberAccount, switchBonfireAccount } from './session.js';
-import { useChat, lookup, wantPresence, setStatus, setCustom, toast, getState } from './store.js';
+import { useChat, lookup, wantPresence, setStatus, setCustom, toast, getState, onUserUpdate } from './store.js';
 import { copy } from './Menu.jsx';
 import { renderBody } from './text.jsx';
 import { Avatar, STATUS_LABEL } from './Profile.jsx';
@@ -168,6 +168,11 @@ export function MePopout({ anchor, onClose, onEditProfile, onCustomStatus }) {
     wantPresence(username);
     return () => { gone = true; };
   }, [username]);
+  // the person changed their profile while the card is open (Velora's user_update): re-read it in place
+  useEffect(() => onUserUpdate(m => {
+    if (!p || String(p.id) !== String(m.user.id)) return;
+    lookup(m.user.username).then(d => { if (d && String(d.id) === String(m.user.id)) setP(d); }).catch(() => {});
+  }), [p?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // above the panel, lined up with its left edge, kept on screen while it fills in
   useLayoutEffect(() => {
     const el = box.current;

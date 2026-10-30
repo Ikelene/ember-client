@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { MessageCircle, Maximize2, X, UserPlus, Check, Clock, ExternalLink, Globe, Gamepad2, Music, Tv, Trophy, Radio, MoreHorizontal, Pencil, ShieldCheck, Crown, UserMinus, Ban, Link as LinkIcon } from 'lucide-react';
 import { apiFetch, getToken } from '../api.js';
 import { BotTag, AddBotButton, TrustedIn } from './Bots.jsx';
-import { useChat, lookup, go, wantPresence, toast, errorText, getState, setCustom, ask, loadFriends, toggleBlock, memberRef, faceOf, botPresenceOf, loadMembers } from './store.js';
+import { useChat, lookup, go, wantPresence, toast, errorText, getState, setCustom, ask, loadFriends, toggleBlock, memberRef, faceOf, botPresenceOf, loadMembers, onUserUpdate } from './store.js';
 import { isInst } from './ids.js';
 import { ServerIcon } from './ServerIcon.jsx';
 // your own profile's "Edit profile": Ember's settings, Profile page (Chat.jsx listens for vc-dialog)
@@ -197,6 +197,11 @@ function useProfile(username, who) {
     wantPresence(vname);
     return () => { gone = true; };
   }, [username, vname, plainOn(who)]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Velora says this person changed their profile: re-read it in place (no blanking)
+  useEffect(() => onUserUpdate(m => {
+    if (!p || p.plain || p.missing || String(p.id) !== String(m.user.id)) return;
+    lookup(m.user.username).then(d => { if (d && String(d.id) === String(m.user.id)) setP(d); }).catch(() => {});
+  }), [p?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   return [p, extra, vname];
 }
 // servers we both are in: Velora's own (the server says) plus the ones on Ember instances (only this browser knows who is in those:

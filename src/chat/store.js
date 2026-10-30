@@ -8,6 +8,7 @@ import { endSession, startSignIn } from './session.js';
 import { callLinePlain } from './callText.js';
 import { inviteSummary } from './gameInvite.js';
 import { applyIdentity } from './identity.js';
+import { applyUserUpdate, instancesWithAccount } from './userUpdate.js';
 import { VELORA, K, parseK, instOf, bare, isInst, normOrigin } from './ids.js';
 import { connections, sendTo, startInstances, loadInstanceData, retryInstances, renewVeloraSession } from './instances.js';
 import { attachmentRefs } from './signing-payload.js';
@@ -183,6 +184,8 @@ export function faceOf(u, s = state) {
   return f && !f.miss ? { ...u, pfp: f.pfp || u.pfp || null, color: f.color || null, rank: f.rank } : u;
 }
 export const useFace = u => { const f = useChat(s => (u?.inst && u.kind === 'velora' ? s.veloraFaces[String(u.velora_id)] : null)); return useMemo(() => faceOf(u), [u, f]); }; // eslint-disable-line react-hooks/exhaustive-deps
+// a profile card / page that is open re-reads its person when Velora says they changed (user_update); fn(event) -> unsubscribe
+export const onUserUpdate = fn => { const h = e => fn(e.detail); addEventListener('vc-user-update', h); return () => removeEventListener('vc-user-update', h); };
 // drop the cached public profile (after you edit your own), so the next lookup is fresh
 export function forgetProfile(username) { lookups.delete(String(username || '').toLowerCase()); }
 export function wantPresence(username) {
@@ -336,6 +339,16 @@ function onEvent(m, inst = VELORA) {
       loadNotifCount(); // (anything that happened while the socket was down)
       break;
     case 'chat_message': addMessage(`c:${m.message.channel}`, m.message); break;
+    // Velora: somebody I can see changed their profile (picture, colour, name, bio ...): patch every cache that holds them, refresh any open
+    // profile card, and ask the instances they are on to re-read it too (instances otherwise pick it up on their own 10-15 min schedule)
+    case 'user_update':
+      if (inst !== VELORA || !m.user?.id) break;
+      lookups.clear();
+      set(s => applyUserUpdate(s, m));
+      dispatchEvent(new CustomEvent('vc-user-update', { detail: m }));
+      if (m.previous_username && m.previous_username !== m.user.username) { loadDMs(); loadGroups(); loadFriends(); } // (name-keyed lists + conversations)
+      for (const o of instancesWithAccount(state, m.user.id)) sendTo(o, { type: 'chat_profile_refresh', velora_id: String(m.user.id) });
+      break;
     case 'chat_identity_update':
       if (inst !== VELORA) { if (m.user?.id) { set(s => applyIdentity(s, m.user, inst)); loadMembersOf(inst); } break; }
       lookups.clear();
