@@ -1,3 +1,4 @@
+import { openSite } from './hosts.js';
 // The frame around the conversation: server rail, channel / DM sidebar, member list, your panel.
 import { BotTag } from './Bots.jsx';
 import { isDesktopApp } from './BonfireLogo.jsx';
@@ -256,8 +257,8 @@ export function Rail({ onDiscover, onAddInstance, onCreate }) {
       <RailItem title="Discover" onClick={onDiscover}><span className="vc-srv-ico act"><Compass size={20} /></span></RailItem>
 
       {!isDesktopApp() && !window.bonfireMobile && (isMobileDevice()
-        ? <RailItem title="Get Ember for Android" onClick={() => { location.href = '/bonfire/android/'; }}><span className="vc-srv-ico act"><Smartphone size={20} /></span></RailItem>
-        : <RailItem title="Get Ember for desktop" onClick={() => { location.href = '/bonfire/download'; }}><span className="vc-srv-ico act"><Download size={20} /></span></RailItem>)}
+        ? <RailItem title="Get Ember for Android" onClick={() => { openSite('/bonfire/android/'); }}><span className="vc-srv-ico act"><Smartphone size={20} /></span></RailItem>
+        : <RailItem title="Get Ember for desktop" onClick={() => { openSite('/bonfire/download'); }}><span className="vc-srv-ico act"><Download size={20} /></span></RailItem>)}
     </nav>
   );
 }

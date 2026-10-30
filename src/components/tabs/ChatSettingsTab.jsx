@@ -1,3 +1,4 @@
+import { siteHref } from '../../chat/hosts.js';
 import AboutBonfire from '../../chat/AboutBonfire.jsx';
 import { useEffect, useState, useRef } from 'react';
 import { Bell, Gamepad2, LogOut, ShieldCheck, MessagesSquare, Volume2, Pause, Play, Radio, Power, PanelBottomClose, Minimize2 } from 'lucide-react';
@@ -275,7 +276,7 @@ function SigningKeyRow() {
   return (
     <div className="cs-row">
       <div className="cs-text"><b>Message signing</b><span>{text}</span></div>
-      <a className="btn btn-surface btn-sm" href="/me#settings/security">Account page</a>
+      <a className="btn btn-surface btn-sm" href={siteHref("/me#settings/security")} target="_blank" rel="noopener noreferrer">Account page</a>
     </div>
   );
 }
@@ -367,7 +368,7 @@ export default function ChatSettingsTab({ embedded = false, onLogout, onLogin, w
         <div className="card-body cs-rows">
           {bare && <div className="cs-row">
             <div className="cs-text"><b>Account management</b><span>Email, password, security, connected accounts, billing and your data live on your Nookara account page.</span></div>
-            <a className="btn btn-surface btn-sm" href="/me">Open</a>
+            <a className="btn btn-surface btn-sm" href={siteHref("/me")} target="_blank" rel="noopener noreferrer">Open</a>
           </div>}
           {bare && <SigningKeyRow />}
           <div className="cs-row">

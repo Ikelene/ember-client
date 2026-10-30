@@ -1,3 +1,4 @@
+import { clientUrl } from '../chat/hosts.js';
 // Ember (/chat): servers + channels, DMs and group chats in one place, with presence.
 import { ForwardDialog, PinsButton } from '../chat/MsgTools.jsx';
 import { TooltipHost } from '../chat/Tooltip.jsx';
@@ -386,11 +387,11 @@ function ChatPage() {
   useEffect(() => {
     if (!ready) return;
     const tb = /^#\/test-bot\/(\d{1,20})\/?$/.exec(location.hash); // admin: /chat#/test-bot/<bot id> opens the test-install dialog
-    if (tb) { setDialog({ kind: 'test-bot', id: tb[1] }); history.replaceState(null, '', '/chat#/home'); open({ kind: 'home' }); return; }
+    if (tb) { setDialog({ kind: 'test-bot', id: tb[1] }); history.replaceState(null, '', clientUrl('#/home')); open({ kind: 'home' }); return; }
     let v = readHash();
-    if (v.kind === 'invite') { setDialog({ kind: 'invite-join', code: v.code, inst: v.inst }); history.replaceState(null, '', '/chat#/home'); open({ kind: 'home' }); return; }
+    if (v.kind === 'invite') { setDialog({ kind: 'invite-join', code: v.code, inst: v.inst }); history.replaceState(null, '', clientUrl('#/home')); open({ kind: 'home' }); return; }
     if (v.kind === 'home' && !location.hash) {
-      try { const last = localStorage.getItem('velora_chat_last'); if (last) { history.replaceState(null, '', `/chat${last}`); v = readHash(); } } catch { /* fine */ }
+      try { const last = localStorage.getItem('velora_chat_last'); if (last) { history.replaceState(null, '', clientUrl(last)); v = readHash(); } } catch { /* fine */ }
     }
     open(v);
   }, [ready]);

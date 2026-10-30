@@ -1,6 +1,6 @@
 // Ember's state + its connection (one Velora socket when signed in with Velora, the /chat, /im and /groups APIs, and one socket per server instance).
 // Components read it with useChat(selector) and change it through the actions below.
-import { shareLink, clientPath } from './hosts.js';
+import { shareLink, clientUrl } from './hosts.js';
 import { packActive, playPackSound } from './messageSounds.js';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import serverCreationPolicy from '../server-creation-policy.json';
@@ -1394,7 +1394,7 @@ export function hashFor(v) {
 export const linkFor = v => shareLink(hashFor(v));
 export function go(v, { replace = false } = {}) {
   const hash = hashFor(v);
-  if (location.hash !== hash) history[replace ? 'replaceState' : 'pushState'](null, '', `${clientPath() === '/' ? '/' : '/chat'}${hash}`);
+  if (location.hash !== hash) history[replace ? 'replaceState' : 'pushState'](null, '', clientUrl(hash));
   open(v);
 }
 export function readHash() {
@@ -1469,7 +1469,7 @@ export async function open(v) {
   if (v.kind === 'invite') {
     // stay where you were; the invite shows as a pop-up
     const back = ['channel', 'dm', 'group'].includes(state.view.kind) ? hashFor(state.view) : '#/home';
-    history.replaceState(null, '', `/chat${back}`);
+    history.replaceState(null, '', clientUrl(back));
     dispatchEvent(new CustomEvent('vc-invite', { detail: { code: v.code, inst: v.inst } }));
     if (!state.view.kind || state.view.kind === 'home') set(s => ({ view: s.view }));
     return;
@@ -1623,7 +1623,7 @@ export function askStripTracking() {
 }
 // a link to somewhere in Ember: go there (or open the invite) without leaving the page
 export function openLink(hash) {
-  history.pushState(null, '', `/chat${hash}`);
+  history.pushState(null, '', clientUrl(hash));
   open(readHash());
 }
 
@@ -1870,7 +1870,7 @@ export function loginAgain() {
   set({ permUpdate: null, scopePrompt: null, reauth: { state: 'waiting' } });
   if (window.bonfireDesktop?.signIn) { window.bonfireDesktop.signIn(); return; }
   if (isWebBonfire()) { startSignIn(); return; } // the web has its own sign-in (a token of its own, not the website's session)
-  location.href = '/login?next=%2Fchat'; // the Android app turns this into its own browser sign-in screen
+  location.href = '/login?next=%2Fchat'; // (apps only) the Android app turns this into its own browser sign-in screen
 }
 export function clearReauth() { set({ reauth: null }); }
 

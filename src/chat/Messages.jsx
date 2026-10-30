@@ -1,3 +1,4 @@
+import { siteHref } from './hosts.js';
 // The conversation: messages (grouped by person, with day dividers), the composer and who's typing.
 import { canAttachInChannel } from './attachment-permissions.js';
 import { apiFetch } from '../api.js';
@@ -462,7 +463,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
     return (
       <div className="vc-msg vc-sys vc-eph vl-in">
         <span className="vc-sys-ico"><Coins size={15} /></span>
-        <div className="vc-sys-body">{m.body}<span className="vc-eph-tag">Only you can see this - <a href="/me#chat" target="_blank" rel="noopener noreferrer">turn these off</a></span></div>
+        <div className="vc-sys-body">{m.body}<span className="vc-eph-tag">Only you can see this - <a href={siteHref("/me#chat")} target="_blank" rel="noopener noreferrer">turn these off</a></span></div>
       </div>
     );
   }

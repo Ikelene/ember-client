@@ -1,3 +1,4 @@
+import { siteHref } from './hosts.js';
 // The bell next to your name (bottom left): Velora's account notifications, which replaced the DMs from "System".
 // The badge is notifUnread (loaded at start, kept live by the home socket). The popup lists only UNREAD ones, newest first;
 // clicking one marks it read and follows its link. Everything else (history, settings) lives on the site under /me.
@@ -88,7 +89,7 @@ function NotifPopup({ anchor, onClose }) {
         <b>Notifications</b>
         <span className="grow" />
         <button type="button" className="vc-notifs-all" disabled={!unread && !list.length} onClick={() => readNotifs('all')}><CheckCheck size={14} /> Mark all read</button>
-        <a className="vc-ico-btn" href="/me#settings/notifications" title="Notification settings" onClick={onClose}><Settings size={16} /></a>
+        <a className="vc-ico-btn" href={siteHref("/me#settings/notifications")} target="_blank" rel="noopener noreferrer" title="Notification settings" onClick={onClose}><Settings size={16} /></a>
       </div>
       <div className="vc-notifs-list">
         {list.map(n => (
@@ -105,7 +106,7 @@ function NotifPopup({ anchor, onClose }) {
         {data?.loading && <div className="vc-notifs-empty"><span>Loading...</span></div>}
         {!data?.loading && data?.cursor && list.length > 0 && <button type="button" className="vc-notifs-more" onClick={() => loadNotifs({ more: true })}>Load more</button>}
       </div>
-      <a className="vc-notifs-foot" href="/me#notifications" onClick={onClose}>View all</a>
+      <a className="vc-notifs-foot" href={siteHref("/me#notifications")} target="_blank" rel="noopener noreferrer" onClick={onClose}>View all</a>
     </div>,
     document.body,
   );

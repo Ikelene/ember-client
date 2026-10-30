@@ -1,3 +1,4 @@
+import { siteHref } from './hosts.js';
 // Settings > Profile in Ember: the Velora profile editor (same fields + endpoints as /me#profile,
 // components/tabs/ProfileTab.jsx) laid out like Fluxer: fields on the left, live "Profile preview" on the
 // right (the same card as your bottom-left pop-out). Saving goes through the unsaved-changes bar.
@@ -257,7 +258,7 @@ function Editor({ user, reload, presence, onDirty }) {
 
           <div className="bf-pe-sec">
             <div className="bf-pe-label">Profile badges</div>
-            <a className="btn btn-surface btn-sm" href={`/u/${encodeURIComponent(username)}?edit=badges`} target="_blank" rel="noopener">Customize your Badge Arcade badges</a>
+            <a className="btn btn-surface btn-sm" href={siteHref(`/u/${encodeURIComponent(username)}?edit=badges`)} target="_blank" rel="noopener">Customize your Badge Arcade badges</a>
           </div>
         </fieldset>
 

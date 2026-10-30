@@ -1,3 +1,4 @@
+import { siteHref } from './hosts.js';
 // Link previews under messages. The server makes them (GET /chat/unfurl: Velora, or the instance a message is on) - the
 // browser never visits the linked site; pictures come from that server too. YouTube gets Ember's own player (YouTube's
 // embed, or streamed through the instance / Velora), Ember invites + Velora profiles get their own cards.
@@ -308,7 +309,7 @@ function InviteEmbed({ e }) {
 }
 function ProfileEmbed({ e }) {
   return (
-    <a className="vc-profile-card vl-rise" href={`/u/${encodeURIComponent(e.username)}`} target="_blank" rel="noopener noreferrer">
+    <a className="vc-profile-card vl-rise" href={siteHref(`/u/${encodeURIComponent(e.username)}`)} target="_blank" rel="noopener noreferrer">
       {e.banner && <span className="vc-profile-banner" style={{ backgroundImage: `url(${e.banner})` }} />}
       <span className="vc-profile-row">
         {e.pfp ? <img src={e.pfp} alt="" /> : <span className="vc-profile-noav" />}

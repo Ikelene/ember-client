@@ -1,3 +1,4 @@
+import { openSite } from './hosts.js';
 // A one-time "Ember has an app" popup for phones using the website. Download goes to the Android download page, Dismiss closes it for
 // good (kept per device in localStorage). After Dismiss a short notice says the rail's download button gets the app too, then it goes
 // away by itself. Never shown in the Android app, the desktop app, or on a computer.
@@ -30,7 +31,7 @@ export function MobileAppPromo() {
           <h3 id="vc-app-promo-t">Ember has an app</h3>
           <p className="vc-dialog-sub">Get Ember for Android for notifications, swipe gestures and a smoother phone experience.</p>
           <div className="vc-dialog-btns">
-            <button type="button" className="btn btn-primary" onClick={() => { markDismissed(); location.href = '/bonfire/android/'; }}><Download size={15} /> Download</button>
+            <button type="button" className="btn btn-primary" onClick={() => { markDismissed(); openSite('/bonfire/android/'); }}><Download size={15} /> Download</button>
             <button type="button" className="btn btn-surface" onClick={dismiss}>Dismiss</button>
           </div>
         </div>

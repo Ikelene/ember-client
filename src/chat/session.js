@@ -1,16 +1,46 @@
 // Ember on the web signs in with Velora the way the apps do (PROTOCOL.md §2.5): the "approve this app" screen, then a token
 // of its own (localStorage['bonfire_token']). The website's own session (velora_token) is never read or written here.
 // The desktop / Android shells keep their own sign-in (store.js loginAgain); none of this runs for them.
-import { clientPath } from './hosts.js';
+import { clientPath, clientUrl, onEmberHost, AUTH_POPUP_URL, AUTH_ORIGINS } from './hosts.js';
 import { getToken, isWebBonfire } from '../api.js';
 import { dropVeloraSessions } from './instances.js';
+import { toast } from './store.js';
 
 const STATE = 'bonfire_signin_state', BACK = 'bonfire_signin_back';
 export const hasVelora = () => !!getToken();
 const rand = () => btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(24)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
 // "Sign in with Velora": back = where to come back to (e.g. { add: 'http://host' } reopens the add-a-server dialog there)
+// ember.nookara.cc never leaves for a site page: sign-in is a popup on nookara.cc that posts { type: 'nookara-auth', token, user } back
+let popupListener = false;
+function onAuthMessage(ev) {
+  if (!AUTH_ORIGINS.includes(ev.origin)) return; // only nookara.cc (or the old velora.ikelene.net), never any other origin
+  const d = ev.data;
+  if (!d || typeof d !== 'object' || d.type !== 'nookara-auth' || typeof d.token !== 'string' || !d.token) return;
+  const name = typeof d.user === 'string' ? d.user : d.user && (d.user.username || d.user.name);
+  try {
+    localStorage.setItem('bonfire_token', d.token);
+    if (name) { localStorage.setItem('bonfire_user', String(name)); rememberAccount(String(name), d.token, (d.user && d.user.pfp) || null); }
+    localStorage.removeItem('bonfire_me_cache_v2');
+    let back = {}; try { back = JSON.parse(sessionStorage.getItem(BACK) || '{}') || {}; sessionStorage.removeItem(BACK); } catch { /* none */ }
+    history.replaceState(null, '', clientUrl(back.hash && !back.hash.startsWith('#/signin') ? back.hash : '#/home'));
+  } catch { return; }
+  location.reload(); // boots again, signed in
+}
+function popupSignIn(back) {
+  if (!popupListener) { popupListener = true; addEventListener('message', onAuthMessage); }
+  try { sessionStorage.setItem(BACK, JSON.stringify({ hash: location.hash, ...back })); } catch { /* fine */ }
+  const w = 480, h = 640;
+  const left = Math.max(0, Math.round(screenX + (outerWidth - w) / 2)), top = Math.max(0, Math.round(screenY + (outerHeight - h) / 2));
+  let win = null;
+  try { win = window.open(AUTH_POPUP_URL(), 'nookara-signin', 'popup=yes,width=' + w + ',height=' + h + ',left=' + left + ',top=' + top); } catch { /* blocked */ }
+  if (!win) {
+    try { win = window.open(AUTH_POPUP_URL(), '_blank'); } catch { /* blocked */ }
+    toast(win ? 'Your browser blocked the pop-up, so Nookara sign-in opened in a new tab.' : 'Your browser blocked the sign-in pop-up. Allow pop-ups for this site and try again.');
+  }
+}
 export function startSignIn(back = {}) {
+  if (onEmberHost()) { popupSignIn(back); return; }
   if (!isWebBonfire()) { location.href = `/login?next=${encodeURIComponent(clientPath())}`; return; }
   const state = rand();
   try { sessionStorage.setItem(STATE, state); sessionStorage.setItem(BACK, JSON.stringify({ hash: location.hash, ...back })); } catch { /* private mode: the state check will fail and say so */ }
@@ -24,7 +54,7 @@ async function finish() {
   const q = new URLSearchParams(location.hash.split('?')[1] || '');
   let want = null, back = {};
   try { want = sessionStorage.getItem(STATE); back = JSON.parse(sessionStorage.getItem(BACK) || '{}') || {}; sessionStorage.removeItem(STATE); sessionStorage.removeItem(BACK); } catch { /* none */ }
-  history.replaceState(null, '', `/chat${back.hash && !back.hash.startsWith('#/signin') ? back.hash : '#/home'}`);
+  history.replaceState(null, '', clientUrl(back.hash && !back.hash.startsWith('#/signin') ? back.hash : '#/home'));
   const code = q.get('code'), state = q.get('state');
   if (q.get('error')) return { back, error: q.get('error') === 'declined' ? 'declined' : 'failed' };
   if (!code || !state || !want || state !== want) return { back, error: 'state' };
@@ -65,7 +95,7 @@ export async function switchBonfireAccount(a) {
   localStorage.setItem('bonfire_token', a.token);
   localStorage.setItem('bonfire_user', a.username);
   localStorage.removeItem('bonfire_me_cache_v2');
-  history.replaceState(null, '', '/chat#/home');
+  history.replaceState(null, '', clientUrl('#/home'));
   location.reload();
 }
 export const SIGNIN_TEXT = { declined: 'Sign-in was cancelled.', state: "That sign-in didn't match this browser - try again.", failed: "Couldn't sign in with Nookara - try again." };
@@ -74,7 +104,7 @@ export const SIGNIN_TEXT = { declined: 'Sign-in was cancelled.', state: "That si
 export function endSession(notice) {
   dropVeloraSessions(); // (while bonfire_user still says whose sessions they are)
   try { forgetAccount(localStorage.getItem('bonfire_user') || ''); localStorage.removeItem('bonfire_token'); localStorage.removeItem('bonfire_user'); localStorage.removeItem('bonfire_me_cache_v2'); if (notice) sessionStorage.setItem('bonfire_notice', notice); } catch { /* fine */ }
-  history.replaceState(null, '', '/chat#/home');
+  history.replaceState(null, '', clientUrl('#/home'));
   location.reload();
 }
 // Settings > Sign out: tell Velora, drop Ember's token. The website's own session is untouched.

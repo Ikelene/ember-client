@@ -1,3 +1,4 @@
+import { siteHref } from './hosts.js';
 // People: square avatars with a status square, the mini profile (the same card as the
 // profile editor's preview) and the large profile it expands into.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -465,11 +466,11 @@ export function ProfileModal({ username: shown, from, sid, who, onClose }) {
             {!isMe && !extra?.bot && <button type="button" className="btn btn-primary" onClick={() => { close(); go({ kind: 'dm', username }); }}><MessageCircle size={15} /> Message</button>}
             {!isMe && !extra?.bot && friend === 'none' && <button type="button" className="btn btn-surface" onClick={addFriend}><UserPlus size={15} /> Add friend</button>}
             {!isMe && friend === 'pending_outgoing' && <span className="vc-chip">Request sent</span>}
-            {!isMe && friend === 'pending_incoming' && <a className="btn btn-surface" href="/me#people">Answer their request</a>}
+            {!isMe && friend === 'pending_incoming' && <a className="btn btn-surface" href={siteHref("/me#people")} target="_blank" rel="noopener noreferrer">Answer their request</a>}
             {!isMe && friend === 'friends' && <button type="button" className="btn btn-surface vc-friend-btn" onClick={removeFriend} disabled={removing} aria-label={`Remove ${username} as a friend`}><span className="is"><Check size={14} /> Friends</span><span className="rm"><UserMinus size={14} /> Remove friend</span></button>}
             {!isMe && !extra?.bot && getToken() && <button type="button" className="btn btn-surface" onClick={() => toggleBlock(username, blocked)}><Ban size={14} /> {blocked ? 'Unblock' : 'Block'}</button>}
             {isMe && <button type="button" className="btn btn-surface" onClick={() => { close(); openProfileEditor(); }}><Pencil size={15} /> Edit profile</button>}
-            <a className="btn btn-surface" href={`/u/${encodeURIComponent(username)}`} target="_blank" rel="noopener"><ExternalLink size={15} /> Profile page</a>
+            <a className="btn btn-surface" href={siteHref(`/u/${encodeURIComponent(username)}`)} target="_blank" rel="noopener"><ExternalLink size={15} /> Profile page</a>
           </div>
         </div>
         <div className="vc-big-id">

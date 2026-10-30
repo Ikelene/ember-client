@@ -1,3 +1,4 @@
+import { siteHref } from './hosts.js';
 // Discord / Fluxer: import a server into Ember (Create a server > Import; or, for a new instance, a Velora import bundle),
 // and the Bridge tab in Server settings (Velora's bot for Velora-hosted servers, the instance owner's own bot on an instance).
 import { useEffect, useMemo, useState } from 'react';
@@ -75,7 +76,7 @@ function GuildPicker({ onPick, pickLabel = 'Choose', exclude = [], inst, base = 
       {!plat?.linked ? (
         <div className="vc-br-note">
           <p>Link your {plat?.name} account to Nookara so Ember can check which servers are yours.</p>
-          <div className="vc-row"><a className="btn btn-primary" href="/me#settings/security" target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> Connected accounts</a>
+          <div className="vc-row"><a className="btn btn-primary" href={siteHref("/me#settings/security")} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> Connected accounts</a>
             <button type="button" className="btn btn-surface" onClick={() => location.reload()}><RefreshCw size={14} /> I've linked it</button></div>
         </div>
       ) : (
