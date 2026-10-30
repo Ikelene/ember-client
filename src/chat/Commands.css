@@ -49,6 +49,13 @@
 .vc-cmd-sug { position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 30; min-width: 200px; max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; padding: 4px; background: var(--flat-box, #151517); border: 1px solid var(--border-2); box-shadow: 0 -12px 30px rgba(0, 0, 0, .5); }
 .vc-cmd-sug button { padding: 5px 8px; background: none; border: 0; color: var(--text); text-align: left; cursor: pointer; white-space: nowrap; }
 .vc-cmd-sug button.on { background: var(--flat-hover, #222226); }
+.vc-cmd-more { position: relative; display: inline-flex; }
+.vc-cmd-add { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: none; border: 1px dashed var(--border-2); color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.vc-cmd-add:hover, .vc-cmd-add.on { color: var(--text); border-color: var(--dim); }
+.vc-cmd-add:focus-visible { outline: 0; border-color: var(--accent); color: var(--text); }
+.vc-cmd-more-list { min-width: 240px; }
+.vc-cmd-more-list button { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; white-space: normal; }
+.vc-cmd-more-list button small { color: var(--muted); font-size: 12px; }
 .vc-cmd-bool { display: flex; outline: none; }
 .vc-cmd-bool:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
 .vc-cmd-bool button, .vc-cmd-file button { padding: 3px 10px; background: none; border: 0; color: var(--muted); cursor: pointer; font: inherit; font-size: 13.5px; display: inline-flex; align-items: center; gap: 6px; }
