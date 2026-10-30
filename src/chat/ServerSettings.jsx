@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Search, LayoutGrid, Shield, Smile, Volume2, Upload, Users, DoorOpen, Bot, ArrowLeftRight, Gamepad2,
   KeyRound, Mic, Globe, UserCog, TriangleAlert, Trash2, RefreshCw, Check, Ban, UserMinus, Compass, Download, Rocket, Archive, Info, Copy, CircleArrowUp,
-  Gauge, MessageSquare, Flag, ShieldAlert, ScrollText,
+  Gauge, MessageSquare, Flag, ShieldAlert, ScrollText, ChartLine,
 
 
 } from 'lucide-react';
@@ -22,6 +22,7 @@ import { BridgeSettings } from './Bridge.jsx';
 import { GameServersSettings } from './GameServer.jsx';
 import { BotsManager } from './Bots.jsx';
 import { ExportButton } from './Community.jsx';
+import { InsightsPage } from './Insights.jsx';
 import { DashboardPage, JoiningPage, MessageRulesPage, ReportsPage, AutoModPage, AuditLogPage, UploadRulesPage } from './ServerRules.jsx';
 import { InstanceTab, BridgeBots, restartInstance } from './Instances.jsx';
 import { UpdateServerRow } from './UpdateServer.jsx';
@@ -40,6 +41,7 @@ function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, 
   return [
     ['Server', [
       onInst && canServer && ['dashboard', 'Dashboard', Gauge, ['Stats', 'Health', 'Storage', 'Disk', 'Top channels', 'Memory', 'Uptime']],
+      onInst && canServer && ['insights', 'Insights', ChartLine, ['Activity', 'Engagement', 'Graphs', 'Joins', 'Leaves', 'Messages', 'Chatters', 'Active', 'Reactions', 'Busiest hours', 'Top chatters']],
       canServer && ['overview', 'Overview', LayoutGrid, ['Name', 'Icon', 'Banner', 'Description', 'Accent colour', 'Invite code', 'Discover', 'Directory', 'Tags', 'List']],
       canRoles && ['roles', 'Roles', Shield, ['Permissions', 'Colour']],
       canServer && ['emojis', 'Emojis', Smile, ['Custom emoji']],
@@ -102,6 +104,7 @@ export function ServerSettings({ sid, onClose, tab: startTab }) {
         {page === 'emojis' && <EmojiManager sid={sid} />}
         {page === 'sounds' && <SoundManager sid={sid} />}
         {page === 'dashboard' && <DashboardPage sid={sid} goTo={goTo} />}
+        {page === 'insights' && <InsightsPage sid={sid} />}
         {page === 'messages' && <MessageRulesPage sid={sid} onDirty={onDirty} goTo={goTo} />}
         {page === 'uploads' && <UploadRulesPage sid={sid} onDirty={onDirty} />}
         {page === 'reports' && <ReportsPage sid={sid} />}
