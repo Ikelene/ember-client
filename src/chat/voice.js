@@ -220,7 +220,7 @@ function updateDmCall(m) {
 // a sound is its id (one of the room's own server) or, from another server, its public view (the room's instance relays the URL)
 export function playBoardSound(sound) { if (!room) return toast('Join a voice channel first.'); send({ type: 'voice_sound', sound: typeof sound === 'object' ? { name: sound.name, emoji: sound.emoji, volume: sound.volume, duration: sound.duration, url: sound.url } : sound, room }); }
 // a sound another server's soundboard sent into this call is only played from an origin you already use (Velora, an instance you are signed in to, this call's instance)
-const trustedSoundOrigin = url => { try { const o = new URL(url).origin; return o === location.origin || o === 'https://velora.ikelene.net' || registry.has(o) || (isInst(String(room).slice(3)) && instOf(String(room).slice(3)) === o); } catch { return false; } };
+const trustedSoundOrigin = url => { try { const o = new URL(url).origin; return o === location.origin || o === 'https://nookara.cc' || o === 'https://velora.ikelene.net' || registry.has(o) || (isInst(String(room).slice(3)) && instOf(String(room).slice(3)) === o); } catch { return false; } };
 // sounds playing in the call right now: they light the player's avatar blue (levels.js reads them through the level source below)
 const boardNow = new Map(); // n -> { key, audio, gain }
 let boardN = 0;

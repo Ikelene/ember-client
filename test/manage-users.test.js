@@ -7,10 +7,10 @@ test('an official client is labelled Ember (before the official clients list has
   assert.match(viaTitle({ official: true }), /official/);
 });
 test('with the official clients list, the name comes from it', () => {
-  const list = [{ name: 'Ember Desktop', origins: ['velora.ikelene.net'], kinds: ['desktop'], app_ids: [], verified: true }];
-  assert.equal(viaLabel({ url: 'https://velora.ikelene.net', kind: 'desktop' }, list), 'Ember Desktop');
-  assert.equal(viaTitle({ url: 'https://velora.ikelene.net', kind: 'desktop' }, list), 'Sent from Ember Desktop (official)');
-  assert.equal(viaLabel({ url: 'https://velora.ikelene.net' }, list), 'velora.ikelene.net');
+  const list = [{ name: 'Ember Desktop', origins: ['nookara.cc'], kinds: ['desktop'], app_ids: [], verified: true }];
+  assert.equal(viaLabel({ url: 'https://nookara.cc', kind: 'desktop' }, list), 'Ember Desktop');
+  assert.equal(viaTitle({ url: 'https://nookara.cc', kind: 'desktop' }, list), 'Sent from Ember Desktop (official)');
+  assert.equal(viaLabel({ url: 'https://nookara.cc' }, list), 'nookara.cc');
 });
 test('other clients show their token name, then their URL', () => {
   assert.equal(viaLabel({ official: false, token: 'My bot', url: 'https://a.example' }), 'My bot');

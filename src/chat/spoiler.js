@@ -13,7 +13,7 @@ export const shownName = name => String(name || '').replace(/^(SPOILER_)+/, '');
 export function nameInLink(url) {
   try {
     const u = String(url);
-    const n = /#n=([^#\s]+)$/.exec(u)?.[1] || /^https:\/\/velora\.ikelene\.net\/t\/[A-Za-z0-9]{22}\/([^\s?#]+)/.exec(u)?.[1] || '';
+    const n = /#n=([^#\s]+)$/.exec(u)?.[1] || /^https:\/\/(?:(?:ember\.)?nookara\.cc|velora\.ikelene\.net)\/t\/[A-Za-z0-9]{22}\/([^\s?#]+)/.exec(u)?.[1] || '';
     return decodeURIComponent(n);
   } catch { return ''; }
 }

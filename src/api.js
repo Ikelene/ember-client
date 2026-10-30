@@ -1,3 +1,4 @@
+import { onWebClientPath } from './chat/hosts.js';
 import { VELORA, registry, hooks, routePath, unNsBody, instPath, fromInstance } from './chat/ids.js';
 
 function getFingerprint() {
@@ -18,7 +19,7 @@ function getFingerprint() {
 // very first request, including in already-installed APKs. This only chooses
 // local storage; the server still validates every token and permission.
 const isAndroidBonfire = () => /\bBonfireAndroid\//.test(navigator.userAgent);
-export const isWebBonfire = () => /^\/chat(\/|$)/.test(location.pathname) && !window.bonfireDesktop && !window.bonfireMobile && !isAndroidBonfire();
+export const isWebBonfire = () => onWebClientPath() && !window.bonfireDesktop && !window.bonfireMobile && !isAndroidBonfire();
 export const TOKEN_KEY = () => (isWebBonfire() ? 'bonfire_token' : 'velora_token');
 export function getToken() {
   try { return localStorage.getItem(TOKEN_KEY()); } catch { return null; }

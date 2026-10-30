@@ -1,5 +1,5 @@
 // Reporting a message or a member: to the Ember server's moderators (they see it in Server settings > Reports), or to
-// Velora's staff (/api/report/submit, the same as velora.ikelene.net/report) when it breaks Velora's rules. Velora can
+// Velora's staff (/api/report/submit, the same as nookara.cc/report) when it breaks Velora's rules. Velora can
 // only act on Velora accounts, so that choice is off on servers that don't sign in with Velora.
 import { apiFetch, uploadFetch } from '../api.js';
 import { ask, toast, errorText, getState, linkFor } from './store.js';

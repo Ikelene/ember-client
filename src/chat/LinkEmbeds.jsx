@@ -189,7 +189,7 @@ function VeloraPlayer({ id, via }) {
 // Velora reads the clip page (its glint:* meta, or just its OpenGraph video) and re-hosts the pictures; the video itself is a
 // file on Velora / ikelene.net and plays in Ember's player only after a click (nothing loads before that). Likes go to
 // Glint's API with Ember's token; whether I liked it is asked once the card scrolls into view.
-const GLINT_MEDIA = /^https:\/\/(velora\.ikelene\.net|(www\.)?ikelene\.net)\//i;
+const GLINT_MEDIA = /^https:\/\/((?:(?:ember\.)?nookara\.cc|velora\.ikelene\.net)|(www\.)?ikelene\.net)\//i;
 const compact = n => (n >= 1e6 ? `${(n / 1e6).toFixed(n < 1e7 ? 1 : 0).replace(/\.0$/, '')}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n < 1e4 ? 1 : 0).replace(/\.0$/, '')}K` : String(n));
 const outside = url => ev => { if (window.bonfireDesktop?.openExternal) { ev.preventDefault(); openOutside(url); } }; // the desktop app opens https links in the browser
 function GlintLike({ id, initial }) {

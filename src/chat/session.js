@@ -1,6 +1,7 @@
 // Ember on the web signs in with Velora the way the apps do (PROTOCOL.md §2.5): the "approve this app" screen, then a token
 // of its own (localStorage['bonfire_token']). The website's own session (velora_token) is never read or written here.
 // The desktop / Android shells keep their own sign-in (store.js loginAgain); none of this runs for them.
+import { clientPath } from './hosts.js';
 import { getToken, isWebBonfire } from '../api.js';
 import { dropVeloraSessions } from './instances.js';
 
@@ -10,7 +11,7 @@ const rand = () => btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8A
 
 // "Sign in with Velora": back = where to come back to (e.g. { add: 'http://host' } reopens the add-a-server dialog there)
 export function startSignIn(back = {}) {
-  if (!isWebBonfire()) { location.href = '/login?next=%2Fchat'; return; }
+  if (!isWebBonfire()) { location.href = `/login?next=${encodeURIComponent(clientPath())}`; return; }
   const state = rand();
   try { sessionStorage.setItem(STATE, state); sessionStorage.setItem(BACK, JSON.stringify({ hash: location.hash, ...back })); } catch { /* private mode: the state check will fail and say so */ }
   location.href = `/bonfire/app-login?client=web&state=${state}`;

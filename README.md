@@ -6,7 +6,7 @@ The web client for **Ember**, a chat system made of servers, channels, direct me
 
 ## Where it runs
 
-[Velora](https://velora.ikelene.net/) hosts the built bundle. Its source lives here. Velora serves:
+[Velora](https://nookara.cc/) hosts the built bundle. Its source lives here. Velora serves:
 
 - `index.html` at `/chat`
 - everything else from this build (`assets/*`, `version.json`) under `/ember/`

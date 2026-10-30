@@ -1,5 +1,6 @@
 // Ember's state + its connection (one Velora socket when signed in with Velora, the /chat, /im and /groups APIs, and one socket per server instance).
 // Components read it with useChat(selector) and change it through the actions below.
+import { shareLink, clientPath } from './hosts.js';
 import { packActive, playPackSound } from './messageSounds.js';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import serverCreationPolicy from '../server-creation-policy.json';
@@ -873,7 +874,7 @@ export async function catchUp(inst = VELORA) {
 
 // an attachment as a link (DMs / group chats are plain text). Files in Velora account storage (and old catbox ones) keep
 // their real name as #n=<name>; a temporary-storage link (/t/<id>/<name>) already carries it in the path.
-const attLink = a => (/^https:\/\/((files|litter)\.catbox\.moe|velora\.ikelene\.net\/uploads)\//.test(a.url) && a.name && a.name !== decodeURIComponent(a.url.split('/').pop()) ? `${a.url}#n=${encodeURIComponent(a.name)}` : a.url);
+const attLink = a => (/^https:\/\/((files|litter)\.catbox\.moe|(?:(?:ember\.)?nookara\.cc|velora\.ikelene\.net)\/uploads)\//.test(a.url) && a.name && a.name !== decodeURIComponent(a.url.split('/').pop()) ? `${a.url}#n=${encodeURIComponent(a.name)}` : a.url);
 // my own accent colour is known right now: put it in the face cache an instance reads names through, so a message that is still
 // sending shows the accent straight away (not the role colour until my Velora face loads, then a flip)
 function seedMyFace(instUser) {
@@ -1390,10 +1391,10 @@ export function hashFor(v) {
   if (v.kind === 'modmail') return `#/modmail${v.username ? `/${encodeURIComponent(v.username)}` : ''}`;
   return '#/home';
 }
-export const linkFor = v => `${location.origin}/chat${hashFor(v)}`;
+export const linkFor = v => shareLink(hashFor(v));
 export function go(v, { replace = false } = {}) {
   const hash = hashFor(v);
-  if (location.hash !== hash) history[replace ? 'replaceState' : 'pushState'](null, '', `/chat${hash}`);
+  if (location.hash !== hash) history[replace ? 'replaceState' : 'pushState'](null, '', `${clientPath() === '/' ? '/' : '/chat'}${hash}`);
   open(v);
 }
 export function readHash() {

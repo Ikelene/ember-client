@@ -1,6 +1,7 @@
 // Message text: a little markdown (**bold**, *italic*, __underline__, ~~strike~~, `code`,
 // ```blocks```, ||spoilers||), links, @mentions, #channels, and picture links shown as pictures.
 import { useMemo, useState } from 'react';
+import { onEmberHost } from './hosts.js';
 import { ask, customEmoji, loadEmojis, useChat } from './store.js';
 import { UNI_EMOJI, Twemoji, nameOfChar } from './emoji.jsx';
 import { emojiDataSync } from './EmojiPicker.jsx';
@@ -8,12 +9,12 @@ import { extractInvites } from './gameInvite.js';
 import { isHiddenInviteLine } from './inviteLink.js';
 
 const IMG = /^https:\/\/\S+\.(png|jpe?g|gif|webp)(\?\S*)?(#\S*)?$/i;
-const VID = /^https:\/\/(velora\.ikelene\.net\/uploads|files\.catbox\.moe)\/\S+\.(mp4|webm|mov)$/i;
-const AUD = /^https:\/\/(velora\.ikelene\.net\/uploads|files\.catbox\.moe)\/\S+\.(mp3|ogg|wav|m4a|aac|flac|weba|opus)$/i;
+const VID = /^https:\/\/((?:(?:ember\.)?nookara\.cc|velora\.ikelene\.net)\/uploads|files\.catbox\.moe)\/\S+\.(mp4|webm|mov)$/i;
+const AUD = /^https:\/\/((?:(?:ember\.)?nookara\.cc|velora\.ikelene\.net)\/uploads|files\.catbox\.moe)\/\S+\.(mp3|ogg|wav|m4a|aac|flac|weba|opus)$/i;
 // Files sent in DMs live on Velora: temporary storage (/t/<id>/<name>, the name is in the path) or account storage
 // (/uploads/..., #n=<name> on the end = the real name). Pictures show as pictures, videos / sounds play, the rest is a file card.
-const TMP = /^https:\/\/velora\.ikelene\.net\/t\/[A-Za-z0-9]{22}\/[^\s?#]+$/i;
-const VUP = /^https:\/\/velora\.ikelene\.net\/uploads\/(images|videos|audio|files)\/[^\s?#]+(#n=[^\s#]*)?$/i;
+const TMP = /^https:\/\/(?:(?:ember\.)?nookara\.cc|velora\.ikelene\.net)\/t\/[A-Za-z0-9]{22}\/[^\s?#]+$/i;
+const VUP = /^https:\/\/(?:(?:ember\.)?nookara\.cc|velora\.ikelene\.net)\/uploads\/(images|videos|audio|files)\/[^\s?#]+(#n=[^\s#]*)?$/i;
 const isVel = u => TMP.test(u) || VUP.test(u);
 const velItem = full => {
   const [u, frag] = full.split('#');
@@ -237,7 +238,7 @@ export function renderBody(body, ctx) {
       if (CB.test(u)) { const it = cbItem(u); if (!images.includes(it.url) && !media.some(x => x.url === it.url)) { if (IMG.test(u)) images.push(it.url); else media.push(it); } continue; }
       // so do Velora-stored DM files (never unfurled: Velora fetching its own temporary file would count as someone opening it)
       if (isVel(u)) { const it = velItem(u); if (!images.includes(u) && !images.includes(it.url) && !media.some(x => x.url === it.url)) { if (IMG.test(u)) images.push(u); else media.push(it); } continue; }
-      if (IMG.test(u) || VID.test(u) || AUD.test(u) || /^https:\/\/([a-z0-9-]+\.)*klipy\.com\//i.test(u) || /^https:\/\/velora\.ikelene\.net\/(uploads|t)\//i.test(u)) continue;
+      if (IMG.test(u) || VID.test(u) || AUD.test(u) || /^https:\/\/([a-z0-9-]+\.)*klipy\.com\//i.test(u) || /^https:\/\/(?:(?:ember\.)?nookara\.cc|velora\.ikelene\.net)\/(uploads|t)\//i.test(u)) continue;
       if (!links.includes(u)) links.push(u);
     }
   });
@@ -280,7 +281,7 @@ export function inAppLink(href, ctx, el) {
   let u;
   try { u = new URL(href, location.href); } catch { return false; }
   if (u.host !== location.host) return false;
-  if (u.pathname === '/chat' || u.pathname === '/chat/') { ctx?.onLink?.(u.hash || '#/home'); return true; }
+  if (u.pathname === '/chat' || u.pathname === '/chat/' || (onEmberHost() && u.pathname === '/')) { ctx?.onLink?.(u.hash || '#/home'); return true; }
   const prof = /^\/u\/([^/]+)\/?$/.exec(u.pathname);
   if (prof && ctx?.onUser) { ctx.onUser(decodeURIComponent(prof[1]), el); return true; }
   return false;

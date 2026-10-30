@@ -38,8 +38,8 @@ const PAGES = [
 const MAC_APP_WORDS = ['Desktop app', 'Mac', 'Open at login', 'Start hidden', 'Menu bar', 'Detect games I play'];
 // help links at the bottom of the sidebar: they open in the browser (the desktop app hands them to the system's browser)
 const HELP = [
-  ['Report a bug', Bug, 'https://velora.ikelene.net/bug-report', ['Bug report', 'Bug', 'Problem', 'Broken', 'Feedback', 'Help']],
-  ['Get support', LifeBuoy, 'https://velora.ikelene.net/support', ['Support', 'Help', 'Contact', 'Question']],
+  ['Report a bug', Bug, 'https://nookara.cc/bug-report', ['Bug report', 'Bug', 'Problem', 'Broken', 'Feedback', 'Help']],
+  ['Get support', LifeBuoy, 'https://nookara.cc/support', ['Support', 'Help', 'Contact', 'Question']],
 ];
 function openOutside(url) {
   const d = window.bonfireDesktop;

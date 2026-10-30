@@ -9,7 +9,7 @@ import { loadUploadDestinations } from './store.js';
 import { normalDays, daysText, expiryChoices, pickedDays } from './temp-pick.js';
 
 const MB = 1024 * 1024;
-const VELORA = 'https://velora.ikelene.net';
+const VELORA = 'https://nookara.cc';
 const fmt = b => (b >= 1024 * MB ? `${(b / 1024 / MB).toFixed(1)} GB` : `${Math.max(0, Math.round(b / MB))} MB`);
 const dateIn = days => new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', ...(days > 300 ? { year: 'numeric' } : {}) }).format(Date.now() + days * 864e5);
 

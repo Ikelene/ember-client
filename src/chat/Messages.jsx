@@ -211,7 +211,7 @@ function Attachments({ list: all, extra = [], m }) {
               {cover(a)}
               {a.type === 'gif' && !hidden(a) && <GifBadge />}
               {hidden(a) ? null : KLIPY.test(a.url) ? <StarButton gif={{ url: a.url, preview: a.url, title: a.name, width: a.width, height: a.height }} />
-                : /^https:\/\/(velora\.ikelene\.net\/(uploads|t)|files\.catbox\.moe)\//.test(a.url) && <button type="button" className="vc-att-save" title="Save to Saved Media" onClick={e => { e.preventDefault(); e.stopPropagation(); saveToMedia(a.url, a.name); }}><BookmarkPlus size={15} /></button>}
+                : /^https:\/\/((?:(?:ember\.)?nookara\.cc|velora\.ikelene\.net)\/(uploads|t)|files\.catbox\.moe)\//.test(a.url) && <button type="button" className="vc-att-save" title="Save to Saved Media" onClick={e => { e.preventDefault(); e.stopPropagation(); saveToMedia(a.url, a.name); }}><BookmarkPlus size={15} /></button>}
             </a>
           ))}
         </div>
@@ -224,7 +224,7 @@ function Attachments({ list: all, extra = [], m }) {
             : <a href={a.url} target="_blank" rel="noopener noreferrer" className="vc-file">{shownName(a.name) || a.url}</a>;
         return hidden(a) ? <div key={a.url} className="vc-att-spoiler-box">{inner}{cover(a)}</div> : <Fragment key={a.url}>{inner}</Fragment>;
       })}
-      {expiry && <a className="vc-att-expiry" href="https://velora.ikelene.net/temp-files" target="_blank" rel="noopener noreferrer" title="Temporary file - how long these last and how to keep them"><Clock size={12} aria-hidden="true" /><span>{expiry}</span></a>}
+      {expiry && <a className="vc-att-expiry" href="https://nookara.cc/temp-files" target="_blank" rel="noopener noreferrer" title="Temporary file - how long these last and how to keep them"><Clock size={12} aria-hidden="true" /><span>{expiry}</span></a>}
     </div>
   );
 }

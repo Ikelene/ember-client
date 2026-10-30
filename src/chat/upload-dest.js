@@ -7,6 +7,6 @@ export function rememberedDest({ fromServer, setting, local }) {
   const pick = v => (DESTS.includes(v) ? v : null);
   return fromServer ? pick(setting) : pick(local);
 }
-// a temporary-storage link: https://velora.ikelene.net/t/<22 letters/digits>/<name>
-export const TEMP_LINK = /^https:\/\/velora\.ikelene\.net\/t\/([A-Za-z0-9]{22})(\/|$)/;
+// a temporary-storage link: https://nookara.cc/t/<22 letters/digits>/<name>
+export const TEMP_LINK = /^https:\/\/(?:(?:ember\.)?nookara\.cc|velora\.ikelene\.net)\/t\/([A-Za-z0-9]{22})(\/|$)/;
 export const tempId = url => TEMP_LINK.exec(String(url || ''))?.[1] || null;

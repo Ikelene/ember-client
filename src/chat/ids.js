@@ -3,6 +3,7 @@
 // bare: they never contain '|', so they can't collide with a namespaced one. Only the code that talks to an instance
 // turns a key back into the bare id, and the origin comes out of the key itself - a request for community X can only
 // ever go to the instance X was loaded from.
+import { onWebClientPath } from './hosts.js';
 export const VELORA = 'velora';
 
 export function normOrigin(input) {
@@ -35,7 +36,7 @@ export const hooks = { refresh: null }; // refresh(origin) -> Promise<boolean>: 
 // web Ember remembers the name at sign-in (localStorage['bonfire_user']); the apps read it from the cached /account/me
 export function acct() {
   try {
-    const web = /^\/chat(\/|$)/.test(location.pathname) && !window.bonfireDesktop && !window.bonfireMobile && !/\bBonfireAndroid\//.test(navigator.userAgent);
+    const web = onWebClientPath() && !window.bonfireDesktop && !window.bonfireMobile && !/\bBonfireAndroid\//.test(navigator.userAgent);
     const u = web ? localStorage.getItem('bonfire_user') : JSON.parse(localStorage.getItem('velora_me_cache_v2') || 'null')?.d?.account?.username;
     return u ? String(u).toLowerCase() : '';
   } catch { return ''; }

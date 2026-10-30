@@ -4,6 +4,7 @@
 // Plus is prepaid weeks and never renews by itself: when the time is up the server is overdue for 2 days, then read-only,
 // and a week later Velora keeps a backup in your account and shuts it down. Velora's side: /bonfire/hosting/* (PROTOCOL §19).
 import { useEffect, useRef, useState } from 'react';
+import { INSTANCE_DOMAIN } from './hosts.js';
 import { Check, Globe, Rocket, Sparkles, Users, Volume2, Upload, Smile, Bot, ArrowLeftRight, KeyRound, TriangleAlert, RefreshCw, Trash2, Coins, Server, ShieldCheck, Archive, Download, CalendarClock, X, Lock, HardDrive } from 'lucide-react';
 import { apiFetch, getToken } from '../api.js';
 import { Dialog } from './Dialogs.jsx';
@@ -122,7 +123,7 @@ export function CreateServer({ onClose, onSetup, onAddByAddress }) {
   const starters = mine.filter(s => s.plan === 'starter' && s.billing !== 'archived').length;
   const starterFull = cfg?.starter_limit_per_account != null && starters >= cfg.starter_limit_per_account;
   useEffect(() => { if (starterFull && plan === 'starter') setPlan('plus'); }, [starterFull]); // eslint-disable-line react-hooks/exhaustive-deps
-  const urlFor = s => (cfg?.url_template ? cfg.url_template.replace('{slug}', s || 'your-server') : `https://${s || 'your-server'}.${cfg?.domain || 'bonfire.ikelene.net'}`);
+  const urlFor = s => (cfg?.url_template ? cfg.url_template.replace('{slug}', s || 'your-server') : `https://e_${s || 'your-server'}.${cfg?.domain || INSTANCE_DOMAIN}`);
   // the address follows the name until it's edited; availability is checked as you type
   useEffect(() => { if (!touched) setSlug(slugFrom(name)); }, [name]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {

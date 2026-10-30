@@ -1,9 +1,9 @@
 // Ember invite links, recognised in message text so they show as an invite card (LinkEmbeds.jsx InviteEmbed):
-//   https://velora.ikelene.net/chat#/invite/<code>                    (a Velora-hosted server)
-//   https://velora.ikelene.net/chat#/i/<instance origin, encoded>/invite/<code>
+//   https://ember.nookara.cc/#/invite/<code>                    (a Velora-hosted server)
+//   https://ember.nookara.cc/#/i/<instance origin, encoded>/invite/<code>
 //   https://<instance>/invite/<code>                                  (the instance's own invite page)
 // The server (unfurl.js) makes the card data - the instance is asked from Velora, never from the browser.
-const VELORA_HOST = /^(www\.)?velora\.ikelene\.net$/i;
+const VELORA_HOST = /^(www\.)?((?:ember\.)?nookara\.cc|velora\.ikelene\.net)$/i;
 const CODE = '[A-Za-z0-9]{4,32}';
 const HASH_OWN = new RegExp(`^#/invite/(${CODE})/?$`);
 const HASH_INST = new RegExp(`^#/i/([^/]+)/invite/(${CODE})/?$`);
@@ -16,7 +16,7 @@ export function inviteRef(href) {
   try { u = new URL(href); } catch { return null; }
   if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
   if (VELORA_HOST.test(u.hostname)) {
-    if (!/^\/chat\/?$/.test(u.pathname)) return null;
+    if (!/^\/(chat\/?)?$/.test(u.pathname)) return null;
     let m = HASH_OWN.exec(u.hash);
     if (m) return { inst: null, code: m[1], sure: true };
     m = HASH_INST.exec(u.hash);
@@ -25,12 +25,12 @@ export function inviteRef(href) {
   }
   const m = PATH_INV.exec(u.pathname);
   if (!m || u.protocol !== 'https:') return null;
-  return { inst: u.origin, code: m[1], sure: /(^|\.)ikelene\.net$/i.test(u.hostname) };
+  return { inst: u.origin, code: m[1], sure: /(^|\.)(ikelene\.net|nookara\.cc)$/i.test(u.hostname) };
 }
 // Velora payment links, shown as a payment card (LinkEmbeds.jsx PaymentEmbed; unfurl.js makes the data):
-//   https://velora.ikelene.net/pay/<username>          (pay a person)
-//   https://velora.ikelene.net/pay/bp_<32 hex>         (a bot's payment request)
-//   https://velora.ikelene.net/payment/<32 hex>        (a payment request, e.g. from a project or a chat bot)
+//   https://nookara.cc/pay/<username>          (pay a person)
+//   https://nookara.cc/pay/bp_<32 hex>         (a bot's payment request)
+//   https://nookara.cc/payment/<32 hex>        (a payment request, e.g. from a project or a chat bot)
 // -> { kind: 'user' | 'bot' | 'request', sure: true } or null
 export function paymentRef(href) {
   let u;

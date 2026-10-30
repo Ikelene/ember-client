@@ -30,7 +30,7 @@ export default function AboutBonfire() {
       {desktop && <div className="cs-row"><div className="cs-text"><b>Installed desktop version</b><span>{installed || 'Checking…'}</span></div></div>}
       <div className="cs-row"><div className="cs-text"><b>Web build</b><span>{isRelease ? <a href={commitUrl(COMMIT)} target="_blank" rel="noopener noreferrer"><code>{SHORT}</code></a> : 'Development'}</span></div></div>
       {release && <div className="cs-row"><div className="cs-text"><b>Latest desktop release</b><span>{release}</span></div></div>}
-      <div className="cs-row"><div className="cs-text"><b>Website</b><span><a href="https://velora.ikelene.net" target="_blank" rel="noopener noreferrer">velora.ikelene.net</a></span></div></div>
+      <div className="cs-row"><div className="cs-text"><b>Website</b><span><a href="https://nookara.cc" target="_blank" rel="noopener noreferrer">nookara.cc</a></span></div></div>
       <div className="cs-row"><div className="cs-text"><b>Copyright</b>
         {repo === undefined ? <span>Checking…</span> : <>
           <span>{copyrightLine(repo) || 'Copyright and license could not be loaded right now.'}</span>

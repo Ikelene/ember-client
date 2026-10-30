@@ -124,7 +124,7 @@ function NotificationBanner() {
   if (!show) return null;
   const turnOn = async () => {
     if (unsupported) { setError(desktop ? `Desktop notifications are not supported by this installation or are disabled by ${macDesktop ? 'macOS' : 'Windows'}.` : "This browser doesn't support background push notifications. Try a current Chrome, Edge, Firefox, or Safari browser."); return; }
-    if (blocked) { setError('Notifications are blocked in this browser. Allow notifications for velora.ikelene.net in your browser settings, then reload Ember.'); return; }
+    if (blocked) { setError('Notifications are blocked in this browser. Allow notifications for ' + location.hostname + ' in your browser settings, then reload Ember.'); return; }
     setBusy(true); setError('');
     try {
       if (desktop) await window.bonfireDesktop.enableNotifications();
@@ -480,7 +480,7 @@ function ChatPage() {
   const title = isServer
     ? { icon: <ChIcon size={34} />, big: `Welcome to #${channel?.name || ''}`, sub: channel?.topic || `This is the start of the #${channel?.name} channel.` }
     : modView
-      ? { icon: <ShieldCheck size={34} />, big: view.username ? `Moderator chat with ${view.username}` : 'Nookara Moderator Chat', sub: view.username ? `They see these as "Nookara Administrator" - never who sent them. Only Nookara staff see the names.` : "Messages from Nookara's admins. You can't reply here - if you need to answer, use velora.ikelene.net/support." }
+      ? { icon: <ShieldCheck size={34} />, big: view.username ? `Moderator chat with ${view.username}` : 'Nookara Moderator Chat', sub: view.username ? `They see these as "Nookara Administrator" - never who sent them. Only Nookara staff see the names.` : "Messages from Nookara's admins. You can't reply here - if you need to answer, use nookara.cc/support." }
     : view.kind === 'dm'
       ? (sysDM ? { icon: <AtSign size={34} />, big: 'Nookara', sub: 'Notices about your account: credits, reports and more.' } : { icon: <AtSign size={34} />, big: view.username, sub: `This is the start of your conversation with ${view.username}.` })
       : { icon: <UsersRound size={34} />, big: group?.name || 'Group chat', sub: 'This is the start of the group chat.' };
