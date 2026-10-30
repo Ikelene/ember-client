@@ -419,7 +419,7 @@ const ACTION_TEXT = {
   channel_update: 'changed', channel_delete: 'deleted', channel_perms: 'changed the permissions of', channel_layout: 'rearranged the channels',
   message_delete: 'deleted a message by', message_pin: 'pinned a message in', message_unpin: 'unpinned a message in', automod_block: 'blocked a message by',
   spam_pause: 'paused', report_resolve: 'resolved a report about', report_dismiss: 'dismissed a report about', report_reopen: 'reopened a report about',
-  server_update: 'changed the server', settings_update: 'changed the settings', invite_create: 'created an invite', invite_delete: 'deleted an invite',
+  server_update: 'changed the server', settings_update: 'changed the settings', unmarked_aliases_update: 'changed unmarked aliases', invite_create: 'created an invite', invite_delete: 'deleted an invite',
   emoji_create: 'added the emoji', emoji_rename: 'renamed the emoji', emoji_delete: 'deleted the emoji',
 };
 const actionName = a => (ACTION_TEXT[a] || a.replace(/_/g, ' ')).replace(/^./, c => c.toUpperCase());
@@ -429,6 +429,7 @@ function detailText(d) {
   if (Array.isArray(d.changed)) out.push(`changed ${d.changed.join(', ')}`);
   for (const k of ['role', 'reason', 'word', 'note', 'name', 'channel', 'code']) if (d[k] != null && typeof d[k] !== 'object') out.push(`${k}: ${d[k]}`);
   if (d.seconds) out.push(`${d.seconds}s`);
+  if (typeof d.enabled === 'boolean') out.push(d.enabled ? 'turned on' : 'turned off');
   return out.join(' - ');
 }
 export function AuditLogPage({ sid, onDirty }) {

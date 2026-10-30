@@ -7,7 +7,7 @@
 // Developer mode (Chat settings) adds "Copy ... ID" items at the bottom (dev: true).
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronRight, Check, Hash, Copy, Link2, BellOff, Bell, CheckCheck, UserPlus, Settings, LogOut, Pencil, Trash2, Reply, User, MessageCircle, ExternalLink, Image as ImageIcon, Code2, Forward, Pin, Download, SmilePlus, BookmarkPlus, RefreshCw, LogIn, ShieldCheck, BellRing, Flag, Ban } from 'lucide-react';
+import { ChevronRight, Check, Hash, Copy, Link2, BellOff, Bell, CheckCheck, UserPlus, Settings, LogOut, Pencil, Trash2, Reply, User, MessageCircle, ExternalLink, Image as ImageIcon, Code2, Forward, Pin, Download, SmilePlus, BookmarkPlus, RefreshCw, LogIn, ShieldCheck, BellRing, Flag, Ban, Info } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { useChat, getState, setMenu, toggleBlock, toast, setNotify, notifyOf, go, markServerRead, markChannelRead, linkFor, isMineMsg } from './store.js';
 import { bare, instOpt, isInst } from './ids.js';
@@ -218,7 +218,7 @@ export function channelMenu(e, c, sid, { admin, onEdit, onDelete } = {}) {
     { label: 'Copy channel ID', icon: Code2, dev: true, onClick: () => copy(bare(c.cid), 'Channel ID copied') },
   ]);
 }
-export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, canReply, onForward, canPin, onPin, onReact } = {}) {
+export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, canReply, onForward, canPin, onPin, onReact, onInfo } = {}) {
   const sel = String(getSelection?.() || '').trim();
   const link = e.target.closest?.('a[href]');
   const img = e.target.closest?.('img');
@@ -247,6 +247,7 @@ export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, 
     canDelete && { label: 'Delete message', icon: Trash2, danger: true, onClick: onDelete },
     view.kind === 'channel' && isInst(view.sid) && !isMineMsg(m) && !m.system && /^\d+$/.test(String(m.id)) && { label: 'Report message', icon: Flag, danger: true, onClick: () => reportTo(view.sid, { message_id: m.id }, 'this message', { target: m.author, message: m }) },
     'sep',
+    onInfo && { label: 'Message info', icon: Info, onClick: onInfo }, // Manage messages: the real sender (aliases included)
     { label: 'Copy message ID', icon: Code2, dev: true, onClick: () => copy(m.imId || m.id, 'Message ID copied') },
     m.author?.id && { label: 'Copy author ID', icon: Code2, dev: true, onClick: () => copy(m.author.id, 'Account ID copied') },
   ], { reaction: onReact ? { id: m.imId ? `dm:${m.imId}` : m.id, inst: instOpt(m.channel), selected: (m.reactions || []).filter(r => r.users?.includes(me)).map(r => r.emoji) } : null });

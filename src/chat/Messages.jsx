@@ -15,7 +15,7 @@ import { inviteSummary } from './gameInvite.js';
 import { PlatformIcon, PLATFORM_NAMES } from './platforms.jsx';
 import { GameEventLine } from './GameServer.jsx';
 import { BotTag } from './Bots.jsx';
-import { AliasMark, aliasOf, replyAliasOf, aliasKey, aliasFace } from './Alias.jsx';
+import { AliasMark, aliasOf, replyAliasOf, aliasKey, aliasFace, isUnmarked, aliasMemberOf } from './Alias.jsx';
 import { CommandPicker, CommandBar, MessageComponents, InteractionLine, Thinking, EphemeralNote } from './Commands.jsx';
 import { slashEntries, matchEntries } from './commands.js';
 import { ViaBadge } from './ClientVia.jsx';
@@ -300,16 +300,44 @@ function SigBadge({ m, inStack }) {
   if (!inStack && isUnsigned(m)) return <span className="vc-sig unsigned" title={`Sent unsigned - Velora can't confirm this came from ${m.author.username}`}><Shield size={14} /></span>;
   return null;
 }
+// Message info (Manage messages only): the real author behind a message - most of all an alias, marked or not
+function messageInfo(m) {
+  const a = aliasOf(m), au = m.author || {};
+  const kind = au.webhook ? (au.bridge ? `bridge (${au.bridge})` : 'webhook') : au.bot ? 'bot' : au.kind === 'local' ? 'local account' : au.kind === 'velora' ? 'Velora account' : au.kind || 'account';
+  const rows = [
+    ['Sent by', `${au.username || 'Unknown'} (${kind})`],
+    a && ['Shown as', `${a.name}${a.unmarked ? ' (unmarked alias: looks like a normal message)' : ' (alias, with the mask)'}`],
+    a?.unmarked && ['Looks like', a.member ? `${a.member.username} (their name colour and profile card)` : 'nobody here (no member has that name)'],
+    au.id && ['Author ID', au.id],
+    ['Message ID', m.id],
+    ['Sent', new Date(m.created_at).toLocaleString()],
+    m.edited_at && ['Edited', new Date(m.edited_at).toLocaleString()],
+  ].filter(Boolean);
+  const text = (
+    <span className="vc-msg-info">
+      {a && <span className="vc-msg-info-lead">Sent by bot <b>{au.username}</b> via {a.unmarked ? 'an unmarked' : 'an'} alias. Only people who can manage messages see this.</span>}
+      {rows.map(([k, v]) => <span key={k} className="vc-msg-info-row"><b>{k}</b><span>{v}</span></span>)}
+    </span>
+  );
+  ask({ title: 'Message info', text, confirm: au.id ? 'Copy author ID' : 'OK', cancel: 'Close' })
+    .then(ok => { if (ok && au.id) navigator.clipboard?.writeText(String(au.id)).then(() => toast('Author ID copied', true)).catch(() => {}); });
+}
 function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, setEditing, view, fresh }) {
   const hook = !!m.author?.webhook;
   // on an instance: Velora people get their Velora profile, local accounts / bots a plain card (never a Velora lookup by name)
-  // an aliased bot message: the card is the real bot's, with a "Posting as alias" line
+  // an aliased bot message: the card is the real bot's, with a "Posting as alias" line. An unmarked alias (server setting) whose
+  // name matched a member opens THAT member's card and takes their colour; one that matched nobody opens the bot's plain card.
   const alias = aliasOf(m);
-  const onUser = (name, el) => openUser(name, el, 'right', m.inst ? (alias ? { ...m.author, alias_name: alias.name } : m.author) : undefined);
+  const unmarked = isUnmarked(alias);
+  const aliasMember = useFace(useMemo(() => { const a = aliasMemberOf(alias); return a && m.inst ? { ...a, inst: m.inst } : a; }, [alias?.member, m.inst])); // eslint-disable-line react-hooks/exhaustive-deps
+  const onUser = (name, el) => (aliasMember
+    ? openUser(aliasMember.username, el, 'right', m.inst ? { ...alias.member, inst: m.inst } : undefined)
+    : openUser(name, el, 'right', m.inst ? (alias && !unmarked ? { ...m.author, alias_name: alias.name } : m.author) : undefined));
   const author = useFace(m.author); // a Velora person on an instance: their live Velora picture / colour / rank
   const replyAlias = replyAliasOf(m.reply);
   const replyAuthor = useFace(useMemo(() => (m.reply?.author && m.inst ? { ...m.reply.author, inst: m.inst } : m.reply?.author), [m.reply?.author, m.inst]));
   useEffect(() => { if (m.inst && m.author?.kind === 'velora') wantVeloraFaces([m.author]); }, [m.inst, m.author?.velora_id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const a = aliasMemberOf(alias); if (m.inst && a?.kind === 'velora') wantVeloraFaces([a]); }, [m.inst, alias?.member?.velora_id]); // eslint-disable-line react-hooks/exhaustive-deps
   // somebody I blocked, in a server: "Blocked User" with the default picture, and the whole message under a cover until clicked
   // (only for me; everyone else sees them as usual). The real name stays behind the clicks, so their menu can still unblock.
   const blockedAuthor = useBlocked(view.kind === 'channel' && !hook && !m.system ? m.author : null, m.inst);
@@ -328,7 +356,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
   const mine = !hook && isMineMsg(m);
   const { nodes, images, media, jumbo, links, invites } = useMemo(() => renderBody(m.body, ctx), [m.body, ctx]);
   const mentionsMe = isMention(m);
-  const nameKey = useNameStyle(view.sid, author);
+  const nameKey = useNameStyle(view.sid, aliasMember || author); // (an unmarked alias that matched a member: their colour + role icon)
   const distrust = useDistrust(m);
   // pronouns come from the viewer's own profile lookup (friends-only profiles hide them), not the broadcast author object
   const pronouns = usePronouns(m.author?.username, !!head && !hook && !m.system && !m.author?.bot && !!m.author?.username && m.author.username !== 'System' && m.author?.kind !== 'local' && !blockedAuthor);
@@ -376,7 +404,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
     <div className={`vc-msg${head ? ' head' : ''}${m.pending ? ' pending' : ''}${m.failed ? ' failed' : ''}${mentionsMe ? ' mention' : ''}${editing ? ' editing' : ''} ${fresh === 'live' ? (isMineMsg(m) ? 'vc-in-mine' : 'vc-in-live') : fresh === 'done' ? '' : 'vl-in'}`} data-id={m.id}
       onContextMenu={e => {
         if (e.target.closest('textarea, input, [contenteditable]') || m.pending) return;
-        if (!hook && e.target.closest('.vc-msg-av, .vc-msg-name')) { const el = e.target.closest('.vc-msg-av, .vc-msg-name'); userMenu(e, name, { sid: view.sid, onProfile: () => onUser(name, el) }); return; }
+        if (!hook && e.target.closest('.vc-msg-av, .vc-msg-name')) { const el = e.target.closest('.vc-msg-av, .vc-msg-name'); userMenu(e, aliasMember?.username || name, { sid: view.sid, onProfile: () => onUser(name, el) }); return; }
         if (m.ephemeral) { openMenu(e, [{ label: 'Dismiss message', icon: X, onClick: () => dismissEphemeral(view, m) }]); return; }
         const reactionAnchor = e.currentTarget.getBoundingClientRect();
         messageMenu(e, m, view, {
@@ -384,6 +412,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
           canPin: view.kind === 'channel' && canMod && !hook, onPin: togglePin,
           canDelete: (mine || canMod) && view.kind !== 'group', onDelete: () => remove({ shiftKey: false }),
           onReact: canReact ? () => openReactionPicker(reactId, reactionAnchor, instOpt(m.channel)) : null,
+          onInfo: view.kind === 'channel' && canMod && !m.system ? () => messageInfo(m) : null, // staff only: who really sent it
         });
       }}>
       {m.statusReply && (
@@ -408,7 +437,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
       <InteractionLine m={m} sid={view.sid} onUser={onUser} />
       {head ? (
         hook ? <span className="vc-msg-av hook">{m.author.pfp ? <img src={m.author.pfp} alt="" /> : m.author.bridge ? <span className="vc-av-l">{(m.author.username || '?')[0].toUpperCase()}</span> : <Webhook size={20} />}</span>
-          : <button type="button" className="vc-msg-av" onClick={e => onUser(name, e.currentTarget)}><Avatar user={blockedAuthor ? blockedFace(author) : distrust ? { ...author, pfp: null } : aliasFace(alias, author)} size={40} /></button>
+          : <button type="button" className="vc-msg-av" onClick={e => onUser(name, e.currentTarget)}><Avatar user={blockedAuthor ? blockedFace(author) : distrust ? { ...author, pfp: null } : aliasFace(alias, author, aliasMember)} size={40} /></button>
       ) : (
         <span className="vc-msg-gut">{timeOf(m.created_at)}</span>
       )}
@@ -419,7 +448,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
             {blockedAuthor
               ? <><button type="button" className="vc-msg-name vc-blocked-name" onClick={e => onUser(name, e.currentTarget)}>{BLOCKED_NAME}</button><BlockedMark /></>
               : <><button type="button" className="vc-msg-name" style={colorFrom(nameKey) && !distrust ? { color: colorFrom(nameKey) } : undefined} onClick={e => onUser(name, e.currentTarget)}>{alias ? alias.name : name}</button>
-                {alias ? <AliasMark alias={alias} by={author} /> : <NameDecor sid={view.sid} user={author} />}</>}{m.author?.bot && <BotTag verified={!!m.author.verified} />}<SigBadge m={m} />{m.via && <ViaBadge via={m.via} />}</>}
+                {alias && !unmarked ? <AliasMark alias={alias} by={author} /> : <NameDecor sid={view.sid} user={aliasMember || author} />}</>}{m.author?.bot && !unmarked && <BotTag verified={!!m.author.verified} />}<SigBadge m={m} />{m.via && <ViaBadge via={m.via} />}</>}
             {pronouns && <span className="vc-pronouns" title="Pronouns">{pronouns}</span>}
             <span className="vc-time" title={new Date(m.created_at).toLocaleString()}>{stampOf(m.created_at)}</span>
             {m.pinned && <span className="vc-pinned-mark" title="Pinned"><Pin size={12} /></span>}

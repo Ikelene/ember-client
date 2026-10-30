@@ -36,7 +36,7 @@ import './SettingsDialog.css';
 // [id, label, icon, words the search box answers to]
 function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, owner, legacyDefault, hosted }) {
   const uploads = ['uploads', 'Uploads', Upload, ['Files', 'Biggest file', 'MB', 'File types', 'Expire', 'Storage', 'Compression', 'Per minute']];
-  const danger = (owner && !legacyDefault) || instAdmin ? ['danger', 'Danger zone', TriangleAlert, ['Delete server', 'Export', 'Restart', 'Update', 'Backup']] : null;
+  const danger = (owner && !legacyDefault) || instAdmin ? ['danger', 'Danger zone', TriangleAlert, ['Delete server', 'Export', 'Restart', 'Update', 'Backup', 'Advanced', 'Unmarked aliases']] : null;
   return [
     ['Server', [
       onInst && canServer && ['dashboard', 'Dashboard', Gauge, ['Stats', 'Health', 'Storage', 'Disk', 'Top channels', 'Memory', 'Uptime']],
@@ -328,6 +328,53 @@ function DangerZone({ sid, origin, instAdmin, onClose }) {
             <button type="button" className="btn btn-danger" onClick={del}><Trash2 size={14} /> Delete server</button></div>
         </Card>
       )}
+      {owner && origin && <AdvancedCard sid={sid} />}
     </div>
+  );
+}
+
+// ── Danger zone > Advanced (owner only, Ember servers): unmarked aliases. Kept at the very bottom on purpose: it lets bots post
+// messages that look exactly like a member's. Turning it on asks first; the server logs every change in the audit log. ──
+function AdvancedCard({ sid }) {
+  const [open, setOpen] = useState(false);
+  const [on, setOn] = useState(null); // null = not loaded yet
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!open || on !== null) return;
+    let off = false;
+    apiFetch(`/chat/servers/${sid}/settings`).then(d => { if (!off) setOn(!!d.settings?.advanced?.unmarked_aliases); }).catch(e => { if (!off) toast(errorText(e.message)); });
+    return () => { off = true; };
+  }, [open, sid]); // eslint-disable-line react-hooks/exhaustive-deps
+  async function flip(next) {
+    if (next && !(await ask({
+      title: 'Turn on unmarked aliases?',
+      text: "Bots you allow will be able to post messages that look exactly like they came from a member of this server: their name, colour and profile card, with no alias mark and no BOT tag. Members won't be able to tell. Only people who can manage messages can still see the real sender (Message info).",
+      match: 'unmarked', confirm: 'Turn on', danger: true,
+    }))) return;
+    setBusy(true);
+    try {
+      const d = await apiFetch(`/chat/servers/${sid}/settings`, { method: 'PATCH', body: JSON.stringify({ advanced: { unmarked_aliases: next } }) });
+      setOn(!!d.settings?.advanced?.unmarked_aliases); refreshServer(sid);
+      toast(next ? 'Unmarked aliases are on. Reload the channel to see older messages change.' : 'Unmarked aliases are off.', true);
+    } catch (e) { toast(errorText(e.message)); }
+    setBusy(false);
+  }
+  return (
+    <Card title="Advanced" icon={ShieldAlert} className="bf-ss-danger">
+      {!open ? (
+        <div className="cs-row"><div className="cs-text"><b>Advanced settings</b><span>Risky settings most servers never need.</span></div>
+          <button type="button" className="btn btn-surface" onClick={() => setOpen(true)}>Show</button></div>
+      ) : (
+        <>
+          <div className="bf-ss-advanced-warn" role="note"><TriangleAlert size={16} /><span>
+            <b>Unmarked aliases</b> let bots post messages that look exactly like they came from a member: no mask, no BOT tag, and if
+            the alias name matches someone in this server, their colour and profile card. Mentions, blocks, reports and moderation still go to the
+            real bot, and people with Manage messages can see it under Message info. A bot also needs the <b>Use unmarked aliases</b> permission
+            (or Administrator) on one of its roles.</span></div>
+          {on === null ? <div className="vc-loading"><i /><i /><i /></div>
+            : <Toggle label="Allow unmarked aliases" hint={on ? 'On: allowed bots post aliases with no mark. Turning it off marks every alias again, old ones too.' : 'Off: every alias shows its mask and the real bot.'} on={on} disabled={busy} onChange={flip} />}
+        </>
+      )}
+    </Card>
   );
 }

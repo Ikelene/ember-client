@@ -418,6 +418,15 @@ a.vc-chip.vc-conn:hover { border-color: var(--cc, var(--accent)); background: #1
 .vc-dialog.wide { width: min(760px, 100%); }
 .vc-dialog h3 { margin-bottom: 4px; font-size: 19px; color: #fff; }
 .vc-dialog-sub { margin-bottom: 14px; color: var(--dim); font-size: 13.5px; }
+/* Message info (Manage messages): who really sent a message */
+.vc-msg-info { display: grid; gap: 6px; }
+.vc-msg-info-lead { display: block; color: var(--text); margin-bottom: 4px; }
+.vc-msg-info-row { display: grid; grid-template-columns: 96px 1fr; gap: 10px; }
+.vc-msg-info-row > b { color: var(--dim); font-weight: 600; }
+.vc-msg-info-row > span { color: var(--text); overflow-wrap: anywhere; }
+/* Danger zone > Advanced: unmarked aliases */
+.bf-ss-advanced-warn { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; margin: 4px 0 10px; border: 1px solid var(--red); color: var(--text); font-size: 13px; line-height: 1.45; }
+.bf-ss-advanced-warn svg { flex: none; color: var(--red); margin-top: 2px; }
 .vc-dialog-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 18px; }
 .vc-dialog-btns .btn { gap: 6px; }
 .vc-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }

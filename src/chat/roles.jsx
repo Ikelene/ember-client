@@ -15,7 +15,9 @@ import { userScrolled } from './userscroll.js';
 export const P = {
   SEND: 1, MANAGE_CHANNELS: 2, MANAGE_SERVER: 4, MANAGE_ROLES: 8, KICK: 16, BAN: 32,
   MANAGE_MESSAGES: 64, MENTION_EVERYONE: 128, ATTACH: 256, ADMIN: 512, MANAGE_USERS: 2048,
+  UNMARKED_ALIASES: 4096, // instances only: a bot's alias messages show unmarked while the server's Danger zone allows it
 };
+const INST_ONLY_PERMS = new Set(['UNMARKED_ALIASES']); // Velora's own servers don't have these
 export const PERM_LIST = [
   ['ADMIN', 'Administrator', 'Every permission, and can do anything in the server. Be careful who gets this.'],
   ['MANAGE_SERVER', 'Manage server', 'Change the name, description, icon, banner and server settings.'],
@@ -28,6 +30,7 @@ export const PERM_LIST = [
   ['MENTION_EVERYONE', 'Mention @everyone, @here and all roles', 'Ping the whole server, or roles that are not mentionable.'],
   ['SEND', 'Send messages', 'Post in channels that let everyone send messages.'],
   ['ATTACH', 'Attach files', 'Send pictures with their messages.'],
+  ['UNMARKED_ALIASES', 'Use unmarked aliases', "For bots: while the server owner has turned on unmarked aliases (Server settings > Danger zone > Advanced), this bot's alias messages look exactly like a member's, with no alias mark. Only give it to bots you trust."],
 ];
 export const has = (perms, bit) => ((Number(perms) || 0) & bit) === bit;
 export const myPerms = sid => getState().detail[sid]?.server.perms || 0;
@@ -351,7 +354,7 @@ export function RolesEditor({ sid }) {
               </>
             )}
           <div className="vc-sec-t" style={{ marginTop: 16 }}>Permissions</div>
-          {PERM_LIST.map(([k, label, hint, instHint]) => (
+          {PERM_LIST.filter(([k]) => isInst(sid) || !INST_ONLY_PERMS.has(k)).map(([k, label, hint, instHint]) => (
             <Toggle key={k} label={label} hint={isInst(sid) && instHint ? instHint : hint} on={has(r.permissions, P[k])}
               disabled={!editable || (!has(perms, P[k]) && !isOwner)}
               onChange={v => save({ permissions: v ? (r.permissions | P[k]) : (r.permissions & ~P[k]) })} />
