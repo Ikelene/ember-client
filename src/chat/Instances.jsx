@@ -22,7 +22,7 @@ function InstanceCard({ origin, info }) {
     <div className="vc-invite-srv vc-inst-card">
       <span className="vc-srv-ico lg">{(c?.icon_url || info.icon_url) ? <img src={c?.icon_url || info.icon_url} alt="" /> : initials(c?.name || info.name)}</span>
       <div><b>{c?.name || info.name}</b><small>{hostOf(origin)}{c ? <> - <Users size={13} /> {c.member_count} member{c.member_count === 1 ? '' : 's'}</> : ''}</small>
-        <small>{info.accounts_mode === 'velora' ? <><ShieldCheck size={13} /> Signs you in with your Velora account</> : <><KeyRound size={13} /> Has its own accounts</>}</small></div>
+        <small>{info.accounts_mode === 'velora' ? <><ShieldCheck size={13} /> Signs you in with your Nookara account</> : <><KeyRound size={13} /> Has its own accounts</>}</small></div>
     </div>
   );
 }
@@ -69,7 +69,7 @@ export function AddInstance({ url, invite, onClose, onSetup }) {
     if (!hasVelora()) { startSignIn({ add: found.origin }); return; }
     setBusy(true); setErr('');
     try { await authed(await veloraSession(found.origin)); }
-    catch (e) { setErr(e.message === 'insufficient_scope' ? 'This login has no chat permission - sign in with Velora again and approve it.' : errorText(e.message)); }
+    catch (e) { setErr(e.message === 'insufficient_scope' ? 'This login has no chat permission - sign in with Nookara again and approve it.' : errorText(e.message)); }
     setBusy(false);
   }
   async function viaLocal(e) {
@@ -113,10 +113,10 @@ export function AddInstance({ url, invite, onClose, onSetup }) {
               {(info.claimed === false || !info.community) && <p className="vc-note"><Server size={14} /> {info.claimed === false ? 'Nobody owns this server yet.' : "This server isn't set up yet."} {info.accounts_mode === 'local' ? 'Make an account' : 'Connect'}{info.claimed === false ? ' and you can set it up with its setup code.' : '.'}</p>}
               {info.accounts_mode === 'velora' ? (
                 <>
-                  {!hasVelora() && <p className="vc-note"><ShieldCheck size={14} /> This server uses Velora accounts. Sign in with Velora first, then connect.</p>}
+                  {!hasVelora() && <p className="vc-note"><ShieldCheck size={14} /> This server uses Nookara accounts. Sign in with Nookara first, then connect.</p>}
                   {err && <p className="vc-err"><TriangleAlert size={14} /> {err}</p>}
                   <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" onClick={back}>Back</button><span className="grow" />
-                    <button type="button" className="btn btn-primary" disabled={busy} onClick={viaVelora}><ShieldCheck size={15} /> {busy ? 'Connecting...' : hasVelora() ? 'Connect with Velora' : 'Sign in with Velora'}</button></div>
+                    <button type="button" className="btn btn-primary" disabled={busy} onClick={viaVelora}><ShieldCheck size={15} /> {busy ? 'Connecting...' : hasVelora() ? 'Connect with Nookara' : 'Sign in with Nookara'}</button></div>
                 </>
               ) : (
                 <form onSubmit={viaLocal}>
@@ -215,7 +215,7 @@ export function InstanceTab({ origin, tab, onDirty }) {
     <div className={`vc-settings${tab === 'accounts' || tab === 'voice' ? ' bf-ss-page' : ''}`}>
       {tab === 'accounts' && managed && (
         <div className="card bf-ss-card"><div className="card-header"><span className="card-title"><KeyRound size={15} /> Who can log in</span></div><div className="card-body">
-          <p className="vc-note"><ShieldCheck size={14} /> Hosted by Velora: people log in with their Velora account, at <b>{cfg.public_url}</b>. Servers that Velora hosts can't switch to their own accounts or change their address.</p>
+          <p className="vc-note"><ShieldCheck size={14} /> Hosted by Nookara: people log in with their Nookara account, at <b>{cfg.public_url}</b>. Servers that Nookara hosts can't switch to their own accounts or change their address.</p>
         </div></div>
       )}
       {tab === 'accounts' && !managed && (
@@ -223,7 +223,7 @@ export function InstanceTab({ origin, tab, onDirty }) {
           <div className="card bf-ss-card"><div className="card-header"><span className="card-title"><KeyRound size={15} /> Who can log in</span></div><div className="card-body">
             <div className="vc-field"><span>Accounts</span>
               <div className="bf-pe-vis">
-                {[['velora', 'Velora accounts', 'People log in with the Velora account they already have. Their Velora profile shows here, and messages can be signed.', ShieldCheck], ['local', "This server's own accounts", 'People register here with a username and password. No Velora account needed.', KeyRound]].map(([id, label, hint, I]) => (
+                {[['velora', 'Nookara accounts', 'People log in with the Nookara account they already have. Their Nookara profile shows here, and messages can be signed.', ShieldCheck], ['local', "This server's own accounts", 'People register here with a username and password. No Nookara account needed.', KeyRound]].map(([id, label, hint, I]) => (
                   <label key={id} className={`bf-pe-vis-opt${(f.accounts_mode || 'velora') === id ? ' on' : ''}`}>
                     <input type="radio" name="bf-accounts" checked={(f.accounts_mode || 'velora') === id} disabled={cfg.accounts_mode_env} onChange={() => set('accounts_mode', id)} />
                     <span><b><I size={13} className="vc-inline-ico" /> {label}{cfg.running_accounts_mode === id ? ' (running now)' : ''}</b><small>{hint}</small></span>
@@ -236,7 +236,7 @@ export function InstanceTab({ origin, tab, onDirty }) {
               {cfg.restart_required && f.accounts_mode === cfg.accounts_mode && <button type="button" className="btn btn-surface btn-sm" onClick={() => restartInstance(origin, inst.name)}><RefreshCw size={13} /> Restart now</button>}</p>}
             {needLocalAdmin && (
               <div className="bf-ss-reg warn vc-gap-top bf-la">
-                <TriangleAlert size={14} /><span><b>Make a local admin account first.</b> After the switch nobody can sign in with Velora, so you need an account here with a username and password. It becomes an instance admin with the Administrator role, so you can always get back in and switch back.</span>
+                <TriangleAlert size={14} /><span><b>Make a local admin account first.</b> After the switch nobody can sign in with Nookara, so you need an account here with a username and password. It becomes an instance admin with the Administrator role, so you can always get back in and switch back.</span>
                 {inst.isOwner ? <form className="vc-row bf-la-form" onSubmit={e => { e.preventDefault(); makeLocalAdmin(); }}>
                   <input className="form-input" placeholder="username" autoComplete="off" maxLength={32} value={la.username} onChange={e => setLa(x => ({ ...x, username: e.target.value }))} aria-label="Username" />
                   <input className="form-input" type="password" placeholder="password (8+ characters)" autoComplete="new-password" maxLength={200} value={la.password} onChange={e => setLa(x => ({ ...x, password: e.target.value }))} aria-label="Password" />
@@ -251,15 +251,15 @@ export function InstanceTab({ origin, tab, onDirty }) {
             )}
           </div></div>
           <div className="card bf-ss-card"><div className="card-header"><span className="card-title"><Server size={15} /> Addresses</span></div><div className="card-body">
-            <label className="vc-field"><span>Public address</span><input className="form-input" value={f.public_url || ''} onChange={e => set('public_url', e.target.value)} /><small className="vc-hint">The address people reach this server at. Velora sign-ins are made out to it, so change it with care.</small></label>
-            <label className="vc-field"><span>Velora address</span><input className="form-input" value={f.velora_url || ''} onChange={e => set('velora_url', e.target.value)} /><small className="vc-hint">Which Velora signs people in, and gives this server its services (both accounts modes).</small></label>
+            <label className="vc-field"><span>Public address</span><input className="form-input" value={f.public_url || ''} onChange={e => set('public_url', e.target.value)} /><small className="vc-hint">The address people reach this server at. Nookara sign-ins are made out to it, so change it with care.</small></label>
+            <label className="vc-field"><span>Nookara address</span><input className="form-input" value={f.velora_url || ''} onChange={e => set('velora_url', e.target.value)} /><small className="vc-hint">Which Nookara signs people in, and gives this server its services (both accounts modes).</small></label>
           </div></div>
           <UnsavedBar changed={changed} bar={bar} busy={busy === 'save'} disabled={needLocalAdmin} onReset={reset} onSave={() => save({ ...(cfg.accounts_mode_env ? {} : { accounts_mode: f.accounts_mode }), registration: f.registration, public_url: f.public_url, velora_url: f.velora_url })} />
         </>
       )}
       {tab === 'voice' && managed && !managed.limits?.custom_voice_keys && (
         <>
-          <p className="vc-note"><Mic size={14} /> Your plan uses Velora's voice{cfg.velora?.voice?.cap_minutes ? `, ${Number(cfg.velora.voice.cap_minutes).toLocaleString()} minutes a month` : ''}.</p>
+          <p className="vc-note"><Mic size={14} /> Your plan uses Nookara's voice{cfg.velora?.voice?.cap_minutes ? `, ${Number(cfg.velora.voice.cap_minutes).toLocaleString()} minutes a month` : ''}.</p>
         </>
       )}
       {tab === 'voice' && (
@@ -290,7 +290,7 @@ export function InstanceTab({ origin, tab, onDirty }) {
           {inst.isOwner && (
             <form className="vc-field vc-gap-top" onSubmit={e => { e.preventDefault(); if (newAdmin.trim()) adminOp(newAdmin.trim(), true); }}><span>Add an admin by user ID</span>
               <div className="vc-row"><input className="form-input" placeholder="v:123 or l:7" value={newAdmin} onChange={e => setNewAdmin(e.target.value)} /><button type="submit" className="btn btn-primary" disabled={!newAdmin.trim()}><Plus size={14} /> Add</button></div>
-              <small className="vc-hint">Velora accounts are v:&lt;their Velora ID&gt;, accounts of this server are l:&lt;number&gt;. People who have logged in once can be made admins; their ID shows with "Copy account ID" in developer mode.</small></form>
+              <small className="vc-hint">Nookara accounts are v:&lt;their Nookara ID&gt;, accounts of this server are l:&lt;number&gt;. People who have logged in once can be made admins; their ID shows with "Copy account ID" in developer mode.</small></form>
           )}
         </>
       )}
@@ -308,7 +308,7 @@ function VeloraTab({ origin, cfg, setCfg, save, busy }) {
   const dir = v.directory || {};
   async function register() {
     setWork('register');
-    try { const d = await apiFetch('/api/v1/instance/velora/register', { inst: origin, method: 'POST' }); setCfg(d); toast(d.velora?.registered ? 'Registered with Velora.' : 'Velora said no - see below.', !!d.velora?.registered); }
+    try { const d = await apiFetch('/api/v1/instance/velora/register', { inst: origin, method: 'POST' }); setCfg(d); toast(d.velora?.registered ? 'Registered with Nookara.' : 'Nookara said no - see below.', !!d.velora?.registered); }
     catch (e) { toast(errorText(e.message)); }
     setWork('');
   }
@@ -323,7 +323,7 @@ function VeloraTab({ origin, cfg, setCfg, save, busy }) {
     try {
       const a = await apiFetch('/api/v1/instance/owner-attestation', { inst: origin });
       await apiFetch('/bonfire/instances/payout', { method: 'POST', body: JSON.stringify({ attestation: a.attestation }) });
-      toast('Payouts for paid roles now go to your Velora account.', true);
+      toast('Payouts for paid roles now go to your Nookara account.', true);
       loadPayee();
     } catch (e) { toast(errorText(e.message)); }
     setWork('');
@@ -331,32 +331,32 @@ function VeloraTab({ origin, cfg, setCfg, save, busy }) {
   const voice = v.voice;
   return (
     <>
-      <p className="vc-dialog-sub">Velora gives this server push notifications, credit payments for paid roles, voice when you have no Cloudflare keys of your own, imports from Discord / Fluxer and a listing in the public directory. Nothing else is shared.</p>
-      {!cfg.managed && <Toggle label="Use Velora's services" hint={off ? 'Off: this server never contacts Velora (no push, payments, voice minutes or directory).' : 'On: this server registers with Velora and uses the services above.'} on={!off} disabled={busy === 'save'} onChange={on => save({ velora_registration: on ? 'auto' : 'off' })} />}
+      <p className="vc-dialog-sub">Nookara gives this server push notifications, credit payments for paid roles, voice when you have no Cloudflare keys of your own, imports from Discord / Fluxer and a listing in the public directory. Nothing else is shared.</p>
+      {!cfg.managed && <Toggle label="Use Nookara's services" hint={off ? 'Off: this server never contacts Nookara (no push, payments, voice minutes or directory).' : 'On: this server registers with Nookara and uses the services above.'} on={!off} disabled={busy === 'save'} onChange={on => save({ velora_registration: on ? 'auto' : 'off' })} />}
 
       {!off && (
         <div className="vc-br-note vc-gap-top">
-          <div className="vc-row"><p className="grow">{v.registered ? <><Check size={13} className="vc-inline-ico" /> <b>Registered</b>{v.trusted ? ' - trusted by Velora' : ''}{v.registered_at ? ` since ${ago(v.registered_at)}` : ''}</> : <><TriangleAlert size={13} className="vc-inline-ico" /> <b>Not registered yet</b></>}</p>
+          <div className="vc-row"><p className="grow">{v.registered ? <><Check size={13} className="vc-inline-ico" /> <b>Registered</b>{v.trusted ? ' - trusted by Nookara' : ''}{v.registered_at ? ` since ${ago(v.registered_at)}` : ''}</> : <><TriangleAlert size={13} className="vc-inline-ico" /> <b>Not registered yet</b></>}</p>
             <button type="button" className="btn btn-surface btn-sm" disabled={!!work} onClick={register}><RefreshCw size={13} /> {work === 'register' ? 'Registering...' : 'Register now'}</button></div>
           {v.instance_id && <p>ID <span className="vc-mono">{v.instance_id}</span>{v.velora_url ? ` on ${hostOf(v.velora_url)}` : ''}</p>}
           {v.last_error && <p className="vc-err"><TriangleAlert size={14} /> {errorText(v.last_error) === 'Something went wrong.' ? v.last_error : errorText(v.last_error)}</p>}
-          <p>Voice: {v.voice_backend === 'direct' ? "your own Cloudflare keys" : voice ? (voice.cap_minutes == null ? `Velora's voice, no limit (${Number(voice.used_minutes || 0).toLocaleString()} minutes this month)` : `Velora's voice - ${Number(voice.used_minutes || 0).toLocaleString()} of ${Number(voice.cap_minutes).toLocaleString()} minutes used this month`) : 'not available'}</p>
+          <p>Voice: {v.voice_backend === 'direct' ? "your own Cloudflare keys" : voice ? (voice.cap_minutes == null ? `Nookara's voice, no limit (${Number(voice.used_minutes || 0).toLocaleString()} minutes this month)` : `Nookara's voice - ${Number(voice.used_minutes || 0).toLocaleString()} of ${Number(voice.cap_minutes).toLocaleString()} minutes used this month`) : 'not available'}</p>
           {voice?.cap_minutes != null && <div className="vc-game-bar vc-imp-bar"><i style={{ width: `${Math.min(100, (Number(voice.used_minutes || 0) / Math.max(1, voice.cap_minutes)) * 100)}%` }} /></div>}
         </div>
       )}
       <h3 className="vc-game-sec-title">Discover</h3>
-      <p className="vc-dialog-sub">{cfg.listed ? (dir.hidden_by_staff ? "Listed, but Velora's staff have hidden the listing." : dir.last_error ? `Listed - the last update failed: ${dir.last_error}` : `Listed in Discover${dir.pushed_at ? ` - updated ${ago(dir.pushed_at)}` : ''}.`) : 'Not listed in Discover.'} Show it in Discover and set its tags in Server &gt; Overview.</p>
+      <p className="vc-dialog-sub">{cfg.listed ? (dir.hidden_by_staff ? "Listed, but Nookara's staff have hidden the listing." : dir.last_error ? `Listed - the last update failed: ${dir.last_error}` : `Listed in Discover${dir.pushed_at ? ` - updated ${ago(dir.pushed_at)}` : ''}.`) : 'Not listed in Discover.'} Show it in Discover and set its tags in Server &gt; Overview.</p>
       {inst?.isOwner && signedIn && !off && (
         <>
           <h3 className="vc-game-sec-title">Payouts</h3>
-          <p className="vc-dialog-sub">Credits people pay for roles go to the owner's Velora account. Link yours to receive them.</p>
+          <p className="vc-dialog-sub">Credits people pay for roles go to the owner's Nookara account. Link yours to receive them.</p>
           {payee === undefined ? <div className="vc-loading"><i /><i /><i /></div> : payee?.linked && payee.payee ? (
             <div className="vc-list-row bf-payee">
               <Avatar user={{ username: payee.payee.username, pfp: payee.payee.pfp }} size={32} />
-              <span className="vc-list-txt"><b>Payouts go to {payee.payee.username}{payee.you ? ' (you)' : ''}</b><small>Linked{payee.linked_at ? ` ${ago(payee.linked_at)}` : ''} - their Velora account gets the credits from paid roles.</small></span>
+              <span className="vc-list-txt"><b>Payouts go to {payee.payee.username}{payee.you ? ' (you)' : ''}</b><small>Linked{payee.linked_at ? ` ${ago(payee.linked_at)}` : ''} - their Nookara account gets the credits from paid roles.</small></span>
             </div>
           ) : <p className="vc-note"><TriangleAlert size={14} /> {payee === null ? "Couldn't check where payouts go right now." : "Not linked yet - people can't buy paid roles until an account is linked to receive the credits."}</p>}
-          <div className="vc-dialog-btns"><span className="grow" /><button type="button" className="btn btn-primary" disabled={!!work || !v.registered} data-tip={v.registered ? undefined : 'Register with Velora first'} onClick={payouts}>{work === 'payout' ? 'Linking...' : payee?.linked && payee.you ? 'Link again' : payee?.linked ? 'Send payouts to me instead' : 'Link payouts to my Velora account'}</button></div>
+          <div className="vc-dialog-btns"><span className="grow" /><button type="button" className="btn btn-primary" disabled={!!work || !v.registered} data-tip={v.registered ? undefined : 'Register with Nookara first'} onClick={payouts}>{work === 'payout' ? 'Linking...' : payee?.linked && payee.you ? 'Link again' : payee?.linked ? 'Send payouts to me instead' : 'Link payouts to my Nookara account'}</button></div>
 
         </>
       )}

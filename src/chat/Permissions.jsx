@@ -39,7 +39,7 @@ export function PermissionPrompts() {
             <>
               <p className="vc-dialog-sub">
                 {update.legacy
-                  ? 'Ember now asks before it gets access to your Velora account. Log in again to see what it can do and approve it.'
+                  ? 'Ember now asks before it gets access to your Nookara account. Log in again to see what it can do and approve it.'
                   : 'Ember has new features that need permissions this login does not have yet. Log in again to approve them. Everything keeps working in the meantime, except the features below.'}
               </p>
               <ul className="vc-perm-list">

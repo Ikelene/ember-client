@@ -12,14 +12,14 @@ import { instOpt } from './ids.js';
 import { usePlan, PlanGate, PlanNotice, planOf } from './PlanGate.jsx';
 
 const ERR = {
-  not_linked: 'Link that account to Velora first (Account > Security > Connected accounts).',
-  bot_not_in_server: "The Velora bot isn't in that server - add it first.",
+  not_linked: 'Link that account to Nookara first (Account > Security > Connected accounts).',
+  bot_not_in_server: "The Nookara bot isn't in that server - add it first.",
   not_your_server: 'You need to own that server, or have Administrator / Manage server there.',
-  bridge_not_set_up: "That platform isn't set up on Velora yet.",
+  bridge_not_set_up: "That platform isn't set up on Nookara yet.",
   pick_a_channel: 'Pick at least one channel.',
   too_many_servers: "You already own as many servers as you can.",
   import_running: 'An import is already running - give it a moment.',
-  bot_needs_webhooks: 'The Velora bot needs the Manage webhooks permission in that channel.',
+  bot_needs_webhooks: 'The Nookara bot needs the Manage webhooks permission in that channel.',
   already_linked: 'That channel is already bridged to another Ember channel.',
   already_bridged: 'This server already has a bridge for that platform.',
   text_channels_only: 'Only text channels can be bridged.',
@@ -30,7 +30,7 @@ const INST_ERR = {
   bot_needs_webhooks: 'Your bot needs the Manage webhooks permission in that channel.', unreachable: "Can't reach the platform right now.",
 };
 const why = (e, inst) => (inst && INST_ERR[e?.message]) || ERR[e?.message] || errorText(e?.message);
-const IMPORT_ERR = { not_linked: 'Link that account to Velora first (Account > Security > Connected accounts).', bot_not_in_server: "Velora's bot isn't in that server - add it first.", not_your_server: 'You need to own that server, or have Administrator / Manage server there.', import_running: 'An import is already running - give it a moment.', invalid_instance: "Velora can't make an import for this server's address.", ticket_invalid: 'That import is gone - run it again.', ticket_expired: 'That import ran out - run it again.', ticket_wrong_instance: 'That import was made for another server.', import_failed: "Velora couldn't build the import - try again.", velora_not_registered: "This server isn't registered with Velora yet - try again in a minute.", velora_off: 'This server has its Velora connection turned off.', community_exists: 'This server already has its community.' };
+const IMPORT_ERR = { not_linked: 'Link that account to Nookara first (Account > Security > Connected accounts).', bot_not_in_server: "Nookara's bot isn't in that server - add it first.", not_your_server: 'You need to own that server, or have Administrator / Manage server there.', import_running: 'An import is already running - give it a moment.', invalid_instance: "Nookara can't make an import for this server's address.", ticket_invalid: 'That import is gone - run it again.', ticket_expired: 'That import ran out - run it again.', ticket_wrong_instance: 'That import was made for another server.', import_failed: "Nookara couldn't build the import - try again.", velora_not_registered: "This server isn't registered with Nookara yet - try again in a minute.", velora_off: 'This server has its Nookara connection turned off.', community_exists: 'This server already has its community.' };
 
 function useLoad(url, deps, inst) {
   const [v, setV] = useState({ data: null, error: null, loading: true });
@@ -63,7 +63,7 @@ function GuildPicker({ onPick, pickLabel = 'Choose', exclude = [], inst, base = 
           <button type="button" key={x.id} className="vc-br-plat" disabled={!x.ready} onClick={() => setP(x.id)}>
             <PlatformIcon p={x.id} size={30} />
             <b>{x.name}</b>
-            <small>{!x.ready ? (inst ? 'No bot set up yet' : `Velora's ${x.name} bot isn't configured on this Velora`) : inst ? `Bot: ${x.bot || 'ready'}` : x.linked ? 'Your account is linked' : 'Link your account first'}</small>
+            <small>{!x.ready ? (inst ? 'No bot set up yet' : `Nookara's ${x.name} bot isn't configured on this Nookara`) : inst ? `Bot: ${x.bot || 'ready'}` : x.linked ? 'Your account is linked' : 'Link your account first'}</small>
           </button>
         ))}
       </div>
@@ -74,14 +74,14 @@ function GuildPicker({ onPick, pickLabel = 'Choose', exclude = [], inst, base = 
       <button type="button" className="vc-br-back" onClick={() => setP(null)}><ArrowLeft size={14} /> <PlatformIcon p={p} size={14} /> {plat?.name}</button>
       {!plat?.linked ? (
         <div className="vc-br-note">
-          <p>Link your {plat?.name} account to Velora so Ember can check which servers are yours.</p>
+          <p>Link your {plat?.name} account to Nookara so Ember can check which servers are yours.</p>
           <div className="vc-row"><a className="btn btn-primary" href="/me#settings/security" target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> Connected accounts</a>
             <button type="button" className="btn btn-surface" onClick={() => location.reload()}><RefreshCw size={14} /> I've linked it</button></div>
         </div>
       ) : (
         <>
           <div className="vc-br-note">
-            <p><b>1.</b> Add <b>{plat.bot}</b> ({inst ? "this server's bot" : "Velora's bot"}) to your {plat.name} server. It reads the server and carries messages across.</p>
+            <p><b>1.</b> Add <b>{plat.bot}</b> ({inst ? "this server's bot" : "Nookara's bot"}) to your {plat.name} server. It reads the server and carries messages across.</p>
             <a className="btn btn-surface" href={plat.invite} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> Add {plat.bot} to a server</a>
           </div>
           <div className="vc-br-note">
@@ -236,7 +236,7 @@ export function BridgeSettings({ sid, gated, onPlan }) {
               if (await ask({ title: `Unlink ${b.guild_name}?`, text: `Messages stop going between Ember and ${b.platform_name}, and the bridge webhooks over there are removed. Messages already sent stay.`, confirm: 'Unlink', danger: true })) call(`unlink-${b.platform}`, () => apiFetch(`/chat/bridge/servers/${sid}`, { method: 'DELETE', body: JSON.stringify({ platform: b.platform }) }));
             }}><Unlink size={14} /> Unlink</button>
           </div>
-          {b.problem && <div className="vc-br-warn">{b.problem === 'bot_not_in_server' ? `${inst ? 'Your' : 'The Velora'} bot isn't in ${b.guild_name} any more - add it back to keep the bridge working.` : b.problem === 'bridge_not_set_up' ? INST_ERR.bridge_not_set_up : `Can't reach ${b.platform_name} right now.`}</div>}
+          {b.problem && <div className="vc-br-warn">{b.problem === 'bot_not_in_server' ? `${inst ? 'Your' : 'The Nookara'} bot isn't in ${b.guild_name} any more - add it back to keep the bridge working.` : b.problem === 'bridge_not_set_up' ? INST_ERR.bridge_not_set_up : `Can't reach ${b.platform_name} right now.`}</div>}
           <Toggle label={`${b.platform_name} bridge on`} hint="Turn it off to pause it without losing the channel links." on={b.enabled} disabled={!!busy} onChange={v => call(`on-${b.platform}`, () => apiFetch(`/chat/bridge/servers/${sid}`, { method: 'PATCH', body: JSON.stringify({ platform: b.platform, enabled: v }) }))} />
           <div className="vc-br-head"><b>Linked channels</b><small>Link each channel from its own settings (Edit channel &gt; Bridge)</small></div>
           <div className="vc-br-map">
@@ -321,7 +321,7 @@ export function VeloraImport({ origin, onDone, onCancel }) {
   return (
     <div className="vc-br-step">
       <button type="button" className="vc-br-back" onClick={onCancel}><ArrowLeft size={14} /> Back</button>
-      <p className="vc-dialog-sub">Velora copies the server's channels, categories, roles and emojis into this one with its own bot. Members and messages stay where they are. You need your Discord / Fluxer account linked to Velora, Velora's bot in that server, and to own or manage it there.</p>
+      <p className="vc-dialog-sub">Nookara copies the server's channels, categories, roles and emojis into this one with its own bot. Members and messages stay where they are. You need your Discord / Fluxer account linked to Nookara, Nookara's bot in that server, and to own or manage it there.</p>
       <GuildPicker base="/bonfire/import" pickLabel="Import" onPick={(p, g, plat) => setPick({ p, g, plat })} />
     </div>
   );

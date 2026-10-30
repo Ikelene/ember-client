@@ -59,7 +59,7 @@ export default function MediaPicker({ onPick, onSendLink, onClose, tab: tab0 }) 
       onDragOver={e => { if (!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
       onDragLeave={e => { if (!hasFiles(e)) return; depth.current = Math.max(0, depth.current - 1); if (!depth.current) setHot(false); }}
       onDrop={e => { if (!hasFiles(e)) return; e.preventDefault(); depth.current = 0; setHot(false); setTab('saved'); add(e.dataTransfer.files); }}>
-      {hot && <div className="vc-picker-drop" aria-hidden="true"><Upload size={30} /><b>Drop to save to your Velora account</b><span>Kept in Saved Media - up to {getUploadLimits().saved_mb} MB per file</span></div>}
+      {hot && <div className="vc-picker-drop" aria-hidden="true"><Upload size={30} /><b>Drop to save to your Nookara account</b><span>Kept in Saved Media - up to {getUploadLimits().saved_mb} MB per file</span></div>}
       <div className="vc-picker-tabs">
         <button type="button" className={tab === 'saved' ? 'on' : ''} onClick={() => setTab('saved')}>Saved Media</button>
         <button type="button" className={tab === 'gifs' ? 'on' : ''} onClick={() => setTab('gifs')}>GIFs</button>
@@ -127,7 +127,7 @@ function Saved({ onPick, add, uploading, clips }) {
   const file = useRef(null);
   useEffect(() => { loadMedia(); }, []);
   async function remove(m) {
-    if (m.upload && !(await ask({ title: 'Delete this file?', text: `${m.name} is deleted from your Velora storage. Messages that already have it will show it as missing.`, confirm: 'Delete file', danger: true }))) return;
+    if (m.upload && !(await ask({ title: 'Delete this file?', text: `${m.name} is deleted from your Nookara storage. Messages that already have it will show it as missing.`, confirm: 'Delete file', danger: true }))) return;
     try { await deleteMedia(m); } catch (e) { toast(errorText(e.message)); }
   }
   const shown = (items || []).filter(m => filter === 'all' || m.kind === filter || (filter === 'image' && m.kind === 'gif'));
@@ -141,7 +141,7 @@ function Saved({ onPick, add, uploading, clips }) {
       </div>
       <div className="vc-picker-scroll">
         {items === null && <div className="vc-loading"><i /><i /><i /></div>}
-        {items && !shown.length && <div className="vc-empty-note">Nothing here yet. Star a GIF, or save a picture, video or audio file - they're kept on your Velora account.</div>}
+        {items && !shown.length && <div className="vc-empty-note">Nothing here yet. Star a GIF, or save a picture, video or audio file - they're kept on your Nookara account.</div>}
         <div className="vc-saved-grid">
           {shown.map((m, i) => (
             <div key={m.id} className={`vc-saved vl-rise k-${m.kind}`} style={{ '--i': Math.min(i, 12) }}>
@@ -153,7 +153,7 @@ function Saved({ onPick, add, uploading, clips }) {
                 {m.kind === 'gif' && <GifBadge />}
                 {m.size ? <span className="vc-saved-size">{fmtSize(m.size)}</span> : null}
               </button>
-              <button type="button" className="vc-saved-x" title={m.upload ? 'Delete from your Velora storage' : 'Remove from Saved Media'} onClick={() => remove(m)}><X size={12} /></button>
+              <button type="button" className="vc-saved-x" title={m.upload ? 'Delete from your Nookara storage' : 'Remove from Saved Media'} onClick={() => remove(m)}><X size={12} /></button>
             </div>
           ))}
         </div>

@@ -187,7 +187,7 @@ export function instanceMenu(e, inst, srv, { onInvite, onSettings, onLeave, onLo
     srv && 'sep',
     ...(srv ? notifyItems(srv.sid, false) : []),
     // Velora's push consent for this server (it pushes to me through Velora only while it's in my list, unmuted, push on)
-    getState().signedIn && inst.prefs && { label: 'Push through Velora', icon: BellRing, sub: [
+    getState().signedIn && inst.prefs && { label: 'Push through Nookara', icon: BellRing, sub: [
       { label: 'Push notifications from this server', hint: 'When Ember is closed', checked: inst.prefs.push, onClick: () => setInstancePrefs(inst.origin, { push: !inst.prefs.push }) },
       { label: 'Mute this server', hint: 'No pushes from it at all', checked: inst.prefs.muted, onClick: () => setInstancePrefs(inst.origin, { muted: !inst.prefs.muted }) },
     ] },
@@ -196,7 +196,7 @@ export function instanceMenu(e, inst, srv, { onInvite, onSettings, onLeave, onLo
     admin && { label: 'Server settings', icon: Settings, onClick: onSettings },
     { label: 'Copy URL', icon: Link2, onClick: () => copy(inst.origin, 'Server URL copied') },
     inst.status !== 'connecting' && { label: 'Reconnect', icon: RefreshCw, onClick: onReconnect },
-    inst.status === 'login' && inst.needsVelora && { label: 'Sign in with Velora', icon: ShieldCheck, onClick: onLogin },
+    inst.status === 'login' && inst.needsVelora && { label: 'Sign in with Nookara', icon: ShieldCheck, onClick: onLogin },
     inst.status === 'login' && !inst.needsVelora && inst.mode === 'local' && { label: 'Log in', icon: LogIn, onClick: onLogin },
     'sep',
     here && srv.role !== 'owner' && { label: 'Leave server', icon: LogOut, danger: true, onClick: onLeave },

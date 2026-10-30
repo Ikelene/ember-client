@@ -46,7 +46,7 @@ export function ServerInfoPage({ origin }) {
       </Card>
       <Card title="Updates" icon={CircleArrowUp}>
         {!u ? <div className="vc-hint">Update status is not available right now.</div> : u.outdated
-          ? <div className="bf-ss-reg warn"><CircleArrowUp size={14} /><span><b>Out of date.</b> Latest is {u.latest?.commit_short || u.latest?.version || 'newer'}{u.latest?.commit_date ? ` (${when(u.latest.commit_date)})` : ''}.{u.latest?.message ? ` ${u.latest.message}` : ''} {inst.managed ? 'Velora updates this server automatically within about 10 minutes.' : 'Update the server software to get it.'}</span></div>
+          ? <div className="bf-ss-reg warn"><CircleArrowUp size={14} /><span><b>Out of date.</b> Latest is {u.latest?.commit_short || u.latest?.version || 'newer'}{u.latest?.commit_date ? ` (${when(u.latest.commit_date)})` : ''}.{u.latest?.message ? ` ${u.latest.message}` : ''} {inst.managed ? 'Nookara updates this server automatically within about 10 minutes.' : 'Update the server software to get it.'}</span></div>
           : <div className="bf-ss-reg ok"><Check size={14} /><span><b>Up to date.</b>{u.checked_at ? ` Checked ${when(u.checked_at)}.` : ''}</span></div>}
         <button type="button" className="btn btn-surface btn-sm vc-gap-top" disabled={busy} onClick={refresh}><RefreshCw size={13} /> {busy ? 'Checking...' : 'Refresh'}</button>
       </Card>

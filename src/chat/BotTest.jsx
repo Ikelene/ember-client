@@ -12,7 +12,7 @@ import { useAddTargets, errText } from './Bots.jsx';
 
 const STATE = { pending: 'Pending', private: 'Private (not submitted)', rejected: 'Rejected', delisted: 'Delisted', approved: 'Approved', banned: 'Banned' };
 const EXTRA = {
-  insufficient_rank: 'Only admins can add a bot as a test install.', no_test_server: "There's no review server set for Velora's own servers.",
+  insufficient_rank: 'Only admins can add a bot as a test install.', no_test_server: "There's no review server set for Nookara's own servers.",
   gallery_banned: 'That bot is banned, so it cannot be added anywhere.', bot_is_private: 'Only admins can add a bot that is not listed.',
   unauthorized: 'Sign in again, then retry.', invalid_token: 'Sign in again, then retry.',
 };
@@ -178,7 +178,7 @@ export function TestBotDialog({ id, onClose }) {
           {(installs.length > 0 || (det?.native_servers || []).length > 0) && (
             <div className="bt-installs">
               <div className="vc-addbot-head">Where it is now</div>
-              {(det.native_servers || []).map(s => <div key={s.sid}>Velora server: {s.name}</div>)}
+              {(det.native_servers || []).map(s => <div key={s.sid}>Nookara server: {s.name}</div>)}
               {installs.map(i => <div key={`${i.instance_id}${i.added_at}`}><span style={mono}>{i.url || i.instance_id}</span>{i.name ? ` (${i.name})` : ''} · {i.test ? 'test install' : 'normal install'} · seen {when(i.seen_at)}{i.url && !targets.some(s => s.inst === normOrigin(i.url)) ? ' · remove it by kicking the bot in that server' : ''}</div>)}
             </div>
           )}

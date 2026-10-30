@@ -33,8 +33,8 @@ export function UploadDestHost() {
         <button type="button" className="vc-updest-card" disabled={!!accWhy} onClick={() => pick('account')}>
           <HardDrive size={22} />
           <span>
-            <b>Velora account storage</b>
-            <small>Stays until you delete it, and counts toward your storage.{acc ? ` ${fmt(acc.remaining)} of ${fmt(acc.limit)} free.` : ''}{acc && !acc.pro ? ' Velora Pro has 2 GB.' : ''}</small>
+            <b>Nookara account storage</b>
+            <small>Stays until you delete it, and counts toward your storage.{acc ? ` ${fmt(acc.remaining)} of ${fmt(acc.limit)} free.` : ''}{acc && !acc.pro ? ' Nookara Pro has 2 GB.' : ''}</small>
             {accWhy && <small className="why">{accWhy}</small>}
           </span>
         </button>

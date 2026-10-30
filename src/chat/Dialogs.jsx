@@ -40,7 +40,7 @@ export function Dialog({ title, sub, onClose, children, wide, className = '' }) 
 export function Discover({ onClose }) {
   const [tab, setTab] = useState('servers');
   return (
-    <Dialog title="Discover" sub={tab === 'servers' ? 'Ember servers that list themselves in the directory. Each runs on its own - adding one shows you how it signs you in.' : 'Bots approved by Velora staff. Verified bots have been looked at before they were listed.'} onClose={onClose} wide>
+    <Dialog title="Discover" sub={tab === 'servers' ? 'Ember servers that list themselves in the directory. Each runs on its own - adding one shows you how it signs you in.' : 'Bots approved by Nookara staff. Verified bots have been looked at before they were listed.'} onClose={onClose} wide>
       {close => (
         <>
           <div className="vc-tabs bg-disc-tabs" role="tablist">
@@ -85,7 +85,7 @@ function Directory({ close }) {
               <div className="vc-disc-banner" />
               <span className="vc-srv-ico lg">{/^https:\/\//i.test(r.icon_url || '') ? <img src={r.icon_url} alt="" /> : initials(r.name)}</span>
               <div className="vc-disc-body">
-                <b>{r.name}{r.trusted && <ShieldCheck size={13} className="vc-inline-ico vc-disc-trusted" title="Trusted by Velora" />}</b>
+                <b>{r.name}{r.trusted && <ShieldCheck size={13} className="vc-inline-ico vc-disc-trusted" title="Trusted by Nookara" />}</b>
                 <small className="vc-disc-host"><Globe size={11} /> {url ? url.replace(/^https?:\/\//, '') : ''}</small>
                 <p>{r.description || 'No description.'}</p>
                 {r.tags?.length > 0 && <div className="vc-disc-tags">{r.tags.slice(0, 8).map(t => <span key={t} className="vc-chip">{t}</span>)}</div>}
@@ -118,7 +118,7 @@ export function Invite({ sid, onClose }) {
   const link = code ? linkFor({ kind: 'invite', code, inst }) : '';
   const copy = (t, what) => { navigator.clipboard?.writeText(t); setCopied(what); setTimeout(() => setCopied(''), 1500); };
   return (
-    <Dialog title={`Invite people to ${d?.server.name || 'this server'}`} sub={inst === VELORA ? "Send them this link. They'll need a Velora account." : `Send them this link. They'll need an account on ${inst.replace(/^https?:\/\//, '')}.`} onClose={onClose}>
+    <Dialog title={`Invite people to ${d?.server.name || 'this server'}`} sub={inst === VELORA ? "Send them this link. They'll need a Nookara account." : `Send them this link. They'll need an account on ${inst.replace(/^https?:\/\//, '')}.`} onClose={onClose}>
       {code ? (
         <>
           <div className="vc-row"><input className="form-input" readOnly value={link} onFocus={e => e.target.select()} /><button type="button" className="btn btn-primary" onClick={() => copy(link, 'link')}>{copied === 'link' ? <Check size={15} /> : <Copy size={15} />} Copy</button></div>
@@ -181,7 +181,7 @@ export function JoinInvite({ code, inst, onClose }) {
     look.then(d => setS(d.server)).catch(() => setBad(true));
   }, [code, inst, !!conn, signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
   const joined = s && servers.some(x => x.sid === s.sid);
-  if (!inst && !signedIn) return <Dialog title="Sign in to join" onClose={onClose}>{() => <SignInPrompt what="servers hosted by Velora" back={{}} />}</Dialog>;
+  if (!inst && !signedIn) return <Dialog title="Sign in to join" onClose={onClose}>{() => <SignInPrompt what="servers hosted by Nookara" back={{}} />}</Dialog>;
   return (
     <Dialog title={bad ? 'Invite not valid' : "You've been invited to join"} onClose={onClose}>
       {close => (bad ? <p className="vc-dialog-sub">That invite link doesn't work any more - ask for a new one.</p> : !s ? <div className="vc-loading"><i /><i /><i /></div> : (
@@ -314,7 +314,7 @@ function PeoplePicker({ multi, onDone, button }) {
 }
 export function NewDM({ onClose }) {
   return (
-    <Dialog title="New message" sub="Pick a friend, or anyone on Velora." onClose={onClose}>
+    <Dialog title="New message" sub="Pick a friend, or anyone on Nookara." onClose={onClose}>
       {close => <PeoplePicker onDone={([u]) => { close(); go({ kind: 'dm', username: u }); }} />}
     </Dialog>
   );
@@ -350,7 +350,7 @@ export function QuickSwitcher({ onClose }) {
   const friends = useChat(s => s.friends);
   const items = useMemo(() => {
     const out = [];
-    dms.forEach(c => out.push({ k: `d${c.username}`, label: c.username === 'System' ? 'Velora' : c.username, hint: 'Direct message', v: { kind: 'dm', username: c.username } }));
+    dms.forEach(c => out.push({ k: `d${c.username}`, label: c.username === 'System' ? 'Nookara' : c.username, hint: 'Direct message', v: { kind: 'dm', username: c.username } }));
     friends.filter(f => !dms.some(c => c.username === f.friend_username)).forEach(f => out.push({ k: `f${f.friend_username}`, label: f.friend_username, hint: 'Friend', v: { kind: 'dm', username: f.friend_username } }));
     groups.forEach(g => out.push({ k: `g${g.room}`, label: g.name, hint: 'Group chat', v: { kind: 'group', room: g.room } }));
     servers.forEach(s => {

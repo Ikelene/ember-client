@@ -21,10 +21,10 @@ const day = t => new Date(t).toLocaleDateString(undefined, { weekday: 'short', m
 const daysLeft = t => Math.max(0, Math.ceil((t - Date.now()) / DAY));
 const sizeOf = b => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 export const HOSTING_TEXT = {
-  hosting_unavailable: "Velora can't host servers right now - try again later.", slug_taken: 'That address is taken.', slug_reserved: "That address can't be used.",
+  hosting_unavailable: "Nookara can't host servers right now - try again later.", slug_taken: 'That address is taken.', slug_reserved: "That address can't be used.",
   invalid_slug: 'Use 3-32 letters, numbers or dashes (not at the start or end).', insufficient_balance: "You don't have enough credits for that.", insufficient_credits: "You don't have enough credits for that.",
-  starter_limit_reached: 'You already have a free Starter server. Pick Plus for another one.', use_weeks: 'Buy weeks of Plus to upgrade.', suspended: "Velora's staff have suspended this server.",
-  hosting_failed: "Velora couldn't do that on the server right now - try again in a bit.", backup_failed: "The backup didn't work, so nothing was deleted - try again in a bit.",
+  starter_limit_reached: 'You already have a free Starter server. Pick Plus for another one.', use_weeks: 'Buy weeks of Plus to upgrade.', suspended: "Nookara's staff have suspended this server.",
+  hosting_failed: "Nookara couldn't do that on the server right now - try again in a bit.", backup_failed: "The backup didn't work, so nothing was deleted - try again in a bit.",
   insufficient_scope: 'Ember needs the "Spend Credits" permission for that. Sign out of Ember and sign in again, and tick it on the approval screen.', not_owner: "You aren't this server's owner.", backup_not_found: 'That backup is gone.',
 };
 const hostingError = e => (e?.error === 'insufficient_balance' && e.cost ? `That costs ${Number(e.cost).toLocaleString()} credits - you have ${Number(e.balance || 0).toLocaleString()}.` : HOSTING_TEXT[e?.message || e] || errorText(e?.message || e));
@@ -58,9 +58,9 @@ const SELF_REPO = 'https://github.com/Ikelene/bonfire-server';
 const selfLines = starterVoice => [
   [Server, 'Runs on your own machine (Docker or Node.js)'],
   [Sparkles, 'Every feature, no limits'],
-  [Volume2, `${starterVoice ? starterVoice.toLocaleString() : 'Some'} voice minutes a month from Velora - unlimited with your own Cloudflare keys`],
+  [Volume2, `${starterVoice ? starterVoice.toLocaleString() : 'Some'} voice minutes a month from Nookara - unlimited with your own Cloudflare keys`],
   [Archive, 'Your data stays with you; backups any time'],
-  [KeyRound, 'Velora accounts or its own accounts'],
+  [KeyRound, 'Nookara accounts or its own accounts'],
 ];
 function PlanCard({ plan, on, onPick, current, disabled, note, pro }) {
   const paid = plan.price_credits > 0 && !(pro && plan.free_with_pro); // with Velora Pro, Plus costs nothing
@@ -73,7 +73,7 @@ function PlanCard({ plan, on, onPick, current, disabled, note, pro }) {
         <span className="grow" />
         <span className="bf-plan-price">{paid ? <><Coins size={13} /> {plan.price_credits.toLocaleString()}<small> / {per(plan)}</small></> : plan.price_credits > 0 ? <><Sparkles size={13} /> Free with Pro</> : 'Free'}</span>
       </span>
-      {plan.free_with_pro && !pro && <small className="bf-plan-note">Free with Velora Pro</small>}
+      {plan.free_with_pro && !pro && <small className="bf-plan-note">Free with Nookara Pro</small>}
       <ul>{(plan.self ? plan.lines : limitLines(plan.limits)).map(([I, t]) => <li key={t}><I size={14} /> {t}</li>)}</ul>
       {note && <small className="bf-plan-note">{note}</small>}
     </button>
@@ -87,7 +87,7 @@ function WeeksPicker({ plan, weeks, setWeeks }) {
       <div className="bf-weeks">
         {WEEK_PICKS.map(w => <button type="button" key={w} className={weeks === w ? 'on' : ''} onClick={() => setWeeks(w)}>{plural(w, per(plan))}</button>)}
       </div>
-      <small className="vc-hint"><Coins size={12} className="vc-inline-ico" /> {(weeks * plan.price_credits).toLocaleString()} credits from your Velora balance. It doesn't renew by itself - buy more time whenever you like.</small>
+      <small className="vc-hint"><Coins size={12} className="vc-inline-ico" /> {(weeks * plan.price_credits).toLocaleString()} credits from your Nookara balance. It doesn't renew by itself - buy more time whenever you like.</small>
     </div>
   );
 }
@@ -154,7 +154,7 @@ export function CreateServer({ onClose, onSetup, onAddByAddress }) {
   }
 
 
-  const sub = step === 'plan' ? 'Velora runs it for you. Pick a plan - you can change it any time.' : step === 'address' ? (restore ? `Bringing back ${restore.name || restore.slug} from its backup.` : 'Name it and pick its address. People add it to Ember with this address.') : 'Setting up your server...';
+  const sub = step === 'plan' ? 'Nookara runs it for you. Pick a plan - you can change it any time.' : step === 'address' ? (restore ? `Bringing back ${restore.name || restore.slug} from its backup.` : 'Name it and pick its address. People add it to Ember with this address.') : 'Setting up your server...';
   return (
     <Dialog title={restore ? 'Restore a server' : 'Create a server'} sub={sub} onClose={onClose} wide className="bf-create">
       {close => (
@@ -177,7 +177,7 @@ export function CreateServer({ onClose, onSetup, onAddByAddress }) {
               )}
               <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" onClick={close}>Cancel</button><span className="grow" />
                 {plan !== 'self' && !signedIn
-                  ? <button type="button" className="btn btn-primary" onClick={() => startSignIn({ create: 1 })}><ShieldCheck size={15} /> Sign in with Velora to continue</button>
+                  ? <button type="button" className="btn btn-primary" onClick={() => startSignIn({ create: 1 })}><ShieldCheck size={15} /> Sign in with Nookara to continue</button>
                   : <button type="button" className="btn btn-primary" disabled={!chosen} onClick={() => { setRestore(null); setStep(plan === 'self' ? 'self' : 'address'); }}>Continue</button>}</div>
 
             </>
@@ -208,7 +208,7 @@ export function CreateServer({ onClose, onSetup, onAddByAddress }) {
                   {!check ? 'Letters, numbers and dashes.' : check.checking ? 'Checking...' : check.available ? <><Check size={12} className="vc-inline-ico" /> <Globe size={12} className="vc-inline-ico" /> {urlFor(slug)} is free.</> : hostingError(check.reason || 'slug_taken')}
                 </small></label>
               {chosen?.price_credits > 0 && !(pro && chosen.free_with_pro) ? <WeeksPicker plan={chosen} weeks={weeks} setWeeks={setWeeks} />
-                : chosen && <p className="vc-note">{chosen.price_credits > 0 ? <><Sparkles size={14} /> {chosen.name}: free with your Velora Pro, for as long as you have it.</> : <><Rocket size={14} /> {chosen.name}: free.</>}</p>}
+                : chosen && <p className="vc-note">{chosen.price_credits > 0 ? <><Sparkles size={14} /> {chosen.name}: free with your Nookara Pro, for as long as you have it.</> : <><Rocket size={14} /> {chosen.name}: free.</>}</p>}
 
               {err && <p className="vc-err"><TriangleAlert size={14} /> {err}</p>}
               <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" onClick={() => { setRestore(null); setStep('plan'); }}>Back</button><span className="grow" />
@@ -231,9 +231,9 @@ export function CreateServer({ onClose, onSetup, onAddByAddress }) {
 // the state of a hosted server's paid time, in words: [level '' | 'near' | 'warn' | 'full', title, text]
 export function billingState(h) {
   if (!h || h.billing === 'pro' || (h.plan === 'starter' && h.billing === 'active')) return null; // (Velora Pro covers it: nothing runs out)
-  if (h.billing === 'read_only') return ['full', 'Read-only - time ran out', `Nobody can post until you buy more time.${h.archive_at ? ` On ${day(h.archive_at)} Velora saves a backup to your account and shuts the server down.` : ''}`];
+  if (h.billing === 'read_only') return ['full', 'Read-only - time ran out', `Nobody can post until you buy more time.${h.archive_at ? ` On ${day(h.archive_at)} Nookara saves a backup to your account and shuts the server down.` : ''}`];
   if (h.billing === 'overdue') return ['warn', 'Plus time ran out', `The server goes read-only${h.read_only_at ? ` on ${day(h.read_only_at)}` : ' soon'} unless you buy more time.`];
-  if (h.billing === 'archived') return ['full', 'Shut down', 'Velora kept a backup in your account - restore it from Create a server.'];
+  if (h.billing === 'archived') return ['full', 'Shut down', 'Nookara kept a backup in your account - restore it from Create a server.'];
   if (h.paid_until && h.paid_until - Date.now() < 3 * DAY) { const n = daysLeft(h.paid_until); return ['near', n <= 1 ? 'Plus ends tomorrow' : `Plus ends in ${n} days`, `Paid until ${day(h.paid_until)}. It doesn't renew by itself.`]; }
   return null;
 }
@@ -287,7 +287,7 @@ export function HostingPage({ origin }) {
   const loadBackups = () => apiFetch('/bonfire/hosting/backups').then(d => setBackups(d.backups || [])).catch(() => setBackups([]));
   useEffect(() => { loadHosted(true).then(() => setLoaded(true)); apiFetch('/bonfire/hosting/plans').then(setCfg).catch(() => {}); loadBackups(); }, [origin]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!h && !loaded) return <div className="vc-loading"><i /><i /><i /></div>;
-  if (!h) return <div className="bf-ss-page"><p className="vc-hint">Only the server's owner sees its hosting. Sign in to Ember with the owner's Velora account.</p></div>;
+  if (!h) return <div className="bf-ss-page"><p className="vc-hint">Only the server's owner sees its hosting. Sign in to Ember with the owner's Nookara account.</p></div>;
   const plans = cfg?.plans || [];
   const plus = plans.find(p => p.price_credits > 0);
   const cur = plans.find(p => p.id === h.plan);
@@ -298,7 +298,7 @@ export function HostingPage({ origin }) {
   const pro = !!you?.pro;
   const saved = Math.round((h.paused_ms || 0) / 86400000);
   async function proUpgrade() {
-    if (!(await ask({ title: `Switch to ${plus.name}?`, text: `It's free with your Velora Pro, for as long as you have it. ${h.name || h.slug} moves to ${plus.name} right away.`, confirm: `Switch to ${plus.name}` }))) return;
+    if (!(await ask({ title: `Switch to ${plus.name}?`, text: `It's free with your Nookara Pro, for as long as you have it. ${h.name || h.slug} moves to ${plus.name} right away.`, confirm: `Switch to ${plus.name}` }))) return;
     setBusy('buy');
     try { await apiFetch(`/bonfire/hosting/servers/${h.slug}/weeks`, { method: 'POST', body: JSON.stringify({ weeks: 1 }) }); await loadHosted(true); toast(`Welcome to ${plus.name}!`, true); }
     catch (e) { toast(hostingError(e)); }
@@ -307,7 +307,7 @@ export function HostingPage({ origin }) {
   async function buy() {
     if (!plus) return;
     const cost = weeks * plus.price_credits;
-    if (!(await ask({ title: `Buy ${plural(weeks, per(plus))} of ${plus.name}?`, text: `${cost.toLocaleString()} credits from your Velora balance.${h.plan === 'starter' ? ` ${h.name || h.slug} moves to ${plus.name} right away.` : ''} It doesn't renew by itself.`, confirm: `Pay ${cost.toLocaleString()} credits` }))) return;
+    if (!(await ask({ title: `Buy ${plural(weeks, per(plus))} of ${plus.name}?`, text: `${cost.toLocaleString()} credits from your Nookara balance.${h.plan === 'starter' ? ` ${h.name || h.slug} moves to ${plus.name} right away.` : ''} It doesn't renew by itself.`, confirm: `Pay ${cost.toLocaleString()} credits` }))) return;
     setBusy('buy');
     try { await apiFetch(`/bonfire/hosting/servers/${h.slug}/weeks`, { method: 'POST', body: JSON.stringify({ weeks }) }); await loadHosted(true); toast(h.billing === 'read_only' ? 'Paid - the server is open again.' : 'Paid. Thank you!', true); }
     catch (e) { toast(hostingError(e)); }
@@ -328,18 +328,18 @@ export function HostingPage({ origin }) {
     setBusy('');
   }
   async function del() {
-    if (!(await ask({ title: `Delete ${h.name || h.slug}?`, text: 'Velora saves a backup to your account first, then shuts the server down and deletes it. You can restore the backup later from Create a server.', match: h.slug, confirm: 'Delete server', danger: true }))) return;
+    if (!(await ask({ title: `Delete ${h.name || h.slug}?`, text: 'Nookara saves a backup to your account first, then shuts the server down and deletes it. You can restore the backup later from Create a server.', match: h.slug, confirm: 'Delete server', danger: true }))) return;
     try { await apiFetch(`/bonfire/hosting/servers/${h.slug}`, { method: 'DELETE', body: JSON.stringify({ confirm: h.slug }) }); loadHosted(true); toast('Deleted. A backup is in your account.', true); go({ kind: 'home' }); } catch (e) { toast(hostingError(e)); }
   }
   async function dropBackup(b) {
     if (!(await ask({ title: 'Delete this backup?', text: "It's gone for good - download it first if you might want it.", confirm: 'Delete backup', danger: true }))) return;
     try { await apiFetch(`/bonfire/hosting/backups/${b.id}`, { method: 'DELETE' }); loadBackups(); } catch (e) { toast(hostingError(e)); }
   }
-  const status = { running: ['ok', 'Running'], provisioning: ['', 'Starting...'], stopped: ['warn', 'Stopped'], suspended: ['warn', "Suspended by Velora's staff"], error: ['warn', 'Something went wrong'] }[h.status] || ['', h.status];
+  const status = { running: ['ok', 'Running'], provisioning: ['', 'Starting...'], stopped: ['warn', 'Stopped'], suspended: ['warn', "Suspended by Nookara's staff"], error: ['warn', 'Something went wrong'] }[h.status] || ['', h.status];
   return (
     <div className="bf-ss-page">
       <div className="card bf-ss-card">
-        <div className="card-header"><span className="card-title"><Server size={15} /> Hosted by Velora</span></div>
+        <div className="card-header"><span className="card-title"><Server size={15} /> Hosted by Nookara</span></div>
         <div className="card-body">
           <div className="cs-row"><div className="cs-text"><b><Globe size={13} className="vc-inline-ico" /> {h.url}</b><span className={`bf-host-status ${status[0]}`}>{status[1]}{h.last_error && h.status === 'error' ? ` - ${h.last_error}` : ''}</span></div>
             <button type="button" className="btn btn-surface" disabled={!!busy} onClick={restart}><RefreshCw size={14} /> Restart</button></div>
@@ -348,7 +348,7 @@ export function HostingPage({ origin }) {
       <div className="card bf-ss-card">
         <div className="card-header"><span className="card-title"><Sparkles size={15} /> Plan</span></div>
         <div className="card-body">
-          {h.billing === 'pro' && <p className="vc-note"><Sparkles size={14} /> <span><b>Covered by your Velora Pro.</b> {saved > 0 ? `Your ${plural(saved, 'day')} of paid ${plus?.name || 'Plus'} time are saved and pick up again if Pro ends.` : `If Pro ends, buy weeks to keep ${plus?.name || 'Plus'}.`}</span></p>}
+          {h.billing === 'pro' && <p className="vc-note"><Sparkles size={14} /> <span><b>Covered by your Nookara Pro.</b> {saved > 0 ? `Your ${plural(saved, 'day')} of paid ${plus?.name || 'Plus'} time are saved and pick up again if Pro ends.` : `If Pro ends, buy weeks to keep ${plus?.name || 'Plus'}.`}</span></p>}
           {st && <p className={`vc-note ${st[0] === 'near' ? '' : 'warn'}`}>{h.billing === 'read_only' ? <Lock size={14} /> : <CalendarClock size={14} />} <span><b>{st[1]}.</b> {st[2]}</span></p>}
           <div className="bf-plans">
             {plans.map(p => <PlanCard key={p.id} plan={p} pro={pro} current={h.plan === p.id} on={h.plan === p.id} disabled
@@ -388,7 +388,7 @@ export function HostingPage({ origin }) {
       <div className="card bf-ss-card">
         <div className="card-header"><span className="card-title"><Archive size={15} /> Backups</span></div>
         <div className="card-body">
-          <small className="vc-hint">Velora saves one to your account when a server is deleted or shut down for running out of time. Make, save and restore backups any time under Backups; a backup also restores into a new server from Create a server.</small>
+          <small className="vc-hint">Nookara saves one to your account when a server is deleted or shut down for running out of time. Make, save and restore backups any time under Backups; a backup also restores into a new server from Create a server.</small>
           {backups === null ? <div className="vc-loading"><i /><i /><i /></div> : !mineBackups.length ? <p className="vc-hint">No backups of this server yet.</p> : (
             <div className="vc-rows vc-gap-top">{mineBackups.map(b => (
               <div key={b.id} className="vc-list-row">
@@ -401,7 +401,7 @@ export function HostingPage({ origin }) {
       </div>
       <div className="card bf-ss-card bf-ss-danger">
         <div className="card-header"><span className="card-title"><Trash2 size={15} /> Delete</span></div>
-        <div className="card-body"><div className="cs-row"><div className="cs-text"><b>Delete this server</b><span>Velora saves a backup to your account, then shuts it down and deletes it.</span></div>
+        <div className="card-body"><div className="cs-row"><div className="cs-text"><b>Delete this server</b><span>Nookara saves a backup to your account, then shuts it down and deletes it.</span></div>
           <button type="button" className="btn btn-danger" onClick={del}><Trash2 size={14} /> Delete server</button></div></div>
       </div>
     </div>

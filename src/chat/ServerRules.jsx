@@ -245,7 +245,7 @@ export function JoiningPage({ sid, onDirty, goTo, instAdmin }) {
         <NumField label="Member limit" value={j.max_members} nullable fallback={100} cap={cap} max={10000000} onChange={v => set('join', 'max_members', v)}
           hint={`${people ? (n => `${n.toLocaleString()} ${n === 1 ? 'person' : 'people'} now. `)(people.filter(m => !m.bot).length) : ''}When the server is full, no one else can join until someone leaves. Bots don't count.`} />
         <RolePicker sid={sid} label="Roles new members get" value={j.default_roles} onChange={v => set('join', 'default_roles', v)} hint="Given to everyone who joins from now on (not bots). You can only pick roles below your own." />
-        {instAdmin && <div className="cs-row"><div className="cs-text"><b>Sign-in methods</b><span>Velora accounts, this server's own accounts and who can register.</span></div><button type="button" className="btn btn-surface" onClick={() => goTo('accounts')}><KeyRound size={14} /> Accounts</button></div>}
+        {instAdmin && <div className="cs-row"><div className="cs-text"><b>Sign-in methods</b><span>Nookara accounts, this server's own accounts and who can register.</span></div><button type="button" className="btn btn-surface" onClick={() => goTo('accounts')}><KeyRound size={14} /> Accounts</button></div>}
       </Card>
       <Card title="Requests & invites" icon={Link2}><JoinInvites sid={sid} requestsOnly /></Card>
       {r.ui}
@@ -527,7 +527,7 @@ export function UploadRulesPage({ sid, onDirty }) {
           hint="Unlimited keeps files until someone deletes them. Members can pick a shorter time when they upload. Expired files show as deleted in their messages." />
         <div className="vc-field"><span>Plans whose files never expire</span>
           <div className="bf-sr-chips">{PLANS.map(([id, label]) => { const on = u.never_expire_plans.includes(id); return <button key={id} type="button" disabled={off || u.expire_days == null} className={`vc-chip${on ? ' on' : ''}`} onClick={() => up('never_expire_plans', on ? u.never_expire_plans.filter(x => x !== id) : [...u.never_expire_plans, id])}>{label}</button>; })}</div>
-          <small className="vc-hint">The Velora plan of the person who uploaded it.</small></div>
+          <small className="vc-hint">The Nookara plan of the person who uploaded it.</small></div>
         <RolePicker sid={sid} label="Roles whose files never expire" value={u.never_expire_roles || []} onChange={v => up('never_expire_roles', v)} hint="Members with one of these roles keep their files until they delete them." />
         <NumField label="Total storage" unit="MB" nullable fallback={1024} cap={plan.storage_mb ?? null} max={100000000} disabled={off} value={u.storage_mb} onChange={v => up('storage_mb', v)} hint="All uploads together. When it's full, uploads are refused until files are deleted." />
       </Card>

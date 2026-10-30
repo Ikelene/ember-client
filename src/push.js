@@ -23,7 +23,7 @@ export async function browserSubscribed() {
 export async function enablePush() {
   if (!pushSupported()) throw new Error("This browser can't do notifications.");
   const perm = await Notification.requestPermission();
-  if (perm !== 'granted') throw new Error(perm === 'denied' ? 'Notifications are blocked for Velora in your browser settings.' : 'You need to allow notifications.');
+  if (perm !== 'granted') throw new Error(perm === 'denied' ? 'Notifications are blocked for Nookara in your browser settings.' : 'You need to allow notifications.');
   const reg = await registration();
   const { publicKey } = await apiFetch('/push/vapid');
   let sub = await reg.pushManager.getSubscription();

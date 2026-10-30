@@ -12,7 +12,7 @@ const POINTS = [
 export default function GlintIntro({ onClose }) {
   const go = (url, close) => e => { e.preventDefault(); openOutside(url); close(); };
   return (
-    <Dialog title={<span className="vc-glint-intro-title"><span className="vc-glint-intro-mark"><GlintMark size={20} /></span>Glint</span>} sub="Medal-style game clipping for Windows, made for Velora." onClose={onClose} className="vc-glint-intro">
+    <Dialog title={<span className="vc-glint-intro-title"><span className="vc-glint-intro-mark"><GlintMark size={20} /></span>Glint</span>} sub="Medal-style game clipping for Windows, made for Nookara." onClose={onClose} className="vc-glint-intro">
       {close => (
         <>
           <ul className="vc-glint-intro-list">

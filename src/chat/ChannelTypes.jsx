@@ -169,7 +169,7 @@ function Templates({ label, list, onChange, example }) {
 function WelcomeSettings({ config, setConfig }) {
   return (
     <>
-      <p className="vc-dialog-sub">One message per line - a random one is picked each time. Use <code className="vc-code">{'{user}'}</code> for the person (needed), <code className="vc-code">{'{server}'}</code> and <code className="vc-code">{'{count}'}</code> for the member count. Leave a box empty for Velora's own messages.</p>
+      <p className="vc-dialog-sub">One message per line - a random one is picked each time. Use <code className="vc-code">{'{user}'}</code> for the person (needed), <code className="vc-code">{'{server}'}</code> and <code className="vc-code">{'{count}'}</code> for the member count. Leave a box empty for Nookara's own messages.</p>
       <Templates label="When someone joins" list={config.join} onChange={join => setConfig({ ...config, join })} example={'{user} just showed up!\nWelcome to {server}, {user}!'} />
       <Templates label="When someone leaves" list={config.leave} onChange={leave => setConfig({ ...config, leave })} example={'{user} left the server.'} />
       {[...(config.join || []), ...(config.leave || [])].some(t => !t.includes('{user}')) && <p className="vc-warn-note">Lines without {'{user}'} are skipped.</p>}
@@ -190,7 +190,7 @@ function ShopSettings({ config, setConfig, sid }) {
   if (!canRoles) return <p className="vc-dialog-sub">You need the Manage roles permission to choose what's in the shop.</p>;
   return (
     <div className="vc-field"><span>Roles for sale</span>
-      <p className="vc-dialog-sub">Free roles anyone can take or drop. Paid roles cost Velora credits, which go to the server owner - once bought, people can take them off and back on for free. Roles with Administrator can't be sold.</p>
+      <p className="vc-dialog-sub">Free roles anyone can take or drop. Paid roles cost Nookara credits, which go to the server owner - once bought, people can take them off and back on for free. Roles with Administrator can't be sold.</p>
       <div className="vc-shop-edit">
         {items.map((it, i) => {
           const r = roles.find(x => x.rid === it.rid);
@@ -281,7 +281,7 @@ export function RoleShop({ channel }) {
     if (!onInst && !it.has && payLack) { await scopeBlocked('CURRENCY_PAY'); return; }
     if (!it.has && !it.owned && it.price > 0) {
       if (onInst && d?.payments === 'velora_required') { toast(errorText('velora_required')); return; }
-      if (!(await ask({ title: `Buy ${it.role.name}?`, text: `${it.price} credits go to the server owner${onInst ? ' through Velora - you approve the payment next' : ''}. You keep it after that - take it off and put it back on whenever you like.${onInst ? (credits != null ? ` You have ${credits} credits.` : '') : readLack || d?.balance == null ? '' : ` You have ${d.balance} credits.`}`, confirm: onInst ? 'Continue' : `Buy for ${it.price}` }))) return;
+      if (!(await ask({ title: `Buy ${it.role.name}?`, text: `${it.price} credits go to the server owner${onInst ? ' through Nookara - you approve the payment next' : ''}. You keep it after that - take it off and put it back on whenever you like.${onInst ? (credits != null ? ` You have ${credits} credits.` : '') : readLack || d?.balance == null ? '' : ` You have ${d.balance} credits.`}`, confirm: onInst ? 'Continue' : `Buy for ${it.price}` }))) return;
     }
     setBusy(it.role.rid);
     try {
@@ -304,7 +304,7 @@ export function RoleShop({ channel }) {
         <span className="grow" />
         {balance}
       </div>
-      {paidOff && d.items.some(it => it.price > 0 && !it.owned) && <p className="vc-warn-note">{d.payments === 'velora_required' ? 'Paid roles need a Velora account - yours only exists on this server. Free roles work as usual.' : "This server can't take credit payments right now, so only free roles work."}</p>}
+      {paidOff && d.items.some(it => it.price > 0 && !it.owned) && <p className="vc-warn-note">{d.payments === 'velora_required' ? 'Paid roles need a Nookara account - yours only exists on this server. Free roles work as usual.' : "This server can't take credit payments right now, so only free roles work."}</p>}
       {!d && <div className="vc-loading"><i /><i /><i /></div>}
       {d && !d.items.length && <div className="vc-empty-note">Nothing in this shop yet.</div>}
       <div className="vc-shop-grid">
@@ -340,7 +340,7 @@ function loadScript(src, ready) {
   if (!el) { el = Object.assign(document.createElement('script'), { src, async: true }); el.dataset.src = src; document.head.appendChild(el); }
   return new Promise((resolve, reject) => { el.addEventListener('load', () => resolve(), { once: true }); el.addEventListener('error', () => reject(new Error('captcha_unavailable')), { once: true }); if (ready()) resolve(); });
 }
-const PAY_ERR = { captcha_required: 'Do the captcha first.', captcha_failed: "The captcha didn't go through - try it again.", captcha_unavailable: "The captcha can't be loaded right now - use the payment page instead.", insufficient_balance: "You don't have enough credits for that.", request_paid: 'That payment already went through.', request_expired: 'That payment request ran out - buy the role again.', request_cancelled: 'That payment was cancelled.', wrong_account: 'That payment is for a different Velora account.', not_found: 'That payment request is gone.' };
+const PAY_ERR = { captcha_required: 'Do the captcha first.', captcha_failed: "The captcha didn't go through - try it again.", captcha_unavailable: "The captcha can't be loaded right now - use the payment page instead.", insufficient_balance: "You don't have enough credits for that.", request_paid: 'That payment already went through.', request_expired: 'That payment request ran out - buy the role again.', request_cancelled: 'That payment was cancelled.', wrong_account: 'That payment is for a different Nookara account.', not_found: 'That payment request is gone.' };
 const PAY_DONE = { declined: 'The payment was declined - you were not charged.', expired: 'The payment request ran out - buy the role again whenever you like.', failed: "The payment didn't go through - you weren't given the role." };
 // "Approve payment of N credits": in-app with the Ember login (needs Spend Credits + a captcha), or on Velora's payment page.
 // The id is the only thing taken from the instance: the page is always Velora's own, never a link the instance sent.
@@ -391,8 +391,8 @@ function PayRequest({ channel, it, req, onDone }) {
         </>
       ) : (
         <>
-          <p className="vc-dialog-sub">The credits go from your Velora account to the server owner. Once Velora confirms the payment, the role is yours.{req.expires_at ? ` This request runs out at ${new Date(req.expires_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.` : ''}</p>
-          {!signedIn && <p className="vc-note"><Coins size={14} /> Sign in to Ember with Velora to pay here, or approve it on Velora's payment page.</p>}
+          <p className="vc-dialog-sub">The credits go from your Nookara account to the server owner. Once Nookara confirms the payment, the role is yours.{req.expires_at ? ` This request runs out at ${new Date(req.expires_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.` : ''}</p>
+          {!signedIn && <p className="vc-note"><Coins size={14} /> Sign in to Ember with Nookara to pay here, or approve it on Nookara's payment page.</p>}
           <div className="vc-game-wait"><span className="vc-game-spin" aria-hidden="true" /> {state.status === 'confirming' ? 'Paid - waiting for the server to hand out the role...' : 'Waiting for your approval...'}</div>
           <div className="vc-dialog-btns">
             <button type="button" className="btn btn-surface" onClick={async () => { await decline(); close(); }}>Cancel payment</button>

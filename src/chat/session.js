@@ -67,7 +67,7 @@ export async function switchBonfireAccount(a) {
   history.replaceState(null, '', '/chat#/home');
   location.reload();
 }
-export const SIGNIN_TEXT = { declined: 'Sign-in was cancelled.', state: "That sign-in didn't match this browser - try again.", failed: "Couldn't sign in with Velora - try again." };
+export const SIGNIN_TEXT = { declined: 'Sign-in was cancelled.', state: "That sign-in didn't match this browser - try again.", failed: "Couldn't sign in with Nookara - try again." };
 
 // forget Ember's Velora sign-in (and the sessions it opened on Velora-login servers) and start over signed out
 export function endSession(notice) {

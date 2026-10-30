@@ -12,7 +12,7 @@ const label = b => (b ? [b.version, b.commit_short ? `(${b.commit_short})` : '']
 const key = b => b?.build_id || b?.commit || null;
 const changed = (a, b) => !!key(a) && !!key(b) && key(a) !== key(b); // unknown on either side counts as unchanged
 const WHY = {
-  managed: 'This server is hosted by Velora and is kept up to date by it.',
+  managed: 'This server is hosted by Nookara and is kept up to date by it.',
   not_configured: 'One-click updates are not set up on this server. Update it where it runs (docker pull / rebuild, then restart).',
 };
 

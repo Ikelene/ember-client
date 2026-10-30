@@ -12,7 +12,7 @@ export const GALLERY_PERMS = [
 
 export const STATE_INFO = {
   private: { label: 'Private', Icon: Lock, hint: 'Only you can add it.' },
-  pending: { label: 'Pending review', Icon: Clock, hint: 'Waiting for Velora staff to look at it.' },
+  pending: { label: 'Pending review', Icon: Clock, hint: 'Waiting for Nookara staff to look at it.' },
   approved: { label: 'Approved', Icon: BadgeCheck, hint: 'Listed in the gallery with a Verified checkmark.' },
   rejected: { label: 'Rejected', Icon: CircleAlert, hint: 'Staff sent it back. Fix what they said and submit it again.' },
   delisted: { label: 'Delisted', Icon: EyeOff, hint: 'Staff took it out of the gallery. You can submit it again.' },

@@ -13,9 +13,9 @@ const VELORA_CATEGORIES = ['Underage', 'NSFW / Explicit Content', 'Graphic Viole
 function veloraBlocked(sid, target) {
   const st = getState(), origin = instOf(sid);
   const inst = st.instances.find(i => i.origin === origin);
-  if (inst?.mode !== 'velora') return "This server doesn't use Velora sign-in, so Velora can't act on its accounts.";
-  if (!target?.velora_id) return "They don't have a Velora account.";
-  if (!hasVelora()) return 'Sign in with Velora to report to Velora.';
+  if (inst?.mode !== 'velora') return "This server doesn't use Nookara sign-in, so Nookara can't act on its accounts.";
+  if (!target?.velora_id) return "They don't have a Nookara account.";
+  if (!hasVelora()) return 'Sign in with Nookara to report to Nookara.';
   return '';
 }
 
@@ -25,7 +25,7 @@ async function toVelora(sid, target, message, a) {
   if (message) {
     lines.push(`Message link: ${linkFor({ kind: 'channel', sid, cid: message.channel })}`, `Message id: ${message.id}`, `Message text: ${String(message.body || '').slice(0, 2000) || '(no text)'}`);
     if (message.attachments?.length) lines.push(`Attachments: ${message.attachments.map(x => x.url || x.name).filter(Boolean).join(', ')}`);
-    lines.push(message.signature ? 'Has their Velora signature: yes' : 'Has their Velora signature: no');
+    lines.push(message.signature ? 'Has their Nookara signature: yes' : 'Has their Nookara signature: no');
   }
   const fd = new FormData();
   fd.append('reported_id', String(target.velora_id));
@@ -44,7 +44,7 @@ export async function reportTo(sid, what, label, ctx = {}) {
     text: 'Who should see this report?',
     choices: [
       { id: 'server', label: 'Report to this server', hint: "Breaks this server's rules. Its moderators see it and who sent it, and can delete messages, time people out or remove them from this server." },
-      { id: 'velora', label: 'Report to Velora', hint: "Breaks Velora's Terms of Service, or is serious (threats, abuse, illegal content). Velora's staff can act on the Velora account everywhere.", disabled: !!blocked, why: blocked, categories: VELORA_CATEGORIES },
+      { id: 'velora', label: 'Report to Nookara', hint: "Breaks Nookara's Terms of Service, or is serious (threats, abuse, illegal content). Nookara's staff can act on the Nookara account everywhere.", disabled: !!blocked, why: blocked, categories: VELORA_CATEGORIES },
     ],
     input: { placeholder: 'What happened? (optional)', value: '', optional: true, multiline: true, max: 500 },
     confirm: 'Send report',
@@ -53,7 +53,7 @@ export async function reportTo(sid, what, label, ctx = {}) {
   try {
     if (a.choice === 'velora') {
       await toVelora(sid, ctx.target, ctx.message, a);
-      toast("Thanks - Velora's staff will take a look.", true);
+      toast("Thanks - Nookara's staff will take a look.", true);
       return;
     }
     const r = await apiFetch(`/chat/servers/${sid}/reports`, { method: 'POST', body: JSON.stringify({ ...what, reason: a.text || '' }) });

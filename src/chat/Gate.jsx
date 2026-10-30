@@ -33,9 +33,9 @@ export function RetryIn({ at, busy }) {
 
 export function SignInPrompt({ what = 'direct messages, group chats and friends', back }) {
   return (
-    <Box icon={<ShieldCheck size={34} />} title="Sign in with Velora">
-      <p>Your Velora account is needed for {what}. Servers with their own accounts work without it.</p>
-      <div className="vc-gate-btns"><button type="button" className="btn btn-primary" onClick={() => startSignIn(back)}><ShieldCheck size={15} /> Sign in with Velora</button></div>
+    <Box icon={<ShieldCheck size={34} />} title="Sign in with Nookara">
+      <p>Your Nookara account is needed for {what}. Servers with their own accounts work without it.</p>
+      <div className="vc-gate-btns"><button type="button" className="btn btn-primary" onClick={() => startSignIn(back)}><ShieldCheck size={15} /> Sign in with Nookara</button></div>
       <small>Ember asks you to approve it first and keeps its own sign-in - the website's session isn't used.</small>
     </Box>
   );
@@ -46,7 +46,7 @@ export function SignedOutSidebar() {
   return (
     <div className="vc-side">
       <div className="vc-side-head" />
-      <div className="vc-side-list"><div className="vc-side-empty">Sign in with Velora to use direct messages, group chats and friends.</div></div>
+      <div className="vc-side-list"><div className="vc-side-empty">Sign in with Nookara to use direct messages, group chats and friends.</div></div>
     </div>
   );
 }
@@ -68,9 +68,9 @@ export function InstanceGate({ origin }) {
   if (status === 'login') {
     return (
       <Box icon={<KeyRound size={34} />} title={`Signed out of ${host}`}>
-        <p>{inst.needsVelora ? 'This server signs you in with your Velora account.' : 'Log in to open this server.'}</p>
+        <p>{inst.needsVelora ? 'This server signs you in with your Nookara account.' : 'Log in to open this server.'}</p>
         <div className="vc-gate-btns">
-          {inst.needsVelora ? <button type="button" className="btn btn-primary" onClick={() => startSignIn()}><ShieldCheck size={15} /> Sign in with Velora</button>
+          {inst.needsVelora ? <button type="button" className="btn btn-primary" onClick={() => startSignIn()}><ShieldCheck size={15} /> Sign in with Nookara</button>
             : <button type="button" className="btn btn-primary" onClick={() => dialog('add-instance', { url: origin })}><LogIn size={15} /> Log in</button>}
           {retry}
         </div>

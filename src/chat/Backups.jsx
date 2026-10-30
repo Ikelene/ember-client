@@ -14,7 +14,7 @@ import { usePlan, PlanGate, PlanNotice, PlanUsage } from './PlanGate.jsx';
 const when = t => new Date(t).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 const sizeOf = b => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round((b || 0) / 1024))} KB`);
 const fail = e => toast(HOSTING_TEXT[e?.message] || errorText(e?.message));
-const REASON = { archived: 'Saved when its time ran out', deleted: 'Saved when it was deleted', manual: 'Saved by Velora hosting', uploaded: 'Saved from the server', 'before restore': 'Before a restore' };
+const REASON = { archived: 'Saved when its time ran out', deleted: 'Saved when it was deleted', manual: 'Saved by Nookara hosting', uploaded: 'Saved from the server', 'before restore': 'Before a restore' };
 function save(blob, name) {
   const url = URL.createObjectURL(blob);
   const a = Object.assign(document.createElement('a'), { href: url, download: name });
@@ -50,7 +50,7 @@ export function BackupsPage({ origin }) {
     fd.append('file', new File([blob], filename, { type: 'application/zip' }));
     fd.append('name', inst?.name || ''); fd.append('url', origin);
     await uploadFetch('/bonfire/hosting/backups/upload', fd);
-    await loadMine(); toast('Saved to your Velora account.', true);
+    await loadMine(); toast('Saved to your Nookara account.', true);
   });
   const remove = b => run(`${b.id}:rm`, async () => {
     if (!(await ask({ title: 'Delete this backup?', text: 'It is gone for good from this server.', confirm: 'Delete backup', danger: true }))) return;
@@ -64,7 +64,7 @@ export function BackupsPage({ origin }) {
   const restoreFile = file => run('file', () => restoreBlob(file, file.name));
   const downloadVelora = b => run(`v${b.id}:dl`, async () => { const { blob, filename } = await downloadFetch(`/bonfire/hosting/backups/${b.id}/download`, { filename: fileName(b) }); save(blob, filename); });
   const removeVelora = b => run(`v${b.id}:rm`, async () => {
-    if (!(await ask({ title: 'Delete this backup?', text: 'It is gone for good from your Velora account.', confirm: 'Delete backup', danger: true }))) return;
+    if (!(await ask({ title: 'Delete this backup?', text: 'It is gone for good from your Nookara account.', confirm: 'Delete backup', danger: true }))) return;
     await apiFetch(`/bonfire/hosting/backups/${b.id}`, { method: 'DELETE' }); await loadMine();
   });
   const ro = inst?.readOnly;
@@ -99,7 +99,7 @@ export function BackupsPage({ origin }) {
                 <span className="vc-list-txt"><b>{when(b.created_at)}</b><small>{[b.note, b.by?.username ? `by ${b.by.username}` : null, sizeOf(b.size)].filter(Boolean).join(' - ')}</small></span>
                 <span className="grow" />
                 <button type="button" className="btn btn-surface btn-sm" disabled={!!busy} onClick={() => download(b)}><Download size={13} /> {busy === `${b.id}:dl` ? 'Downloading...' : 'Download'}</button>
-                {signedIn && <button type="button" className="btn btn-surface btn-sm" disabled={!!busy} data-tip="Keep a copy in your Velora account" onClick={() => toVelora(b)}><CloudUpload size={13} /> {busy === `${b.id}:up` ? 'Saving...' : 'Save to Velora'}</button>}
+                {signedIn && <button type="button" className="btn btn-surface btn-sm" disabled={!!busy} data-tip="Keep a copy in your Nookara account" onClick={() => toVelora(b)}><CloudUpload size={13} /> {busy === `${b.id}:up` ? 'Saving...' : 'Save to Nookara'}</button>}
                 {owner && <button type="button" className="btn btn-surface btn-sm" disabled={!!busy || ro} onClick={() => restoreHere(b)}><RefreshCw size={13} /> {busy === `${b.id}:rs` ? 'Restoring...' : 'Restore'}</button>}
                 <button type="button" className="vc-ico-btn danger" title="Delete backup" disabled={!!busy || ro} onClick={() => remove(b)}><Trash2 size={15} /></button>
               </div>))}</div>
@@ -107,12 +107,12 @@ export function BackupsPage({ origin }) {
         </div>
       </div>
       <div className="card bf-ss-card">
-        <div className="card-header"><span className="card-title"><CloudUpload size={15} /> In your Velora account</span></div>
+        <div className="card-header"><span className="card-title"><CloudUpload size={15} /> In your Nookara account</span></div>
         <div className="card-body">
-          {!signedIn ? <p className="vc-hint">Sign in with Velora to keep backups in your account, safe even if this server goes away.</p> : mine === null ? <div className="vc-loading"><i /><i /><i /></div> : (
+          {!signedIn ? <p className="vc-hint">Sign in with Nookara to keep backups in your account, safe even if this server goes away.</p> : mine === null ? <div className="vc-loading"><i /><i /><i /></div> : (
             <>
-              <small className="vc-hint">Up to 10 backups, 500 MB each, kept for 180 days. Velora hosting also saves one here when a hosted server is deleted or runs out of time.</small>
-              {!here.length && !other.length && <p className="vc-hint">Nothing here yet - use Save to Velora on a backup above.</p>}
+              <small className="vc-hint">Up to 10 backups, 500 MB each, kept for 180 days. Nookara hosting also saves one here when a hosted server is deleted or runs out of time.</small>
+              {!here.length && !other.length && <p className="vc-hint">Nothing here yet - use Save to Nookara on a backup above.</p>}
               {here.length > 0 && <div className="vc-rows vc-gap-top">{here.map(veloraRow)}</div>}
               {owner && other.length > 0 && (<><div className="vc-sec-t vc-gap-top"><Server size={13} className="vc-inline-ico" /> From other servers</div><div className="vc-rows">{other.map(veloraRow)}</div></>)}
             </>

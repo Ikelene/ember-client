@@ -106,7 +106,7 @@ export function SetupWizard({ origin, onClose, name: givenName = '' }) {
 
           {step === 1 && !importing && (
             <>
-              <p className="vc-dialog-sub">What should people see when they find this server? You can change all of this later in its settings. Or bring one over: from an Ember export (a <span className="vc-mono">.zip</span> from another server or from Velora), or from Discord / Fluxer.</p>
+              <p className="vc-dialog-sub">What should people see when they find this server? You can change all of this later in its settings. Or bring one over: from an Ember export (a <span className="vc-mono">.zip</span> from another server or from Nookara), or from Discord / Fluxer.</p>
               <div className="vc-field"><span>Icon</span>
                 <div className="vc-img-row"><span className="vc-srv-ico lg">{icon ? <img src={icon.url} alt="" /> : initials(f.name || 'My server')}</span>
                   <button type="button" className="btn btn-surface" onClick={() => pick.current?.click()}><Upload size={14} /> Upload</button>
@@ -115,7 +115,7 @@ export function SetupWizard({ origin, onClose, name: givenName = '' }) {
               <label className="vc-field"><span>Server name</span><input className="form-input" autoFocus maxLength={60} value={f.name} placeholder="My server" onChange={e => setF(x => ({ ...x, name: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter' && f.name.trim()) createServer(); }} /></label>
               <label className="vc-field"><span>Description</span><textarea className="form-textarea" rows={3} maxLength={300} value={f.description} onChange={e => setF(x => ({ ...x, description: e.target.value }))} placeholder="What is it for?" /></label>
               <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" onClick={close}>Finish later</button><span className="grow" />
-                <button type="button" className="btn btn-surface" disabled={busy || !signedIn} data-tip={signedIn ? undefined : 'Sign in with Velora to import from Discord or Fluxer'} onClick={() => setImporting(true)}><PlatformIcon p="discord" size={14} /><PlatformIcon p="fluxer" size={14} /> Import from Discord / Fluxer</button>
+                <button type="button" className="btn btn-surface" disabled={busy || !signedIn} data-tip={signedIn ? undefined : 'Sign in with Nookara to import from Discord or Fluxer'} onClick={() => setImporting(true)}><PlatformIcon p="discord" size={14} /><PlatformIcon p="fluxer" size={14} /> Import from Discord / Fluxer</button>
                 <label className={`btn btn-surface${busy ? ' disabled' : ''}`}><Upload size={14} /> Import an export<input type="file" hidden accept=".zip,application/zip" onChange={e => { const x = e.target.files[0]; e.target.value = ''; if (x) importZip(x); }} /></label>
                 <button type="button" className="btn btn-primary" disabled={busy || !f.name.trim()} onClick={createServer}>{busy ? 'Working...' : 'Create server'}</button></div>
             </>
@@ -124,11 +124,11 @@ export function SetupWizard({ origin, onClose, name: givenName = '' }) {
             <>
               <p className="vc-dialog-sub">How do people sign in? You can't mix the two.</p>
               <div className="vc-seg-pick">
-                {[['velora', 'Velora accounts', 'People log in with the Velora account they already have. Messages can be signed.'], ['local', "This server's own accounts", 'People register here with a username and password.']].map(([id, label, hint]) => (
+                {[['velora', 'Nookara accounts', 'People log in with the Nookara account they already have. Messages can be signed.'], ['local', "This server's own accounts", 'People register here with a username and password.']].map(([id, label, hint]) => (
                   <button key={id} type="button" className={`vc-check-card${mode === id ? ' on' : ''}`} onClick={() => setMode(id)}><KeyRound size={16} /><span><b>{label}</b><small>{hint}</small></span></button>
                 ))}
               </div>
-              <p className="vc-hint">Running now: <b>{cfg?.running_accounts_mode === 'local' ? 'own accounts' : 'Velora accounts'}</b>.</p>
+              <p className="vc-hint">Running now: <b>{cfg?.running_accounts_mode === 'local' ? 'own accounts' : 'Nookara accounts'}</b>.</p>
               {(restartNote || cfg?.restart_required) && <p className="vc-note"><RefreshCw size={14} /> Saved - the server has to restart to switch.</p>}
               <div className="vc-dialog-btns">
                 <button type="button" className="btn btn-surface" onClick={close}>Finish later</button><span className="grow" />

@@ -60,7 +60,7 @@ export function TempAttPopover({ att, rect, onExpires, onDest, onClose }) {
     body = (
       <>
         <div className="vc-tpop-head"><HardDrive size={16} /><b>Kept on your account</b></div>
-        <p className="vc-tpop-text">Stays until you delete it, and counts toward your Velora storage{acc ? ` (${fmt(acc.remaining)} of ${fmt(acc.limit)} free)` : ''}.</p>
+        <p className="vc-tpop-text">Stays until you delete it, and counts toward your Nookara storage{acc ? ` (${fmt(acc.remaining)} of ${fmt(acc.limit)} free)` : ''}.</p>
         <button type="button" className="vc-tpop-move" disabled={!!tmpWhy} onClick={() => { onDest('temp'); onClose(); }}>
           <Clock size={15} /><span><b>Send as a temporary file instead</b><small>{tmpWhy || `Free, deleted after about ${daysText(normal) || 'a while'} unopened`}</small></span>
         </button>
@@ -94,7 +94,7 @@ export function TempAttPopover({ att, rect, onExpires, onDest, onClose }) {
             <div className="vc-tpop-pro">
               <Sparkles size={15} />
               <span>
-                <b>Velora Pro</b> keeps it {proNormal ? `${daysText(proNormal)}` : 'twice as long'} and lets you pick when it expires, up to {daysText(tmp?.pro_days?.max || 120)}.
+                <b>Nookara Pro</b> keeps it {proNormal ? `${daysText(proNormal)}` : 'twice as long'} and lets you pick when it expires, up to {daysText(tmp?.pro_days?.max || 120)}.
                 <a href={`${VELORA}/upgrade`} target="_blank" rel="noopener noreferrer">Get Pro <ArrowRight size={12} /></a>
               </span>
             </div>

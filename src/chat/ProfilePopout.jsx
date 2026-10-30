@@ -54,7 +54,7 @@ export function PopoutCard({ p, status = 'online', custom, children, preview = f
         {(badges.length > 0 || PRO.has(p?.rank)) && (
           <span className="bf-pp-badges">
             {badges.length ? badges.map(b => <img key={b.name} src={b.icon_url} alt={b.name} data-tip={b.description ? `${b.name} - ${b.description}` : b.name} />)
-              : <Crown size={16} data-tip="Velora Pro" />}
+              : <Crown size={16} data-tip="Nookara Pro" />}
           </span>
         )}
       </div>
@@ -68,7 +68,7 @@ export function PopoutCard({ p, status = 'online', custom, children, preview = f
         <Bio text={p?.bio} />
         {p?.website && <a className="bf-pp-link" href={/^https?:\/\//i.test(p.website) ? p.website : `https://${p.website}`} target="_blank" rel="noopener noreferrer nofollow"><Globe size={13} /> {hostOf(p.website)}</a>}
         {p?.localTime && <div className="bf-pp-fact"><b>Local time</b><span>{p.localTime}</span></div>}
-        {p?.created && <div className="bf-pp-fact"><b>Velora member since</b><span>{new Date(p.created).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span></div>}
+        {p?.created && <div className="bf-pp-fact"><b>Nookara member since</b><span>{new Date(p.created).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span></div>}
         {children}
       </div>
     </div>
@@ -95,7 +95,7 @@ const STATUS_ITEMS = [
   ['online', Circle, 'Online'],
   ['idle', Moon, 'Idle'],
   ['dnd', MinusCircle, 'Do not disturb', "You won't get notifications."],
-  ['invisible', EyeOff, 'Invisible', "You'll look offline, but can still use Velora."],
+  ['invisible', EyeOff, 'Invisible', "You'll look offline, but can still use Nookara."],
 ];
 
 // the accounts saved on this device (same list as the login page's "Choose an account" and the site's account menu)
@@ -119,7 +119,7 @@ async function switchTo(a, setBusy) {
   if (web()) {
     try { await switchBonfireAccount(a); } catch (e) {
       setBusy('');
-      toast(e.message === 'ended' ? `${a.username} was signed out - sign in again with "Add another account".` : "Couldn't reach Velora - try again.");
+      toast(e.message === 'ended' ? `${a.username} was signed out - sign in again with "Add another account".` : "Couldn't reach Nookara - try again.");
     }
     return;
   }

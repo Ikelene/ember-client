@@ -13,7 +13,7 @@ import { PopoutCard, localTimeFrom } from './ProfilePopout.jsx';
 
 const isHex = c => /^#[0-9a-f]{6}$/i.test(c || '');
 const UPLOAD_ERRORS = {
-  gif_pro_only: type => `Animated ${type === 'banner' ? 'banners' : 'profile pictures'} need Velora Pro.`,
+  gif_pro_only: type => `Animated ${type === 'banner' ? 'banners' : 'profile pictures'} need Nookara Pro.`,
   file_too_large: () => 'That file is too big.',
   upload_suspended: () => 'Uploads are currently suspended on your account.',
 };
@@ -210,7 +210,7 @@ function Editor({ user, reload, presence, onDirty }) {
               </label>
               {f.color && <button type="button" className="btn btn-surface btn-sm" onClick={() => set('color', '')}>Reset</button>}
             </div>
-            <div className="bf-pe-hint">Your name colour on your profile, and Velora's theme colour everywhere for you.</div>
+            <div className="bf-pe-hint">Your name colour on your profile, and Nookara's theme colour everywhere for you.</div>
           </div>
 
           <div className="bf-pe-sec">

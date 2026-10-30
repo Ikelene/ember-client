@@ -65,11 +65,11 @@ function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, 
     ]],
     ['Instance', instAdmin ? [
       hosted && ['hosting', 'Hosting', Rocket, ['Plan', 'Starter', 'Plus', 'Billing', 'Credits', 'Upgrade', 'Voice minutes', 'Delete server']],
-      ['accounts', 'Accounts', KeyRound, ['Accounts mode', 'Velora accounts', 'Own accounts', 'Local accounts', 'Registration', 'Public address']],
+      ['accounts', 'Accounts', KeyRound, ['Accounts mode', 'Nookara accounts', 'Own accounts', 'Local accounts', 'Registration', 'Public address']],
       uploads,
-      ['backups', 'Backups', Archive, ['Backup', 'Restore', 'Download', 'Save to Velora', 'Export']],
+      ['backups', 'Backups', Archive, ['Backup', 'Restore', 'Download', 'Save to Nookara', 'Export']],
       ['voice', 'Voice', Mic, ['Cloudflare', 'Realtime', 'TURN']],
-      ['velora', 'Velora', Globe, ['Registration', 'Register', 'Payouts', 'Push', 'Directory', 'Voice minutes']],
+      ['velora', 'Nookara', Globe, ['Registration', 'Register', 'Payouts', 'Push', 'Directory', 'Voice minutes']],
       ['admins', 'Admins', UserCog, ['Instance admins', 'Owner']],
       ['serverinfo', 'Server info', Info, ['Version', 'Commit', 'Build', 'Update', 'Outdated', 'Uptime', 'Node', 'Stats', 'Database', 'Uploads']],
       danger,
@@ -96,7 +96,7 @@ export function ServerSettings({ sid, onClose, tab: startTab }) {
     <SettingsShell label="Server settings" groups={groups} startTab={startTab} onClose={onClose} gone={!d}
       head={srv && <>
         <span className="vc-srv-ico">{srv.icon ? <img src={srv.icon} alt="" /> : initials(srv.name)}</span>
-        <span><b>{srv.name}</b><small>{onInst ? <><Globe size={11} /> {inst?.host || origin}</> : 'Hosted by Velora'}</small></span>
+        <span><b>{srv.name}</b><small>{onInst ? <><Globe size={11} /> {inst?.host || origin}</> : 'Hosted by Nookara'}</small></span>
       </>}>
       {(page, { onDirty, goTo }) => <PlanCtx.Provider value={buildPlanCtx(inst, goTo)}>
         {page === 'overview' && <Overview sid={sid} origin={origin} instAdmin={instAdmin} onDirty={onDirty} goTo={goTo} />}
@@ -185,7 +185,7 @@ function Overview({ sid, origin, instAdmin, onDirty, goTo }) {
   }
   async function register() {
     setBusy('register');
-    try { const c = await call('/instance/velora/register', { method: 'POST' }); setCfg(c); toast(c.velora?.registered ? 'Registered with Velora.' : "Velora said no - see below.", !!c.velora?.registered); if (c.listed) recheck(); }
+    try { const c = await call('/instance/velora/register', { method: 'POST' }); setCfg(c); toast(c.velora?.registered ? 'Registered with Nookara.' : "Nookara said no - see below.", !!c.velora?.registered); if (c.listed) recheck(); }
     catch (e) { toast(errorText(e.message)); }
     setBusy('');
   }
@@ -217,9 +217,9 @@ function Overview({ sid, origin, instAdmin, onDirty, goTo }) {
                 <button type="button" role="switch" aria-label="Show in Discover" aria-checked={!!cfg.listed} className={`cs-switch${cfg.listed ? ' on' : ''}`} disabled={off || busy === 'listed'} onClick={() => setListed(!cfg.listed)}><i /></button>
               </div>
               <div className={`bf-ss-reg${off || !v.registered ? ' warn' : ' ok'}`}>
-                {off ? <><TriangleAlert size={14} /><span>Velora's services are off for this server, so it can't be listed.</span><button type="button" className="btn btn-surface btn-sm" onClick={() => goTo('velora')}>Velora settings</button></>
-                  : !v.registered ? <><TriangleAlert size={14} /><span><b>Not registered with Velora yet.</b> Discover lists only registered servers.{v.last_error ? ` (${errorText(v.last_error) === 'Something went wrong.' ? v.last_error : errorText(v.last_error)})` : ''}</span><button type="button" className="btn btn-primary btn-sm" disabled={!!busy} onClick={register}><RefreshCw size={13} /> {busy === 'register' ? 'Registering...' : 'Register now'}</button></>
-                  : <><Check size={14} /><span><b>Registered with Velora</b>{v.trusted ? ' - trusted' : ''}. {dir.hidden_by_staff ? "Velora's staff have hidden the listing." : cfg.listed ? (dir.last_error ? `The listing didn't update: ${dir.last_error}` : dir.pushed_at ? `Listed - updated ${stampOf(dir.pushed_at)}.` : 'Listing it now...') : 'Not listed.'}</span></>}
+                {off ? <><TriangleAlert size={14} /><span>Nookara's services are off for this server, so it can't be listed.</span><button type="button" className="btn btn-surface btn-sm" onClick={() => goTo('velora')}>Nookara settings</button></>
+                  : !v.registered ? <><TriangleAlert size={14} /><span><b>Not registered with Nookara yet.</b> Discover lists only registered servers.{v.last_error ? ` (${errorText(v.last_error) === 'Something went wrong.' ? v.last_error : errorText(v.last_error)})` : ''}</span><button type="button" className="btn btn-primary btn-sm" disabled={!!busy} onClick={register}><RefreshCw size={13} /> {busy === 'register' ? 'Registering...' : 'Register now'}</button></>
+                  : <><Check size={14} /><span><b>Registered with Nookara</b>{v.trusted ? ' - trusted' : ''}. {dir.hidden_by_staff ? "Nookara's staff have hidden the listing." : cfg.listed ? (dir.last_error ? `The listing didn't update: ${dir.last_error}` : dir.pushed_at ? `Listed - updated ${stampOf(dir.pushed_at)}.` : 'Listing it now...') : 'Not listed.'}</span></>}
               </div>
               <label className="vc-field vc-gap-top"><span>Tags</span>
                 <input className="form-input" maxLength={220} placeholder="gaming, art, minecraft" value={tags} onChange={e => setTags(e.target.value)} />
@@ -229,7 +229,7 @@ function Overview({ sid, origin, instAdmin, onDirty, goTo }) {
         </Card>
       )}
       <Card title="Members' names" icon={Users}>
-        <Toggle label="Let people show their accent colour" hint="On: names use each person's own Velora accent colour. Off: names use the colour of their highest role." on={srv.allow_accent !== false}
+        <Toggle label="Let people show their accent colour" hint="On: names use each person's own Nookara accent colour. Off: names use the colour of their highest role." on={srv.allow_accent !== false}
           onChange={on => apiFetch(`/chat/servers/${sid}`, { method: 'PATCH', body: JSON.stringify({ allow_accent: on }) }).then(() => refreshServer(sid)).catch(e => toast(errorText(e.message)))} />
       </Card>
       <Card title="Invite code" icon={DoorOpen}>
@@ -311,7 +311,7 @@ function DangerZone({ sid, origin, instAdmin, onClose }) {
     <div className="bf-ss-page">
       {owner && (
         <Card title="Export" icon={Download}>
-          <div className="cs-row"><div className="cs-text"><b>Download a copy</b><span>A zip with the channels, roles, members, emojis, files and every message.{origin ? '' : " Servers hosted by Velora are moving to Ember servers of their own - you can import it into one."}</span></div><ExportButton sid={sid} /></div>
+          <div className="cs-row"><div className="cs-text"><b>Download a copy</b><span>A zip with the channels, roles, members, emojis, files and every message.{origin ? '' : " Servers hosted by Nookara are moving to Ember servers of their own - you can import it into one."}</span></div><ExportButton sid={sid} /></div>
         </Card>
       )}
       {instAdmin && (

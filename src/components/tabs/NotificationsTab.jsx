@@ -44,13 +44,13 @@ export default function NotificationsTab() {
         <div className="card-header">
           <div className="card-title-group">
             <span className="card-title">Browser notifications</span>
-            <span className="card-subtitle">Get a notification from Velora even when this tab is closed. Turn it on separately on each browser or device.</span>
+            <span className="card-subtitle">Get a notification from Nookara even when this tab is closed. Turn it on separately on each browser or device.</span>
           </div>
         </div>
         <div className="card-body" style={{ display: 'grid', gap: 12 }}>
           {msg && <div className={`inline-msg ${msg.type}`}>{msg.text}</div>}
           {state?.hyperfocus && !on && (
-            <div className="form-hint">You use Hyperfocus, which already sends you Velora notifications on this PC - so these are off unless you turn them on (handy for other devices).</div>
+            <div className="form-hint">You use Hyperfocus, which already sends you Nookara notifications on this PC - so these are off unless you turn them on (handy for other devices).</div>
           )}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className={`btn btn-sm ${on ? 'btn-surface' : 'btn-primary'}`} onClick={toggle} disabled={busy}>
@@ -105,7 +105,7 @@ export function PushPrompt() {
         <Bell size={18} style={{ color: 'var(--accent)' }} />
         <div style={{ flex: 1, minWidth: 200 }}>
           <div style={{ fontWeight: 600 }}>Get notified?</div>
-          <div style={{ fontSize: 13, color: 'var(--muted)' }}>Messages, calls, friend requests and credits - even when Velora is closed. You can turn this on for each device.</div>
+          <div style={{ fontSize: 13, color: 'var(--muted)' }}>Messages, calls, friend requests and credits - even when Nookara is closed. You can turn this on for each device.</div>
           {msg && <div className="inline-msg error" style={{ marginTop: 6 }}>{msg}</div>}
         </div>
         <button className="btn btn-primary btn-sm" onClick={async () => { try { await enablePush(); setShow(false); } catch (e) { setMsg(e.message); } }}>Turn on</button>

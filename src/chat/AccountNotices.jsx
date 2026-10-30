@@ -11,7 +11,7 @@ const NOTICES = {
     lines: [
       [MessageCircle, 'Choose who can DM you: everyone, friends only, or people in servers you\'re in.'],
       [Ban, 'Block people so they can\'t see your profile, message you, call you or pay you. Their messages in servers are hidden behind a click.'],
-      [Settings, 'Who can DM you is in Settings > Privacy. Block someone from their profile or user menu, and see everyone you blocked in your Velora account under Privacy.'],
+      [Settings, 'Who can DM you is in Settings > Privacy. Block someone from their profile or user menu, and see everyone you blocked in your Nookara account under Privacy.'],
     ],
     action: 'Open privacy settings',
     page: 'Privacy', // SettingsDialog page with "Who can send me direct messages"

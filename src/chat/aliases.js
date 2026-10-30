@@ -13,5 +13,5 @@ export const aliasKey = m => { const a = aliasOf(m); return a ? (isUnmarked(a) ?
 // bot's own. member: the matched member's live face when the caller has it (useFace), else alias.member
 export const aliasFace = (alias, face, member = aliasMemberOf(alias)) => (alias ? { ...face, username: alias.name, display_name: alias.name, pfp: alias.avatar_url || member?.pfp || face?.pfp || null, color: member ? member.color : face?.color } : face);
 // the name a message is shown under (notifications, search, pins, the reply bar)
-export const shownName = (m, fallback = 'Velora') => aliasOf(m)?.name || m?.author?.username || fallback;
+export const shownName = (m, fallback = 'Nookara') => aliasOf(m)?.name || m?.author?.username || fallback;
 export const shownPfp = m => { const a = aliasOf(m); return (a && (a.avatar_url || aliasMemberOf(a)?.pfp)) || m?.author?.pfp || null; };

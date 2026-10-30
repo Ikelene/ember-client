@@ -20,7 +20,7 @@ export const GROUPS = [
     ['share_activity', 'Share my activity', 'Show what you are playing or doing (Hyperfocus games, projects, integrations) under your name and on your profile.'],
     ['share_typing', 'Let others see when I am typing', 'Turn this off to type without the "is typing..." showing for anyone.'],
     ['allow_vc_calls', 'Let people call me into voice channels', 'Where a voice channel allows it, people in that server can ring you straight into it. Turn off to never get those calls.'],
-    ['dm_privacy', 'Who can send me direct messages', 'Friends only stops people you are not friends with from starting a DM or calling you. The servers option also lets in people who share an Ember server with you. Velora staff can always reach you.', [['everyone', 'Everyone'], ['friends', 'Friends only'], ['servers', "Members in servers I'm in"]]],
+    ['dm_privacy', 'Who can send me direct messages', 'Friends only stops people you are not friends with from starting a DM or calling you. The servers option also lets in people who share an Ember server with you. Nookara staff can always reach you.', [['everyone', 'Everyone'], ['friends', 'Friends only'], ['servers', "Members in servers I'm in"]]],
   ]],
   ['Notifications', [
     ['sounds', 'Sounds', 'A sound for new direct messages and when someone @mentions you.'],
@@ -31,8 +31,8 @@ export const GROUPS = [
     ['show_typing', 'Show typing indicators', 'See who is typing, in the conversation and next to channels in the list.'],
     ['strip_tracking', 'Remove tracking from links', 'Cleans tracking junk (like ?utm_source=, ?si= or fbclid) off links you paste or send. Only the junk goes; the link still works the same.'],
     ['link_images', 'Show pictures from links', 'Links to pictures show as the picture instead of a link.'],
-    ['yt_mode', 'Play YouTube videos', "Through Velora: Velora streams the video for you - no ads, no trackers. YouTube's player: starts instantly, but YouTube can track you and show ads.", [['ask', 'Ask each time'], ['velora', 'Through Velora'], ['youtube', "YouTube's player"]]],
-    ['dm_upload_dest', 'Where files in DMs go', "Velora account storage: kept until you delete them, counts toward your storage. Temporary storage: free, deleted after a while nobody opens them (pictures about 30 days, videos and sounds 14, other files 7). The + button can always pick once.", [['ask', 'Ask every time'], ['account', 'Account storage'], ['temp', 'Temporary storage']]],
+    ['yt_mode', 'Play YouTube videos', "Through Nookara: Nookara streams the video for you - no ads, no trackers. YouTube's player: starts instantly, but YouTube can track you and show ads.", [['ask', 'Ask each time'], ['velora', 'Through Nookara'], ['youtube', "YouTube's player"]]],
+    ['dm_upload_dest', 'Where files in DMs go', "Nookara account storage: kept until you delete them, counts toward your storage. Temporary storage: free, deleted after a while nobody opens them (pictures about 30 days, videos and sounds 14, other files 7). The + button can always pick once.", [['ask', 'Ask every time'], ['account', 'Account storage'], ['temp', 'Temporary storage']]],
     ['compact', 'Compact message layout', 'Smaller pictures and tighter spacing, so more messages fit.'],
     ['animations', 'Animations', 'Messages, menus and pop-ups slide and fade in. Off = everything changes instantly.'],
   ]],
@@ -240,7 +240,7 @@ function RadioSettings({ s, change, saving }) {
       <div className="card-body cs-rows">
         <p className="cs-note">This is a bit of an easter egg feature. It has been in every ScratchCord version, so it's here too.</p>
         <div className="cs-row cs-radio-url">
-          <div className="cs-text"><b>Stream address</b><span>Any http(s) radio stream (MP3, AAC or Ogg). It plays through Velora so the visualizer can see it.</span></div>
+          <div className="cs-text"><b>Stream address</b><span>Any http(s) radio stream (MP3, AAC or Ogg). It plays through Nookara so the visualizer can see it.</span></div>
           <div className="cs-radio-input">
             <input className="form-input" maxLength={500} value={url} spellCheck={false} onChange={e => setUrl(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && valid && dirty) change('radio_url', url.trim()); }} />
             <button type="button" className="btn btn-surface btn-sm" disabled={saving || !valid || !dirty} onClick={() => change('radio_url', url.trim())}>Save</button>
@@ -268,10 +268,10 @@ export const matches = (q, ...texts) => { const t = String(q || '').trim().toLow
 // read-only: the key your messages are signed with is the Velora account's (made and rotated on the account page)
 function SigningKeyRow() {
   const sg = useChat(s => s.signing);
-  const text = sg?.state === 'ready' ? <>Signing key <code>{sg.kid}</code> - managed on your Velora account</>
+  const text = sg?.state === 'ready' ? <>Signing key <code>{sg.kid}</code> - managed on your Nookara account</>
     : sg?.state === 'no_scope' ? 'Not signing: this login lacks the "Sign Messages" permission. Sign in again to allow it.'
     : sg?.state === 'unsupported' ? "This browser can't make Ed25519 signatures, so messages are sent unsigned."
-    : sg?.state === 'error' ? "Couldn't load your signing key." : 'Signing key - managed on your Velora account';
+    : sg?.state === 'error' ? "Couldn't load your signing key." : 'Signing key - managed on your Nookara account';
   return (
     <div className="cs-row">
       <div className="cs-text"><b>Message signing</b><span>{text}</span></div>
@@ -357,7 +357,7 @@ export default function ChatSettingsTab({ embedded = false, onLogout, onLogin, w
         <div className="card-header"><span className="card-title">{bare ? 'Your account' : 'Sign in'}</span></div>
         <div className="card-body cs-rows">
           <div className="cs-row">
-            <div className="cs-text"><b>Sign in with Velora</b><span>Direct messages, group chats, friends and servers hosted by Velora need your Velora account. Servers with their own accounts work without it. Ember asks you to approve it first and keeps its own sign-in - the website's session isn't used.</span></div>
+            <div className="cs-text"><b>Sign in with Nookara</b><span>Direct messages, group chats, friends and servers hosted by Nookara need your Nookara account. Servers with their own accounts work without it. Ember asks you to approve it first and keeps its own sign-in - the website's session isn't used.</span></div>
             <button type="button" className="btn btn-primary btn-sm" onClick={onLogin}><ShieldCheck size={14} /> Sign in</button>
           </div>
         </div>
@@ -366,12 +366,12 @@ export default function ChatSettingsTab({ embedded = false, onLogout, onLogin, w
         <div className="card-header"><span className="card-title">{bare ? 'Your account' : 'Log out'}</span></div>
         <div className="card-body cs-rows">
           {bare && <div className="cs-row">
-            <div className="cs-text"><b>Account management</b><span>Email, password, security, connected accounts, billing and your data live on your Velora account page.</span></div>
+            <div className="cs-text"><b>Account management</b><span>Email, password, security, connected accounts, billing and your data live on your Nookara account page.</span></div>
             <a className="btn btn-surface btn-sm" href="/me">Open</a>
           </div>}
           {bare && <SigningKeyRow />}
           <div className="cs-row">
-            <div className="cs-text"><b>Sign out of Ember</b><span>{web ? "Remove Ember's Velora sign-in from this browser. The website's own session isn't touched. Servers with their own accounts stay logged in." : 'Remove this account from this Ember app or browser. You can sign in with a different account afterwards.'}</span></div>
+            <div className="cs-text"><b>Sign out of Ember</b><span>{web ? "Remove Ember's Nookara sign-in from this browser. The website's own session isn't touched. Servers with their own accounts stay logged in." : 'Remove this account from this Ember app or browser. You can sign in with a different account afterwards.'}</span></div>
             <button type="button" className="btn btn-danger btn-sm" onClick={onLogout}><LogOut size={14} /> Log out</button>
           </div>
         </div>

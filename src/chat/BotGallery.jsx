@@ -109,7 +109,7 @@ function BotDetail({ id, signedIn, onBack }) {
           )}
           <p className="vc-hint">After adding it, connect the bot to that server's address with its token. Its developer's page or the support link explains how.</p>
           {/* spam, scams or rule-breaking: Velora staff see it in Admin > Apps */}
-          <p className="vc-hint"><a href={`https://velora.ikelene.net/report?bot=${encodeURIComponent(b.id)}`} target="_blank" rel="noopener noreferrer"><Flag size={12} style={{ verticalAlign: '-2px' }} /> Report this bot to Velora</a></p>
+          <p className="vc-hint"><a href={`https://velora.ikelene.net/report?bot=${encodeURIComponent(b.id)}`} target="_blank" rel="noopener noreferrer"><Flag size={12} style={{ verticalAlign: '-2px' }} /> Report this bot to Nookara</a></p>
         </>
       )}
     </div>

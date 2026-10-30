@@ -36,13 +36,13 @@ export const errText = e => ({
   too_many_bots: 'That server has as many bots as it can have.', already_in_server: "It's already in that server.",
   bot_is_private: 'This bot is private.', not_allowed: 'You need Manage server there.', forbidden: 'You need Manage server for that.',
   gallery_banned: 'This bot was banned from the gallery.', bot_not_found: "That bot doesn't exist (any more).",
-  invalid_instance: "That server's instance address isn't valid.", unknown_instance: "That server's instance isn't registered with Velora, so it can't take gallery bots.",
-  instance_banned: "That server's instance is banned from Velora.", gallery_needs_velora_account: "That instance uses its own accounts, so it can't take gallery bots (they need Velora sign-in).",
-  ticket_invalid: "Velora's permission slip wasn't accepted - try again.", ticket_unknown_kid: "The instance doesn't know Velora's signing key yet - try again in a minute.",
-  ticket_bad_signature: "Velora's permission slip didn't check out - try again.", ticket_wrong_issuer: "That slip didn't come from Velora.",
+  invalid_instance: "That server's instance address isn't valid.", unknown_instance: "That server's instance isn't registered with Nookara, so it can't take gallery bots.",
+  instance_banned: "That server's instance is banned from Nookara.", gallery_needs_velora_account: "That instance uses its own accounts, so it can't take gallery bots (they need Nookara sign-in).",
+  ticket_invalid: "Nookara's permission slip wasn't accepted - try again.", ticket_unknown_kid: "The instance doesn't know Nookara's signing key yet - try again in a minute.",
+  ticket_bad_signature: "Nookara's permission slip didn't check out - try again.", ticket_wrong_issuer: "That slip didn't come from Nookara.",
   ticket_wrong_audience: 'That slip was made for another instance - try again.', ticket_wrong_user: "That slip isn't yours.", ticket_expired: 'That took too long and the slip expired - try again.',
   ticket_used: 'That slip was already used - try again.', banned_from_server: 'This bot is banned from that server.',
-  token_conflict: 'A different bot with the same token is already in that server.', velora_unreachable: "That instance couldn't reach Velora - try again in a bit.",
+  token_conflict: 'A different bot with the same token is already in that server.', velora_unreachable: "That instance couldn't reach Nookara - try again in a bit.",
   instance_unreachable: "Couldn't reach that instance.", instance_not_connected: 'Sign in to that instance first.', inst_scope: 'This login needs a new permission for that instance - log in again.',
   signed_out: 'Sign in to add bots.', message_required: 'Write a message first.', description_required: 'Add a short description of at least 10 characters (the one-line summary shown on the card).', long_description_required: 'Add a long description of at least 20 characters (what the bot does and how to use it).', description_too_long: 'The short description can be 200 characters at most.',
   avatar_required: 'Give the bot a profile picture first (upload one in the bot settings above).', already_pending: "It's already waiting for review.", already_listed: "It's already in the gallery.",
@@ -260,7 +260,7 @@ export function BotsManager({ inst, sid }) {
         {inst ? (
           <div className="vc-note bm-note">
             <Info size={14} />
-            <span><b>Server-only bots.</b> Bots you make here belong to this server only. They are mostly handy if you would rather not use Velora services. Want a bot that works in any server, can be added by anyone and can be listed in Discover? Make it in Settings &gt; Developer &gt; Bots instead.</span>
+            <span><b>Server-only bots.</b> Bots you make here belong to this server only. They are mostly handy if you would rather not use Nookara services. Want a bot that works in any server, can be added by anyone and can be listed in Discover? Make it in Settings &gt; Developer &gt; Bots instead.</span>
             <button type="button" className="btn btn-surface btn-sm" onClick={() => dispatchEvent(new CustomEvent("vc-dialog", { detail: { kind: "chat-settings", page: "Bots" } }))}><Bot size={13} /> Open Developer &gt; Bots</button>
           </div>
         ) : (

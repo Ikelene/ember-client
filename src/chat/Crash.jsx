@@ -21,7 +21,7 @@ function CrashScreen({ error, info }) {
         <TriangleAlert size={34} className="vc-crash-ico" />
         <h2>Ember crashed</h2>
         <p>Something went wrong while showing this page. Reloading usually fixes it.</p>
-        <p>If it keeps happening (or you can make it happen again), it's probably a bug - please report it on the <a href={REPORT_URL} target="_blank" rel="noopener noreferrer">Velora bug report form</a> and paste the details below.</p>
+        <p>If it keeps happening (or you can make it happen again), it's probably a bug - please report it on the <a href={REPORT_URL} target="_blank" rel="noopener noreferrer">Nookara bug report form</a> and paste the details below.</p>
         <div className="vc-crash-btns">
           <button type="button" className="btn btn-primary" onClick={() => location.reload()}><RotateCw size={15} /> Reload</button>
           <a className="btn btn-surface" href={REPORT_URL} target="_blank" rel="noopener noreferrer"><Bug size={15} /> Report a bug</a>

@@ -238,12 +238,12 @@ export function Rail({ onDiscover, onAddInstance, onCreate }) {
         <span className="vc-rail-home"><img src="/assets/bonfire/logo-photo-96.jpg" alt="" width={44} height={44} draggable={false} /></span>
       </RailItem>
       {newDMs.map(c => (
-        <RailItem key={`dm-${c.username}`} unread badge={c.unread} onContextMenu={e => userMenu(e, c.username)} title={`${c.username === 'System' ? 'Velora' : c.username} - ${c.unread} new`} onClick={() => go({ kind: 'dm', username: c.username })}>
+        <RailItem key={`dm-${c.username}`} unread badge={c.unread} onContextMenu={e => userMenu(e, c.username)} title={`${c.username === 'System' ? 'Nookara' : c.username} - ${c.unread} new`} onClick={() => go({ kind: 'dm', username: c.username })}>
           <span className="vc-srv-ico">{c.username === 'System' ? <Logo size={22} /> : (c.pfp || people[c.username]?.pfp) ? <img src={c.pfp || people[c.username].pfp} alt="" /> : initials(c.username)}</span>
         </RailItem>
       ))}
       {modmail?.unread > 0 && view.kind !== 'modmail' && (
-        <RailItem unread badge={modmail.unread} title="Velora Moderator Chat" onClick={() => go({ kind: 'modmail' })}>
+        <RailItem unread badge={modmail.unread} title="Nookara Moderator Chat" onClick={() => go({ kind: 'modmail' })}>
           <span className="vc-srv-ico"><ShieldCheck size={20} /></span>
         </RailItem>
       )}
@@ -463,7 +463,7 @@ export function VeloraConnNote({ className = '' }) {
   return (
     <div className={`vc-conn-note ${className}`} role="status">
       <i className="vc-gate-spin" />
-      <span><b>{conn === 'closed' ? 'Reconnecting to Velora...' : 'Connecting to Velora...'}</b>{conn === 'closed' && <RetryIn at={at} />}</span>
+      <span><b>{conn === 'closed' ? 'Reconnecting to Nookara...' : 'Connecting to Nookara...'}</b>{conn === 'closed' && <RetryIn at={at} />}</span>
       {conn === 'closed' && <button type="button" onClick={retryNow}>Retry now</button>}
     </div>
   );
@@ -502,7 +502,7 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
         {modmail.messages.length > 0 && (
           <button type="button" className={`vc-dm vc-dm-mod${keyOf(view) === 'mm:' ? ' on' : ''}${keyOf(view) !== 'mm:' && modmail.unread ? ' unread' : ''}`} onClick={() => go({ kind: 'modmail' })}>
             <span className="vc-av vc-sys-av" style={{ width: 32, height: 32 }}><ShieldCheck size={18} /></span>
-            <span className="vc-dm-txt"><b>Velora Moderator Chat</b><small>From Velora's admins</small></span>
+            <span className="vc-dm-txt"><b>Nookara Moderator Chat</b><small>From Nookara's admins</small></span>
             {modmail.unread > 0 && keyOf(view) !== 'mm:' && <span className="vc-count">{modmail.unread}</span>}
           </button>
         )}
@@ -517,7 +517,7 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
               onContextMenu={e => (sys ? openMenu(e, [{ label: 'Open', onClick: () => go({ kind: 'dm', username: c.username }) }]) : userMenu(e, c.username, { onProfile: () => dispatchEvent(new CustomEvent('vc-open-big', { detail: { username: c.username } })) }))}
               onClick={() => go({ kind: 'dm', username: c.username })}>
               {sys ? <span className="vc-av vc-sys-av" style={{ width: 32, height: 32 }}><Logo size={18} /></span> : <Avatar user={{ username: c.username, pfp: c.pfp || people[c.username]?.pfp }} size={32} status={p?.status || 'offline'} />}
-              <span className="vc-dm-txt"><b>{sys ? 'Velora' : c.username}</b>{!sys && subtitle(p) && <small>{subtitle(p)}</small>}</span>
+              <span className="vc-dm-txt"><b>{sys ? 'Nookara' : c.username}</b>{!sys && subtitle(p) && <small>{subtitle(p)}</small>}</span>
               {!on && <TypingMark names={typersOf(typing, k)} people={people} />}
               {(c.unread > 0) && !on && <span className="vc-count">{c.unread > 99 ? '99+' : c.unread}</span>}
             </button>
@@ -659,7 +659,7 @@ export function OutdatedNote() {
     <div className="vc-quota-note near" role="status">
       <button type="button" className="vc-quota-x" aria-label="Dismiss" onClick={dismiss}><X size={14} /></button>
       <b><CircleArrowUp size={14} /> Server update available</b>
-      <span>This server is running an old version ({mine}). Latest is {latest}. {inst.managed ? 'Velora updates it automatically within about 10 minutes.' : 'Update the server software to get the latest.'}</span>
+      <span>This server is running an old version ({mine}). Latest is {latest}. {inst.managed ? 'Nookara updates it automatically within about 10 minutes.' : 'Update the server software to get the latest.'}</span>
       <button type="button" className="btn btn-surface btn-sm" onClick={open}>Server info</button>
     </div>
   );
@@ -688,7 +688,7 @@ export function UserPanel({ onSettings, onEditProfile }) {
     return (
       <div className="vc-me">
         {u ? <div className="vc-me-who"><Avatar user={u} size={36} /><span className="vc-me-txt"><b>{u.username}</b><small>{here.host}</small></span></div>
-          : <button type="button" className="vc-me-who" onClick={() => startSignIn()} title="Sign in with Velora"><span className="vc-av vc-sys-av" style={{ width: 36, height: 36 }}><UserRound size={19} /></span><span className="vc-me-txt"><b>Not signed in</b><small>Sign in with Velora</small></span></button>}
+          : <button type="button" className="vc-me-who" onClick={() => startSignIn()} title="Sign in with Nookara"><span className="vc-av vc-sys-av" style={{ width: 36, height: 36 }}><UserRound size={19} /></span><span className="vc-me-txt"><b>Not signed in</b><small>Sign in with Nookara</small></span></button>}
         <QuickVoiceBtns />
         <button type="button" className="vc-ico-btn" onClick={onSettings} title="Settings"><Settings size={17} /></button>
       </div>

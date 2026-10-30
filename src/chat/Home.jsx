@@ -51,7 +51,7 @@ export default function Home({ onUser }) {
             <form className="vc-add vl-rise" onSubmit={sendReq}>
               <h3>Add a friend</h3>
               <p className="vc-dialog-sub">Friends can see your friends-only profile, and you'll see what they're playing.</p>
-              <div className="vc-row"><input className="form-input" placeholder="Their Velora username" value={add} onChange={e => setAdd(e.target.value)} /><button className="btn btn-primary" disabled={!add.trim()}>Send request</button></div>
+              <div className="vc-row"><input className="form-input" placeholder="Their Nookara username" value={add} onChange={e => setAdd(e.target.value)} /><button className="btn btn-primary" disabled={!add.trim()}>Send request</button></div>
               {msg && <div className={`inline-msg ${msg.ok ? 'success' : 'error'}`}>{msg.text}</div>}
             </form>
           )}
@@ -103,7 +103,7 @@ export default function Home({ onUser }) {
       </div>
       <aside className="vc-active">
         <h3>Active now</h3>
-        {!active.length && <div className="vc-active-empty"><b>It's quiet for now...</b><p>When friends start playing something - a Hyperfocus game, or anything that shares its activity with Velora - it'll show here.</p></div>}
+        {!active.length && <div className="vc-active-empty"><b>It's quiet for now...</b><p>When friends start playing something - a Hyperfocus game, or anything that shares its activity with Nookara - it'll show here.</p></div>}
         {active.map((f, i) => (
           <button type="button" key={f.friend_username} className="vc-active-card vl-rise" style={{ '--i': i }} onClick={e => onUser(f.friend_username, e.currentTarget, 'left')}>
             <div className="vc-active-who"><Avatar user={{ username: f.friend_username, pfp: f.pfp_url }} size={32} status={presence[f.friend_username]?.status} /><b>{f.friend_username}</b></div>

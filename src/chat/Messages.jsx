@@ -372,13 +372,13 @@ function useDistrust(m) {
 function SigBadge({ m, inStack }) {
   const v = useChat(s => (m.signature ? s.sigs[sigId(m)] : null));
   if (v === 'bad') return <span className="vc-sig bad" title="Signature doesn't match"><TriangleAlert size={14} /></span>;
-  if (!inStack && isUnsigned(m)) return <span className="vc-sig unsigned" title={`Sent unsigned - Velora can't confirm this came from ${m.author.username}`}><Shield size={14} /></span>;
+  if (!inStack && isUnsigned(m)) return <span className="vc-sig unsigned" title={`Sent unsigned - Nookara can't confirm this came from ${m.author.username}`}><Shield size={14} /></span>;
   return null;
 }
 // Message info (Manage messages only): the real author behind a message - most of all an alias, marked or not
 function messageInfo(m) {
   const a = aliasOf(m), au = m.author || {};
-  const kind = au.webhook ? (au.bridge ? `bridge (${au.bridge})` : 'webhook') : au.bot ? 'bot' : au.kind === 'local' ? 'local account' : au.kind === 'velora' ? 'Velora account' : au.kind || 'account';
+  const kind = au.webhook ? (au.bridge ? `bridge (${au.bridge})` : 'webhook') : au.bot ? 'bot' : au.kind === 'local' ? 'local account' : au.kind === 'velora' ? 'Nookara account' : au.kind || 'account';
   const rows = [
     ['Sent by', `${au.username || 'Unknown'} (${kind})`],
     a && ['Shown as', `${a.name}${a.unmarked ? ' (unmarked alias: looks like a normal message)' : ' (alias, with the mask)'}`],
@@ -504,7 +504,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
           {replyAuthor ? <Avatar user={replyBlocked ? blockedFace(replyAuthor) : aliasFace(replyAlias, replyAuthor)} size={16} /> : null}
           {replyBlocked
             ? <><b className="vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={11} /></b><span className="vc-reply-text vc-blocked-quote">Message from someone you blocked</span></>
-            : <><b style={replyAuthor?.color ? { color: replyAuthor.color } : undefined}>{replyAlias ? replyAlias.name : replyAuthor?.username || 'Velora'}</b>
+            : <><b style={replyAuthor?.color ? { color: replyAuthor.color } : undefined}>{replyAlias ? replyAlias.name : replyAuthor?.username || 'Nookara'}</b>
               {replyAlias && <AliasMark alias={replyAlias} by={replyAuthor} size={12} />}
               <ReplyText body={m.reply.body} ctx={ctx} /></>}
         </div>
@@ -1069,10 +1069,10 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
     openMenu({ clientX: r.left, clientY: Math.max(6, r.top - 150), preventDefault() {}, stopPropagation() {} }, [
       ...(onVelora ? [ // DMs / group chats: pick where these files go (just this once - the remembered choice stays)
         { label: 'Upload to temporary storage', hint: `Free, deleted after a while unopened - up to ${lim.server_mb} MB${mine === 'temp' ? ' (your default)' : ''}`, icon: Clock, onClick: () => pickOnce('temp') },
-        { label: 'Upload to account storage', hint: `Kept on your Velora account - up to ${lim.saved_mb} MB${mine === 'account' ? ' (your default)' : ''}`, icon: CloudUpload, onClick: () => pickOnce('account') },
+        { label: 'Upload to account storage', hint: `Kept on your Nookara account - up to ${lim.saved_mb} MB${mine === 'account' ? ' (your default)' : ''}`, icon: CloudUpload, onClick: () => pickOnce('account') },
       ] : [
         { label: 'Upload to server', hint: `Sent here - up to ${uploadCap()} MB`, icon: Upload, onClick: () => file.current?.click() },
-        { label: 'Upload to my Velora account', hint: `Kept in Saved Media and attached - up to ${lim.saved_mb} MB`, icon: CloudUpload, onClick: () => saveFile.current?.click() },
+        { label: 'Upload to my Nookara account', hint: `Kept in Saved Media and attached - up to ${lim.saved_mb} MB`, icon: CloudUpload, onClick: () => saveFile.current?.click() },
       ]),
       { label: <span className="vc-ctx-newlabel">Attach a Glint clip <NewTag /></span>, hint: 'One of your game clips', icon: GlintMark,
         onClick: async () => { const list = liveClips(await loadMyClips()); setEmoji(false); if (list.length) setPicker('clips'); else setGlintIntro(true); } },
@@ -1095,7 +1095,7 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
         , document.body)}
       {replyTo && (
         <div className="vc-replybar">
-          <span className="vc-replybar-main">Replying to <b>{aliasOf(replyTo)?.name || replyTo.author?.username || 'Velora'}</b>{replyTo.body ? <ReplyText body={replyTo.body} ctx={barCtx} /> : null}</span>
+          <span className="vc-replybar-main">Replying to <b>{aliasOf(replyTo)?.name || replyTo.author?.username || 'Nookara'}</b>{replyTo.body ? <ReplyText body={replyTo.body} ctx={barCtx} /> : null}</span>
           <button type="button" onClick={() => setReplyTo(null)} title="Cancel reply"><X size={14} /></button>
         </div>
       )}
@@ -1131,7 +1131,7 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
                 {spoiler && <span className="vc-patt-spoiler-tag">Spoiler</span>}
                 {a.local && a.dest && (
                   <button type="button" className={`vc-patt-dest${picked ? ' picked' : ''}${attPop?.id === a.id ? ' open' : ''}`} aria-haspopup="dialog" aria-expanded={attPop?.id === a.id}
-                    title={a.dest === 'account' ? 'Goes to your Velora account storage - click for options' : `Goes to Velora's temporary storage${picked ? ` (deleted after ${daysText(a.expiresDays)}, fixed)` : ''} - click for options`}
+                    title={a.dest === 'account' ? 'Goes to your Nookara account storage - click for options' : `Goes to Nookara's temporary storage${picked ? ` (deleted after ${daysText(a.expiresDays)}, fixed)` : ''} - click for options`}
                     onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setAttPop(p => (p?.id === a.id ? null : { id: a.id, rect: r })); }}>
                     {a.dest === 'account' ? <HardDrive size={12} /> : <Clock size={12} />}{picked && <span>{picked}</span>}
                   </button>

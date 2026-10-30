@@ -335,7 +335,7 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
             {!plain && <ManageFacts presence={presence} />}
             {plain && <LastOnlineFact member={member} />}
             {member?.joined_at && <div className="pe-fact"><b>Joined this server</b><span>{new Date(member.joined_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span></div>}
-            {!plain && p?.created_at && <div className="pe-fact"><b>Velora member since</b><span>{new Date(p.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span></div>}
+            {!plain && p?.created_at && <div className="pe-fact"><b>Nookara member since</b><span>{new Date(p.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span></div>}
           </>
         )}
         {!p && <div className="vc-skel" />}
@@ -511,7 +511,7 @@ export function ProfileModal({ username: shown, from, sid, who, onClose }) {
                     {p?.country_code && <div className="pe-fact"><b>Country</b><span className="pe-country"><img className="pe-flag" src={`/assets/flags/${p.country_code.toLowerCase()}.png`} alt="" onError={e => { e.currentTarget.style.display = 'none'; }} /> {regionName(p.country_code)}</span></div>}
                     {localTime && <div className="pe-fact"><b>Local time</b><span>{localTime}</span></div>}
                     <ManageFacts presence={presence} />
-                    {p?.created_at && <div className="pe-fact"><b>Velora member since</b><span>{new Date(p.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</span></div>}
+                    {p?.created_at && <div className="pe-fact"><b>Nookara member since</b><span>{new Date(p.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</span></div>}
                     {p?.website && <div className="pe-fact"><b>Website</b><span><a className="pe-link" href={/^https?:/i.test(p.website) ? p.website : `https://${p.website}`} target="_blank" rel="noopener noreferrer nofollow"><Globe size={13} /> {p.website.replace(/^https?:\/\/(www\.)?/i, '')}</a></span></div>}
                   </div>
                   {p?.connections?.length > 0 && (

@@ -71,9 +71,9 @@ function DesktopTitle() {
   const pfp = useChat(s => (view.kind === 'dm' && view.username !== 'System' ? s.people[view.username]?.pfp || s.dms.find(c => c.username === view.username)?.pfp : null));
   const group = useChat(s => (view.kind === 'group' ? s.groups.find(g => g.room === view.room)?.name : null));
   const text = view.kind === 'channel' || view.kind === 'server' ? server || ''
-    : view.kind === 'dm' ? (view.username === 'System' ? 'Velora' : `@${view.username}`)
+    : view.kind === 'dm' ? (view.username === 'System' ? 'Nookara' : `@${view.username}`)
       : view.kind === 'group' ? group || 'Group chat'
-        : view.kind === 'modmail' ? 'Velora Moderator Chat'
+        : view.kind === 'modmail' ? 'Nookara Moderator Chat'
           : view.kind === 'home' ? 'Friends' : '';
   const raw = view.kind === 'channel' || view.kind === 'server' ? srvIcon : view.kind === 'dm' ? (view.username === 'System' ? '/assets/bonfire/logo-256.png' : pfp) : view.kind === 'modmail' ? '/assets/bonfire/logo-256.png' : null;
   const icon = raw ? new URL(raw, location.origin).href : '';
@@ -137,7 +137,7 @@ function NotificationBanner() {
   return (
     <div className="vc-notify-banner" role="status">
       <Bell size={18} />
-      <span><b>{desktopUpdate ? 'Enable desktop notifications' : unsupported ? 'Notifications unavailable' : blocked ? 'Notifications are blocked' : desktop ? 'Enable desktop notifications' : 'Turn on notifications?'}</b> {desktopUpdate ? 'Update Ember, then restart it to receive DMs and incoming-call actions.' : unsupported ? (desktop ? `Enable ${macDesktop ? 'macOS' : 'Windows'} notifications for Ember, then restart the app.` : "This browser can't receive background push notifications.") : blocked ? 'Allow notifications for Velora in your browser settings, then reload Ember.' : desktop ? 'Get DM reply boxes and incoming-call actions while Ember is inactive.' : 'Get DMs, calls and mentions even when Ember is closed.'}</span>
+      <span><b>{desktopUpdate ? 'Enable desktop notifications' : unsupported ? 'Notifications unavailable' : blocked ? 'Notifications are blocked' : desktop ? 'Enable desktop notifications' : 'Turn on notifications?'}</b> {desktopUpdate ? 'Update Ember, then restart it to receive DMs and incoming-call actions.' : unsupported ? (desktop ? `Enable ${macDesktop ? 'macOS' : 'Windows'} notifications for Ember, then restart the app.` : "This browser can't receive background push notifications.") : blocked ? 'Allow notifications for Nookara in your browser settings, then reload Ember.' : desktop ? 'Get DM reply boxes and incoming-call actions while Ember is inactive.' : 'Get DMs, calls and mentions even when Ember is closed.'}</span>
       {error && <small>{error}</small>}
       {!blocked && !unsupported && <button type="button" onClick={() => desktopUpdate ? window.bonfireDesktop?.checkForUpdates?.() : turnOn()} disabled={busy}>{desktopUpdate ? 'Check for update' : busy ? 'Turning on…' : desktop ? 'Enable & test' : 'Turn on'}</button>}
       <button type="button" className="dismiss" title="Not now" onClick={() => { document.cookie = 'bonfire_notifications_dismissed=1; Max-Age=2592000; Path=/; SameSite=Lax'; setShow(false); }}><X size={15} /></button>
@@ -176,16 +176,16 @@ function LegacyReadOnlyBar() {
   const open = () => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'add-instance', url: srv.moved_to } }));
   async function keep() {
     setBusy('keep');
-    try { await apiFetch(`/chat/servers/${view.sid}/export-to-account`, { method: 'POST' }); toast('Saved to your Velora account - restore it from Create a server.', true); }
+    try { await apiFetch(`/chat/servers/${view.sid}/export-to-account`, { method: 'POST' }); toast('Saved to your Nookara account - restore it from Create a server.', true); }
     catch (e) { toast(errorText(e.message)); }
     setBusy('');
   }
   return (
     <div className="vc-sign-banner vc-legacy-bar" role="status">
       <Lock size={14} />
-      <span>{moved ? <>This server moved to <b>{moved}</b>. This copy is read-only.</> : <>Servers hosted inside Velora are read-only now.{owner ? ' Move it to an Ember server to keep going.' : ''}</>}</span>
+      <span>{moved ? <>This server moved to <b>{moved}</b>. This copy is read-only.</> : <>Servers hosted inside Nookara are read-only now.{owner ? ' Move it to an Ember server to keep going.' : ''}</>}</span>
       {moved && <button type="button" onClick={open}>Open {moved}</button>}
-      {owner && !moved && <button type="button" disabled={!!busy} onClick={keep}>{busy === 'keep' ? 'Saving...' : 'Save to my Velora account'}</button>}
+      {owner && !moved && <button type="button" disabled={!!busy} onClick={keep}>{busy === 'keep' ? 'Saving...' : 'Save to my Nookara account'}</button>}
       {owner && !moved && <ExportButton sid={view.sid} />}
     </div>
   );
@@ -199,7 +199,7 @@ function ReconnectBar() {
   return (
     <div className="vc-sign-banner vc-reconnect-bar" role="status">
       <i className="vc-gate-spin" />
-      <span>Reconnecting to Velora... <RetryIn at={at} /></span>
+      <span>Reconnecting to Nookara... <RetryIn at={at} /></span>
       <button type="button" onClick={retryNow}>Retry now</button>
     </div>
   );
@@ -378,8 +378,8 @@ function ChatPage() {
   useEffect(() => {
     if (!ready) return;
     const r = signin.current;
-    if (r) { if (r.ok) toast('Signed in with Velora.', true); else toast(SIGNIN_TEXT[r.error]); if (r.back?.add) setDialog({ kind: 'add-instance', url: r.back.add }); else if (r.back?.create) setDialog({ kind: 'create-server' }); }
-    try { if (sessionStorage.getItem('bonfire_notice')) { sessionStorage.removeItem('bonfire_notice'); toast('Your Velora sign-in ended - sign in again to get your messages back.'); } } catch { /* fine */ }
+    if (r) { if (r.ok) toast('Signed in with Nookara.', true); else toast(SIGNIN_TEXT[r.error]); if (r.back?.add) setDialog({ kind: 'add-instance', url: r.back.add }); else if (r.back?.create) setDialog({ kind: 'create-server' }); }
+    try { if (sessionStorage.getItem('bonfire_notice')) { sessionStorage.removeItem('bonfire_notice'); toast('Your Nookara sign-in ended - sign in again to get your messages back.'); } } catch { /* fine */ }
   }, [ready]);
 
   // where to start: the address, or where you were last time
@@ -480,9 +480,9 @@ function ChatPage() {
   const title = isServer
     ? { icon: <ChIcon size={34} />, big: `Welcome to #${channel?.name || ''}`, sub: channel?.topic || `This is the start of the #${channel?.name} channel.` }
     : modView
-      ? { icon: <ShieldCheck size={34} />, big: view.username ? `Moderator chat with ${view.username}` : 'Velora Moderator Chat', sub: view.username ? `They see these as "Velora Administrator" - never who sent them. Only Velora staff see the names.` : "Messages from Velora's admins. You can't reply here - if you need to answer, use velora.ikelene.net/support." }
+      ? { icon: <ShieldCheck size={34} />, big: view.username ? `Moderator chat with ${view.username}` : 'Nookara Moderator Chat', sub: view.username ? `They see these as "Nookara Administrator" - never who sent them. Only Nookara staff see the names.` : "Messages from Nookara's admins. You can't reply here - if you need to answer, use velora.ikelene.net/support." }
     : view.kind === 'dm'
-      ? (sysDM ? { icon: <AtSign size={34} />, big: 'Velora', sub: 'Notices about your account: credits, reports and more.' } : { icon: <AtSign size={34} />, big: view.username, sub: `This is the start of your conversation with ${view.username}.` })
+      ? (sysDM ? { icon: <AtSign size={34} />, big: 'Nookara', sub: 'Notices about your account: credits, reports and more.' } : { icon: <AtSign size={34} />, big: view.username, sub: `This is the start of your conversation with ${view.username}.` })
       : { icon: <UsersRound size={34} />, big: group?.name || 'Group chat', sub: 'This is the start of the group chat.' };
   const sideKey = view.kind === 'channel' ? view.sid : 'home';
 
@@ -541,8 +541,8 @@ function ChatPage() {
               <button type="button" className="vc-ico-btn vc-burger" onClick={openDrawer} title="Menu"><Menu size={19} /></button>
               <button type="button" className="vc-ico-btn vc-back" onClick={openDrawer} title="Back to your chats" aria-label="Back to your chats"><ChevronLeft size={22} /></button>
               {isServer && <><ChIcon size={20} className="vc-head-ico" /><b className="vc-head-name">{channel?.name || ''}</b>{(channel?.bridges || (channel?.bridged ? [channel.bridged] : [])).map(link => <span key={link.platform} className="vc-bridge-tag" title={`Bridged with #${link.name} in the linked ${link.platform === 'discord' ? 'Discord' : 'Fluxer'} community`}><PlatformIcon p={link.platform} size={14} /> #{link.name}</span>)}{channel?.type === 'logs' && channel.config?.mode === 'cloudlink' && <span className="vc-bridge-tag" title={`Bridged with CloudLink (${channel.config.url}${channel.config.room ? `, room ${channel.config.room}` : ''}) - messages go both ways. Type !online to see who's there.`}><PlatformIcon p="cloudlink" size={14} /> CloudLink</span>}{channel?.topic && <span className="vc-head-topic" title={channel.topic}>{channel.topic}</span>}</>}
-              {sysDM && <><b className="vc-head-name">Velora</b><span className="vc-head-topic">Notices about your account</span></>}
-              {modView && <><ShieldCheck size={20} className="vc-head-ico" /><b className="vc-head-name">{view.username ? `Moderator chat: ${view.username}` : 'Velora Moderator Chat'}</b><span className="vc-head-topic">{view.username ? 'You write as Velora Administrator' : 'From Velora\'s admins - read only'}</span></>}
+              {sysDM && <><b className="vc-head-name">Nookara</b><span className="vc-head-topic">Notices about your account</span></>}
+              {modView && <><ShieldCheck size={20} className="vc-head-ico" /><b className="vc-head-name">{view.username ? `Moderator chat: ${view.username}` : 'Nookara Moderator Chat'}</b><span className="vc-head-topic">{view.username ? 'You write as Nookara Administrator' : 'From Nookara\'s admins - read only'}</span></>}
               {view.kind === 'dm' && !sysDM && (
                 <>
                   <button type="button" className="vc-head-user" onClick={e => openMini(view.username, e.currentTarget)}>
@@ -563,7 +563,7 @@ function ChatPage() {
               )}
               {isServer && channel && (['text', 'logs', 'welcome', undefined].includes(channel.type) || (channel.type === 'game' && channel.config?.purpose === 'chat')) && <PinsButton channel={channel} sid={view.sid} />}
               {isServer && <button type="button" className={`vc-ico-btn${showMembers ? ' on' : ''}`} title={showMembers ? 'Hide members' : 'Show members'} onClick={() => setShowMembers(x => !x)}><Users size={19} /></button>}
-              {view.kind === 'dm' && !sysDM && staff && <button type="button" className="vc-ico-btn" title="Message them as Velora Administrator (Velora Moderator Chat)" onClick={() => go({ kind: 'modmail', username: view.username })}><ShieldCheck size={19} /></button>}
+              {view.kind === 'dm' && !sysDM && staff && <button type="button" className="vc-ico-btn" title="Message them as Nookara Administrator (Nookara Moderator Chat)" onClick={() => go({ kind: 'modmail', username: view.username })}><ShieldCheck size={19} /></button>}
               {view.kind === 'dm' && !sysDM && <DmCallButton username={view.username} />}
               {view.kind !== 'channel' && <button type="button" className={`vc-ico-btn${showMembers ? ' on' : ''}`} title="Side panel" onClick={() => setShowMembers(x => !x)}><PanelRight size={19} /></button>}
             </header>
@@ -581,9 +581,9 @@ function ChatPage() {
                 {channel?.type === 'game' && <GameChatStrip channel={channel} />}
                 <MessageList view={view} onUser={openMini} onReply={setReplyTo} canPost={canPost} canMod={canMod} channels={detail?.channels} title={title} />
                 {channel?.type === 'game' && <GameOfflineNote channel={channel} />}
-                <Composer view={view} locked={(isServer && !canPost) || sysDM || (modView && !view.username)} lockedText={sysDM ? "These are Velora's own notices - there's no one to reply to here." : modView ? "This is a message from Velora's admins - you can't reply here." : detail?.server?.read_only ? 'This server is read-only.' : lockedTextFor(channel)}
+                <Composer view={view} locked={(isServer && !canPost) || sysDM || (modView && !view.username)} lockedText={sysDM ? "These are Nookara's own notices - there's no one to reply to here." : modView ? "This is a message from Nookara's admins - you can't reply here." : detail?.server?.read_only ? 'This server is read-only.' : lockedTextFor(channel)}
  replyTo={replyTo} setReplyTo={setReplyTo}
-                  placeholder={modView ? `Message ${view.username} as Velora Administrator` : isServer ? `Message #${channel?.name || ''}${channel?.type === 'game' ? ' (also shows in Minecraft)' : ''}` : view.kind === 'dm' ? `Message @${view.username}` : `Message ${group?.name || 'the group'}`} /></>}
+                  placeholder={modView ? `Message ${view.username} as Nookara Administrator` : isServer ? `Message #${channel?.name || ''}${channel?.type === 'game' ? ' (also shows in Minecraft)' : ''}` : view.kind === 'dm' ? `Message @${view.username}` : `Message ${group?.name || 'the group'}`} /></>}
               </div>
               {search && (
                 <aside className="vc-results">

@@ -21,7 +21,7 @@ function forwardText(m, from) {
   else if (from.kind === 'group') where = ` in ${st.groups.find(g => g.room === from.room)?.name || 'a group chat'}`;
   const body = (from.kind === 'channel' ? decodeRoleMentions(m.body || '', from.sid) : String(m.body || ''))
     .replace(/@(everyone|here)\b/g, '@​$1');
-  return `-# Forwarded from @${m.author?.username || 'Velora'}${where}\n${body}`.trim();
+  return `-# Forwarded from @${m.author?.username || 'Nookara'}${where}\n${body}`.trim();
 }
 export function ForwardDialog({ message, from, onClose }) {
   const dms = useChat(s => s.dms);
@@ -58,7 +58,7 @@ export function ForwardDialog({ message, from, onClose }) {
       {close => (
         <>
           <div className="vc-fwd-preview">
-            <span className="vc-fwd-from"><Forward size={13} /> {message.author?.username || 'Velora'}</span>
+            <span className="vc-fwd-from"><Forward size={13} /> {message.author?.username || 'Nookara'}</span>
             <FwdBody body={message.body || (message.attachments?.length ? '(attachment)' : '')} />
           </div>
           <input className="form-input" maxLength={2000} placeholder="Add a message (optional)" value={note} onChange={e => setNote(e.target.value)} />

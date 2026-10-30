@@ -115,7 +115,7 @@ function YouTubeEmbed({ e, inst }) {
       const a = document.createElement('a');
       a.href = d.download; a.download = `${e.title || e.id}.mp4`;
       document.body.appendChild(a); a.click(); a.remove();
-    } catch (er) { toast(er.message === 'pro_only' ? 'Downloading is a Velora Pro perk.' : YT_ERR[er.message] || errorText(er.message)); }
+    } catch (er) { toast(er.message === 'pro_only' ? 'Downloading is a Nookara Pro perk.' : YT_ERR[er.message] || errorText(er.message)); }
     setDl(null);
   }
   return (
@@ -125,11 +125,11 @@ function YouTubeEmbed({ e, inst }) {
           <span className="vc-yt-channel">{e.channel || 'YouTube'}</span>
           <a className="vc-yt-title" href={e.url} target="_blank" rel="noopener noreferrer nofollow">{e.title || 'YouTube video'}</a>
         </div>
-        {via === 'velora' && <button type="button" className={`vc-yt-dl${sv === 'done' ? ' done' : ''}`} title={sv === 'done' ? 'Saved to Saved Media' : 'Save to Saved Media (a copy in your Velora storage)'} onClick={saveToMedia} disabled={!!sv}>
+        {via === 'velora' && <button type="button" className={`vc-yt-dl${sv === 'done' ? ' done' : ''}`} title={sv === 'done' ? 'Saved to Saved Media' : 'Save to Saved Media (a copy in your Nookara storage)'} onClick={saveToMedia} disabled={!!sv}>
           {sv === 'done' ? <BookmarkCheck size={16} /> : sv ? <><Loader2 size={15} className="vc-spin" />{sv.progress ? ` ${sv.progress}%` : ''}</> : <BookmarkPlus size={16} />}
         </button>}
         {(onInst || (via === 'velora' && isPro())) && (
-          <button type="button" className="vc-yt-dl" title={onInst ? 'Download' : 'Download (Velora Pro)'} onClick={download} disabled={!!dl}>
+          <button type="button" className="vc-yt-dl" title={onInst ? 'Download' : 'Download (Nookara Pro)'} onClick={download} disabled={!!dl}>
             {dl ? <><Loader2 size={15} className="vc-spin" />{dl.progress ? ` ${dl.progress}%` : ''}</> : <Download size={16} />}
           </button>
         )}
@@ -146,7 +146,7 @@ function YouTubeEmbed({ e, inst }) {
               <div className="vc-yt-ask">
                 <b>How do you want to watch?</b>
                 <button type="button" className="vc-yt-opt good" onClick={() => choose('velora')}>
-                  <ShieldCheck size={18} /><span><b>{onInst ? 'Through this server' : 'Through Velora'}</b><small>{onInst ? 'This server' : 'Velora'} streams it for you - no ads, no trackers. Can take a moment to start.</small></span>
+                  <ShieldCheck size={18} /><span><b>{onInst ? 'Through this server' : 'Through Nookara'}</b><small>{onInst ? 'This server' : 'Nookara'} streams it for you - no ads, no trackers. Can take a moment to start.</small></span>
                 </button>
                 <button type="button" className="vc-yt-opt" onClick={() => choose('youtube')}>
                   <Eye size={18} /><span><b>YouTube's player</b><small>Starts straight away, but YouTube can track you and show ads.</small></span>
@@ -176,7 +176,7 @@ function VeloraPlayer({ id, via }) {
     return (
       <div className="vc-yt-wait">
         <Loader2 size={26} className="vc-spin" />
-        <b>{via && via !== 'velora' ? 'The server' : 'Velora'} is getting the video ready</b>
+        <b>{via && via !== 'velora' ? 'The server' : 'Nookara'} is getting the video ready</b>
         <span>{p?.status === 'queued' ? 'Waiting for a free slot...' : `${p?.progress || 0}%${p?.part > 1 ? ' (audio)' : ''}`}</span>
         <i className="vc-yt-bar"><i style={{ width: `${p?.progress || 0}%` }} /></i>
       </div>
@@ -312,7 +312,7 @@ function ProfileEmbed({ e }) {
       {e.banner && <span className="vc-profile-banner" style={{ backgroundImage: `url(${e.banner})` }} />}
       <span className="vc-profile-row">
         {e.pfp ? <img src={e.pfp} alt="" /> : <span className="vc-profile-noav" />}
-        <span><b style={e.color ? { color: e.color } : undefined}>{e.username}</b><small>{e.bio || 'Velora profile'}</small></span>
+        <span><b style={e.color ? { color: e.color } : undefined}>{e.username}</b><small>{e.bio || 'Nookara profile'}</small></span>
         <ExternalLink size={14} />
       </span>
     </a>
@@ -326,7 +326,7 @@ function PaymentEmbed({ e, url }) {
   const credits = n => `${Number(n).toLocaleString()} credit${Number(n) === 1 ? '' : 's'}`;
   const done = e.status && e.status !== 'pending';
   let title, sub, ico;
-  if (e.kind === 'user') { title = `Pay ${e.username}`; sub = 'Send Velora credits to this person.'; ico = e.pfp ? <img src={e.pfp} alt="" /> : <Coins size={20} />; }
+  if (e.kind === 'user') { title = `Pay ${e.username}`; sub = 'Send Nookara credits to this person.'; ico = e.pfp ? <img src={e.pfp} alt="" /> : <Coins size={20} />; }
   else if (e.kind === 'bot') { title = `${credits(e.amount)} to ${e.bot}`; sub = e.description || 'Payment request from a bot.'; ico = e.pfp ? <img src={e.pfp} alt="" /> : <Coins size={20} />; }
   else { title = `${credits(e.amount)} to ${e.to}`; sub = `Requested by ${e.project}.`; ico = <Coins size={20} />; }
   return (
