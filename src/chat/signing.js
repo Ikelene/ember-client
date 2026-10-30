@@ -52,6 +52,11 @@ export async function setupSigning() {
   } catch (e) { patchState({ signing: { state: 'error', error: e.message } }); }
 }
 
+// The signed "iss" is the account issuer the instances check against (their velora_url), not the page's address: it stays
+// https://velora.ikelene.net after the move to nookara.cc / ember.nookara.cc. Checks also accept the new hosts, for messages
+// signed on ember.nookara.cc before this was pinned.
+const SIG_ISS = 'https://velora.ikelene.net';
+const SIG_ISS_ALL = [...new Set([SIG_ISS, location.origin, 'https://nookara.cc', 'https://ember.nookara.cc'])];
 // -> { kid, sig, ts, nonce } for a message about to be sent / edited
 export async function signMessage(fields) {
   if (!device) throw new Error('no_key');
@@ -59,7 +64,7 @@ export async function signMessage(fields) {
   const go = async () => {
     const ts = Date.now();
     const nonce = b64u(crypto.getRandomValues(new Uint8Array(16)));
-    const payload = payloadOf({ iss: location.origin, ...fields, ts, nonce });
+    const payload = payloadOf({ iss: SIG_ISS, ...fields, ts, nonce });
     const sig = await crypto.subtle.sign({ name: 'Ed25519' }, device.priv, bytesOf(payload));
     return { kid: device.kid, sig: b64u(sig), ts, nonce };
   };
@@ -93,10 +98,11 @@ export async function checkMessage(m) {
     const vid = m.author.velora_id;
     if (!vid || String(key.user_id) !== String(vid)) return 'bad';
     if (key.revoked_at != null && Number(key.revoked_at) < Number(sig.ts)) return 'bad';
-    const payload = receivedPayload(m, location.origin);
     const pub = await importKey(key.public_key);
-    const ok = await crypto.subtle.verify({ name: 'Ed25519' }, pub, unb64u(sig.sig), bytesOf(payload));
-    return ok ? 'ok' : 'bad';
+    for (const iss of SIG_ISS_ALL) {
+      if (await crypto.subtle.verify({ name: 'Ed25519' }, pub, unb64u(sig.sig), bytesOf(receivedPayload(m, iss)))) return 'ok';
+    }
+    return 'bad';
   } catch (e) {
     if (e?.name === 'NotSupportedError') return null;
     return e?.message === 'key_lookup' || e instanceof TypeError ? null : 'bad';
