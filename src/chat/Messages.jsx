@@ -51,7 +51,7 @@ import { renderBody, timeOf, stampOf, dayOf } from './text.jsx';
 import { embedLabel } from './inviteLink.js';
 import { Avatar, BlockedMark } from './Profile.jsx';
 import { messageMenu, userMenu, openMenu } from './Menu.jsx';
-import { mentionsMe as isMention, useFace, wantVeloraFaces, useBlocked, blockedFace, isBlockedName, BLOCKED_NAME } from './store.js';
+import { mentionsMe as isMention, useFace, wantVeloraFaces, useBlocked, blockedFace, isBlockedName, faceOf, BLOCKED_NAME } from './store.js';
 import { useNameStyle, colorFrom, NameDecor, P, has } from './roles.jsx';
 import { suggestQuery, useSuggestItems, MentionPicker, encodeRoleMentions, decodeRoleMentions } from './Mentions.jsx';
 import { serialize, fill, caretToEnd, caretText, replaceBeforeCaret, insertAt, resolveWord, markdownShortcut, styleMarkdown } from './richInput.js';
@@ -639,7 +639,14 @@ export function Typing({ view }) {
   const show = useChat(s => s.settings.show_typing);
   const t = useChat(s => (show ? s.typing[keyOf(view)] : null));
   const people = useChat(s => s.people);
+  const members = useChat(s => (view.kind === 'channel' ? s.members[view.sid] : null));
+  const faces = useChat(s => s.veloraFaces);
   const now = Date.now();
+  // the picture comes from the server's member list first (bots are members there, not in `people`), then anyone I've seen
+  const pfpOf = n => {
+    const m = members?.find(x => x.username === n);
+    return (m ? faceOf(m, { veloraFaces: faces })?.pfp : null) || people[n]?.pfp || null;
+  };
   const names = Object.entries(t || {}).filter(([, until]) => until > now).map(([n]) => n);
   // in a server, somebody I blocked types as "Blocked User" with the default picture
   const blockedNames = useChat(s => (view.kind === 'channel' ? names.filter(n => isBlockedName(view.sid, n, s)).join('\n') : ''));
@@ -647,7 +654,7 @@ export function Typing({ view }) {
   const who = n => (isB(n) ? <b className="vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={11} /></b> : <b>{n}</b>);
   return (
     <div className={`vc-typing${names.length ? ' on' : ''}`} aria-live="polite">
-      {names.length > 0 && <span className="vc-ch-typing-avs">{names.slice(0, 3).map(u => <Avatar key={u} user={isB(u) ? { username: BLOCKED_NAME, pfp: null } : { username: u, pfp: people[u]?.pfp }} size={18} />)}</span>}
+      {names.length > 0 && <span className="vc-ch-typing-avs">{names.slice(0, 3).map(u => <Avatar key={u} user={isB(u) ? { username: BLOCKED_NAME, pfp: null } : { username: u, pfp: pfpOf(u) }} size={18} />)}</span>}
       {names.length > 0 && <span className="vc-dots"><i /><i /><i /></span>}
       {names.length === 1 && <span>{who(names[0])} is typing...</span>}
       {names.length === 2 && <span>{who(names[0])} and {who(names[1])} are typing...</span>}
