@@ -1121,20 +1121,58 @@ export function answerUploadAsk(dest, remember) {
   if (dest && remember) setUploadDest(dest);
   a.resolve(dest || null);
 }
-// a temporary-storage link: { expires_in (seconds), ttl_days, ... }, or 'gone' when it expired / was deleted, or null
-// when that couldn't be found out. Asked once per file per page load (it doesn't count as opening the file).
+// a temporary-storage link: { expires_in (seconds), ttl_days, at (when we asked) }, or 'gone' when it expired / was deleted,
+// or null when that couldn't be found out. /t/info doesn't count as opening the file. Answers are kept 10 minutes (a 'gone'
+// forever), asked at most 4 at a time, and the same file in many messages is one request.
 export { TEMP_LINK };
-const tempInfos = new Map();
+const TEMP_INFO_MS = 10 * 60 * 1000;
+const tempInfos = new Map(); // id -> { p: Promise, at: when it was asked, v: the answer once there is one }
+const tempWaiting = [];
+let tempBusy = 0;
+const tempSubs = new Set();
+const tempPump = () => {
+  while (tempBusy < 4 && tempWaiting.length) { tempBusy++; tempWaiting.shift()(); }
+};
+const tempAsk = id => new Promise(resolve => {
+  tempWaiting.push(() => {
+    const at = Date.now();
+    fetch(`/t/info/${id}`, { credentials: 'omit', cache: 'no-store' })
+      .then(r => (r.status === 404 ? 'gone' : r.ok ? r.json().then(d => ({ ...d, at })) : null))
+      .catch(() => null)
+      .then(v => { tempBusy--; tempPump(); resolve(v); });
+  });
+  tempPump();
+});
+function tempLoad(id) {
+  const prev = tempInfos.get(id);
+  const e = { at: Date.now(), v: prev?.v }; // an older answer stays on screen while the new one is on its way
+  e.p = tempAsk(id).then(v => {
+    if (v === null) { if (tempInfos.get(id) === e) { if (prev?.v !== undefined) tempInfos.set(id, prev); else tempInfos.delete(id); } return prev?.v ?? null; }
+    e.v = v;
+    tempSubs.forEach(f => f(id));
+    return v;
+  });
+  tempInfos.set(id, e);
+  return e;
+}
 export function tempFileInfo(url) {
   const id = tempId(url);
   if (!id) return Promise.resolve(null);
-  if (!tempInfos.has(id)) {
-    tempInfos.set(id, fetch(`/t/info/${id}`, { credentials: 'omit' })
-      .then(r => (r.status === 404 ? 'gone' : r.ok ? r.json().then(d => ({ ...d, at: Date.now() })) : null))
-      .catch(() => null)
-      .then(v => { if (v === null) tempInfos.delete(id); return v; }));
-  }
-  return tempInfos.get(id);
+  const e = tempInfos.get(id);
+  if (e && (e.v === 'gone' || Date.now() - e.at < TEMP_INFO_MS)) return e.p;
+  return tempLoad(id).p;
+}
+// the answer we already have for a link (undefined = not asked / still asking), without asking
+export const tempFileInfoNow = url => { const e = tempInfos.get(tempId(url)); return e && (e.v === 'gone' || Date.now() - e.at < TEMP_INFO_MS) ? e.v : undefined; };
+export const onTempInfo = fn => { tempSubs.add(fn); return () => tempSubs.delete(fn); };
+// Opening a temporary file restarts its clock on Velora, so what we kept is stale: ask again a moment after the picture / video
+// loaded (Velora writes the reset while it sends the file, and only once per file per 10 minutes - so this shows what's really
+// stored, which can still be the older date if the reset was skipped).
+const tempRefreshing = new Map();
+export function refreshTempInfo(url, delay = 1500) {
+  const id = tempId(url);
+  if (!id || tempRefreshing.has(id) || tempInfos.get(id)?.v === 'gone') return;
+  tempRefreshing.set(id, setTimeout(() => { tempRefreshing.delete(id); if (tempInfos.get(id)?.v !== 'gone') tempLoad(id); }, delay));
 }
 async function prepareAttachments(v, attachments) {
   return prepareInstanceAttachments(attachments, instOf(v.sid), location.origin, a =>

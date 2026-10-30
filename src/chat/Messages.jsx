@@ -26,6 +26,8 @@ import GlintIntro from './GlintIntro.jsx';
 import { GlintMark, NewTag, loadMyClips, liveClips } from './glint.jsx';
 import EmojiPicker, { loadEmojiData } from './EmojiPicker.jsx';
 import { TriangleAlert, Shield, Clock } from 'lucide-react';
+import { expiryAt, expiryLabel } from './temp-expiry.js';
+import { tempId } from './upload-dest.js';
 import { BookmarkPlus, Smile, File as FileIcon, FileArchive, FileCode, FileText, Download, Coins, MessageSquareQuote } from 'lucide-react';
 
 // a "GIF" picture-frame icon (drawn, not text) for the GIF picker button
@@ -40,7 +42,7 @@ function GifIcon() {
   );
 }
 import { loadEmojis, loadMembers, loadCommands, clearStatusReply, useTimedOut, untilText, dismissEphemeral } from './store.js';
-import { takeJump, fileKind, uploadMedia, saveToMedia, isMineMsg, loadUploadLimits, getUploadLimits, chooseUploadDest, rememberedUploadDest, tempFileInfo, TEMP_LINK } from './store.js';
+import { takeJump, fileKind, uploadMedia, saveToMedia, isMineMsg, loadUploadLimits, getUploadLimits, chooseUploadDest, rememberedUploadDest, tempFileInfo, tempFileInfoNow, onTempInfo, refreshTempInfo, TEMP_LINK } from './store.js';
 import { useStarboardFor, starredByMe, STAR } from './Starboard.jsx';
 import { CALL_LINE, callLineText } from './callText.js';
 import { setReaction } from './Reactions.jsx';
@@ -99,27 +101,42 @@ const KIND_OF = ext => (/^(zip|rar|7z|tar|gz|xz|bz2)$/.test(ext) ? 'Archive' : /
   : /^(js|ts|jsx|tsx|py|json|html|css|c|cpp|cs|java|lua|sh|bat|cmd|ps1)$/.test(ext) ? 'Code' : 'File');
 // a file in Velora's temporary storage: { left: 'N days' } while it's there, 'gone' once it expired, null = don't know (yet)
 const leftText = s => (s < 3600 ? 'under an hour' : s < 86400 ? `${Math.round(s / 3600)} hours` : `${Math.round(s / 86400)} days`);
-export function useTempFile(url) {
-  const temp = TEMP_LINK.test(String(url || ''));
-  const [info, setInfo] = useState(null);
+// re-renders when the answers for these temporary-storage links arrive or change; `enabled` = start asking (a message scrolled into view)
+function useTempTick(urls, enabled) {
+  const [, bump] = useState(0);
+  const key = urls.join('\n');
   useEffect(() => {
-    if (!temp) return undefined;
-    let live = true;
-    tempFileInfo(url).then(v => { if (live) setInfo(v); });
-    return () => { live = false; };
-  }, [url, temp]);
+    const ids = new Set(urls.map(tempId).filter(Boolean));
+    if (!ids.size || !enabled) return undefined;
+    const off = onTempInfo(id => { if (ids.has(id)) bump(n => n + 1); });
+    urls.forEach(u => tempFileInfo(u));
+    return off;
+  }, [key, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+export function useTempFile(url, enabled = true) {
+  const temp = TEMP_LINK.test(String(url || ''));
+  useTempTick(temp ? [url] : [], enabled);
+  const info = temp ? tempFileInfoNow(url) : null;
   if (!temp || !info) return null;
   if (info === 'gone') return 'gone';
   return { left: leftText(Math.max(0, info.expires_in - (Date.now() - info.at) / 1000)), ttl: info.ttl_days };
 }
+// "Expires Nov 29, 2026" for the temporary files of one message (null until all answers are in, and when none is left)
+function useExpiryLabel(urls, enabled) {
+  useTempTick(urls, enabled);
+  if (!urls.length || !enabled) return null;
+  const infos = urls.map(tempFileInfoNow);
+  if (infos.some(i => i === undefined)) return null;
+  return expiryLabel(infos.map(i => expiryAt(i)), { now: Date.now(), locale: navigator.language });
+}
 export function ExpiredFile({ name }) {
   return <div className="vc-filecard vc-att-expired"><FileIcon size={18} /><span><b>{shownName(name) || 'File'}</b><small>This file expired. Temporary files are deleted after a while nobody opens them.</small></span></div>;
 }
-export function FileCard({ a }) {
+export function FileCard({ a, live = true }) {
   const name = shownName((() => { try { return decodeURIComponent(a.name || a.url.split('/').pop()); } catch { return a.name || 'file'; } })());
   const ext = (/\.([a-z0-9]{1,10})$/i.exec(name)?.[1] || /\.([a-z0-9]{1,10})$/i.exec(a.url)?.[1] || '').toLowerCase();
   const risky = RISKY.test(ext);
-  const temp = useTempFile(a.url);
+  const temp = useTempFile(a.url, live);
   const dl = /^https:\/\/files\.catbox\.moe\/[\w-]+\.[a-z0-9]{1,8}$/i.test(a.url) ? `/chat/dl?u=${encodeURIComponent(a.url)}&n=${encodeURIComponent(name)}`
     : TEMP_LINK.test(a.url) ? `${a.url.split(/[?#]/)[0]}?dl=1` : a.url;
   const open = async e => {
@@ -153,12 +170,35 @@ function Attachments({ list: all, extra = [], m }) {
   // picture links in the text count too (a Klipy link = a GIF; a DM's catbox link carries its name, so its spoiler mark too)
   const pics = [...list.filter(a => a.type === 'image' || a.type === 'gif'), ...extra.map(u => ({ url: u, name: nameInLink(u) || undefined, type: KLIPY.test(u) || /\.gif(\?|$)/i.test(u) ? 'gif' : 'image' }))];
   const others = list.filter(a => a.type !== 'image' && a.type !== 'gif');
+  // the message's temporary-storage files: asked about once it scrolls into view, and again a moment after one of them loads (opening restarts its clock)
+  const tempUrls = [...new Set([...pics, ...others].map(a => a.url).filter(u => TEMP_LINK.test(u)))];
+  const wrap = useRef(null);
+  const [seen, setSeen] = useState(false);
+  const hasTemp = tempUrls.length > 0;
+  useEffect(() => {
+    const el = wrap.current;
+    if (!hasTemp || seen || !el) return undefined;
+    if (typeof IntersectionObserver === 'undefined') { setSeen(true); return undefined; }
+    const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { setSeen(true); io.disconnect(); } }, { rootMargin: '300px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasTemp, seen]);
+  useEffect(() => {
+    const el = wrap.current;
+    if (!hasTemp || !el) return undefined;
+    // load / loadedmetadata don't bubble, so listen while they travel down
+    const onLoad = e => { const u = e.target?.currentSrc || e.target?.src; if (u && TEMP_LINK.test(u)) refreshTempInfo(u); };
+    el.addEventListener('load', onLoad, true);
+    el.addEventListener('loadedmetadata', onLoad, true);
+    return () => { el.removeEventListener('load', onLoad, true); el.removeEventListener('loadedmetadata', onLoad, true); };
+  }, [hasTemp]);
+  const expiry = useExpiryLabel(tempUrls, seen);
   if (!pics.length && !others.length && !gone.length) return null;
   const cover = a => hidden(a) && (
     <button type="button" className="vc-att-spoiler-cover" onClick={e => { e.preventDefault(); e.stopPropagation(); reveal(a); }}>Spoiler</button>
   );
   return (
-    <div className="vc-atts-wrap">
+    <div className="vc-atts-wrap" ref={wrap}>
       {gone.map(a => <div key={a.url} className="vc-filecard vc-att-expired"><FileIcon size={18} /><span><b>{a.name || 'File'}</b><small>This file expired and was deleted.</small></span></div>)}
       {pics.length > 0 && (
         <div className={`vc-atts n${Math.min(pics.length, 4)}`}>
@@ -175,19 +215,20 @@ function Attachments({ list: all, extra = [], m }) {
         </div>
       )}
       {others.map(a => {
-        const inner = a.type === 'file' ? <FileCard a={a} /> : TEMP_LINK.test(a.url) ? <TempMedia a={a} /> : a.type === 'video'
+        const inner = a.type === 'file' ? <FileCard a={a} live={seen} /> : TEMP_LINK.test(a.url) ? <TempMedia a={a} live={seen} /> : a.type === 'video'
           ? <div className="vc-media-wrap" data-media-url={a.url} data-media-name={shownName(a.name)}><VideoPlayer className="vc-att-video" src={a.url} /></div>
           : a.type === 'audio'
             ? <div className="vc-media-wrap" data-media-url={a.url} data-media-name={shownName(a.name)}><AudioPlayer src={a.url} name={shownName(a.name)} /></div>
             : <a href={a.url} target="_blank" rel="noopener noreferrer" className="vc-file">{shownName(a.name) || a.url}</a>;
         return hidden(a) ? <div key={a.url} className="vc-att-spoiler-box">{inner}{cover(a)}</div> : <Fragment key={a.url}>{inner}</Fragment>;
       })}
+      {expiry && <div className="vc-att-expiry"><Clock size={12} aria-hidden="true" /><span>{expiry}</span></div>}
     </div>
   );
 }
 // a video / sound in temporary storage: the player, or the placeholder once it expired
-function TempMedia({ a }) {
-  const temp = useTempFile(a.url);
+function TempMedia({ a, live }) {
+  const temp = useTempFile(a.url, live);
   if (temp === 'gone') return <ExpiredFile name={a.name} />;
   return a.type === 'video'
     ? <div className="vc-media-wrap" data-media-url={a.url} data-media-name={shownName(a.name)}><VideoPlayer className="vc-att-video" src={a.url} /></div>
