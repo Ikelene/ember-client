@@ -96,7 +96,12 @@ export async function checkMessage(m) {
     const payload = receivedPayload(m, location.origin);
     const pub = await importKey(key.public_key);
     const ok = await crypto.subtle.verify({ name: 'Ed25519' }, pub, unb64u(sig.sig), bytesOf(payload));
-    return ok ? 'ok' : 'bad';
+    if (ok) return 'ok';
+    // sent before the server moved to its current address: the signature names the address it had then
+    for (const inst of getState().instances?.find(i => i.origin === m.inst)?.previousUrls || []) {
+      if (await crypto.subtle.verify({ name: 'Ed25519' }, pub, unb64u(sig.sig), bytesOf({ ...payload, instance: inst }))) return 'ok';
+    }
+    return 'bad';
   } catch (e) {
     if (e?.name === 'NotSupportedError') return null;
     return e?.message === 'key_lookup' || e instanceof TypeError ? null : 'bad';
