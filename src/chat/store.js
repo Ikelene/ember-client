@@ -970,6 +970,7 @@ function sendAfterUpload(v, text, { replyTo, attachments = [], uploads }) {
       const file = u.spoiler ? new File([u.file], spoilerName(u.file.name, true), { type: u.file.type }) : u.file;
       const a = await uploadAttachment(v, file, {
         dest: u.dest,
+        expires: u.expires, // a Velora Pro member's picked expiry (days or 'max'), temporary storage only
         signal: ctrl.signal,
         onProgress: sent => {
           const pct = Math.floor(((before + Math.min(sent, u.file.size)) / total) * 100);
@@ -1073,8 +1074,11 @@ export async function saveToMedia(url, name) {
 //   'account' your Velora account storage: counts toward your storage, stays until you delete it
 // (pictures / videos / sounds show inline, the rest is a download card). Which one: the chat setting dm_upload_dest
 // ('ask' | 'account' | 'temp', synced to the account) with a copy in localStorage, or the picker below when it's 'ask'.
+// opts.expires: a picked expiry (days, or 'max') - Velora Pro only, the server refuses it otherwise (pro_required).
+// That date is fixed: opening the file doesn't move it. Left out = the normal expiry that starts over on every load.
 export async function uploadTemp(file, opts = {}) {
   const fd = new FormData();
+  if (opts.expires != null && opts.expires !== 'default') fd.append('expires_in_days', String(opts.expires));
   fd.append('file', file);
   const d = await uploadFetch('/chat/media/temp', fd, opts);
   return d.attachment;
@@ -1558,7 +1562,7 @@ export function errorText(code) {
     too_many_servers: "You've made as many servers as you can.", too_many_joined: "You're in too many servers.", invalid_invite: "That invite doesn't work.",
     invite_required: 'That server needs an invite.', banned_from_server: "You're banned from that server.", owner_cannot_leave: "You own this server - delete it instead of leaving.",
     storage_limit_exceeded: 'Your Velora storage is full.', images_only: 'Only pictures (PNG, JPG, GIF, WebP) can be attached.', upload_suspended: 'Uploads are suspended on your account.',
-    media_import_failed: "Couldn't download that media. Try downloading it and attaching the file.", invalid_media_url: 'Media links must use HTTPS without login credentials.', upload_failed: "Couldn't upload that file. Please try again.", external_upload_failed: "The file host didn't take that file. Please try again.", file_type_blocked: "That kind of file can't be uploaded.", temp_daily_quota: "You've sent as much to temporary storage as you can today - try again tomorrow, or use your account storage.", temp_storage_full: "Velora's temporary storage is full right now - try again later, or use your account storage.", uploads_disabled: 'File uploads are disabled in this server.',
+    media_import_failed: "Couldn't download that media. Try downloading it and attaching the file.", invalid_media_url: 'Media links must use HTTPS without login credentials.', upload_failed: "Couldn't upload that file. Please try again.", external_upload_failed: "The file host didn't take that file. Please try again.", file_type_blocked: "That kind of file can't be uploaded.", temp_daily_quota: "You've sent as much to temporary storage as you can today - try again tomorrow, or use your account storage.", temp_storage_full: "Velora's temporary storage is full right now - try again later, or use your account storage.", pro_required: 'Picking when a temporary file expires comes with Velora Pro.', invalid_expiry: "That expiry doesn't work - pick another one.", uploads_disabled: 'File uploads are disabled in this server.',
     file_too_large: 'That file exceeds the upload size limit.', dms_friends_only: 'They only take messages from friends.', status_changed: 'Their status changed - take another look.', cannot_reply_own_status: "That's your own status.", cannot_dm_bot: "Bots can't be messaged.", unsupported_file: 'Only pictures, videos (MP4, WebM, MOV) and audio files can be saved.', gifs_not_configured: "GIF search isn't set up yet.", too_many_saved: 'Saved Media is full (500 GIFs).', too_many_emojis: 'This server has as many emojis as it can have (50).', bad_gif: "That GIF can't be saved.", no_send_permission: "You don't have permission to send messages here.", no_attach_permission: "You can't attach files here.", role_too_high: "That role is above your own highest role.", role_not_found: "That role doesn't exist any more.", too_many_roles: 'A server can have up to 100 roles.', user_not_found: "That person doesn't exist.", mailbox_full: 'Their inbox is full.', message_too_long: 'That message is too long.',
     last_channel: "A server needs at least one channel.", not_allowed: "You can't do that here.", owner_only: 'Only the owner can do that.', offline: "You're offline - it wasn't sent.",
     scope_disabled: 'An admin has turned this off for your account.', insufficient_scope: SCOPE_TEXT, name_required: 'It needs a name.',

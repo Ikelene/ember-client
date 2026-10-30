@@ -25,9 +25,11 @@ import MediaPicker, { GifBadge, StarButton } from './MediaPicker.jsx';
 import GlintIntro from './GlintIntro.jsx';
 import { GlintMark, NewTag, loadMyClips, liveClips } from './glint.jsx';
 import EmojiPicker, { loadEmojiData } from './EmojiPicker.jsx';
-import { TriangleAlert, Shield, Clock } from 'lucide-react';
+import { TriangleAlert, Shield, Clock, HardDrive } from 'lucide-react';
 import { expiryAt, expiryLabel } from './temp-expiry.js';
 import { tempId } from './upload-dest.js';
+import { TempAttPopover } from './TempAttPopover.jsx';
+import { shortDays, daysText } from './temp-pick.js';
 import { BookmarkPlus, Smile, File as FileIcon, FileArchive, FileCode, FileText, Download, Coins, MessageSquareQuote } from 'lucide-react';
 
 // a "GIF" picture-frame icon (drawn, not text) for the GIF picker button
@@ -222,7 +224,7 @@ function Attachments({ list: all, extra = [], m }) {
             : <a href={a.url} target="_blank" rel="noopener noreferrer" className="vc-file">{shownName(a.name) || a.url}</a>;
         return hidden(a) ? <div key={a.url} className="vc-att-spoiler-box">{inner}{cover(a)}</div> : <Fragment key={a.url}>{inner}</Fragment>;
       })}
-      {expiry && <div className="vc-att-expiry"><Clock size={12} aria-hidden="true" /><span>{expiry}</span></div>}
+      {expiry && <a className="vc-att-expiry" href="https://velora.ikelene.net/temp-files" target="_blank" rel="noopener noreferrer" title="Temporary file - how long these last and how to keep them"><Clock size={12} aria-hidden="true" /><span>{expiry}</span></a>}
     </div>
   );
 }
@@ -926,7 +928,7 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
     if (t.length > maxLen) { toast(maxLen < 4000 ? `Messages here can be up to ${maxLen.toLocaleString()} characters (this one is ${t.length.toLocaleString()}).` : errorText('message_too_long')); return; }
     // files picked here upload now, after the message is sent: the composer is free again straight away
     const queued = atts.filter(a => a.local);
-    sendMessage(view, sid ? encodeRoleMentions(t, sid) : t, { replyTo, attachments: atts.filter(a => !a.local), uploads: queued.map(a => ({ file: a.file, spoiler: a.spoiler, dest: a.dest })) });
+    sendMessage(view, sid ? encodeRoleMentions(t, sid) : t, { replyTo, attachments: atts.filter(a => !a.local), uploads: queued.map(a => ({ file: a.file, spoiler: a.spoiler, dest: a.dest, expires: a.dest === 'temp' && a.expires !== 'default' ? a.expires : undefined })) });
     queued.forEach(a => a.preview && URL.revokeObjectURL(a.preview));
     setMq(null);
     if (ta.current) ta.current.textContent = '';
@@ -963,7 +965,7 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
     if (fits.length > Math.max(0, 4 - atts.length - context.pending)) toast('A message can carry up to 4 files.');
     if (!fits.length) return;
     // (counted again inside the update: two drops in a row can come before a re-render)
-    setAtts(x => [...x, ...fits.slice(0, Math.max(0, 4 - x.length - context.pending)).map((f, i) => ({ local: true, id: `q${Date.now()}_${i}_${f.name}`, file: f, name: f.name, size: f.size, kind: fileKind(f), spoiler: false, dest, preview: /^image\//.test(f.type) ? URL.createObjectURL(f) : null }))]);
+    setAtts(x => [...x, ...fits.slice(0, Math.max(0, 4 - x.length - context.pending)).map((f, i) => ({ local: true, id: `q${Date.now()}_${i}_${f.name}`, file: f, name: f.name, size: f.size, kind: fileKind(f), spoiler: false, dest, expires: 'default', preview: /^(image|video)\//.test(f.type) ? URL.createObjectURL(f) : null }))]);
     // a drop never focuses the box by itself: put the caret there so typing + Enter just work
     const el = ta.current;
     if (el && document.activeElement !== el && !mobileTextInput()) { el.focus({ preventScroll: true }); caretToEnd(el); }
@@ -974,7 +976,12 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
   function removeAtt(a) {
     if (a.preview) URL.revokeObjectURL(a.preview);
     setAtts(x => x.filter(y => y !== a));
+    if (attPop?.id === a.id) setAttPop(null);
   }
+  // the storage badge on a waiting file (TempAttPopover): a Velora Pro member's picked expiry, or the other storage
+  const [attPop, setAttPop] = useState(null); // { id, rect } of the file whose popover is open
+  const patchAtt = (id, p) => setAtts(x => x.map(y => (y.id === id ? { ...y, ...p } : y)));
+  const popAtt = attPop && atts.find(a => a.id === attPop.id);
   // Android keyboard images and native Paste use the same attachment path as
   // file selection. The listener is refreshed with current permissions/draft.
   useEffect(() => {
@@ -1103,18 +1110,44 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
           {atts.map(a => {
             const type = a.local ? a.kind : a.type, src = a.local ? a.preview : a.url;
             const spoiler = a.local ? a.spoiler : isSpoiler(a);
+            const name = shownName(a.name) || 'File';
+            // pictures and videos show as a big thumbnail; sounds and other files as a card with their name and size
+            const thumb = (type === 'image' || type === 'gif' || type === 'video') && src;
+            const ext = (/\.([a-z0-9]{1,8})$/i.exec(name)?.[1] || '').toUpperCase();
+            const picked = a.local && a.dest === 'temp' && a.expires && a.expires !== 'default' && a.expiresDays ? shortDays(a.expiresDays) : null;
             return (
-              <span key={a.local ? a.id : a.url} className={`vc-patt${spoiler ? ' spoiler' : ''}`} title={`${shownName(a.name) || ''}${a.size ? ` (${fmtSize(a.size)})` : ''}${a.local && a.dest ? (a.dest === 'account' ? ' - account storage' : ' - temporary storage') : ''}`}>
-                {type === 'video' ? <Film size={22} /> : type === 'audio' ? <Music size={22} /> : type === 'file' || !src ? <span className="vc-patt-file"><FileIcon size={20} /><small>{shownName(a.name)}</small></span> : <img src={src} alt="" />}
+              <span key={a.local ? a.id : a.url} className={`vc-patt${thumb ? ' thumb' : ' card'}${spoiler ? ' spoiler' : ''}`} title={`${name}${a.size ? ` (${fmtSize(a.size)})` : ''}`}>
+                {thumb ? (
+                  <>
+                    {type === 'video' ? <video src={src} muted preload="metadata" playsInline /> : <img src={src} alt="" />}
+                    {type === 'video' && <span className="vc-patt-kind"><Film size={11} />Video</span>}
+                  </>
+                ) : (
+                  <>
+                    <span className="vc-patt-ico">{type === 'audio' ? <Music size={22} /> : type === 'video' ? <Film size={22} /> : <FileIcon size={22} />}{ext && <b>{ext.slice(0, 4)}</b>}</span>
+                    <span className="vc-patt-meta"><span className="vc-patt-name">{name}</span><small>{[type === 'audio' ? 'Sound' : type === 'video' ? 'Video' : KIND_OF(ext.toLowerCase()), fmtSize(a.size)].filter(Boolean).join(' - ')}</small></span>
+                  </>
+                )}
                 {spoiler && <span className="vc-patt-spoiler-tag">Spoiler</span>}
-                {a.local && a.dest && <span className="vc-patt-dest" title={a.dest === 'account' ? 'Goes to your Velora account storage' : "Goes to Velora's temporary storage"}>{a.dest === 'account' ? <CloudUpload size={11} /> : <Clock size={11} />}</span>}
+                {a.local && a.dest && (
+                  <button type="button" className={`vc-patt-dest${picked ? ' picked' : ''}${attPop?.id === a.id ? ' open' : ''}`} aria-haspopup="dialog" aria-expanded={attPop?.id === a.id}
+                    title={a.dest === 'account' ? 'Goes to your Velora account storage - click for options' : `Goes to Velora's temporary storage${picked ? ` (deleted after ${daysText(a.expiresDays)}, fixed)` : ''} - click for options`}
+                    onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setAttPop(p => (p?.id === a.id ? null : { id: a.id, rect: r })); }}>
+                    {a.dest === 'account' ? <HardDrive size={12} /> : <Clock size={12} />}{picked && <span>{picked}</span>}
+                  </button>
+                )}
                 <button type="button" className="vc-patt-spoiler" title={spoiler ? 'Remove spoiler' : 'Mark as spoiler'} aria-pressed={spoiler} onClick={() => toggleSpoiler(a)}>{spoiler ? <Eye size={12} /> : <EyeOff size={12} />}</button>
-                <button type="button" title="Remove" onClick={() => removeAtt(a)}><X size={12} /></button>
+                <button type="button" className="vc-patt-x" title="Remove" onClick={() => removeAtt(a)}><X size={12} /></button>
               </span>
             );
           })}
-          {Array.from({ length: busy }, (_, i) => <span key={`b${i}`} className="vc-patt busy"><ImageIcon size={18} /></span>)}
+          {Array.from({ length: busy }, (_, i) => <span key={`b${i}`} className="vc-patt thumb busy"><ImageIcon size={22} /></span>)}
         </div>
+      )}
+      {popAtt && (
+        <TempAttPopover att={popAtt} rect={attPop.rect} onClose={() => setAttPop(null)}
+          onExpires={(v, days) => patchAtt(popAtt.id, { expires: v, expiresDays: days })}
+          onDest={d => patchAtt(popAtt.id, { dest: d, expires: 'default', expiresDays: null })} />
       )}
       <div className={`vc-composer${replyTo || srActive ? ' replying' : ''}`}>
         {(view.kind !== 'channel' || canAttach) && view.username !== 'System' && (

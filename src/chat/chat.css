@@ -283,10 +283,26 @@ body:has(.vc-sign-banner) .vc-notify-banner { top: 52px; } /* (the notifications
 .vc-replybar button { display: grid; place-items: center; padding: 2px; background: none; border: 0; color: var(--muted); cursor: pointer; }
 .vc-replybar button:hover { color: #fff; }
 .vc-pending-atts { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; background: #101012; border: 1px solid var(--border); border-bottom: 0; }
-.vc-patt { position: relative; width: 84px; height: 84px; display: grid; place-items: center; overflow: hidden; background: #0a0a0c; border: 1px solid var(--border); color: var(--muted); animation: vc-pop .2s cubic-bezier(.2, .8, .2, 1); }
-.vc-patt img { width: 100%; height: 100%; object-fit: cover; }
-.vc-patt button { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; display: grid; place-items: center; padding: 0; background: rgba(0, 0, 0, .75); border: 0; color: #fff; cursor: pointer; }
-.vc-patt.busy { animation: vc-pulse .8s ease-in-out infinite alternate; }
+/* files waiting to be sent: pictures / videos as a big thumbnail, sounds and other files as a card with name + size */
+.vc-patt { position: relative; display: grid; place-items: center; overflow: hidden; background: #0a0a0c; border: 1px solid var(--border); color: var(--muted); animation: vc-pop .2s cubic-bezier(.2, .8, .2, 1); }
+.vc-patt.thumb { width: 136px; height: 136px; }
+.vc-patt.thumb img, .vc-patt.thumb video { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
+.vc-patt.card { width: 264px; height: 72px; display: flex; align-items: center; gap: 10px; padding: 10px 58px 10px 10px; background: #111113; border-left: 3px solid var(--accent); }
+.vc-patt-ico { position: relative; flex: none; width: 40px; height: 46px; display: grid; place-items: center; color: var(--accent); }
+.vc-patt-ico b { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); padding: 0 4px; background: var(--accent); color: #0b0b0d; font-size: 9px; font-weight: 800; letter-spacing: .04em; line-height: 14px; }
+.vc-patt-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vc-patt-name { color: var(--text); font-size: 13px; font-weight: 600; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
+.vc-patt-meta small { color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vc-patt-kind { position: absolute; left: 4px; bottom: 4px; display: inline-flex; align-items: center; gap: 3px; padding: 0 5px; height: 18px; background: rgba(0, 0, 0, .75); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; pointer-events: none; }
+.vc-patt button { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; display: grid; place-items: center; padding: 0; background: rgba(0, 0, 0, .75); border: 0; color: #fff; cursor: pointer; }
+.vc-patt button:hover { background: rgba(0, 0, 0, .92); }
+.vc-patt.card .vc-patt-spoiler { left: auto; right: 30px; }
+.vc-patt.card .vc-patt-spoiler-tag { left: auto; right: 4px; bottom: auto; top: 30px; transform: none; }
+.vc-patt.busy { width: 136px; height: 136px; animation: vc-pulse .8s ease-in-out infinite alternate; }
+@media (max-width: 760px) {
+  .vc-patt.thumb, .vc-patt.busy { width: 104px; height: 104px; }
+  .vc-patt.card { width: min(264px, calc(100vw - 40px)); }
+}
 .vc-typing { height: 24px; display: flex; align-items: center; gap: 7px; padding: 0 2px; font-size: 12px; color: var(--dim); opacity: 0; transform: translateY(3px); transition: opacity .2s, transform .2s; }
 .vc-typing.on { opacity: 1; transform: none; }
 .vc-typing b { color: var(--text); }
@@ -1389,8 +1405,9 @@ img.vc-sug-emoji { width: 20px; height: 20px; object-fit: contain; }
 
 /* file cards (DM files in Velora storage, old catbox links, instance files) */
 .vc-filecard { display: flex; align-items: center; gap: 12px; width: 100%; max-width: 420px; margin-top: 4px; padding: 10px 12px; background: #111113; border: 1px solid var(--border); border-left: 3px solid var(--accent); }
-.vc-att-expiry { display: flex; align-items: center; gap: 5px; margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--muted); }
+.vc-att-expiry { display: flex; align-items: center; gap: 5px; width: fit-content; margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--muted); text-decoration: none; }
 .vc-att-expiry svg { flex: none; }
+a.vc-att-expiry:hover { color: var(--dim); text-decoration: underline; text-underline-offset: 2px; }
 .vc-filecard.vc-att-expired { opacity: .7; font-style: italic; border-left-color: var(--border-2); }
 .vc-filecard-ico { position: relative; width: 40px; height: 44px; color: var(--accent); flex: none; display: grid; place-items: center; }
 .vc-filecard-ico b { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); padding: 0 4px; background: var(--accent); color: #0b0b0d; font-size: 9px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; line-height: 14px; }
@@ -1401,8 +1418,6 @@ img.vc-sug-emoji { width: 20px; height: 20px; object-fit: contain; }
 .vc-filecard-name { padding: 0; color: #e8e8ee; font-weight: 600; font-size: 14px; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vc-filecard-name:hover { color: var(--accent); }
 .vc-filecard-txt small { color: var(--muted); font-size: 12px; }
-.vc-patt-file { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 100%; height: 100%; padding: 4px; color: var(--accent); }
-.vc-patt-file small { max-width: 100%; color: var(--dim); font-size: 9.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* only-you messages (daily credits) */
 .vc-eph .vc-sys-ico { color: #e0b84a; }
 .vc-eph-tag { margin-left: 8px; color: var(--muted); font-size: 11.5px; }
@@ -2342,4 +2357,38 @@ a.vc-glint-site:hover { color: var(--text); text-decoration: none; }
 /* temporary-storage files: how long they have left (shown on hover) */
 .vc-filecard-exp { color: var(--muted); opacity: 0; transition: opacity .15s; }
 .vc-filecard:hover .vc-filecard-exp, .vc-filecard:focus-within .vc-filecard-exp { opacity: 1; }
-.vc-patt-dest { position: absolute; right: 3px; bottom: 3px; display: grid; place-items: center; width: 17px; height: 17px; background: rgba(0, 0, 0, .7); color: #fff; pointer-events: auto; }
+/* the storage badge on a waiting file: opens TempAttPopover (a picked expiry shows as "7d") */
+.vc-patt .vc-patt-dest { top: auto; bottom: 4px; right: 4px; width: auto; min-width: 22px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center; gap: 3px; font-family: inherit; font-size: 10.5px; font-weight: 700; line-height: 1; transition: background .12s, color .12s; }
+.vc-patt .vc-patt-dest:hover, .vc-patt .vc-patt-dest.open, .vc-patt .vc-patt-dest.picked { background: var(--accent); color: #16141c; }
+.vc-tpop { position: fixed; z-index: 3600; width: 300px; max-width: calc(100vw - 16px); padding: 12px; background: #18181b; border: 1px solid var(--border-2); box-shadow: 0 18px 50px rgba(0, 0, 0, .6); color: var(--text); font-size: 13px; animation: vc-pop .14s cubic-bezier(.2, .8, .2, 1); }
+.vc-tpop-loading { padding: 14px 4px; color: var(--muted); font-size: 12.5px; }
+.vc-tpop-head { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
+.vc-tpop-head svg { color: var(--accent); flex: none; }
+.vc-tpop-head b { font-size: 14px; }
+.vc-tpop-chip { margin-left: auto; padding: 0 6px; font-size: 10px; font-weight: 700; line-height: 17px; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--accent); }
+.vc-tpop-text { margin: 0 0 10px; color: var(--dim); font-size: 12.5px; line-height: 1.45; }
+.vc-tpop-choices { display: flex; flex-direction: column; border: 1px solid var(--border); margin-bottom: 8px; }
+.vc-tpop-choice { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 9px; padding: 7px 10px; background: none; border: 0; border-top: 1px solid var(--border); color: var(--dim); font: inherit; text-align: left; cursor: pointer; }
+.vc-tpop-choice:first-child { border-top: 0; }
+.vc-tpop-choice:hover { background: #1f1f23; color: var(--text); }
+.vc-tpop-choice.on { background: var(--accent-dim); color: var(--text); }
+.vc-tpop-radio { width: 14px; height: 14px; display: grid; place-items: center; border: 1px solid var(--border-2); color: #16141c; }
+.vc-tpop-choice.on .vc-tpop-radio { background: var(--accent); border-color: var(--accent); }
+.vc-tpop-label em { color: var(--muted); font-style: normal; font-size: 11.5px; }
+.vc-tpop-choice small { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+.vc-tpop-note { margin: 0 0 10px; color: var(--muted); font-size: 11.5px; line-height: 1.45; }
+.vc-tpop-pro { display: flex; gap: 9px; margin-bottom: 10px; padding: 10px; background: #151517; border: 1px solid var(--border-2); border-left: 3px solid var(--accent); color: var(--dim); font-size: 12.5px; line-height: 1.45; }
+.vc-tpop-pro svg { flex: none; margin-top: 2px; color: var(--accent); }
+.vc-tpop-pro > span { display: flex; flex-direction: column; align-items: flex-start; }
+.vc-tpop-pro b { color: var(--text); }
+.vc-tpop-pro a { display: inline-flex; align-items: center; gap: 3px; margin-top: 6px; color: var(--accent); font-weight: 600; text-decoration: none; }
+.vc-tpop-pro a:hover { text-decoration: underline; }
+.vc-tpop-move { display: flex; align-items: flex-start; gap: 9px; width: 100%; padding: 9px 10px; background: #151517; border: 1px solid var(--border-2); color: var(--dim); font: inherit; text-align: left; cursor: pointer; transition: border-color .12s, background .12s; }
+.vc-tpop-move svg { flex: none; margin-top: 2px; color: var(--accent); }
+.vc-tpop-move span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vc-tpop-move b { color: var(--text); font-size: 13px; }
+.vc-tpop-move small { color: var(--muted); font-size: 11.5px; }
+.vc-tpop-move:hover:not(:disabled) { border-color: var(--accent); background: #1b1b1f; }
+.vc-tpop-move:disabled { opacity: .55; cursor: not-allowed; }
+.vc-tpop-help { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px; color: var(--muted); font-size: 12px; text-decoration: none; }
+.vc-tpop-help:hover { color: var(--text); text-decoration: underline; }
