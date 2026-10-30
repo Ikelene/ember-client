@@ -48,11 +48,6 @@ export function ViaTip({ t }) {
     </div>
   );
 }
-// "Last login" alone, for an instance's members (their member row carries last_login; presence is Velora's)
-export function LastLoginFact({ at }) {
-  if (!at) return null;
-  return <div className="pe-fact vc-manage-fact"><b>Last login</b><span>{new Date(at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span></div>;
-}
 // "just now", "5 minutes ago", "4 hours ago", "5 days ago" ... for a timestamp in the past
 function agoText(at) {
   const sec = Math.max(0, Math.round((Date.now() - at) / 1000));
@@ -60,6 +55,17 @@ function agoText(at) {
   const units = [['year', 31536000], ['month', 2592000], ['day', 86400], ['hour', 3600], ['minute', 60]];
   const [u, n] = units.find(([, n]) => sec >= n);
   return new Intl.RelativeTimeFormat(undefined, { numeric: 'always' }).format(-Math.floor(sec / n), u);
+}
+// the "Last online" row: "Online now", or how long ago with the full date on hover
+function LastOnlineRow({ online, at }) {
+  if (online) return <div className="pe-fact vc-manage-fact"><b>Last online</b><span>Online now</span></div>;
+  if (!(at > 0)) return null;
+  return <div className="pe-fact vc-manage-fact"><b>Last online</b><span title={new Date(at).toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'medium' })}>{agoText(at)}</span></div>;
+}
+// an instance's members (their member row carries last_online + online; presence is Velora's)
+export function LastOnlineFact({ member }) {
+  if (!member) return null;
+  return <LastOnlineRow online={!!member.online} at={Number(member.last_online) || 0} />;
 }
 // the "Client" and "Last online" rows of a mini profile
 export function ManageFacts({ presence }) {
@@ -84,9 +90,7 @@ export function ManageFacts({ presence }) {
         </div>
       )}
       {sessions.length === 0 && presence.status === 'offline' && <div className="pe-fact vc-manage-fact"><b>Client</b><span>Not connected</span></div>}
-      {online
-        ? <div className="pe-fact vc-manage-fact"><b>Last online</b><span>Online now</span></div>
-        : at > 0 && <div className="pe-fact vc-manage-fact"><b>Last online</b><span title={new Date(at).toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'medium' })}>{agoText(at)}</span></div>}
+      <LastOnlineRow online={online} at={at} />
     </>
   );
 }
