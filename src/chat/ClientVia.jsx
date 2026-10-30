@@ -1,5 +1,5 @@
 // Which client someone is using. Velora only sends this to people with the Manage users permission:
-// `via` on a message, and `sessions` / `last_login` / `notifications_only` on a presence. Ember servers send `via` the same way.
+// `via` on a message, and `sessions` / `last_online` / `notifications_only` on a presence (people also get `sessions` for themselves). Ember servers send `via` the same way.
 // The name and verified badge come from Velora's official clients list (officialClients.js); anything not on it shows
 // its domain (or token name) with no badge.
 import { useEffect, useState } from 'react';
@@ -53,12 +53,21 @@ export function LastLoginFact({ at }) {
   if (!at) return null;
   return <div className="pe-fact vc-manage-fact"><b>Last login</b><span>{new Date(at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span></div>;
 }
-// the "Client" and "Last login" rows of a mini profile
+// "just now", "5 minutes ago", "4 hours ago", "5 days ago" ... for a timestamp in the past
+function agoText(at) {
+  const sec = Math.max(0, Math.round((Date.now() - at) / 1000));
+  if (sec < 60) return 'just now';
+  const units = [['year', 31536000], ['month', 2592000], ['day', 86400], ['hour', 3600], ['minute', 60]];
+  const [u, n] = units.find(([, n]) => sec >= n);
+  return new Intl.RelativeTimeFormat(undefined, { numeric: 'always' }).format(-Math.floor(sec / n), u);
+}
+// the "Client" and "Last online" rows of a mini profile
 export function ManageFacts({ presence }) {
   const list = useOfficialClients();
-  if (!presence || (presence.sessions === undefined && presence.last_login === undefined)) return null;
+  if (!presence || (presence.sessions === undefined && presence.last_online === undefined && presence.last_login === undefined)) return null;
   const sessions = presence.sessions || [];
-  const when = presence.last_login ? new Date(presence.last_login).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : null;
+  const online = presence.status !== 'offline';
+  const at = presence.last_online ? Number(presence.last_online) : 0;
   return (
     <>
       {sessions.length > 0 && (
@@ -75,7 +84,9 @@ export function ManageFacts({ presence }) {
         </div>
       )}
       {sessions.length === 0 && presence.status === 'offline' && <div className="pe-fact vc-manage-fact"><b>Client</b><span>Not connected</span></div>}
-      {when && <div className="pe-fact vc-manage-fact"><b>Last login</b><span>{when}</span></div>}
+      {online
+        ? <div className="pe-fact vc-manage-fact"><b>Last online</b><span>Online now</span></div>
+        : at > 0 && <div className="pe-fact vc-manage-fact"><b>Last online</b><span title={new Date(at).toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'medium' })}>{agoText(at)}</span></div>}
     </>
   );
 }
