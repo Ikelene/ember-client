@@ -124,6 +124,15 @@ body:has(.vc-sign-banner) .vc-notify-banner { top: 52px; } /* (the notifications
 .vc-via { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 0 5px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; font-size: 11px; line-height: 16px; color: var(--muted); background: var(--surface-3); border: 1px solid var(--border); }
 .vc-via.official { color: var(--accent); }
 .vc-via svg { flex: none; }
+.vc-via-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.vc-via-icon { flex: none; width: 12px; height: 12px; object-fit: cover; }
+/* the "sent from" hover card (Tooltip.jsx data-tip-via) */
+.vc-tip-via { display: flex; flex-direction: column; gap: 2px; }
+.vc-tip-via span { display: inline-flex; align-items: center; gap: 4px; }
+.vc-tip-via b { color: #fff; }
+.vc-tip-via .vc-via-check { color: var(--accent); flex: none; }
+.vc-tip-via small { font-size: 11px; font-weight: 500; color: var(--muted); }
+.vc-tip-via small.vc-tip-via-note { color: var(--dim); }
 .vc-via-row { display: flex; flex-direction: column; gap: 1px; margin-top: 3px; }
 .vc-via-row .vc-via { margin-left: 0; align-self: flex-start; }
 .vc-via-row small { font-size: 12px; color: var(--dim); }
