@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test test/aliases.test.js test/attachments.test.js test/insights.test.js test/manage-users.test.js test/official-clients.test.js test/temp-expiry.test.js test/unread.test.js test/upload-dest.test.js test/user-update.test.js tests/reaction-usage.mjs && node tests/composer-scope.mjs"
+    "test": "node --test test/aliases.test.js test/attachments.test.js test/insights.test.js test/manage-users.test.js test/official-clients.test.js test/temp-expiry.test.js test/temp-pick.test.js test/unread.test.js test/upload-dest.test.js test/user-update.test.js tests/reaction-usage.mjs && node tests/composer-scope.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.441.0",
