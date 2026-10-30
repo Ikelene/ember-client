@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { X, ExternalLink, Check, ChevronDown, Paperclip, EyeOff, Loader } from 'lucide-react';
+import { X, ExternalLink, Check, ChevronDown, Paperclip, EyeOff, Loader, LayoutGrid } from 'lucide-react';
 import { useChat, toast, errorText, sendInteraction, dismissEphemeral, closeInteractionModal, uploadAttachment } from './store.js';
 import { bare } from './ids.js';
 import { Avatar } from './Profile.jsx';
@@ -10,14 +10,19 @@ import './Commands.css';
 
 const fail = e => toast(interactionError(e) || errorText(e.message));
 
-export function CommandPicker({ items, sel, setSel, onPick }) {
+export function CommandPicker({ items, sel, setSel, onPick, bots = [], bot = null, onBot }) {
   useEffect(() => { if (sel >= items.length) setSel(0); }, [items.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const on = useRef(null);
+  const railOn = useRef(null);
   useEffect(() => { on.current?.scrollIntoView({ block: 'nearest' }); }, [sel]);
-  if (!items.length) return null;
+  useEffect(() => { railOn.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [bot]);
+  const rail = bots.length > 1 && onBot;
+  if (!items.length && !rail) return null;
+  const only = bot ? bots.find(b => b.id === bot) : null;
   let last = null;
-  return (
-    <div className="vc-mentions vc-cmd-picker" onMouseDown={e => e.preventDefault()}>
+  const list = (
+    <div className="vc-cmd-list">
+      {!items.length && <div className="vc-cmd-none">No commands from {only?.username || 'this bot'} match that.</div>}
       {items.map((it, i) => {
         const head = it.bot.id !== last ? it.bot : null;
         last = it.bot.id;
@@ -32,6 +37,21 @@ export function CommandPicker({ items, sel, setSel, onPick }) {
           </div>
         );
       })}
+    </div>
+  );
+  if (!rail) return <div className="vc-mentions vc-cmd-picker" onMouseDown={e => e.preventDefault()}>{list}</div>;
+  return (
+    <div className="vc-mentions vc-cmd-picker has-rail" onMouseDown={e => e.preventDefault()}>
+      <div className="vc-cmd-rail" role="tablist" aria-label="Filter commands by bot (Alt + Up/Down)">
+        <button type="button" role="tab" aria-selected={!bot} ref={!bot ? railOn : null} className={`vc-cmd-rail-btn all${!bot ? ' on' : ''}`} title="All bots (Alt + Up/Down to switch)" aria-label="All bots" onClick={() => onBot(null)}><LayoutGrid size={18} /></button>
+        <span className="vc-cmd-rail-sep" />
+        {bots.map(b => (
+          <button type="button" role="tab" key={b.id} aria-selected={bot === b.id} ref={bot === b.id ? railOn : null} className={`vc-cmd-rail-btn${bot === b.id ? ' on' : ''}${b.online ? '' : ' off'}`} title={b.online ? b.username : `${b.username} (offline)`} aria-label={b.username} onClick={() => onBot(bot === b.id ? null : b.id)}>
+            <Avatar user={b} size={28} />
+          </button>
+        ))}
+      </div>
+      {list}
     </div>
   );
 }
@@ -167,7 +187,7 @@ export function CommandBar({ view, entry, onCancel, onSent, submitRef }) {
         </label>
       ))}
       {!opts.length && <input ref={ghost} className="vc-cmd-ghost" aria-label={`Run /${entry.label}`} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } if (e.key === 'Backspace') { e.preventDefault(); onCancel(); } }} />}
-      <button type="button" className="vc-cmd-x" title="Cancel the command" onClick={onCancel}><X size={14} /></button>
+      <button type="button" className="vc-cmd-x" title="Clear this command (Esc)" aria-label="Clear this command" onClick={onCancel}><X size={15} strokeWidth={2.5} /><span>Clear</span></button>
     </div>
   );
 }
@@ -244,14 +264,20 @@ export function MessageComponents({ m, view }) {
   );
 }
 
-export function InteractionLine({ m }) {
+export function InteractionLine({ m, sid, onUser }) {
   const i = m.interaction;
+  // older rows only stored id + username, so fall back to the member list for the pfp
+  const member = useChat(s => (i?.user?.username && sid ? (s.members[sid] || []).find(x => x.username === i.user.username) : null));
   if (!i?.user) return null;
+  const user = { ...member, ...i.user, pfp: i.user.pfp || member?.pfp || null };
+  const open = e => { e.stopPropagation(); onUser?.(user.username, e.currentTarget); };
   return (
     <div className="vc-reply-to vc-interaction">
       <span className="vc-reply-line" />
-      <Avatar user={{ username: i.user.username }} size={16} />
-      <b>{i.user.username}</b>
+      <button type="button" className="vc-int-who" onClick={open} title={`Open ${user.username}'s profile`}>
+        <Avatar user={user} size={16} />
+        <b>{user.username}</b>
+      </button>
       <span>used <span className="vc-cmd-used">/{i.name}</span></span>
     </div>
   );

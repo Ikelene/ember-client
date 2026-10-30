@@ -405,7 +405,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
               <ReplyText body={m.reply.body} ctx={ctx} /></>}
         </div>
       )}
-      <InteractionLine m={m} />
+      <InteractionLine m={m} sid={view.sid} onUser={onUser} />
       {head ? (
         hook ? <span className="vc-msg-av hook">{m.author.pfp ? <img src={m.author.pfp} alt="" /> : m.author.bridge ? <span className="vc-av-l">{(m.author.username || '?')[0].toUpperCase()}</span> : <Webhook size={20} />}</span>
           : <button type="button" className="vc-msg-av" onClick={e => onUser(name, e.currentTarget)}><Avatar user={blockedAuthor ? blockedFace(author) : distrust ? { ...author, pfp: null } : aliasFace(alias, author)} size={40} /></button>
@@ -703,7 +703,15 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
   useEffect(() => { if (sid && isInst(sid)) loadCommands(sid, view.cid); }, [sid, view.cid]); // eslint-disable-line react-hooks/exhaustive-deps
   const centries = useMemo(() => slashEntries(cdata), [cdata]);
   const slashQ = !cmd && text.startsWith('/') && !/\n|^\/\s/.test(text) ? text.slice(1) : null;
-  const citems = useMemo(() => (slashQ == null ? [] : matchEntries(centries, slashQ)), [slashQ, centries]);
+  // the bot rail on the left of the slash popup: null = every bot
+  const [cbot, setCbot] = useState(null);
+  const cbots = useMemo(() => [...new Map(centries.map(en => [en.bot.id, en.bot])).values()].sort((a, b) => a.username.localeCompare(b.username)), [centries]);
+  const cbotOn = cbot && cbots.some(b => b.id === cbot) ? cbot : null;
+  useEffect(() => { if (slashQ == null && cbot) setCbot(null); }, [slashQ == null]); // eslint-disable-line react-hooks/exhaustive-deps
+  const citems = useMemo(() => (slashQ == null ? [] : matchEntries(cbotOn ? centries.filter(en => en.bot.id === cbotOn) : centries, slashQ)), [slashQ, centries, cbotOn]);
+  const cpicker = slashQ != null && (citems.length > 0 || (cbotOn && cbots.length > 1));
+  const pickBot = id => { setCbot(id); setCsel(0); };
+  const stepBot = d => { const ids = [null, ...cbots.map(b => b.id)]; pickBot(ids[(ids.indexOf(cbotOn) + d + ids.length) % ids.length]); };
   function startCommand(entry) {
     if (ta.current) ta.current.textContent = '';
     setText(''); setDraft(key, ''); setCmd(entry); setCsel(0); setMq(null);
@@ -985,7 +993,7 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
         )}
         {mq && <MentionPicker items={mitems} sel={msel} setSel={setMsel} onPick={pickMention} sid={view.sid} />}
         {slashQ === '' && cdata && !centries.length && <div className="vc-mentions vc-cmd-picker vc-cmd-empty">No bot commands in this server yet. Bots can add slash commands, and they will show up here.</div>}
-        {citems.length > 0 && <CommandPicker items={citems} sel={csel} setSel={setCsel} onPick={startCommand} />}
+        {cpicker && <CommandPicker items={citems} sel={csel} setSel={setCsel} onPick={startCommand} bots={cbots} bot={cbotOn} onBot={pickBot} />}
         {cmd && <CommandBar key={cmd.key} view={view} entry={cmd} submitRef={cmdSubmit} onCancel={() => { setCmd(null); ta.current?.focus(); }} onSent={() => { setCmd(null); setReplyTo?.(null); ta.current?.focus(); }} />}
         <input ref={file} type="file" multiple hidden onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
         <input ref={saveFile} type="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm,video/quicktime,audio/*" onChange={e => { addSavedFiles(e.target.files); e.target.value = ''; }} />
@@ -1015,6 +1023,7 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
             if (composing.current || e.nativeEvent.isComposing || e.keyCode === 229) return;
             const marker = markdownMarker(e);
             if (marker) { e.preventDefault(); markdownShortcut(ta.current, view, marker); styleMarkdown(ta.current, view); sync(); return; }
+            if (cpicker && cbots.length > 1 && e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); stepBot(e.key === 'ArrowDown' ? 1 : -1); return; }
             if (citems.length) {
               if (e.key === 'ArrowDown') { e.preventDefault(); setCsel(x => (x + 1) % citems.length); return; }
               if (e.key === 'ArrowUp') { e.preventDefault(); setCsel(x => (x - 1 + citems.length) % citems.length); return; }
