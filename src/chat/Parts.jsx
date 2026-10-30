@@ -17,6 +17,7 @@ import { P, has, ChannelIcon, useNameStyle, colorFrom, NameDecor } from './roles
 import { serverMenu, instanceMenu, channelMenu, userMenu, openMenu, copy } from './Menu.jsx';
 import { apiFetch, getToken } from '../api.js';
 import { VELORA, instOf, isInst } from './ids.js';
+import { loudUnread } from './unread.js';
 import { removeInstance, reorderInstances, reconnect as reconnectInstance } from './instances.js';
 import { startSignIn } from './session.js';
 import { Avatar, subtitle, RoleChip, STATUS_LABEL, BlockedMark } from './Profile.jsx';
@@ -64,13 +65,16 @@ export function Rail({ onDiscover, onAddInstance, onCreate }) {
   const people = useChat(s => s.people);
   const srvMentions = useChat(s => s.srvMentions);
   // a server lights up only for unread channels I haven't muted (its own unread flag can't know my channel mutes)
-  const detail = useChat(s => s.detail), chUnread = useChat(s => s.unread);
+  const detail = useChat(s => s.detail), chUnread = useChat(s => s.unread), unreadN = useChat(s => s.unreadN);
   useChat(s => s.notify);
-  const loudUnread = srv => {
-    if (!srv?.unread || isMuted(srv.sid)) return false;
-    const chs = detail[srv.sid]?.channels;
-    return chs ? chs.some(c => (c.unread || chUnread[`c:${c.cid}`]) && !effectiveNotify(c.cid, srv.sid).muted) : true;
-  };
+  const chMuted = (cid, sid) => effectiveNotify(cid, sid).muted;
+  const loudOf = srv => loudUnread(srv, { channels: detail[srv?.sid]?.channels || null, unread: chUnread, unreadN, muted: chMuted, serverMuted: !!srv && isMuted(srv.sid) });
+  // can't tell yet (an older server that doesn't list its unread channels, channels not loaded): load its channels once, quiet until then
+  const asked = useRef(new Set());
+  useEffect(() => {
+    for (const srv of servers) if (loudOf(srv) === null && !asked.current.has(srv.sid)) { asked.current.add(srv.sid); refreshServer(srv.sid); }
+  });
+  const loudUnreadOf = srv => loudOf(srv) === true;
   // DMs with new messages sit in the rail under Home (with how many), like Discord / Fluxer
   const newDMs = dms.filter(c => c.unread > 0 && keyOf(view) !== `d:${c.username.toLowerCase()}`).slice(0, 6);
   const modmail = useChat(s => s.modmail);
@@ -202,7 +206,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate }) {
   });
 
   const item = (s, i) => (
-    <RailItem key={s.sid} dnd={dnd(`v:${s.sid}`)} server={s.sid} active={view.sid === s.sid} unread={view.sid !== s.sid && loudUnread(s)} title={s.name} style={{ '--i': i }} onClick={() => go({ kind: 'server', sid: s.sid })}
+    <RailItem key={s.sid} dnd={dnd(`v:${s.sid}`)} server={s.sid} active={view.sid === s.sid} unread={view.sid !== s.sid && loudUnreadOf(s)} title={s.name} style={{ '--i': i }} onClick={() => go({ kind: 'server', sid: s.sid })}
       badge={isMuted(s.sid) ? 0 : (s.mentions || 0) + (srvMentions[s.sid] || 0)}
       onContextMenu={e => serverMenu(e, s, { onInvite: () => dialog('invite', s.sid), onSettings: () => dialog('settings', s.sid), onLeave: () => dialog('leave', s.sid) })}>
       <span className="vc-srv-ico"><ServerIcon src={s.icon} name={s.name} /></span>
@@ -216,7 +220,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate }) {
     const muted = s && isMuted(s.sid);
     const ask_ = async () => { if (await ask({ title: `Remove ${name}?`, text: `${inst.host} leaves your server list${getToken() ? ' on every device' : ''}. Your account there stays as it is - you can add it again any time.`, confirm: 'Remove from list', danger: true })) removeInstance(inst.origin); };
     return (
-      <RailItem key={inst.origin} dnd={dnd(`i:${inst.origin}`)} active={active} unread={!active && loudUnread(s)} title={`${name} · ${inst.host}`} server={s?.sid} style={{ '--i': legacy.length + i }}
+      <RailItem key={inst.origin} dnd={dnd(`i:${inst.origin}`)} active={active} unread={!active && !!s && loudUnreadOf(s)} title={`${name} · ${inst.host}`} server={s?.sid} style={{ '--i': legacy.length + i }}
         status={inst.status !== 'open' ? inst.status : null} badge={s && !muted ? (s.mentions || 0) + (srvMentions[s.sid] || 0) : 0}
         onClick={() => go(s && inst.status === 'open' ? { kind: 'server', sid: s.sid } : { kind: 'instance', inst: inst.origin })}
         onContextMenu={e => instanceMenu(e, inst, s, {

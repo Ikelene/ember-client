@@ -69,7 +69,7 @@ export function fixUrls(origin, v, key) {
 }
 
 // ── instance payloads -> Ember's shapes (ids namespaced) ──
-export const nsServer = (inst, s) => ({ ...s, sid: K(inst, s.sid), inst });
+export const nsServer = (inst, s) => ({ ...s, sid: K(inst, s.sid), inst, ...(Array.isArray(s.unread_channels) ? { unread_channels: s.unread_channels.map(c => K(inst, c)) } : {}) });
 export const nsChannel = (inst, c) => ({ ...c, cid: K(inst, c.cid), server: c.server != null ? K(inst, c.server) : c.server, inst });
 export const nsMessage = (inst, m) => ({ ...m, inst, channel: K(inst, m.channel), server: m.server != null ? K(inst, m.server) : m.server, author: m.author ? { ...m.author, inst } : m.author });
 const mapKeys = (o, f) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [f(k), v]));
