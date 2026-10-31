@@ -3,7 +3,7 @@
 // bare: they never contain '|', so they can't collide with a namespaced one. Only the code that talks to an instance
 // turns a key back into the bare id, and the origin comes out of the key itself - a request for community X can only
 // ever go to the instance X was loaded from.
-import { onWebClientPath } from './hosts.js';
+import { onWebClientPath, hostedAlias } from './hosts.js';
 export const VELORA = 'velora';
 
 export function normOrigin(input) {
@@ -13,6 +13,8 @@ export function normOrigin(input) {
   try {
     const u = new URL(s);
     if (!/^https?:$/.test(u.protocol) || !u.hostname || u.username || u.password) return null;
+    const alias = hostedAlias(u.hostname); // e_<slug>.nookara.cc -> e-<slug>.nookara.cc
+    if (alias !== u.hostname) u.hostname = alias;
     return u.origin;
   } catch { return null; }
 }
@@ -43,7 +45,9 @@ export function acct() {
 }
 export const acctKey = base => { const a = acct(); return a ? `${base}:${a}` : base; };
 const SESSIONS = 'bonfire_instance_sessions';
-export function loadSessions() { try { const v = JSON.parse(localStorage.getItem(acctKey(SESSIONS)) || '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; } }
+// (keys go through normOrigin: a session saved under e_<slug>.nookara.cc is the e-<slug> server's)
+const byOrigin = v => (v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, s]) => [normOrigin(k) || k, s])) : {});
+export function loadSessions() { try { return byOrigin(JSON.parse(localStorage.getItem(acctKey(SESSIONS)) || '{}')); } catch { return {}; } }
 export function saveSession(origin, session, tag) {
   try { const all = loadSessions(); if (session) all[origin] = session; else delete all[origin]; localStorage.setItem(acctKey(SESSIONS), JSON.stringify(all)); } catch { /* private mode */ }
   try { const t = loadSessionTags(); if (session && tag) t[origin] = tag; else delete t[origin]; localStorage.setItem(acctKey(SESSION_TAGS), JSON.stringify(t)); } catch { /* private mode */ }
@@ -51,7 +55,7 @@ export function saveSession(origin, session, tag) {
 // which Ember sign-in a Velora-login session came from: signing in again (e.g. now with "Sign messages" approved) must
 // trade a fresh instance token, or the instance keeps the old session's permissions
 const SESSION_TAGS = 'bonfire_instance_session_tags';
-export function loadSessionTags() { try { const v = JSON.parse(localStorage.getItem(acctKey(SESSION_TAGS)) || '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; } }
+export function loadSessionTags() { try { return byOrigin(JSON.parse(localStorage.getItem(acctKey(SESSION_TAGS)) || '{}')); } catch { return {}; } }
 export function tokenTag(token) { let h = 0; for (let i = 0; i < (token || '').length; i++) h = (h * 31 + token.charCodeAt(i)) | 0; return token ? (h >>> 0).toString(36) : ''; }
 
 

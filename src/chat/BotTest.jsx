@@ -47,7 +47,7 @@ function Advanced({ id }) {
       <summary>Advanced (API)</summary>
       <p className="vc-hint">For scripts: get a test ticket (valid 5 minutes, one use), then send it to the instance yourself.</p>
       <div className="bt-row">
-        <input className="form-input grow" placeholder="https://e_testing.nookara.cc" value={inst} onChange={e => setInst(e.target.value)} aria-label="Instance address" />
+        <input className="form-input grow" placeholder="https://e-testing.nookara.cc" value={inst} onChange={e => setInst(e.target.value)} aria-label="Instance address" />
         <button type="button" className="btn btn-surface btn-sm" disabled={busy || !inst.trim()} onClick={getTicket}>Get test ticket</button>
       </div>
       {err && <div className="vc-addbot-err">{err}</div>}
@@ -169,7 +169,7 @@ export function TestBotDialog({ id, onClose }) {
                 )}
               </div>
             ))}
-            {!targets.length && <div className="vc-empty-note">No servers to add it to. You need Manage server on one - add your test instance (for example e_testing.nookara.cc) from the + in the sidebar first.</div>}
+            {!targets.length && <div className="vc-empty-note">No servers to add it to. You need Manage server on one - add your test instance (for example e-testing.nookara.cc) from the + in the sidebar first.</div>}
           </div>
           {Object.values(done).some(Boolean) && (
             <div className="vc-addbot-ok bt-ok"><FlaskConical size={14} /> Added as a test install. The developer&apos;s program connects with its normal token to that server&apos;s address (<span style={mono}>/bot/gateway</span>); bots that read <span style={mono}>/bonfire/bots/self/installs</span> find it on their own within a few minutes.</div>

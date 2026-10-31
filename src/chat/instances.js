@@ -11,6 +11,7 @@ import { getState, patchState, toast, handleEvent, instanceVoiceClosed, loadEmoj
 export const connections = new Map();
 const LIST_CACHE = () => acctKey('bonfire_instance_list'); // (per account: an alt must not inherit the main's servers)
 
+const rawOrigin = u => { try { const x = new URL(String(u)); return /^https?:$/.test(x.protocol) ? x.origin : null; } catch { return null; } };
 export const hostOf = o => { try { return new URL(o).host; } catch { return String(o).replace(/^https?:\/\//, ''); } };
 export const instView = c => ({
   origin: c.origin, host: hostOf(c.origin), name: c.info?.name || hostOf(c.origin), icon: c.info?.icon_url || null, description: c.info?.description || '',
@@ -24,7 +25,9 @@ export const instView = c => ({
   serverInfo: c.isAdmin ? (c.serverInfo || null) : null, // its admins: /instance/info (build, runtime, stats, update)
   managed: c.info?.managed || null, // hosted by Velora: { plan, limits, host }
   readOnly: !!(c.info?.read_only || c.info?.community?.read_only), // hosted by Velora and its paid time ran out
-  previousUrls: Array.isArray(c.info?.previous_urls) ? c.info.previous_urls.map(normOrigin).filter(Boolean) : [], // addresses it had before (old signatures name them)
+  // addresses it had before (old signatures name them): exact origins, NOT normOrigin (that reads e_<x> as e-<x>, but a message signed
+  // while the server was e_<x>.nookara.cc names e_<x>)
+  previousUrls: Array.isArray(c.info?.previous_urls) ? c.info.previous_urls.map(rawOrigin).filter(Boolean) : [],
 
 });
 const mirror = () => patchState({ instances: [...connections.values()].map(instView) });
@@ -40,7 +43,7 @@ async function plain(origin, path, body, method = 'POST') {
   return data;
 }
 // what an address is: the instance's public face, or why it isn't one.
-// A Nookara-hosted server that moved (e_<name>.nookara.cc) redirects its old address for two weeks: then the answer is the new
+// A Nookara-hosted server that moved (e-<name>.nookara.cc; before that e_<name>, <name>-bonfire.ikelene.net) redirects its old address for two weeks: then the answer is the new
 // origin plus movedFrom, and callers keep the new one (the server says the same in public_url).
 export async function discover(input) {
   const origin = normOrigin(input);

@@ -13,8 +13,11 @@ export const onWebClientPath = () => onEmberHost() || /^\/chat(\/|$)/.test(locat
 export const clientPath = () => (onEmberHost() ? '/' : '/chat');
 // shareable link to a view hash such as '#/s/1': always the canonical Ember host (a local dev server keeps its own origin)
 export const shareLink = hash => (/^(localhost|127\.|\[::1\])/i.test(here()) ? `${location.origin}/chat${hash}` : `${EMBER_ORIGIN}/${hash}`);
-// a hosted instance's address: <slug> -> https://e_<slug>.nookara.cc (older ones were <slug>.ikelene.net)
+// a hosted instance's address: <slug> -> https://e-<slug>.nookara.cc (older ones: e_<slug>.nookara.cc, <slug>-bonfire.ikelene.net)
 export const INSTANCE_DOMAIN = 'nookara.cc';
+// e_<slug>.nookara.cc (2026-10-30/31, before the dash: OpenSSL clients reject underscores) is read as e-<slug>.nookara.cc, so saved
+// entries, invites and typed addresses go straight to the dash host. -> the host to use
+export const hostedAlias = host => String(host || '').toLowerCase().replace(/^e_([a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9]))\.nookara\.cc$/, 'e-$1.nookara.cc');
 // URL for history.pushState / replaceState of a view hash ('#/home'): /chat#.. on the Velora-era hosts, /#.. on ember.nookara.cc
 export const clientUrl = hash => `${clientPath() === '/' ? '/' : '/chat'}${hash || ''}`;
 // a path on the Nookara website (/me, /u/name, /upgrade...). ember.nookara.cc serves only the chat, so there it becomes an

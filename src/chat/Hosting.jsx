@@ -12,8 +12,8 @@ import { discover, veloraSession, addInstance, moveInstance } from './instances.
 import { normOrigin, instOf, isInst } from './ids.js';
 import { hasVelora, startSignIn } from './session.js';
 
-// a hosted server's address is e_<slug>.nookara.cc (the host template from /bonfire/hosting/plans); choosing <slug> is a Nookara Pro perk
-const DEFAULT_TEMPLATE = 'e_{slug}.nookara.cc';
+// a hosted server's address is e-<slug>.nookara.cc (the host template from /bonfire/hosting/plans); choosing <slug> is a Nookara Pro perk
+const DEFAULT_TEMPLATE = 'e-{slug}.nookara.cc';
 const tplParts = cfg => (cfg?.host_template || DEFAULT_TEMPLATE).split('{slug}');
 // the same rules Nookara checks (bonfire-hosting-slugs.js), so most mistakes show before asking it
 export function slugIssue(s) {
@@ -297,7 +297,7 @@ async function downloadBackup(b) {
   } catch (e) { toast(hostingError(e)); }
 }
 
-// ── Server settings > Hosting > Address: e_<slug>.nookara.cc. Nookara Pro owners pick <slug> and change it once per 24 hours
+// ── Server settings > Hosting > Address: e-<slug>.nookara.cc. Nookara Pro owners pick <slug> and change it once per 24 hours
 // (the old address redirects for 14 days); without Pro the address is random; after Pro ends a chosen one stays, frozen ──
 function AddressCard({ h, cfg, origin }) {
   const a = h.address || { state: 'pro_only', url: h.url, host_slug: h.host_slug };
