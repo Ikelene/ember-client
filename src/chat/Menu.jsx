@@ -11,7 +11,8 @@ import { ChevronRight, Check, Hash, Copy, Link2, BellOff, Bell, CheckCheck, User
 import { apiFetch } from '../api.js';
 import { useChat, getState, setMenu, toggleBlock, toast, setNotify, notifyOf, go, markServerRead, markChannelRead, linkFor, isMineMsg } from './store.js';
 import { bare, instOpt, isInst } from './ids.js';
-import { reportTo } from './report.js';
+import { reportTo, reportDmMessage } from './report.js';
+import { canReportDm } from './dm-report.js';
 import { setInstancePrefs } from './instances.js';
 import { roleMenuItems, modMenuItems, P, has } from './roles.jsx';
 import { viewPicture, copyImage, downloadImage } from './MediaViewer.jsx';
@@ -246,6 +247,7 @@ export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, 
     view.kind === 'channel' && { label: 'Copy message link', icon: Link2, onClick: () => copy(linkFor(view), 'Link copied') },
     canDelete && { label: 'Delete message', icon: Trash2, danger: true, onClick: onDelete },
     view.kind === 'channel' && isInst(view.sid) && !isMineMsg(m) && !m.system && /^\d+$/.test(String(m.id)) && { label: 'Report message', icon: Flag, danger: true, onClick: () => reportTo(view.sid, { message_id: m.id }, 'this message', { target: m.author, message: m }) },
+    canReportDm(view, m, getState().me?.username) && { label: 'Report message', icon: Flag, danger: true, onClick: () => reportDmMessage(view, m) },
     'sep',
     onInfo && { label: 'Message info', icon: Info, onClick: onInfo }, // Manage messages: the real sender (aliases included)
     { label: 'Copy message ID', icon: Code2, dev: true, onClick: () => copy(m.imId || m.id, 'Message ID copied') },

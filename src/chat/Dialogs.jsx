@@ -395,11 +395,15 @@ export function AskHost() {
   const [cat, setCat] = useState('');
   const [amount, setAmount] = useState(''); // a choice with custom: a number and a unit
   const [unit, setUnit] = useState('');
-  useEffect(() => { setTyped(a?.input?.value || ''); setPick(a?.choices?.find(c => !c.disabled)?.id ?? null); setCat(''); setAmount(''); setUnit(a?.choices?.find(c => c.custom)?.custom?.units?.[0]?.[0] || ''); }, [a]);
+  const [sel, setSel] = useState(''); // a.select = { label, options: [[value, label]], optional? }: a dropdown; the answer is { text, select }
+  useEffect(() => { setTyped(a?.input?.value || ''); setPick(a?.choices?.find(c => !c.disabled)?.id ?? null); setCat(''); setAmount(''); setUnit(a?.choices?.find(c => c.custom)?.custom?.units?.[0]?.[0] || ''); setSel(''); }, [a]);
   if (!a) return null;
   const chosen = a.choices?.find(c => c.id === pick);
-  const ok = (a.input ? (a.input.optional || !!typed.trim()) : (!a.match || typed.trim() === a.match)) && (!a.choices || (!!chosen && (!chosen.categories || !!cat) && (!chosen.custom || (Number(amount) > 0 && Number(amount) <= (chosen.custom.max || Infinity)))));
-  const answer = () => { const v = a.input ? (a.input.optional ? { text: typed.trim() } : typed.trim()) : true; return a.choices ? { ...(typeof v === 'object' ? v : { text: '' }), choice: pick, category: cat, amount: Number(amount), unit } : v; };
+  const ok = (a.input ? (a.input.optional || !!typed.trim()) : (!a.match || typed.trim() === a.match)) && (!a.select || a.select.optional || !!sel) && (!a.choices || (!!chosen && (!chosen.categories || !!cat) && (!chosen.custom || (Number(amount) > 0 && Number(amount) <= (chosen.custom.max || Infinity)))));
+  const answer = () => {
+    const v = a.select ? { text: a.input ? typed.trim() : '', select: sel } : a.input ? (a.input.optional ? { text: typed.trim() } : typed.trim()) : true;
+    return a.choices ? { ...(typeof v === 'object' ? v : { text: '' }), choice: pick, category: cat, amount: Number(amount), unit } : v;
+  };
   return (
     <Dialog key={a.title} title={a.title} onClose={() => answerAsk(false)} className="vc-ask">
       {close => (
@@ -424,13 +428,17 @@ export function AskHost() {
             <label className="vc-field"><span>What's wrong?</span>
               <select className="form-input" value={cat} onChange={e => setCat(e.target.value)}><option value="">Pick one...</option>{chosen.categories.map(x => <option key={x} value={x}>{x}</option>)}</select></label>
           )}
+          {a.select && (
+            <label className="vc-field"><span>{a.select.label || 'Pick one'}</span>
+              <select className="form-input" autoFocus value={sel} onChange={e => setSel(e.target.value)}><option value="">Pick one...</option>{a.select.options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+          )}
           {a.link && <div className="vc-ask-link"><b>{a.link.host}</b><span>{a.link.href}</span></div>}
           {a.match && (
             <label className="vc-field"><span>Type <b className="vc-ask-match">{a.match}</b> to confirm</span>
               <input className="form-input" autoFocus value={typed} onChange={e => setTyped(e.target.value)} /></label>
           )}
           {a.input && (a.input.multiline
-            ? <textarea className="form-textarea" autoFocus rows={3} maxLength={a.input.max || 40} placeholder={a.input.placeholder} value={typed} onChange={e => setTyped(e.target.value)} />
+            ? <textarea className="form-textarea" autoFocus={!a.select} rows={3} maxLength={a.input.max || 40} placeholder={a.input.placeholder} value={typed} onChange={e => setTyped(e.target.value)} />
             : <input className="form-input" autoFocus maxLength={a.input.max || 40} placeholder={a.input.placeholder} value={typed} onChange={e => setTyped(e.target.value)} />)}
           <div className="vc-dialog-btns">
             <span className="grow" />

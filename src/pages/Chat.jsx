@@ -10,7 +10,8 @@ import { Starboard } from '../chat/Starboard.jsx';
 import { GameChannel, GameChatStrip, GameOfflineNote } from '../chat/GameServer.jsx';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { initSheets } from '../chat/sheets.js';
-import { Hash, Lock, Users, Menu, ChevronLeft, Search, X, AtSign, UsersRound, LogOut, Megaphone, PanelRight, ExternalLink, ShieldCheck, ShieldAlert, Bell, Ban } from 'lucide-react';
+import { Hash, Lock, Users, Menu, ChevronLeft, Search, X, AtSign, UsersRound, LogOut, Megaphone, PanelRight, ExternalLink, ShieldCheck, ShieldAlert, Bell, Ban, Flag } from 'lucide-react';
+import { reportDmUser } from '../chat/report.js';
 import { api, getToken, cachedMe, apiFetch, isWebBonfire } from '../api.js';
 import { applyAccentColor } from '../theme.js';
 import { jumpToMessage, loginAgain, retryNow } from '../chat/store.js';
@@ -575,6 +576,7 @@ function ChatPage() {
               {isServer && <button type="button" className={`vc-ico-btn${showMembers ? ' on' : ''}`} title={showMembers ? 'Hide members' : 'Show members'} onClick={() => setShowMembers(x => !x)}><Users size={19} /></button>}
               {view.kind === 'dm' && !sysDM && staff && <button type="button" className="vc-ico-btn" title="Message them as Nookara Administrator (Nookara Moderator Chat)" onClick={() => go({ kind: 'modmail', username: view.username })}><ShieldCheck size={19} /></button>}
               {view.kind === 'dm' && !sysDM && <DmCallButton username={view.username} />}
+              {view.kind === 'dm' && !sysDM && <button type="button" className="vc-ico-btn" title={`Report @${view.username} to Nookara staff`} aria-label={`Report @${view.username}`} onClick={() => reportDmUser(view.username)}><Flag size={19} /></button>}
               {view.kind !== 'channel' && <button type="button" className={`vc-ico-btn${showMembers ? ' on' : ''}`} title="Side panel" onClick={() => setShowMembers(x => !x)}><PanelRight size={19} /></button>}
             </header>
             <div className="vc-body">
