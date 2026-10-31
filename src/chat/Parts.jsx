@@ -13,7 +13,7 @@ import {
 
 import { RetryIn } from './Gate.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
-import { useChat, retryNow, isMobileDevice, go, keyOf, setStatus, setCustom, isMuted, effectiveNotify, ask, refreshServer, toast, errorText, setDetailLayout, patchState, saveSettings, getState, statusOf, presenceFor, useFace, isBlockedPerson, isBlockedName, blockedFace, BLOCKED_NAME } from './store.js';
+import { useChat, retryNow, isMobileDevice, go, keyOf, setStatus, setCustom, isMuted, effectiveNotify, ask, refreshServer, toast, errorText, setDetailLayout, patchState, saveSettings, getState, statusOf, presenceFor, useFace, isBlockedPerson, isBlockedName, blockedFace, BLOCKED_NAME, loadMoreMembers } from './store.js';
 import { P, has, ChannelIcon, useNameStyle, colorFrom, NameDecor } from './roles.jsx';
 import { serverMenu, instanceMenu, channelMenu, userMenu, openMenu, copy } from './Menu.jsx';
 import { apiFetch, getToken } from '../api.js';
@@ -551,6 +551,7 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
 // ── member list (grouped: owner / admins / online / offline) ────────────────
 export function MemberList({ sid, onUser }) {
   const members = useChat(s => s.members[sid]);
+  const more = useChat(s => s.membersMore[sid]); // a big Velora-hosted server: more pages to load (as you scroll)
   const presence = useChat(s => s.presence);
   const names = useChat(s => s.veloraNames);
   const signedIn = useChat(s => s.signedIn);
@@ -579,7 +580,7 @@ export function MemberList({ sid, onUser }) {
   if (!members) return <aside className="vc-members"><div className="vc-loading"><i /><i /><i /></div></aside>;
   let n = 0;
   return (
-    <aside className="vc-members" key={sid}>
+    <aside className="vc-members" key={sid} onScroll={more != null ? e => { const el = e.currentTarget; if (el.scrollTop + el.clientHeight > el.scrollHeight - 400) loadMoreMembers(sid); } : undefined}>
       {groups.map(([title, list, role]) => (
         <div key={role?.rid || title} className="vc-mgroup">
           <div className="vc-cat-name static">{role?.icon && <img className="vc-role-ico" src={role.icon} alt="" />}{title} - {list.length}</div>
@@ -602,7 +603,7 @@ export function MemberList({ sid, onUser }) {
           })}
         </div>
       ))}
-      {n > shown && <button type="button" className="vc-more" onClick={() => setShown(x => x + 100)}>Show more</button>}
+      {(n > shown || more != null) && <button type="button" className="vc-more" onClick={() => { setShown(x => x + 100); if (more != null) loadMoreMembers(sid); }}>Show more</button>}
     </aside>
   );
 }

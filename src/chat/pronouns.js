@@ -1,17 +1,18 @@
 // Pronouns shown in message headers.
 // Message author objects are broadcast to everyone in a channel, so pronouns are NOT put in them (friends-only
 // profiles hide pronouns from non-friends). Each viewer fetches them through GET /account/lookup, which already
-// applies that rule per viewer, via the shared (60 s) lookup cache in store.js.
+// applies that rule per viewer, via the shared (5 min) lookup cache in store.js - in batches (lookupMany: one request
+// for up to 100 names), not one request per author.
 import { useEffect, useState } from 'react';
-import { lookup, forgetProfile } from './store.js';
+import { lookupMany, forgetProfile } from './store.js';
 
 const vals = new Map();      // lowercase username -> pronouns string ('' = none / hidden)
 const subs = new Map();      // lowercase username -> Set of setState callbacks
 const pending = new Set();   // names being fetched
 const queue = [];
-let running = 0;
+let running = 0, flushTimer = null;
 let timer = null;
-const REFRESH_MS = 60000, MAX_REFRESH = 40, CONCURRENT = 3;
+const REFRESH_MS = 60000, MAX_REFRESH = 100, CONCURRENT = 2, BATCH = 100;
 
 const key = n => String(n || '').toLowerCase();
 function set(k, v) {
@@ -19,13 +20,17 @@ function set(k, v) {
   vals.set(k, v);
   subs.get(k)?.forEach(fn => fn(v));
 }
+// names asked for within a few ms go out together
 function pump() {
-  while (running < CONCURRENT && queue.length) {
-    const k = queue.shift();
+  if (flushTimer || running >= CONCURRENT || !queue.length) return;
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    const ks = queue.splice(0, BATCH);
     running++;
-    lookup(k).then(d => set(k, typeof d?.pronouns === 'string' ? d.pronouns.trim() : ''), () => { if (!vals.has(k)) set(k, ''); })
-      .finally(() => { running--; pending.delete(k); pump(); });
-  }
+    lookupMany(ks).then(got => ks.forEach(k => { const d = got.get(k); if (d) set(k, typeof d.pronouns === 'string' ? d.pronouns.trim() : ''); else if (!vals.has(k)) set(k, ''); }),
+      () => ks.forEach(k => { if (!vals.has(k)) set(k, ''); }))
+      .finally(() => { running--; ks.forEach(k => pending.delete(k)); pump(); });
+  }, 25);
 }
 function want(k) {
   if (!k || pending.has(k)) return;

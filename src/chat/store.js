@@ -28,6 +28,7 @@ let state = {
   servers: [],             // my servers
   detail: {},              // sid -> { server, channels }
   members: {},             // sid -> [member]
+  membersMore: {},         // sid -> next offset, for a big Velora-hosted server whose member list comes in pages (absent: all loaded)
   presence: {},            // username -> { status, custom, activities }
   people: {},              // username -> { username, pfp, color, rank }
   msgs: {},                // key -> { list, hasMore, loading, loaded }
@@ -135,20 +136,51 @@ export function remember(list) {
   if (Object.keys(add).length) set(s => ({ people: { ...s.people, ...add } }));
 }
 const lookups = new Map();
+// public profiles are cached for 5 minutes: an edit still shows at once (Velora sends user_update, which clears this)
+const LOOKUP_MS = 5 * 60 * 1000, LOOKUP_BATCH = 100;
 // a public Velora endpoint (no token): what signed-out Ember may still ask Velora for (public profiles)
 const publicJson = path => fetch(path).then(r => r.json().then(d => (r.ok ? d : Promise.reject(Object.assign(new Error(d.error || 'request_failed'), { status: r.status })))));
-export function lookup(username) { // the public profile (cached for a minute)
+const faceOfProfile = d => ({ id: d.id != null ? String(d.id) : undefined, username: d.username, pfp: d.pfp_url || null, color: d.color || null, rank: d.rank });
+export function lookup(username) { // the public profile (cached for 5 minutes)
   const k = String(username).toLowerCase();
   const hit = lookups.get(k);
-  if (hit && Date.now() - hit.at < 60000) return hit.p;
+  if (hit && Date.now() - hit.at < LOOKUP_MS) return hit.p;
   const path = `/account/lookup/${encodeURIComponent(username)}`;
   const p = (getToken() ? apiFetch(path) : publicJson(path)).then(d => {
-    remember([{ id: d.id != null ? String(d.id) : undefined, username: d.username, pfp: d.pfp_url || null, color: d.color || null, rank: d.rank }]);
+    remember([faceOfProfile(d)]);
     return d;
   });
   p.catch(() => lookups.delete(k));
   lookups.set(k, { at: Date.now(), p });
   return p;
+}
+// many public profiles in as few requests as possible (GET /account/lookup?u=a,b,c - up to 100 per request), into the
+// same cache as lookup(). -> Map(lower-case username -> profile); names that don't exist (or are hidden) are left out.
+export async function lookupMany(usernames) {
+  const out = new Map(), ask = [];
+  for (const n of new Set((usernames || []).map(x => String(x || '').trim()).filter(Boolean))) {
+    const k = n.toLowerCase(), hit = lookups.get(k);
+    if (hit && Date.now() - hit.at < LOOKUP_MS) out.set(k, hit.p); else ask.push(n);
+  }
+  for (let i = 0; i < ask.length; i += LOOKUP_BATCH) {
+    const chunk = ask.slice(i, i + LOOKUP_BATCH);
+    const path = `/account/lookup?u=${chunk.map(encodeURIComponent).join(',')}`;
+    const batch = (getToken() ? apiFetch(path) : publicJson(path)).then(d => {
+      const users = d?.users || [];
+      remember(users.map(faceOfProfile));
+      return new Map(users.map(u => [String(u.username).toLowerCase(), u]));
+    });
+    for (const n of chunk) {
+      const k = n.toLowerCase();
+      const p = batch.then(m => m.get(k) || Promise.reject(Object.assign(new Error('not_found'), { status: 404 })));
+      p.catch(() => lookups.delete(k));
+      lookups.set(k, { at: Date.now(), p });
+      out.set(k, p);
+    }
+  }
+  const done = new Map();
+  await Promise.all([...out].map(([k, p]) => p.then(d => { done.set(k, d); }, () => {})));
+  return done;
 }
 // Velora people on an instance server (v:<id>) show their live Velora face - picture, accent colour, rank - like on Velora's own
 // servers. By id when signed in (/chat/identities), else by the name the instance knows, through the public profile (kept
@@ -173,7 +205,8 @@ async function flushFaces() {
       for (const u of r?.users || []) if (u.username) got[u.id] = u;
     }
   } else {
-    await Promise.all(ids.slice(0, 100).map(id => lookup(q.get(id)).then(d => { if (String(d.id) === id) got[id] = { id, username: d.username, pfp: d.pfp_url || null, color: d.color || null, rank: d.rank }; }).catch(() => {})));
+    const found = await lookupMany(ids.slice(0, 100).map(id => q.get(id))).catch(() => new Map());
+    for (const id of ids.slice(0, 100)) { const d = found.get(String(q.get(id) || '').toLowerCase()); if (d && String(d.id) === id) got[id] = { id, username: d.username, pfp: d.pfp_url || null, color: d.color || null, rank: d.rank }; }
   }
   for (const id of ids) if (!got[id]) got[id] = { id, miss: true }; // nobody to show: stop holding their name colour back
   if (Object.keys(got).length) set(s => ({ veloraFaces: { ...s.veloraFaces, ...got }, veloraNames: { ...s.veloraNames, ...Object.fromEntries(Object.entries(got).filter(([, u]) => !u.miss).map(([id, u]) => [id, u.username])) } }));
@@ -192,8 +225,23 @@ export const onUserUpdate = fn => { const h = e => fn(e.detail); addEventListene
 // drop the cached public profile (after you edit your own), so the next lookup is fresh
 export function forgetProfile(username) { lookups.delete(String(username || '').toLowerCase()); }
 export function wantPresence(username) {
+  if (username) watched.add(username);
   if (!username || state.presence[username]) return;
   send({ type: 'chat_presence', username });
+}
+// Velora only sends presence to the people who can see it (friends, DMs, groups, small shared servers) and to the
+// sockets that asked about someone: ask for a whole list at once (one chat_presence_watch per 200, answered by one
+// presence_bulk), and again after every reconnect so the lists we show stay live.
+const watched = new Set();
+export function watchPresence(usernames) {
+  const fresh = [...new Set((usernames || []).filter(Boolean))].filter(n => !watched.has(n));
+  fresh.forEach(n => watched.add(n));
+  for (let i = 0; i < fresh.length; i += 200) send({ type: 'chat_presence_watch', usernames: fresh.slice(i, i + 200) });
+}
+function rewatchPresence() {
+  const me = state.me?.username;
+  const names = [...new Set([...watched, ...Object.keys(state.presence)])].filter(n => n && n !== me).slice(-1000);
+  for (let i = 0; i < names.length; i += 200) send({ type: 'chat_presence_watch', usernames: names.slice(i, i + 200) });
 }
 // Spotify's `progress` is sampled by the server, but the clock that advances
 // it must begin on this device when the presence payload arrives. Using the
@@ -348,6 +396,7 @@ function onEvent(m, inst = VELORA) {
       break;
     case 'chat_ready':
       set(s => ({ conn: 'open', presence: { ...s.presence, [m.you.username]: localizePresence(m.you.presence) } }));
+      rewatchPresence(); // (a new socket: the server forgot what this one was watching)
       catchUp();
       loadNotifCount(); // (anything that happened while the socket was down)
       break;
@@ -534,6 +583,9 @@ function onEvent(m, inst = VELORA) {
       break;
     case 'presence_update':
       set(s => ({ presence: { ...s.presence, [m.username]: localizePresence(m.presence) } }));
+      break;
+    case 'presence_bulk': // the answer to chat_presence_watch
+      if (Array.isArray(m.presences) && m.presences.length) set(s => ({ presence: { ...s.presence, ...Object.fromEntries(m.presences.map(x => [x.username, localizePresence(x.presence)])) } }));
       break;
     case 'im_received':
     case 'im_sent': {
@@ -833,7 +885,7 @@ export async function loadMessages(v, { older = false } = {}) {
     } else if (v.kind === 'group') {
       const d = await apiFetch(`/groups/${encodeURIComponent(v.room)}/messages?limit=300`);
       const names = [...new Set(d.messages.map(m => m.user).filter(Boolean))].filter(n => !state.people[n]?.pfp);
-      await Promise.all(names.slice(0, 30).map(n => lookup(n).catch(() => null)));
+      await lookupMany(names.slice(0, 100)).catch(() => null);
       list = d.messages.map(groupToMsg);
     }
     if (v.kind === 'channel' && isInst(v.cid)) list.forEach(watchSignature); else remember(list.map(m => m.author).filter(Boolean));
@@ -1264,12 +1316,32 @@ export async function loadMembers(sid) {
     const ids = [...new Set(d.members.filter(m => m.kind === 'velora' && /^[1-9]\d*$/.test(String(m.velora_id))).map(m => String(m.velora_id)))].slice(0, 200);
     const names = await apiFetch(`/chat/identities?ids=${ids.join(',')}`).then(r => Object.fromEntries(r.users.map(u => [String(u.id), u.username]))).catch(() => ({})); // their name now (the instance knows the one from their last login)
     if (Object.keys(names).length) set(s => ({ veloraNames: { ...s.veloraNames, ...names } }));
-    d.members.filter(m => m.kind === 'velora').slice(0, 100).forEach(m => wantPresence(names[m.velora_id] || m.username));
+    watchPresence(d.members.filter(m => m.kind === 'velora').slice(0, 400).map(m => names[m.velora_id] || m.username));
     return;
   }
   remember(d.members);
   const pres = Object.fromEntries(d.members.map(m => [m.username, localizePresence(m.presence)]));
-  set(s => ({ members: { ...s.members, [sid]: d.members }, presence: { ...s.presence, ...pres } }));
+  set(s => ({ members: { ...s.members, [sid]: d.members }, presence: { ...s.presence, ...pres }, membersMore: pagedMore(s.membersMore, sid, d) }));
+  if (d.next_offset != null) watchPresence(d.members.map(m => m.username)); // a big server: its members' presence isn't pushed to everyone
+}
+const pagedMore = (all, sid, d) => { const next = { ...all }; if (d.next_offset != null) next[sid] = d.next_offset; else delete next[sid]; return next; };
+// a big Velora-hosted server answers its member list in pages (Velora chat.js memberList): the next one, as you scroll
+const loadingMore = new Set();
+export async function loadMoreMembers(sid) {
+  const from = state.membersMore[sid];
+  if (from == null || loadingMore.has(sid) || isInst(sid)) return;
+  loadingMore.add(sid);
+  try {
+    const d = await apiFetch(`/chat/servers/${sid}/members?offset=${from}&limit=200`).catch(() => null);
+    if (!d || state.membersMore[sid] !== from) return;
+    remember(d.members);
+    const pres = Object.fromEntries(d.members.map(m => [m.username, localizePresence(m.presence)]));
+    set(s => {
+      const have = new Set((s.members[sid] || []).map(m => m.username));
+      return { members: { ...s.members, [sid]: [...(s.members[sid] || []), ...d.members.filter(m => !have.has(m.username))] }, presence: { ...s.presence, ...pres }, membersMore: pagedMore(s.membersMore, sid, d) };
+    });
+    watchPresence(d.members.map(m => m.username));
+  } finally { loadingMore.delete(sid); }
 }
 export async function loadCommands(sid, cid) {
   if (!isInst(sid)) return;
@@ -1332,7 +1404,7 @@ export async function loadFriends() {
   if (!d) return;
   remember(d.friends.map(f => ({ username: f.friend_username, pfp: f.pfp_url, color: f.color, rank: f.rank })));
   set({ friends: d.friends });
-  d.friends.forEach(f => wantPresence(f.friend_username));
+  watchPresence(d.friends.map(f => f.friend_username));
 }
 export async function loadBlocks() {
   const d = await apiFetch('/account/blocks').catch(() => null);
