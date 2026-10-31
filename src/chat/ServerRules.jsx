@@ -15,6 +15,7 @@ import { stampOf } from './text.jsx';
 import { Card } from './SettingsShell.jsx';
 import { useUnsaved, UnsavedBar } from './unsaved.jsx';
 import { JoinInvites, UploadsTab } from './Community.jsx';
+import { OperatorTermsNotice } from './OperatorTerms.jsx';
 
 const clone = v => JSON.parse(JSON.stringify(v));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -157,6 +158,7 @@ export function DashboardPage({ sid, goTo }) {
   ];
   return (
     <div className="bf-ss-page">
+      <OperatorTermsNotice sid={sid} />
       <div className="bf-sr-tiles">
         {tiles.map(([I, label, big, small, onClick]) => {
           const T = onClick ? 'button' : 'div';

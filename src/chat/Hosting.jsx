@@ -4,13 +4,14 @@
 // Plus is prepaid weeks and never renews by itself: when the time is up the server is overdue for 2 days, then read-only,
 // and a week later Velora keeps a backup in your account and shuts it down. Velora's side: /bonfire/hosting/* (PROTOCOL §19).
 import { useEffect, useRef, useState } from 'react';
-import { Check, Globe, Rocket, Sparkles, Users, Volume2, Upload, Smile, Bot, ArrowLeftRight, KeyRound, TriangleAlert, RefreshCw, Trash2, Coins, Server, ShieldCheck, Archive, Download, CalendarClock, X, Lock, HardDrive, Clock, Pencil } from 'lucide-react';
+import { Check, Globe, Rocket, Sparkles, Users, Volume2, Upload, Smile, Bot, ArrowLeftRight, KeyRound, TriangleAlert, ScrollText, RefreshCw, Trash2, Coins, Server, ShieldCheck, Archive, Download, CalendarClock, X, Lock, HardDrive, Clock, Pencil } from 'lucide-react';
 import { apiFetch, getToken } from '../api.js';
 import { Dialog } from './Dialogs.jsx';
 import { useChat, patchState, toast, errorText, ask, go } from './store.js';
 import { discover, veloraSession, addInstance, moveInstance } from './instances.js';
 import { normOrigin, instOf, isInst } from './ids.js';
 import { hasVelora, startSignIn } from './session.js';
+import { OperatorTermsCheck, TermsLink } from './OperatorTerms.jsx';
 
 // a hosted server's address is e-<slug>.nookara.cc (the host template from /bonfire/hosting/plans); choosing <slug> is a Nookara Pro perk
 const DEFAULT_TEMPLATE = 'e-{slug}.nookara.cc';
@@ -34,6 +35,7 @@ const day = t => new Date(t).toLocaleDateString(undefined, { weekday: 'short', m
 const daysLeft = t => Math.max(0, Math.ceil((t - Date.now()) / DAY));
 const sizeOf = b => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 export const HOSTING_TEXT = {
+  operator_terms_required: 'Accept the Ember Server Operator Terms to create a server.',
   hosting_unavailable: "Nookara can't host servers right now - try again later.", slug_taken: 'That address is taken.', slug_reserved: "That address can't be used.",
   invalid_slug: 'Use 3-32 letters, numbers or dashes (not at the start or end).', pro_required: 'Choosing your own address needs Nookara Pro.',
   address_cooldown: 'You can change the address once every 24 hours.', address_locked: 'This address stays yours, but changing it needs Nookara Pro again.', nothing_to_change: "That's already its address.", insufficient_balance: "You don't have enough credits for that.", insufficient_credits: "You don't have enough credits for that.",
@@ -117,6 +119,7 @@ export function CreateServer({ onClose, onSetup, onAddByAddress }) {
   const [step, setStep] = useState('plan'); // plan | address | work
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
+  const [terms, setTerms] = useState(false); // Ember Server Operator Terms (required to host a server)
   const [touched, setTouched] = useState(false); // typed an address of their own (stop following the name)
   const [check, setCheck] = useState(null); // { slug, available, reason }
   const [progress, setProgress] = useState(0); // 0 reserve, 1 start, 2 sign in
@@ -156,7 +159,7 @@ export function CreateServer({ onClose, onSetup, onAddByAddress }) {
   async function create() {
     setStep('work'); setErr(''); setProgress(0);
     try {
-      const d = await apiFetch('/bonfire/hosting/servers', { method: 'POST', body: JSON.stringify({ ...(pro && slug ? { host_slug: slug } : {}), name: name.trim(), plan, ...(chosen?.price_credits > 0 ? { weeks } : {}), ...(restore ? { restore_backup: restore.id } : {}) }) });
+      const d = await apiFetch('/bonfire/hosting/servers', { method: 'POST', body: JSON.stringify({ accept_operator_terms: true, ...(pro && slug ? { host_slug: slug } : {}), name: name.trim(), plan, ...(chosen?.price_credits > 0 ? { weeks } : {}), ...(restore ? { restore_backup: restore.id } : {}) }) });
       const origin = normOrigin(d.url || d.server?.url);
       loadHosted(true);
       setProgress(1);
@@ -184,8 +187,9 @@ export function CreateServer({ onClose, onSetup, onAddByAddress }) {
               <div className="bf-plans">
                 {cfg.available && plans.map(p =>
  <PlanCard key={p.id} plan={p} pro={pro} on={plan === p.id} onPick={() => setPlan(p.id)} disabled={p.id === 'starter' && starterFull} note={p.id === 'starter' && starterFull ? 'You already have a free server.' : null} />)}
-                <PlanCard plan={selfPlan} on={plan === 'self'} onPick={() => setPlan('self')} note="Free and open source (AGPL-3.0)" />
+                <PlanCard plan={selfPlan} on={plan === 'self'} onPick={() => setPlan('self')} note="Free and open source (AGPL-3.0). Needs the operator terms." />
               </div>
+              {plan === 'self' && <p className="vc-note"><ScrollText size={14} /> <span>Self-hosting an Ember server means accepting the <TermsLink />.</span></p>}
               {backups.length > 0 && (
                 <div className="vc-field"><span>Or bring one back</span>
                   <div className="vc-rows">{backups.map(b => (
@@ -205,6 +209,7 @@ export function CreateServer({ onClose, onSetup, onAddByAddress }) {
               <ol className="bf-self-steps">
                 <li><b>Get Ember Server</b><span>Download it from <a href={SELF_REPO} target="_blank" rel="noreferrer">GitHub</a> (or clone it) on the machine that will run it.</span></li>
                 <li><b>Start it</b><span>With Docker, in its folder:</span><code className="bf-code">docker compose up -d --build</code><span>Or with Node.js 22.13 or newer: <code>npm install</code> then <code>npm start</code>. Set <code>public_url</code> in <code>data/config.json</code> to the address people will use (https).</span></li>
+                <li><b>Accept the operator terms</b><span>Running an Ember server means accepting the <TermsLink />. The first time you claim it here, you'll tick a box to say you have.</span></li>
                 <li><b>Add it here</b><span>Add a server by its address, sign in, and claim it with the setup code it prints the first time it starts. Then name it or import a server.</span></li>
               </ol>
               <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" onClick={() => setStep('plan')}>Back</button><span className="grow" />
@@ -214,7 +219,7 @@ export function CreateServer({ onClose, onSetup, onAddByAddress }) {
             </>
           )}
           {cfg?.available && step === 'address' && (
-            <form onSubmit={e => { e.preventDefault(); if (addressOk && name.trim()) create(); }}>
+            <form onSubmit={e => { e.preventDefault(); if (addressOk && name.trim() && terms) create(); }}>
               {restore && (
                 <div className="bf-plans">{plans.map(p => <PlanCard key={p.id} plan={p} pro={pro} on={plan === p.id} onPick={() => setPlan(p.id)} disabled={p.id === 'starter' && starterFull} />)}</div>
               )}
@@ -233,9 +238,10 @@ export function CreateServer({ onClose, onSetup, onAddByAddress }) {
               {chosen?.price_credits > 0 && !(pro && chosen.free_with_pro) ? <WeeksPicker plan={chosen} weeks={weeks} setWeeks={setWeeks} />
                 : chosen && <p className="vc-note">{chosen.price_credits > 0 ? <><Sparkles size={14} /> {chosen.name}: free with your Nookara Pro, for as long as you have it.</> : <><Rocket size={14} /> {chosen.name}: free.</>}</p>}
 
+              <OperatorTermsCheck checked={terms} onChange={setTerms} />
               {err && <p className="vc-err"><TriangleAlert size={14} /> {err}</p>}
               <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" onClick={() => { setRestore(null); setStep('plan'); }}>Back</button><span className="grow" />
-                <button type="submit" className="btn btn-primary" disabled={!addressOk || !name.trim()}>{restore ? <><RefreshCw size={15} /> Restore server</> : <><Rocket size={15} /> Create server</>}</button></div>
+                <button type="submit" className="btn btn-primary" disabled={!addressOk || !name.trim() || !terms}>{restore ? <><RefreshCw size={15} /> Restore server</> : <><Rocket size={15} /> Create server</>}</button></div>
             </form>
           )}
           {step === 'work' && (

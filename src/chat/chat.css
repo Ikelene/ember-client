@@ -1994,6 +1994,9 @@ html.vc-radio .vc-main { background: transparent; }
 .vc-note { display: flex; align-items: center; gap: 8px; margin: 10px 0; padding: 9px 12px; background: #111113; border: 1px solid var(--border-2); color: var(--dim); font-size: 13px; }
 .vc-note svg { flex: none; color: var(--accent); }
 .vc-note > span { flex: 1; }
+.bf-terms-notice { align-items: flex-start; flex-wrap: wrap; }
+.bf-terms-notice .vc-check { margin: 8px 0 0; }
+.vc-check a, .vc-note a { color: var(--accent); }
 .vc-note.ok { border-color: rgba(111, 158, 124, .5); color: #8fd19e; }
 .vc-note.ok svg { color: #8fd19e; }
 .vc-inline-ico { vertical-align: -2px; margin-right: 3px; }

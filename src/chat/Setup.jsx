@@ -10,6 +10,7 @@ import { useChat, toast, errorText, ask, go, refreshServer } from './store.js';
 import { refreshInstance, loadInstanceData, hostOf } from './instances.js';
 import { VeloraImport } from './Bridge.jsx';
 import { PlatformIcon } from './platforms.jsx';
+import { OperatorTermsCheck } from './OperatorTerms.jsx';
 
 const STEPS = ['Claim', 'Your server', 'Accounts', 'Options', 'Done'];
 
@@ -22,6 +23,7 @@ export function SetupWizard({ origin, onClose, name: givenName = '' }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [code, setCode] = useState('');
+  const [terms, setTerms] = useState(false); // Ember Server Operator Terms: setting up a server means accepting them
   const [cfg, setCfg] = useState(null);
   const [mode, setMode] = useState('velora');
   const [f, setF] = useState({ name: givenName, description: '' });
@@ -47,7 +49,7 @@ export function SetupWizard({ origin, onClose, name: givenName = '' }) {
     setBusy(false);
   }
   const claim = () => run(async () => {
-    await call('/instance/claim', { method: 'POST', body: JSON.stringify({ code: code.trim() }) });
+    await call('/instance/claim', { method: 'POST', body: JSON.stringify({ code: code.trim(), accept_operator_terms: true }) });
     await refreshInstance(origin);
     await loadCfg();
   });
@@ -98,8 +100,9 @@ export function SetupWizard({ origin, onClose, name: givenName = '' }) {
           {step === 0 && (
             <>
               <p className="vc-dialog-sub">Nobody owns this server yet. Enter its setup code to become the owner. The code is printed in the server's console when it starts, and saved in <span className="vc-mono">setup-code.txt</span> in its data folder.</p>
-              <label className="vc-field"><span>Setup code</span><input className="form-input vc-mono vc-narrow" autoFocus placeholder="XXXX-XXXX" maxLength={9} value={code} onChange={e => setCode(e.target.value.toUpperCase())} onKeyDown={e => { if (e.key === 'Enter' && code.trim()) claim(); }} /></label>
-              <Foot onNext={claim} nextLabel="Claim this server" disabled={!code.trim()} canSkip={false} close={close} />
+              <label className="vc-field"><span>Setup code</span><input className="form-input vc-mono vc-narrow" autoFocus placeholder="XXXX-XXXX" maxLength={9} value={code} onChange={e => setCode(e.target.value.toUpperCase())} onKeyDown={e => { if (e.key === 'Enter' && code.trim() && terms) claim(); }} /></label>
+              <OperatorTermsCheck checked={terms} onChange={setTerms} />
+              <Foot onNext={claim} nextLabel="Claim this server" disabled={!code.trim() || !terms} canSkip={false} close={close} />
             </>
           )}
           {step === 1 && importing && <VeloraImport origin={origin} onCancel={() => setImporting(false)} onDone={k => run(async () => { await made(k); setImporting(false); toast('Imported.', true); setStep(accountsStep); }, false)} />}
