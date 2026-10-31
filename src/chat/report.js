@@ -5,6 +5,7 @@ import { apiFetch, uploadFetch } from '../api.js';
 import { ask, toast, errorText, getState, linkFor } from './store.js';
 import { instOf } from './ids.js';
 import { hasVelora } from './session.js';
+import { DM_REPORT_REASONS, DM_REPORT_NOTE, dmReportBody, dmReportError } from './dm-report.js';
 
 const VELORA_CATEGORIES = ['Underage', 'NSFW / Explicit Content', 'Graphic Violence / Gore', 'Hate Speech / Harassment', 'Threats or Real-World Harm',
   'Spam or Bot Activity', 'Malware / Phishing / Scam', 'Copyright / Intellectual Property Violation', 'Other'];
@@ -58,5 +59,45 @@ export async function reportTo(sid, what, label, ctx = {}) {
     }
     const r = await apiFetch(`/chat/servers/${sid}/reports`, { method: 'POST', body: JSON.stringify({ ...what, reason: a.text || '' }) });
     toast(r.duplicate ? "You've already reported that - the moderators have it." : 'Thanks - the moderators will take a look.', true);
+  } catch (e) { toast(/\s/.test(e.message || '') ? e.message : errorText(e.message)); }
+}
+
+// "Report message" in a DM or group chat: straight to Nookara staff (POST /api/report/dm-message). The server checks
+// that I'm in that conversation and snapshots the message, a few around it and their attachments into the report.
+export async function reportDmMessage(view, m) {
+  const a = await ask({
+    title: 'Report message',
+    text: DM_REPORT_NOTE,
+    select: { label: "What's wrong?", options: DM_REPORT_REASONS },
+    input: { placeholder: 'Anything staff should know? (optional)', value: '', optional: true, multiline: true, max: 1000 },
+    confirm: 'Send report', danger: true,
+  });
+  if (!a) return;
+  const body = dmReportBody(view, m, a.select, a.text);
+  if (!body) return;
+  try {
+    const r = await apiFetch('/api/report/dm-message', { method: 'POST', body: JSON.stringify(body) });
+    toast(r.duplicate ? "You've already reported that message - Nookara staff have it." : 'Thanks - Nookara staff will take a look.', true);
+  } catch (e) { toast(dmReportError(e.error || e.message, e.message)); }
+}
+
+// "Report" on the person in a DM's header: a report about their account (the same as nookara.cc/report)
+export async function reportDmUser(username) {
+  const a = await ask({
+    title: `Report @${username}`,
+    text: 'Goes to Nookara staff. To report something they sent, right-click the message and pick Report message instead, so staff see it in context.',
+    select: { label: "What's wrong?", options: VELORA_CATEGORIES.map(c => [c, c]) },
+    input: { placeholder: 'What happened?', value: '', multiline: true, max: 1000 },
+    confirm: 'Send report', danger: true,
+  });
+  if (!a) return;
+  const fd = new FormData();
+  fd.append('reported_id', String(username));
+  fd.append('category', a.select);
+  fd.append('location', 'Ember direct messages');
+  fd.append('description', a.text);
+  try {
+    await uploadFetch('/api/report/submit', fd);
+    toast('Thanks - Nookara staff will take a look.', true);
   } catch (e) { toast(/\s/.test(e.message || '') ? e.message : errorText(e.message)); }
 }
