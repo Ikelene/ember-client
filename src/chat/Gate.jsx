@@ -1,13 +1,14 @@
 // What shows where there's nothing to show yet: a server whose instance isn't connected / signed in (instead of its channels),
 // and Velora-only places (friends, DMs, groups) while you're signed out of Velora.
 import { useEffect, useState } from 'react';
-import { ShieldCheck, LogIn, RefreshCw, Users, Server, TriangleAlert, Trash2, KeyRound, Globe, Ban, LifeBuoy } from 'lucide-react';
+import { ShieldCheck, LogIn, RefreshCw, Users, Server, TriangleAlert, Trash2, KeyRound, Globe, Ban, LifeBuoy, LogOut, UserRound } from 'lucide-react';
 import { useChat, go, toast, errorText, ask, RESTRICTED_TEXT } from './store.js';
 import { initials } from './Parts.jsx';
 import { reconnect, joinCommunity, removeInstance } from './instances.js';
 import { joinLabel, joinHint } from './Community.jsx';
 import { startSignIn } from './session.js';
 import { BootMark } from './Boot.jsx';
+import { signOut, savedAccounts, switchTo } from './ProfilePopout.jsx';
 
 export const SUPPORT_URL = 'https://nookara.cc/support';
 const dialog = (kind, extra) => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind, ...extra } }));
@@ -21,6 +22,24 @@ function Box({ icon, spin, title, children }) {
         {children}
       </div>
     </div>
+  );
+}
+
+// Staff switched Ember and DMs off for the account (store.js lockAccount): this is the whole app, nothing else of Ember shows.
+// Signing out / another saved account on this device still works (that's the account, not Ember); it lifts by itself.
+export function LockedScreen() {
+  const me = useChat(s => s.me);
+  const [busy, setBusy] = useState('');
+  const others = savedAccounts().filter(a => a.username.toLowerCase() !== String(me?.username || '').toLowerCase()).slice(0, 3);
+  return (
+    <Box icon={<Ban size={34} />} title="Ember is switched off">
+      <p>{RESTRICTED_TEXT} Contact Nookara support if you think this is a mistake.</p>
+      <div className="vc-gate-btns"><a className="btn btn-primary" href={SUPPORT_URL} target="_blank" rel="noopener noreferrer"><LifeBuoy size={15} /> Nookara support</a></div>
+      <div className="vc-gate-links">
+        {others.map(a => <button key={a.username} type="button" className="vc-gate-link" disabled={!!busy} onClick={() => switchTo(a, setBusy)}><UserRound size={12} /> {busy === a.username ? 'Switching...' : `Use ${a.username}`}</button>)}
+        <button type="button" className="vc-gate-link" disabled={!!busy} onClick={() => { setBusy('-'); signOut(); }}><LogOut size={12} /> {busy === '-' ? 'Signing out...' : me?.username ? `Sign out of ${me.username}` : 'Sign out'}</button>
+      </div>
+    </Box>
   );
 }
 

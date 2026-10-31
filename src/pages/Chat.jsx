@@ -45,7 +45,7 @@ import { UploadDestHost } from '../chat/UploadDest.jsx';
 import Home from '../chat/Home.jsx';
 import { TestBotDialog } from '../chat/BotTest.jsx';
 import { AddInstance } from '../chat/Instances.jsx';
-import { InstanceGate, SUPPORT_URL, SignInPrompt, SignedOutSidebar, RetryIn } from '../chat/Gate.jsx';
+import { InstanceGate, LockedScreen, SUPPORT_URL, SignInPrompt, SignedOutSidebar, RetryIn } from '../chat/Gate.jsx';
 import { finishSignIn, SIGNIN_TEXT } from '../chat/session.js';
 import { SetupWizard } from '../chat/Setup.jsx';
 import { MenuHost, openMenu, copy } from '../chat/Menu.jsx';
@@ -454,8 +454,10 @@ function ChatPage() {
   const gateName = useChat(s => (view.kind === 'instance' ? s.instances.find(i => i.origin === view.inst)?.name : null));
   useEffect(() => { document.title = `${unreadCount ? `(${unreadCount > 999 ? '999+' : unreadCount}) ` : ''}${channel ? `#${channel.name} - ${detail.server.name}` : view.kind === 'instance' ? gateName || 'Server' : view.kind === 'dm' ? `@${view.username}` : group ? group.name : 'Friends'} | Ember`; }, [unreadCount, channel, detail, view, group, gateName]);
   const signedIn = useChat(s => s.signedIn);
+  const locked = useChat(s => s.locked); // staff switched Ember and DMs off for the account (store.js lockAccount)
 
   if (!ready) return <BootScreen />;
+  if (locked) return <div className="vc"><LockedScreen /></div>; // (no rail, lists, dialogs or toasts: just the notice)
 
   const isServer = view.kind === 'channel';
   const sysDM = view.kind === 'dm' && view.username === 'System';

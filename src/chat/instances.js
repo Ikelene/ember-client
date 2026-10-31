@@ -6,7 +6,7 @@
 // with Velora it is merged with (and saved to) /bonfire/instances.
 import { apiFetch, getToken } from '../api.js';
 import { K, acctKey, registry, hooks, normOrigin, instOf, loadSessions, loadSessionTags, tokenTag, saveSession, fromInstance, parseK } from './ids.js';
-import { getState, patchState, toast, handleEvent, RESTRICTED_TEXT, instanceVoiceClosed, loadEmojis, go, catchUp, resumeInstanceView, backoff } from './store.js';
+import { getState, patchState, toast, handleEvent, RESTRICTED_TEXT, instanceVoiceClosed, loadEmojis, go, catchUp, resumeInstanceView, backoff, instanceRestricted, instanceRestored } from './store.js';
 
 export const connections = new Map();
 const LIST_CACHE = () => acctKey('bonfire_instance_list'); // (per account: an alt must not inherit the main's servers)
@@ -49,6 +49,22 @@ function restrict(c, message) {
   const here = (v.sid && instOf(v.sid) === c.origin) || v.inst === c.origin;
   setStatus(c, 'restricted');
   if (here && v.kind !== 'instance') go({ kind: 'instance', inst: c.origin, then: v.sid ? { kind: 'server', sid: v.sid } : undefined }, { replace: true });
+  instanceRestricted(); // (account-wide: the whole app locks, store.js checks with Nookara)
+}
+// The whole account is locked (store.js lockAccount): nothing connects or retries. Open sockets stay up but quiet (their
+// events are dropped) so a restricted one can still say account_restored. Lifted: the open ones say hello again (chat_ready
+// reloads what was missed), the rest connect; one that still says restricted keeps its own notice until it says restored.
+let held = false;
+export function holdInstances(on) {
+  held = !!on;
+  for (const c of connections.values()) {
+    clearTimeout(c.timer); c.retryAt = 0;
+    if (held) { instanceVoiceClosed(c.origin); continue; }
+    c.retry = 0;
+    if (c.restricted) { if (!c.ws) scheduleRetry(c, RESTRICTED_RETRY); continue; } // (as before the lockout: slow tries)
+    if (c.ws?.readyState === 1) { setStatus(c, 'connecting'); sendTo(c.origin, { type: 'chat_hello' }); } else if (!c.ws) connect(c.origin);
+  }
+  mirror();
 }
 hooks.restricted = (origin, message) => { const c = connections.get(origin); if (c) restrict(c, message); };
 const restrictedErr = e => e?.status === 403 && ['account_restricted', 'scope_disabled'].includes(e.error);
@@ -178,12 +194,14 @@ function openSocket(c) {
 }
 function scheduleRetry(c, min = 0) {
   clearTimeout(c.timer);
+  if (held) { c.retryAt = 0; mirror(); return; } // (locked: holdInstances(false) connects it)
   const wait = Math.max(min, backoff(c.retry++));
   c.retryAt = Date.now() + wait; mirror();
   c.timer = setTimeout(() => { if (connections.get(c.origin) === c) connect(c.origin); }, wait);
 }
 // the network / tab came back, or the server was opened: every instance that isn't connected tries again now
 export function retryInstances(origin) {
+  if (held) return;
   for (const c of connections.values()) {
     if ((origin && c.origin !== origin) || c.busy || (c.ws && c.ws.readyState <= 1) || !['closed', 'error'].includes(c.status)) continue;
     clearTimeout(c.timer); c.retry = 0;
@@ -219,11 +237,13 @@ function onFrame(c, m) {
       c.restricted = null; c.retry = 0; c.failed = false;
       setStatus(c, 'connecting');
       sendTo(c.origin, { type: 'chat_hello' });
+      instanceRestored(); // (the app's lockout too, once Nookara agrees)
       return;
     case 'chat_error':
       if (m.error === 'account_restricted') { restrict(c, m.message); return; } // (any chat_ / voice_ frame after the notice: no toast per request)
       break;
     case 'chat_ready':
+      if (held) return; // (the account is locked: holdInstances(false) says hello again)
       c.restricted = null;
       c.retry = 0; c.failed = false; c.retryAt = 0;
       setStatus(c, 'open');
@@ -273,7 +293,7 @@ function addConnection(origin, info) {
 }
 export async function connect(origin) {
   const c = connections.get(origin);
-  if (!c || c.busy) return;
+  if (!c || c.busy || held) return;
   c.busy = true;
   clearTimeout(c.timer); c.retryAt = 0;
   let movedTo = null;

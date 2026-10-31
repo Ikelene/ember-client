@@ -100,7 +100,7 @@ const STATUS_ITEMS = [
 
 // the accounts saved on this device (same list as the login page's "Choose an account" and the site's account menu)
 const web = () => isWebBonfire();
-function savedAccounts() {
+export function savedAccounts() {
   if (web()) return savedBonfireAccounts();
   try { const a = JSON.parse(localStorage.getItem('velora_saved') || '[]'); return Array.isArray(a) ? a.filter(x => x && x.username && x.token) : []; } catch { return []; }
 }
@@ -114,7 +114,7 @@ function rememberCurrent(username, pfp) {
     localStorage.setItem('velora_saved', JSON.stringify(list.slice(0, 10)));
   } catch { /* private mode */ }
 }
-async function switchTo(a, setBusy) {
+export async function switchTo(a, setBusy) {
   setBusy(a.username);
   if (web()) {
     try { await switchBonfireAccount(a); } catch (e) {
@@ -137,8 +137,8 @@ async function switchTo(a, setBusy) {
   }
 }
 
-// the switcher's Sign out (the other one is Settings > Account): the same as Settings' Log out
-async function signOut() {
+// the switcher's Sign out (the other one is Settings > Account): the same as Settings' Log out (the lockout screen uses it too)
+export async function signOut() {
   if (isWebBonfire()) { await signOutVelora(); return; } // Ember's own sign-in only; the website's session stays
   try { localStorage.removeItem('velora_token'); localStorage.removeItem('velora_me_cache'); } catch { /* fine */ }
   if (window.bonfireDesktop?.logout) await window.bonfireDesktop.logout();

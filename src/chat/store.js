@@ -11,8 +11,8 @@ import { callLinePlain } from './callText.js';
 import { inviteSummary } from './gameInvite.js';
 import { applyIdentity } from './identity.js';
 import { applyUserUpdate, instancesWithAccount } from './userUpdate.js';
-import { VELORA, K, parseK, instOf, bare, isInst, normOrigin } from './ids.js';
-import { connections, sendTo, startInstances, loadInstanceData, retryInstances, renewVeloraSession } from './instances.js';
+import { VELORA, K, parseK, instOf, bare, isInst, normOrigin, acctKey } from './ids.js';
+import { connections, sendTo, startInstances, loadInstanceData, retryInstances, renewVeloraSession, holdInstances } from './instances.js';
 import { attachmentRefs } from './signing-payload.js';
 import { spoilerName } from './spoiler.js';
 import { prepareInstanceAttachments } from './attachment-preparation.js';
@@ -65,6 +65,7 @@ let state = {
   scopePrompt: null,       // "This needs a new permission" card: { name, reason }
   scopeLack: null,         // scopes this login can't use: { ACCOUNT_WRITE: 'missing' | 'disabled' } (null = website session / not loaded = everything works)
   reauth: null,            // after "Log in again": { state: waiting | working | failed, error }
+  locked: false,           // staff switched Ember and DMs off for this account: the whole app is the notice (Gate.jsx LockedScreen)
   instances: [],           // the instances I'm on: [{ origin, name, icon, mode, status, claimed, isAdmin, isOwner, user }]
   signing: null,           // this device's signing key: { state: ready | no_scope | unsupported | revoked | error, kid }
   sigs: {},                // signed message -> 'ok' | 'bad' (checked here, never taken from the instance)
@@ -304,10 +305,12 @@ setInterval(() => send({ type: 'ping' }), 25000);
 // an instance may only say what PROTOCOL.md §7 lets it: nothing that is Velora's own (DMs, kicks, presence, calls...)
 const INSTANCE_EVENTS = new Set(['chat_message', 'chat_message_update', 'chat_message_delete', 'chat_reactions', 'chat_typing', 'chat_pins_update', 'chat_server_update', 'chat_server_removed', 'chat_roles_update', 'chat_perms_changed', 'chat_channels_update', 'chat_member_update', 'chat_presence', 'chat_members_stale', 'chat_emojis_update', 'chat_identity_update', 'chat_ack', 'chat_error', 'chat_ephemeral', 'chat_join_request', 'chat_join_result', 'chat_report', 'chat_timeout', 'chat_server_added', 'chat_starboard', 'chat_shop_update', 'chat_commands_update', 'chat_interaction_message', 'chat_interaction_modal', 'game_status', 'game_console', 'game_linked', 'game_unlinked', 'voice_sound', 'voice_sound_failed']);
 const INSTANCE_VOICE = /^(chat_rtc_|chat_voice_state$)/;
+const LOCKED_EVENTS = new Set(['auth_success', 'auth_error', 'restrictions', 'error', 'kicked', 'bonfire_update', 'web_build']); // (what still matters while locked)
 export function handleEvent(m, inst = VELORA) {
   if (inst !== VELORA && !INSTANCE_EVENTS.has(m?.type) && !INSTANCE_VOICE.test(String(m?.type))) return;
   if (inst !== VELORA && m.type === 'chat_error' && String(m.request || '').startsWith('chat_rtc')) { voiceHook?.({ ...m, inst }); return; }
   if (inst === VELORA && (m.type === 'chat_error' || m.type === 'error') && (m.error === 'insufficient_scope' || m.error === 'scope_disabled')) scopeDenied(m); // before anything else, voice errors included
+  if (state.locked && (inst !== VELORA || !LOCKED_EVENTS.has(m?.type))) return; // Ember is switched off: only what can switch it back on (or sign out) gets in
   if (VOICE_EVENTS.has(m.type) || (m.type === 'chat_error' && String(m.request || '').startsWith('chat_rtc'))) { voiceHook?.({ ...m, inst }); return; }
   onEvent(m, inst);
 }
@@ -325,11 +328,19 @@ const isMine = msg => {
 
 function onEvent(m, inst = VELORA) {
   switch (m.type) {
-    case 'auth_success':
+    case 'auth_success': {
       retry = 0;
-      send({ type: 'chat_hello' });
+      const was = state.locked;
+      if (m.disabled_scopes !== undefined) applyDisabled(m.disabled_scopes);
+      if (state.locked) break; // (nothing to say hello for: the socket only waits to hear it's switched back on)
+      if (!was) send({ type: 'chat_hello' }); // (just unlocked: unlockAccount said it)
       noteBonfireActivity();
       if (rpcNow) send({ type: 'set_rich_presence', activity: { ...rpcNow, app: rpcNow.app || 'Discord RPC' } }); // a game status from the desktop app, again after a reconnect
+      break;
+    }
+    case 'restrictions': // staff changed which services this account may use (live, Nookara ws.js applyRestrictions)
+      if (m.disabled_scopes !== undefined) applyDisabled(m.disabled_scopes);
+      checkPermissions(); // (the greyed-out controls follow too)
       break;
     case 'error': break; // (scope errors were handled above)
     case 'auth_error':
@@ -1528,6 +1539,7 @@ export const RESTRICTED_TEXT = 'Ember is switched off for your account.';
 export function toast(text, ok = false) {
   if (text === SCOPE_TEXT) return; // the "log in again" prompt (PermissionPrompts) already says it
   if (text === RESTRICTED_TEXT) return; // the server's notice (RestrictedBox / RestrictedBar) already says it
+  if (state.locked) return; // (the lockout screen is all there is)
   set({ error: text, toastOk: ok });
   clearTimeout(toastT);
   toastT = setTimeout(() => set({ error: null }), 4200);
@@ -1727,15 +1739,59 @@ export function authLost() {
   endSession('ended');
 }
 onAuthLost(authLost);
+// what the signed-in account holds (on start, and again when a lockout is lifted)
+function loadAccount() { loadServers(); loadDMs(); loadGroups(); loadFriends(); loadBlocks(); loadModmail(); loadMedia(); loadNotifCount(); }
+
+// ── lockout: staff switched Ember and DMs off for the account (users.disabled_scopes) ──
+// The "Ember and DMs" switch sets 2048 (Ember and group chat) with 64 | 128 (DMs); any of them locks, so it works before and
+// after Nookara merged the two switches. Locked, the app is one calm notice (Gate.jsx LockedScreen): the instances are held
+// (no connects, no retries), events are dropped and nothing toasts. The Nookara socket stays up - its `restrictions` push
+// (or an instance's account_restored) is how it comes back, without a reload. Nookara's own word (/bonfire/session,
+// auth_success, `restrictions`, a 403 scope_disabled) settles it; an instance's account_restricted locks at once and is
+// then checked with Nookara - if Nookara says it's on, only that server keeps its per-server notice (InstanceGate).
+export const LOCK_BITS = 64 | 128 | 2048;
+const LOCK_KEY = () => acctKey('bonfire_locked');
+function lockAccount() {
+  if (state.locked) return;
+  set({ locked: true, error: null, scopePrompt: null, permUpdate: null });
+  clearTimeout(toastT);
+  try { localStorage.setItem(LOCK_KEY(), '1'); } catch { /* fine */ }
+  voiceHook?.({ type: 'voice_closed' }); // (a DM call or voice channel is over)
+  holdInstances(true);
+}
+function unlockAccount() {
+  if (!state.locked) return;
+  set({ locked: false });
+  try { localStorage.removeItem(LOCK_KEY()); } catch { /* fine */ }
+  holdInstances(false);
+  if (!state.signedIn) return;
+  if (sock && sock.readyState === 1) send({ type: 'chat_hello' }); else { retry = 0; connect(); } // (chat_ready catches up on what was dropped)
+  loadAccount();
+}
+export function applyDisabled(disabled) {
+  if ((Number(disabled) || 0) & LOCK_BITS) lockAccount(); else unlockAccount();
+}
+// an instance said account_restricted / account_restored: lock now (restriction is account-wide), and ask Nookara
+let lockCheck = null;
+const askNookara = () => (lockCheck ||= apiFetch('/bonfire/session').then(d => { if (d?.disabled !== undefined) applyDisabled(d.disabled); }).catch(() => {}).finally(() => { lockCheck = null; }));
+export function instanceRestricted() {
+  if (!state.signedIn) return; // (signed out: only that server's own notice)
+  lockAccount();
+  askNookara();
+}
+export function instanceRestored() { if (state.locked) askNookara(); }
+
 // me = null: signed out of Velora (web Ember without a token) - only local-account instances work then
 export function init(me) {
   set({ me, signedIn: !!me });
+  if (me) { try { if (localStorage.getItem(LOCK_KEY())) lockAccount(); } catch { /* fine */ } } // (locked last time: no flash of the app before /bonfire/session answers)
   window.bonfireDesktop?.onSignIn?.(s => set({ reauth: s.state === 'failed' ? { state: 'failed', error: s.error } : { state: 'working' } }));
   if (me) { checkPermissions(); loadSettings(); loadNotify(); loadEmojis(); connect(); }
   window.bonfireDesktop?.isFocused?.().then(v => { desktopFocused = !!v; }).catch(() => {});
   window.bonfireDesktop?.onWindowFocus?.(v => { desktopFocused = v; if (v) markViewRead(); });
-  startInstances();
-  if (me) { loadServers(); setupSigning(); loadDMs(); loadGroups(); loadFriends(); loadBlocks(); loadModmail(); loadMedia(); loadNotifCount(); }
+  startInstances(); // (held while locked: nothing connects until it's lifted)
+  if (me) setupSigning();
+  if (me && !state.locked) loadAccount();
   try { if (me && Notification.permission === 'default') setTimeout(() => Notification.requestPermission().catch(() => {}), 8000); } catch { /* fine */ }
   window.addEventListener('popstate', () => open(readHash()));
   const markFocusedViewRead = () => {
@@ -1791,6 +1847,7 @@ export async function scopeDenied(info) {
   const byAdmin = !!info?.disabled_by_admin || info?.error === 'scope_disabled';
   // remember it, so the control greys out from now on (the up-front check below normally already did)
   if (bit) getCatalog().then(cat => markLack((cat.scopes || []).find(x => x.bit === bit)?.id, byAdmin ? 'disabled' : 'missing'));
+  if (byAdmin && bit & LOCK_BITS) lockAccount(); // Ember or DMs switched off: the whole app locks
   if (byAdmin) return; // an admin switched it off: logging in again won't change that
   if (Date.now() - scopeAt < 6000) return; // one prompt, not one per refused request
   scopeAt = Date.now();
@@ -1823,7 +1880,7 @@ if (typeof window !== 'undefined' && !window.__bfScopeWatch) {
   window.__bfScopeWatch = true;
   const real = window.fetch.bind(window);
   window.fetch = (...a) => real(...a).then(r => {
-    if (r.status === 403) r.clone().json().then(d => { if (d?.error === 'insufficient_scope') scopeDenied(d); }).catch(() => {});
+    if (r.status === 403) r.clone().json().then(d => { if (d?.error === 'insufficient_scope' || d?.error === 'scope_disabled') scopeDenied(d); }).catch(() => {});
     return r;
   });
 }
@@ -1844,6 +1901,7 @@ export async function checkPermissions() {
   try {
     await afterReauth();
     const d = await apiFetch('/bonfire/session');
+    if (d?.disabled !== undefined) applyDisabled(d.disabled); // (website sessions too: the lockout is the account's, not the token's)
     if (!d?.app) { set({ permUpdate: null, scopeLack: null }); return; }
     try { // which scopes this token lacks (granted) or an admin switched off (disabled), by id
       const cat = await getCatalog();
