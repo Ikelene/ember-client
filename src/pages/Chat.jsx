@@ -10,7 +10,7 @@ import { Starboard } from '../chat/Starboard.jsx';
 import { GameChannel, GameChatStrip, GameOfflineNote } from '../chat/GameServer.jsx';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { initSheets } from '../chat/sheets.js';
-import { Hash, Lock, Users, Menu, ChevronLeft, Search, X, AtSign, UsersRound, LogOut, Megaphone, PanelRight, ExternalLink, ShieldCheck, ShieldAlert, Bell } from 'lucide-react';
+import { Hash, Lock, Users, Menu, ChevronLeft, Search, X, AtSign, UsersRound, LogOut, Megaphone, PanelRight, ExternalLink, ShieldCheck, ShieldAlert, Bell, Ban } from 'lucide-react';
 import { api, getToken, cachedMe, apiFetch, isWebBonfire } from '../api.js';
 import { applyAccentColor } from '../theme.js';
 import { jumpToMessage, loginAgain, retryNow } from '../chat/store.js';
@@ -45,7 +45,7 @@ import { UploadDestHost } from '../chat/UploadDest.jsx';
 import Home from '../chat/Home.jsx';
 import { TestBotDialog } from '../chat/BotTest.jsx';
 import { AddInstance } from '../chat/Instances.jsx';
-import { InstanceGate, SignInPrompt, SignedOutSidebar, RetryIn } from '../chat/Gate.jsx';
+import { InstanceGate, SUPPORT_URL, SignInPrompt, SignedOutSidebar, RetryIn } from '../chat/Gate.jsx';
 import { finishSignIn, SIGNIN_TEXT } from '../chat/session.js';
 import { SetupWizard } from '../chat/Setup.jsx';
 import { MenuHost, openMenu, copy } from '../chat/Menu.jsx';
@@ -159,6 +159,12 @@ function SigningBanner() {
       <button type="button" className="dismiss" title="Dismiss for now" aria-label="Dismiss" onClick={() => { try { sessionStorage.setItem('bonfire_sign_banner_off', '1'); } catch { /* fine */ } setHidden(true); }}><X size={15} /></button>
     </div>
   );
+}
+// Ember is switched off for this account on that server (the server's own view is a notice, see Gate.jsx; this covers a channel opened anyway)
+function RestrictedBar() {
+  const note = useChat(s => { const v = s.view; const o = v.kind === 'channel' && v.sid && isInst(v.sid) ? instOf(v.sid) : null; return o ? s.instances.find(i => i.origin === o)?.restricted : null; });
+  if (!note) return null;
+  return <div className="vc-sign-banner" role="status"><Ban size={14} /><span>{note} Contact Nookara support if you think this is a mistake.</span><a className="vc-sign-link" href={SUPPORT_URL} target="_blank" rel="noopener noreferrer">Nookara support</a></div>;
 }
 // a server hosted by Velora whose paid time ran out is read-only for everyone until its owner buys more time
 function ReadOnlyBar() {
@@ -529,6 +535,7 @@ function ChatPage() {
       <main className="vc-main">
         {signedIn && view.kind !== 'home' && <ReconnectBar />}{/* (Friends shows its own note) */}
         {signedIn && <SigningBanner />}
+        <RestrictedBar />
         <ReadOnlyBar />
         <LegacyReadOnlyBar />
         {view.kind === 'home' || view.kind === 'instance' ? (

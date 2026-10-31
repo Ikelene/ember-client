@@ -1524,8 +1524,10 @@ export async function setCustom(text) {
 // ── little pop-up notes at the bottom ──
 let toastT;
 export const SCOPE_TEXT = 'This needs a new permission - log in again to use it.';
+export const RESTRICTED_TEXT = 'Ember is switched off for your account.';
 export function toast(text, ok = false) {
   if (text === SCOPE_TEXT) return; // the "log in again" prompt (PermissionPrompts) already says it
+  if (text === RESTRICTED_TEXT) return; // the server's notice (RestrictedBox / RestrictedBar) already says it
   set({ error: text, toastOk: ok });
   clearTimeout(toastT);
   toastT = setTimeout(() => set({ error: null }), 4200);
@@ -1566,7 +1568,7 @@ export function errorText(code) {
     media_import_failed: "Couldn't download that media. Try downloading it and attaching the file.", invalid_media_url: 'Media links must use HTTPS without login credentials.', upload_failed: "Couldn't upload that file. Please try again.", external_upload_failed: "The file host didn't take that file. Please try again.", file_type_blocked: "That kind of file can't be uploaded.", temp_daily_quota: "You've sent as much to temporary storage as you can today - try again tomorrow, or use your account storage.", temp_storage_full: "Nookara's temporary storage is full right now - try again later, or use your account storage.", pro_required: 'Picking when a temporary file expires comes with Nookara Pro.', invalid_expiry: "That expiry doesn't work - pick another one.", uploads_disabled: 'File uploads are disabled in this server.',
     file_too_large: 'That file exceeds the upload size limit.', dms_friends_only: 'They only take messages from friends.', status_changed: 'Their status changed - take another look.', cannot_reply_own_status: "That's your own status.", cannot_dm_bot: "Bots can't be messaged.", unsupported_file: 'Only pictures, videos (MP4, WebM, MOV) and audio files can be saved.', gifs_not_configured: "GIF search isn't set up yet.", too_many_saved: 'Saved Media is full (500 GIFs).', too_many_emojis: 'This server has as many emojis as it can have (50).', bad_gif: "That GIF can't be saved.", no_send_permission: "You don't have permission to send messages here.", no_attach_permission: "You can't attach files here.", role_too_high: "That role is above your own highest role.", role_not_found: "That role doesn't exist any more.", too_many_roles: 'A server can have up to 100 roles.', user_not_found: "That person doesn't exist.", mailbox_full: 'Their inbox is full.', message_too_long: 'That message is too long.',
     last_channel: "A server needs at least one channel.", not_allowed: "You can't do that here.", owner_only: 'Only the owner can do that.', offline: "You're offline - it wasn't sent.",
-    scope_disabled: 'An admin has turned this off for your account.', insufficient_scope: SCOPE_TEXT, name_required: 'It needs a name.',
+    scope_disabled: 'An admin has turned this off for your account.', account_restricted: RESTRICTED_TEXT, insufficient_scope: SCOPE_TEXT, name_required: 'It needs a name.',
     instance_not_linked: "That Minecraft server isn't linked to this Ember server.", already_linked: 'That Minecraft server is already linked.', too_many_instances: 'An Ember server can link up to 10 Minecraft servers.',
     cl_bad_url: 'That CloudLink address needs to start with wss:// (or ws://).', cl_bad_port: 'CloudLink bridges can only use the normal ports (80 / 443).', cl_private_address: "That address is on a private network - Ember can't connect to it.", too_many_cloudlink_bridges: 'A server can have up to 3 CloudLink bridges.', not_a_cloudlink_bridge: "That channel isn't a CloudLink bridge.",
     voice_unavailable: "Voice isn't set up on this server yet - ask its admins.", voice_cap_reached: 'This server used up its free voice minutes for the month - ask its admins.', sound_too_long: 'Sounds can be up to 5 seconds long.', not_in_voice: 'Join a voice channel first.', too_fast: 'Slow down a little!',

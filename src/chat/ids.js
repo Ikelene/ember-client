@@ -31,7 +31,7 @@ export const instOpt = k => (k && isInst(k) ? instOf(k) : undefined); // apiFetc
 
 // ── the instances this page is connected to (set by instances.js; api.js reads it) ──
 export const registry = new Map(); // origin -> { origin, session }
-export const hooks = { refresh: null }; // refresh(origin) -> Promise<boolean>: a new session after a 401
+export const hooks = { refresh: null, restricted: null }; // refresh(origin) -> Promise<boolean>: a new session after a 401; restricted(origin, message): the instance said account_restricted (Ember switched off for this account)
 
 // Everything Ember keeps per account on this device (its server list, the sessions it opened on instances) is stored under the
 // signed-in Velora account's name, so switching accounts shows that account's servers and not the previous one's.

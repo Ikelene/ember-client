@@ -50,6 +50,7 @@ async function instanceRequest(origin, rel, options, retry = true) {
   let res;
   try { res = options.onProgress ? await xhrFetch(origin + instPath(rel), { ...options, headers }) : await fetch(origin + instPath(rel), { ...options, headers }); } catch (e) { if (e.name === 'AbortError') throw e; throw Object.assign(new Error('instance_unreachable'), { status: 0 }); }
   if (res.status === 401 && retry && hooks.refresh && await hooks.refresh(origin).catch(() => false)) return instanceRequest(origin, rel, options, false);
+  if (res.status === 403) res.clone().json().then(d => { if (d?.error === 'account_restricted') hooks.restricted?.(origin, d.message); }).catch(() => {}); // staff switched Ember off for this account: one notice, not an error per request
   return res;
 }
 const relOf = p => p.replace(/^\/(chat|api\/v1)(?=\/|$)/, '') || '/';

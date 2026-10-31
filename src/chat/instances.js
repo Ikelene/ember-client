@@ -5,8 +5,8 @@
 // Sessions live in localStorage['bonfire_instance_sessions']. The list of instances is always kept locally; signed in
 // with Velora it is merged with (and saved to) /bonfire/instances.
 import { apiFetch, getToken } from '../api.js';
-import { K, acctKey, registry, hooks, normOrigin, loadSessions, loadSessionTags, tokenTag, saveSession, fromInstance, parseK } from './ids.js';
-import { getState, patchState, toast, handleEvent, instanceVoiceClosed, loadEmojis, go, catchUp, resumeInstanceView, backoff } from './store.js';
+import { K, acctKey, registry, hooks, normOrigin, instOf, loadSessions, loadSessionTags, tokenTag, saveSession, fromInstance, parseK } from './ids.js';
+import { getState, patchState, toast, handleEvent, RESTRICTED_TEXT, instanceVoiceClosed, loadEmojis, go, catchUp, resumeInstanceView, backoff } from './store.js';
 
 export const connections = new Map();
 const LIST_CACHE = () => acctKey('bonfire_instance_list'); // (per account: an alt must not inherit the main's servers)
@@ -16,7 +16,7 @@ export const hostOf = o => { try { return new URL(o).host; } catch { return Stri
 export const instView = c => ({
   origin: c.origin, host: hostOf(c.origin), name: c.info?.name || hostOf(c.origin), icon: c.info?.icon_url || null, description: c.info?.description || '',
   community: c.info?.community || null, mode: c.info?.accounts_mode || null, status: c.status, claimed: c.info?.claimed !== false, features: c.info?.features || {},
-  registration: c.info?.registration || 'closed', isAdmin: !!c.isAdmin, isOwner: !!c.isOwner, user: c.user || null, error: c.error || null,
+  registration: c.info?.registration || 'closed', isAdmin: !!c.isAdmin, isOwner: !!c.isOwner, user: c.user || null, error: c.error || null, restricted: c.restricted || null,
   needsVelora: c.info?.accounts_mode === 'velora' && !getToken(), pending: !!c.pending, failed: !!c.failed,
   loaded: !!c.loaded, // this account's communities on it have been fetched (so "not in it" is known)
   prefs: c.prefs || null, // Velora's push consent for it ({ muted, push }), signed in only
@@ -31,7 +31,27 @@ export const instView = c => ({
 
 });
 const mirror = () => patchState({ instances: [...connections.values()].map(instView) });
-function setStatus(c, status, error = null) { c.status = status; c.error = error; mirror(); }
+function setStatus(c, status, error = null) {
+  if (c.restricted && ['connecting', 'closed', 'error'].includes(status)) return mirror(); // Ember is switched off for this account: the notice stays until the server says otherwise
+  c.status = status; c.error = error; mirror();
+}
+// Staff switched Ember off for this account (account_restricted, from the gateway, a REST 403 or Nookara refusing the instance token):
+// the server's view becomes a calm notice, voice is over, and nothing retries quickly - a socket that is still open hears account_restored
+const RESTRICTED_RETRY = 120000;
+function restrict(c, message) {
+  if (!connections.has(c.origin)) return;
+  const text = typeof message === 'string' && message.trim() ? message.trim().slice(0, 300) : RESTRICTED_TEXT;
+  if (c.restricted === text && c.status === 'restricted') return;
+  c.restricted = text;
+  clearTimeout(c.timer); c.retry = 0; c.retryAt = 0; c.failed = false;
+  instanceVoiceClosed(c.origin);
+  const v = getState().view;
+  const here = (v.sid && instOf(v.sid) === c.origin) || v.inst === c.origin;
+  setStatus(c, 'restricted');
+  if (here && v.kind !== 'instance') go({ kind: 'instance', inst: c.origin, then: v.sid ? { kind: 'server', sid: v.sid } : undefined }, { replace: true });
+}
+hooks.restricted = (origin, message) => { const c = connections.get(origin); if (c) restrict(c, message); };
+const restrictedErr = e => e?.status === 403 && ['account_restricted', 'scope_disabled'].includes(e.error);
 
 // ── talking to an instance without a session (discovery, login) ──
 async function plain(origin, path, body, method = 'POST') {
@@ -68,11 +88,16 @@ function adopt(c, { session, user, instance_admin, instance_owner }) {
 }
 // -> { session, user } (nothing is stored until the instance is added or adopts it)
 export async function veloraSession(origin) {
-  const t = await apiFetch('/bonfire/instance-token', { method: 'POST', body: JSON.stringify({ instance: origin }) });
+  let t;
+  try { t = await apiFetch('/bonfire/instance-token', { method: 'POST', body: JSON.stringify({ instance: origin }) }); }
+  catch (e) { throw restrictedErr(e) ? Object.assign(new Error('account_restricted'), { status: 403, restricted: true, text: e.error === 'account_restricted' ? e.message : '' }) : e; } // (Nookara won't sign new instance tokens while Ember is off for the account)
   return plain(origin, '/api/v1/auth/velora', { token: t.token });
 }
 export const localSession = (origin, kind, username, password) => plain(origin, `/api/v1/auth/${kind === 'register' ? 'register' : 'login'}`, { username, password });
-async function authVelora(c) { const r = await veloraSession(c.origin); adopt(c, r); return r; }
+async function authVelora(c) {
+  try { const r = await veloraSession(c.origin); adopt(c, r); return r; }
+  catch (e) { if (e.restricted) restrict(c, e.text); throw e; }
+}
 // forget this instance's session (and tell it)
 function dropSession(c) {
   if (c.session) fetch(`${c.origin}/api/v1/auth/logout`, { method: 'POST', headers: { Authorization: `Bearer ${c.session}` }, keepalive: true }).catch(() => {});
@@ -103,7 +128,7 @@ hooks.refresh = origin => {
       c.session = null; registry.delete(origin); saveSession(origin, null);
       if (c.info?.accounts_mode !== 'velora' || !getToken()) { setStatus(c, 'login'); return false; }
       // Velora rejecting the token signs out (api.js); anything else (Velora / the instance unreachable) is retried
-      try { await authVelora(c); return true; } catch (e) { c.failed = true; setStatus(c, getToken() ? 'closed' : 'login', e.message); if (getToken()) scheduleRetry(c); return false; }
+      try { await authVelora(c); return true; } catch (e) { c.failed = true; setStatus(c, getToken() ? 'closed' : 'login', e.message); if (getToken()) scheduleRetry(c, e.restricted ? RESTRICTED_RETRY : 0); return false; }
     })().finally(() => refreshing.delete(origin));
     refreshing.set(origin, p);
   }
@@ -147,7 +172,7 @@ function openSocket(c) {
     }
     c.failed = true;
     setStatus(c, 'closed');
-    scheduleRetry(c, ev.code === 4010 ? 3000 : 0);
+    scheduleRetry(c, c.restricted ? RESTRICTED_RETRY : ev.code === 4010 ? 3000 : 0);
   };
   ws.onerror = () => {};
 }
@@ -187,7 +212,19 @@ function onFrame(c, m) {
       c.ws.send(JSON.stringify({ type: 'chat_hello' }));
       mirror();
       return;
+    case 'account_restricted':
+      restrict(c, m.message);
+      return;
+    case 'account_restored': // Ember is on again: say hello as after any connect (chat_ready then reloads the server list)
+      c.restricted = null; c.retry = 0; c.failed = false;
+      setStatus(c, 'connecting');
+      sendTo(c.origin, { type: 'chat_hello' });
+      return;
+    case 'chat_error':
+      if (m.error === 'account_restricted') { restrict(c, m.message); return; } // (any chat_ / voice_ frame after the notice: no toast per request)
+      break;
     case 'chat_ready':
+      c.restricted = null;
       c.retry = 0; c.failed = false; c.retryAt = 0;
       setStatus(c, 'open');
       loadInstanceData(c.origin).then(() => { catchUp(c.origin); if (autoJoin.has(c.origin)) joinOnce(c); });
@@ -253,7 +290,7 @@ export async function connect(origin) {
 
     c.failed = true;
     setStatus(c, e.message === 'insufficient_scope' ? 'error' : 'closed', e.message);
-    scheduleRetry(c);
+    scheduleRetry(c, e.restricted ? RESTRICTED_RETRY : 0);
   } finally { c.busy = false; if (movedTo) moveInstance(origin, movedTo); }
 }
 // A server moved to a new address: the rail entry, its session (same server, same database) and the saved list follow, and the
@@ -309,7 +346,7 @@ export function renewVeloraSession(origin) {
         const ws = c.ws; c.ws = null; try { ws?.close(); } catch { /* gone */ }
         openSocket(c);
         return d?.scopes || null;
-      } catch { scheduleRetry(c); return null; }
+      } catch (e) { scheduleRetry(c, e.restricted ? RESTRICTED_RETRY : 0); return null; }
     })().finally(() => setTimeout(() => renewing.delete(origin), 30000))); // (at most one try per half minute)
   }
   return renewing.get(origin);

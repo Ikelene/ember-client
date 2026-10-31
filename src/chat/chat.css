@@ -19,6 +19,7 @@ body:has(.vc-sign-banner) .vc-notify-banner { top: 52px; } /* (the notifications
 .vc-sign-banner > span { flex: 1; min-width: 0; }
 .vc-sign-banner button { flex: none; border: 0; background: var(--accent); color: #121014; padding: 5px 10px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .vc-sign-banner button.dismiss { display: grid; place-items: center; padding: 4px; background: transparent; color: var(--muted); }
+.vc-sign-banner a.vc-sign-link { flex: none; background: var(--accent); color: #121014; padding: 5px 10px; font-size: 12px; font-weight: 700; text-decoration: none; }
 @media (max-width: 700px) { .vc-sign-banner { flex-wrap: wrap; } .vc-sign-banner > span { flex-basis: calc(100% - 30px); } }
 
 /* ── server rail ── */
@@ -1983,7 +1984,7 @@ html.vc-radio .vc-main { background: transparent; }
 /* ── instances: rail status dot, connecting box, add / setup dialogs, signatures ── */
 .vc-inst-dot { position: absolute; left: calc(50% + 15px); top: 2px; z-index: 2; width: 9px; height: 9px; pointer-events: none; background: var(--st-offline); border: 2px solid #0a0a0c; box-sizing: content-box; }
 .vc-inst-dot.connecting, .vc-inst-dot.login { background: var(--st-idle); }
-.vc-inst-dot.closed, .vc-inst-dot.error, .vc-inst-dot.banned { background: var(--st-dnd); }
+.vc-inst-dot.closed, .vc-inst-dot.error, .vc-inst-dot.banned, .vc-inst-dot.restricted { background: var(--st-dnd); }
 .vc-inst-card { margin-bottom: 12px; }
 .vc-inst-card small { display: flex; align-items: center; gap: 5px; }
 .vc-gap-top { margin-top: 12px; }

@@ -1,14 +1,15 @@
 // What shows where there's nothing to show yet: a server whose instance isn't connected / signed in (instead of its channels),
 // and Velora-only places (friends, DMs, groups) while you're signed out of Velora.
 import { useEffect, useState } from 'react';
-import { ShieldCheck, LogIn, RefreshCw, Users, Server, TriangleAlert, Trash2, KeyRound, Globe } from 'lucide-react';
-import { useChat, go, toast, errorText, ask } from './store.js';
+import { ShieldCheck, LogIn, RefreshCw, Users, Server, TriangleAlert, Trash2, KeyRound, Globe, Ban, LifeBuoy } from 'lucide-react';
+import { useChat, go, toast, errorText, ask, RESTRICTED_TEXT } from './store.js';
 import { initials } from './Parts.jsx';
 import { reconnect, joinCommunity, removeInstance } from './instances.js';
 import { joinLabel, joinHint } from './Community.jsx';
 import { startSignIn } from './session.js';
 import { BootMark } from './Boot.jsx';
 
+export const SUPPORT_URL = 'https://nookara.cc/support';
 const dialog = (kind, extra) => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind, ...extra } }));
 
 function Box({ icon, spin, title, children }) {
@@ -74,6 +75,15 @@ export function InstanceGate({ origin }) {
             : <button type="button" className="btn btn-primary" onClick={() => dialog('add-instance', { url: origin })}><LogIn size={15} /> Log in</button>}
           {retry}
         </div>
+      </Box>
+    );
+  }
+  if (status === 'restricted') { // staff switched Ember off for this account: calm and final until they switch it back (the socket tells us)
+    return (
+      <Box icon={<Ban size={34} />} title="Ember is switched off">
+        <small className="vc-gate-host"><Globe size={12} /> {host}</small>
+        <p>{inst.restricted || RESTRICTED_TEXT} Contact Nookara support if you think this is a mistake.</p>
+        <div className="vc-gate-btns"><a className="btn btn-primary" href={SUPPORT_URL} target="_blank" rel="noopener noreferrer"><LifeBuoy size={15} /> Nookara support</a></div>
       </Box>
     );
   }
