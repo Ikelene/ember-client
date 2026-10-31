@@ -66,7 +66,8 @@ let state = {
   scopePrompt: null,       // "This needs a new permission" card: { name, reason }
   scopeLack: null,         // scopes this login can't use: { ACCOUNT_WRITE: 'missing' | 'disabled' } (null = website session / not loaded = everything works)
   reauth: null,            // after "Log in again": { state: waiting | working | failed, error }
-  locked: false,           // staff switched Ember and DMs off for this account: the whole app is the notice (Gate.jsx LockedScreen)
+  locked: false,           // Ember and DMs are off for this account: the whole app is the notice (Gate.jsx LockedScreen)
+  lockReason: null,        // why (Nookara's restriction_reason): 'staff' | 'birthday_required' (no birthday set yet) | 'under_minimum_age'
   instances: [],           // the instances I'm on: [{ origin, name, icon, mode, status, claimed, isAdmin, isOwner, user }]
   signing: null,           // this device's signing key: { state: ready | no_scope | unsupported | revoked | error, kid }
   sigs: {},                // signed message -> 'ok' | 'bad' (checked here, never taken from the instance)
@@ -379,15 +380,15 @@ function onEvent(m, inst = VELORA) {
     case 'auth_success': {
       retry = 0;
       const was = state.locked;
-      if (m.disabled_scopes !== undefined) applyDisabled(m.disabled_scopes);
+      if (m.disabled_scopes !== undefined) applyDisabled(m.disabled_scopes, m.restriction_reason);
       if (state.locked) break; // (nothing to say hello for: the socket only waits to hear it's switched back on)
       if (!was) send({ type: 'chat_hello' }); // (just unlocked: unlockAccount said it)
       noteBonfireActivity();
       if (rpcNow) send({ type: 'set_rich_presence', activity: { ...rpcNow, app: rpcNow.app || 'Discord RPC' } }); // a game status from the desktop app, again after a reconnect
       break;
     }
-    case 'restrictions': // staff changed which services this account may use (live, Nookara ws.js applyRestrictions)
-      if (m.disabled_scopes !== undefined) applyDisabled(m.disabled_scopes);
+    case 'restrictions': // staff changed which services this account may use, or the birthday was set (live, Nookara ws.js applyRestrictions)
+      if (m.disabled_scopes !== undefined) applyDisabled(m.disabled_scopes, m.restriction_reason);
       checkPermissions(); // (the greyed-out controls follow too)
       break;
     case 'error': break; // (scope errors were handled above)
@@ -1814,7 +1815,9 @@ onAuthLost(authLost);
 // what the signed-in account holds (on start, and again when a lockout is lifted)
 function loadAccount() { loadServers(); loadDMs(); loadGroups(); loadFriends(); loadBlocks(); loadModmail(); loadMedia(); loadNotifCount(); }
 
-// ── lockout: staff switched Ember and DMs off for the account (users.disabled_scopes) ──
+// ── lockout: staff switched Ember and DMs off for the account (users.disabled_scopes), or Nookara's birthday gate did ──
+// (no birthday set yet, or under the minimum age for their region: the same bits, told apart by restriction_reason, so the
+// notice can say "set your birthday" with a link to the account settings instead of "switched off by staff")
 // The "Ember and DMs" switch sets 2048 (Ember and group chat) with 64 | 128 (DMs); any of them locks, so it works before and
 // after Nookara merged the two switches. Locked, the app is one calm notice (Gate.jsx LockedScreen): the instances are held
 // (no connects, no retries), events are dropped and nothing toasts. The Nookara socket stays up - its `restrictions` push
@@ -1827,7 +1830,7 @@ function lockAccount() {
   if (state.locked) return;
   set({ locked: true, error: null, scopePrompt: null, permUpdate: null });
   clearTimeout(toastT);
-  try { localStorage.setItem(LOCK_KEY(), '1'); } catch { /* fine */ }
+  try { localStorage.setItem(LOCK_KEY(), state.lockReason || '1'); } catch { /* fine */ }
   voiceHook?.({ type: 'voice_closed' }); // (a DM call or voice channel is over)
   holdInstances(true);
 }
@@ -1840,12 +1843,19 @@ function unlockAccount() {
   if (sock && sock.readyState === 1) send({ type: 'chat_hello' }); else { retry = 0; connect(); } // (chat_ready catches up on what was dropped)
   loadAccount();
 }
-export function applyDisabled(disabled) {
-  if ((Number(disabled) || 0) & LOCK_BITS) lockAccount(); else unlockAccount();
+const LOCK_REASONS = ['staff', 'birthday_required', 'under_minimum_age'];
+export function applyDisabled(disabled, reason) {
+  const locked = !!((Number(disabled) || 0) & LOCK_BITS);
+  const why = locked ? (LOCK_REASONS.includes(reason) ? reason : 'staff') : null; // (older Nookara: no reason = staff)
+  if (state.lockReason !== why) {
+    set({ lockReason: why });
+    if (locked && state.locked) { try { localStorage.setItem(LOCK_KEY(), why); } catch { /* fine */ } } // (already locked: the reason changed)
+  }
+  if (locked) lockAccount(); else unlockAccount();
 }
 // an instance said account_restricted / account_restored: lock now (restriction is account-wide), and ask Nookara
 let lockCheck = null;
-const askNookara = () => (lockCheck ||= apiFetch('/bonfire/session').then(d => { if (d?.disabled !== undefined) applyDisabled(d.disabled); }).catch(() => {}).finally(() => { lockCheck = null; }));
+const askNookara = () => (lockCheck ||= apiFetch('/bonfire/session').then(d => { if (d?.disabled !== undefined) applyDisabled(d.disabled, d.restriction_reason); }).catch(() => {}).finally(() => { lockCheck = null; }));
 export function instanceRestricted() {
   if (!state.signedIn) return; // (signed out: only that server's own notice)
   lockAccount();
@@ -1856,7 +1866,7 @@ export function instanceRestored() { if (state.locked) askNookara(); }
 // me = null: signed out of Velora (web Ember without a token) - only local-account instances work then
 export function init(me) {
   set({ me, signedIn: !!me });
-  if (me) { try { if (localStorage.getItem(LOCK_KEY())) lockAccount(); } catch { /* fine */ } } // (locked last time: no flash of the app before /bonfire/session answers)
+  if (me) { try { const was = localStorage.getItem(LOCK_KEY()); if (was) { if (LOCK_REASONS.includes(was)) set({ lockReason: was }); lockAccount(); } } catch { /* fine */ } } // (locked last time: no flash of the app before /bonfire/session answers)
   window.bonfireDesktop?.onSignIn?.(s => set({ reauth: s.state === 'failed' ? { state: 'failed', error: s.error } : { state: 'working' } }));
   if (me) { checkPermissions(); loadSettings(); loadNotify(); loadEmojis(); connect(); }
   window.bonfireDesktop?.isFocused?.().then(v => { desktopFocused = !!v; }).catch(() => {});
@@ -1919,7 +1929,7 @@ export async function scopeDenied(info) {
   const byAdmin = !!info?.disabled_by_admin || info?.error === 'scope_disabled';
   // remember it, so the control greys out from now on (the up-front check below normally already did)
   if (bit) getCatalog().then(cat => markLack((cat.scopes || []).find(x => x.bit === bit)?.id, byAdmin ? 'disabled' : 'missing'));
-  if (byAdmin && bit & LOCK_BITS) lockAccount(); // Ember or DMs switched off: the whole app locks
+  if (byAdmin && bit & LOCK_BITS) { if (LOCK_REASONS.includes(info?.reason) && state.lockReason !== info.reason) set({ lockReason: info.reason }); lockAccount(); } // Ember or DMs switched off: the whole app locks
   if (byAdmin) return; // an admin switched it off: logging in again won't change that
   if (Date.now() - scopeAt < 6000) return; // one prompt, not one per refused request
   scopeAt = Date.now();
@@ -1973,7 +1983,7 @@ export async function checkPermissions() {
   try {
     await afterReauth();
     const d = await apiFetch('/bonfire/session');
-    if (d?.disabled !== undefined) applyDisabled(d.disabled); // (website sessions too: the lockout is the account's, not the token's)
+    if (d?.disabled !== undefined) applyDisabled(d.disabled, d.restriction_reason); // (website sessions too: the lockout is the account's, not the token's)
     if (!d?.app) { set({ permUpdate: null, scopeLack: null }); return; }
     try { // which scopes this token lacks (granted) or an admin switched off (disabled), by id
       const cat = await getCatalog();

@@ -1,7 +1,7 @@
 // What shows where there's nothing to show yet: a server whose instance isn't connected / signed in (instead of its channels),
 // and Velora-only places (friends, DMs, groups) while you're signed out of Velora.
 import { useEffect, useState } from 'react';
-import { ShieldCheck, LogIn, RefreshCw, Users, Server, TriangleAlert, Trash2, KeyRound, Globe, Ban, LifeBuoy, LogOut, UserRound } from 'lucide-react';
+import { ShieldCheck, LogIn, RefreshCw, Users, Server, TriangleAlert, Trash2, KeyRound, Globe, Ban, LifeBuoy, LogOut, UserRound, Cake, ExternalLink } from 'lucide-react';
 import { useChat, go, toast, errorText, ask, RESTRICTED_TEXT } from './store.js';
 import { initials } from './Parts.jsx';
 import { reconnect, joinCommunity, removeInstance } from './instances.js';
@@ -9,8 +9,31 @@ import { joinLabel, joinHint } from './Community.jsx';
 import { startSignIn } from './session.js';
 import { BootMark } from './Boot.jsx';
 import { signOut, savedAccounts, switchTo } from './ProfilePopout.jsx';
+import { siteHref } from './hosts.js';
 
 export const SUPPORT_URL = 'https://nookara.cc/support';
+// where the birthday is set (Nookara account settings; a website session, the Ember token can't set it)
+export const BIRTHDAY_URL = siteHref('/me#settings/birthday');
+
+// The lockout notice by reason (store.js lockReason). Staff restrictions keep the old wording; Nookara's birthday gate
+// (no birthday yet / under the minimum age for their region) says what to do instead.
+export function lockText(reason) {
+  if (reason === 'birthday_required') return {
+    icon: <Cake size={34} />, title: 'Set your birthday to use Ember',
+    text: 'Ember and direct messages are off until you add your date of birth in your Nookara account settings. Only you can see it. Ember unlocks as soon as it is saved.',
+    action: <a className="btn btn-primary" href={BIRTHDAY_URL} target="_blank" rel="noopener noreferrer"><Cake size={15} /> Set your birthday <ExternalLink size={13} /></a>,
+  };
+  if (reason === 'under_minimum_age') return {
+    icon: <Ban size={34} />, title: "Ember isn't available for your account",
+    text: "You're under the minimum age for chat in your region, so Ember and direct messages are off. The rest of your Nookara account works as usual. Contact Nookara support if your birthday is wrong.",
+    action: <a className="btn btn-primary" href={SUPPORT_URL} target="_blank" rel="noopener noreferrer"><LifeBuoy size={15} /> Nookara support</a>,
+  };
+  return {
+    icon: <Ban size={34} />, title: 'Ember is switched off',
+    text: `${RESTRICTED_TEXT} Contact Nookara support if you think this is a mistake.`,
+    action: <a className="btn btn-primary" href={SUPPORT_URL} target="_blank" rel="noopener noreferrer"><LifeBuoy size={15} /> Nookara support</a>,
+  };
+}
 const dialog = (kind, extra) => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind, ...extra } }));
 
 function Box({ icon, spin, title, children }) {
@@ -25,16 +48,19 @@ function Box({ icon, spin, title, children }) {
   );
 }
 
-// Staff switched Ember and DMs off for the account (store.js lockAccount): this is the whole app, nothing else of Ember shows.
-// Signing out / another saved account on this device still works (that's the account, not Ember); it lifts by itself.
+// Ember and DMs are off for the account (store.js lockAccount: staff switched them off, or Nookara's birthday gate): this is
+// the whole app, nothing else of Ember shows. Signing out / another saved account on this device still works (that's the
+// account, not Ember); it lifts by itself (the `restrictions` push, e.g. the moment the birthday is saved).
 export function LockedScreen() {
   const me = useChat(s => s.me);
+  const reason = useChat(s => s.lockReason);
   const [busy, setBusy] = useState('');
   const others = savedAccounts().filter(a => a.username.toLowerCase() !== String(me?.username || '').toLowerCase()).slice(0, 3);
+  const L = lockText(reason);
   return (
-    <Box icon={<Ban size={34} />} title="Ember is switched off">
-      <p>{RESTRICTED_TEXT} Contact Nookara support if you think this is a mistake.</p>
-      <div className="vc-gate-btns"><a className="btn btn-primary" href={SUPPORT_URL} target="_blank" rel="noopener noreferrer"><LifeBuoy size={15} /> Nookara support</a></div>
+    <Box icon={L.icon} title={L.title}>
+      <p>{L.text}</p>
+      <div className="vc-gate-btns">{L.action}</div>
       <div className="vc-gate-links">
         {others.map(a => <button key={a.username} type="button" className="vc-gate-link" disabled={!!busy} onClick={() => switchTo(a, setBusy)}><UserRound size={12} /> {busy === a.username ? 'Switching...' : `Use ${a.username}`}</button>)}
         <button type="button" className="vc-gate-link" disabled={!!busy} onClick={() => { setBusy('-'); signOut(); }}><LogOut size={12} /> {busy === '-' ? 'Signing out...' : me?.username ? `Sign out of ${me.username}` : 'Sign out'}</button>
@@ -75,6 +101,7 @@ export function SignedOutSidebar() {
 export function InstanceGate({ origin }) {
   const inst = useChat(s => s.instances.find(i => i.origin === origin));
   const srv = useChat(s => s.servers.find(x => x.inst === origin));
+  const lockReason = useChat(s => s.lockReason);
   const [busy, setBusy] = useState(false);
   const [code, setCode] = useState('');
   const [pass, setPass] = useState('');
@@ -97,12 +124,13 @@ export function InstanceGate({ origin }) {
       </Box>
     );
   }
-  if (status === 'restricted') { // staff switched Ember off for this account: calm and final until they switch it back (the socket tells us)
+  if (status === 'restricted') { // Ember is off for this account: calm and final until it's switched back (the socket tells us)
+    const L = lockReason && lockReason !== 'staff' ? lockText(lockReason) : null; // (Nookara's birthday gate: its own words, not the instance's)
     return (
-      <Box icon={<Ban size={34} />} title="Ember is switched off">
+      <Box icon={L ? L.icon : <Ban size={34} />} title={L ? L.title : 'Ember is switched off'}>
         <small className="vc-gate-host"><Globe size={12} /> {host}</small>
-        <p>{inst.restricted || RESTRICTED_TEXT} Contact Nookara support if you think this is a mistake.</p>
-        <div className="vc-gate-btns"><a className="btn btn-primary" href={SUPPORT_URL} target="_blank" rel="noopener noreferrer"><LifeBuoy size={15} /> Nookara support</a></div>
+        <p>{L ? L.text : `${inst.restricted || RESTRICTED_TEXT} Contact Nookara support if you think this is a mistake.`}</p>
+        <div className="vc-gate-btns">{L ? L.action : <a className="btn btn-primary" href={SUPPORT_URL} target="_blank" rel="noopener noreferrer"><LifeBuoy size={15} /> Nookara support</a>}</div>
       </Box>
     );
   }
