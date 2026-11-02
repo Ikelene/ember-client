@@ -24,3 +24,7 @@ export function uploadKey(url) {
   const m = new RegExp(R`^https:\/\/(?:${UPLOAD_ORIGIN_SRC})(\/uploads\/.+)$`, 'i').exec(bare);
   return m ? m[1] : bare;
 }
+// a link without its #fragment: a picture on its own line keeps "#n=<name>" in `images`, but the text scan cuts a link at ) ' etc., so
+// the two only compare equal by what is before the #
+export const linkBase = u => String(u || '').split('#')[0];
+export const inLinks = (list, u) => list.some(x => linkBase(x) === linkBase(u));

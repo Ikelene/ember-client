@@ -11,7 +11,7 @@ import { callLinePlain } from './callText.js';
 import { inviteSummary } from './gameInvite.js';
 import { applyIdentity } from './identity.js';
 import { applyUserUpdate, instancesWithAccount } from './userUpdate.js';
-import { NAMED_LINK } from './uploadLinks.js';
+import { findPending, dropSettled, wireText, settle } from './pending.js';
 import { VELORA, K, parseK, instOf, bare, isInst, normOrigin, acctKey } from './ids.js';
 import { connections, sendTo, startInstances, loadInstanceData, retryInstances, renewVeloraSession, holdInstances } from './instances.js';
 import { attachmentRefs } from './signing-payload.js';
@@ -592,6 +592,7 @@ function onEvent(m, inst = VELORA) {
     case 'im_received':
     case 'im_sent': {
       const msg = imToMsg(m.message);
+      if (m.nonce || m.message.nonce) msg.nonce = m.nonce || m.message.nonce;
       const other = m.type === 'im_sent' || msg.author?.username === state.me?.username ? m.message.to : m.message.from;
       addMessage(`d:${String(other).toLowerCase()}`, msg);
       if (m.type === 'im_received') typingFrom(`d:${String(other).toLowerCase()}`, other, false);
@@ -625,11 +626,6 @@ function onEvent(m, inst = VELORA) {
 }
 
 // ── messages ──
-// my message came back: drop the greyed-out copy (the real one may have arrived first)
-function settle(list, n, real) {
-  const has = list.some(x => x.id === real.id);
-  return has ? list.filter(x => x.nonce !== n) : list.map(x => (x.nonce === n ? real : x));
-}
 function addMessage(key, msg) {
   const b = state.msgs[key];
   const mine = isMine(msg);
@@ -638,7 +634,8 @@ function addMessage(key, msg) {
     if (msg.id && b.list.some(x => x.id === msg.id)) return;
     // my own message over the socket before the ack: replace the pending copy with the same text
     let list = b.list;
-    const p = mine && list.findIndex(x => x.pending && !x.uploads && x.body === msg.body);
+    // (a DM with files went out as text + links, so it is matched on that, or on the nonce when the server echoes it)
+    const p = mine ? findPending(list, msg) : -1;
     if (mine && p >= 0) list = list.map((x, i) => (i === p ? msg : x)); else list = [...list, msg];
     set(s => ({ msgs: { ...s.msgs, [key]: { ...b, list: ordered(list) } } }));
   }
@@ -894,7 +891,7 @@ export async function loadMessages(v, { older = false } = {}) {
     set(s => {
       const cur = s.msgs[key] || { list: [] };
       const ids = new Set(list.map(m => m.id));
-      const live = cur.list.filter(m => !ids.has(m.id));
+      const live = dropSettled(cur.list.filter(m => !ids.has(m.id)), list, isMine);
       return { msgs: { ...s.msgs, [key]: { list: ordered(older ? [...list, ...cur.list] : [...list, ...live]), hasMore, loading: false, loaded: true } } };
     });
   } catch (e) {
@@ -939,7 +936,6 @@ export async function catchUp(inst = VELORA) {
 
 // an attachment as a link (DMs / group chats are plain text). Files in Velora account storage (and old catbox ones) keep
 // their real name as #n=<name>; a temporary-storage link (/t/<id>/<name>) already carries it in the path.
-const attLink = a => (NAMED_LINK.test(a.url) && a.name && a.name !== decodeURIComponent(a.url.split('/').pop()) ? `${a.url}#n=${encodeURIComponent(a.name)}` : a.url);
 // my own accent colour is known right now: put it in the face cache an instance reads names through, so a message that is still
 // sending shows the accent straight away (not the role colour until my Velora face loads, then a flip)
 function seedMyFace(instUser) {
@@ -958,7 +954,7 @@ export function sendMessage(v, text, { replyTo, attachments, uploads } = {}) {
   // the picture and name colour resolve exactly the same way before and after the ack (no flash)
   seedMyFace(instUser);
   const temp = {
-    id: n, nonce: n, pending: true, body: text, attachments: attachments || [], system: false,
+    id: n, nonce: n, pending: true, body: text, wire: v.kind === 'dm' ? wireText(text, attachments) : undefined, attachments: attachments || [], system: false,
     ...(instUser ? { inst: instOf(v.cid), unsigned: !!instUser.velora_id && !signingInfo(v.sid).can } : {}),
     author: instUser ? { id: instUser.id, username: me.username, pfp: me.pfp, color: instUser.velora_id ? (state.me?.color || me.color) : me.color, rank: me.rank, kind: instUser.kind || (instUser.velora_id ? 'velora' : 'local'), velora_id: instUser.velora_id } : { username: me.username, pfp: me.pfp, color: me.color, rank: me.rank }, created_at: Date.now(),
     reply: replyTo ? { id: replyTo.id, author: replyTo.author, alias: replyTo.alias || null, body: String(replyTo.body || '').slice(0, 200) } : null,
@@ -992,8 +988,8 @@ export function sendMessage(v, text, { replyTo, attachments, uploads } = {}) {
         set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? { ...x, failed: e.message } : x)) }) }));
       });
     } else ok = frame();
-  } else if (v.kind === 'dm') ok = send({ type: 'im_send', to: v.username, message: text + (attachments?.length ? `${text ? '\n' : ''}${attachments.map(attLink).join('\n')}` : ''), reply_to: replyTo?.imId, status_reply: sr ? { text: sr.text } : undefined, nonce: n });
-  else ok = send({ type: 'roomMessage', room: v.room, message: text + (attachments?.length ? `${text ? '\n' : ''}${attachments.map(attLink).join('\n')}` : ''), reply_to: replyTo?.gid });
+  } else if (v.kind === 'dm') ok = send({ type: 'im_send', to: v.username, message: wireText(text, attachments), reply_to: replyTo?.imId, status_reply: sr ? { text: sr.text } : undefined, nonce: n });
+  else ok = send({ type: 'roomMessage', room: v.room, message: wireText(text, attachments), reply_to: replyTo?.gid });
   if (!ok) set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? { ...x, failed: 'offline' } : x)) }) }));
   setTyping(v, false);
 }

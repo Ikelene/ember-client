@@ -7,7 +7,7 @@ import { UNI_EMOJI, Twemoji, nameOfChar } from './emoji.jsx';
 import { emojiDataSync } from './EmojiPicker.jsx';
 import { extractInvites } from './gameInvite.js';
 import { isHiddenInviteLine } from './inviteLink.js';
-import { VID, AUD, VUP, NOOKARA_FILE, TEMP_FILE } from './uploadLinks.js'; // account uploads also live on cdn.nookara.cc (/uploads/ only)
+import { VID, AUD, VUP, NOOKARA_FILE, TEMP_FILE, inLinks } from './uploadLinks.js'; // account uploads also live on cdn.nookara.cc (/uploads/ only)
 
 const IMG = /^https:\/\/\S+\.(png|jpe?g|gif|webp)(\?\S*)?(#\S*)?$/i;
 // Files sent in DMs live on Velora: temporary storage (/t/<id>/<name>, or cdn.nookara.cc/temp/<id>/<name>, the name is in the path) or account storage
@@ -232,6 +232,8 @@ export function renderBody(body, ctx) {
     for (const m of text.matchAll(URL_RE)) {
       const u = m[0];
       if (text[m.index - 1] === '<' && text[m.index + u.length] === '>') continue;
+      // a picture already taken whole from its own line (its name can hold ) ' which cut the match short here): not again
+      if (inLinks(images, u)) continue;
       // catbox links in the middle of a sentence keep their text, and still get shown underneath
       if (CB.test(u)) { const it = cbItem(u); if (!images.includes(it.url) && !media.some(x => x.url === it.url)) { if (IMG.test(u)) images.push(it.url); else media.push(it); } continue; }
       // so do Velora-stored DM files (never unfurled: Velora fetching its own temporary file would count as someone opening it)
