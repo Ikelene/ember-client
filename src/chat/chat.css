@@ -1224,6 +1224,7 @@ ol.vc-list > li::marker { color: var(--accent); font-weight: 700; }
 .vc-fwd-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .vc-fwd-txt b { color: var(--text); font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vc-fwd-txt small { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vc-fwd-txt small.vc-fwd-failed { color: #e08a8a; white-space: normal; }
 
 /* ── pins ── */
 .vc-pins-wrap { position: relative; display: inline-flex; }

@@ -614,6 +614,14 @@ function onEvent(m, inst = VELORA) {
     case 'roomMessage':
       if (String(m.room || '').startsWith('grp_')) { addMessage(`g:${m.room}`, groupToMsg(m)); loadGroups(); }
       break;
+    case 'room_message_deleted': // someone took back their own group message
+      dropGroupMessage(m.room, m.id);
+      loadGroups();
+      break;
+    case 'im_deleted': // the other side (or another device of mine) removed a DM
+      set(s => ({ msgs: upd(s.msgs, `d:${String(m.with).toLowerCase()}`, b => b && { ...b, list: b.list.filter(x => x.imId !== m.id) }) }));
+      loadDMs();
+      break;
     case 'group_update': case 'group_removed': loadGroups(); break;
     case 'chat_pins_update': set(s => ({ pinsVersion: { ...s.pinsVersion, [m.channel]: (s.pinsVersion[m.channel] || 0) + 1 } })); break;
     case 'friend_request': case 'friend_request_accepted': loadFriends(); break;
@@ -943,8 +951,9 @@ function seedMyFace(instUser) {
   const fid = String(instUser.velora_id), f = state.veloraFaces[fid];
   if (!f || f.miss) set(s => ({ veloraFaces: { ...s.veloraFaces, [fid]: { id: fid, username: state.me.username, pfp: state.me.pfp || null, color: state.me.color || null, rank: state.me.rank } } }));
 }
-export function sendMessage(v, text, { replyTo, attachments, uploads } = {}) {
-  if (uploads?.length) { sendAfterUpload(v, text, { replyTo, attachments, uploads }); return; }
+// -> the pending copy's nonce (a forward watches it for the server's refusal). noStatusReply: a forward isn't the status reply being drafted
+export function sendMessage(v, text, { replyTo, attachments, uploads, noStatusReply } = {}) {
+  if (uploads?.length) { sendAfterUpload(v, text, { replyTo, attachments, uploads }); return undefined; }
   setTimeout(() => dispatchEvent(new CustomEvent('vc-sent', { detail: keyOf(v) })), 0); // the open conversation jumps to the bottom
   const key = keyOf(v);
   const n = `n${Date.now()}_${nonce++}`;
@@ -960,18 +969,19 @@ export function sendMessage(v, text, { replyTo, attachments, uploads } = {}) {
     reply: replyTo ? { id: replyTo.id, author: replyTo.author, alias: replyTo.alias || null, body: String(replyTo.body || '').slice(0, 200) } : null,
   };
   if (v.kind !== 'group') {
-    set(s => ({ msgs: upd(s.msgs, key, b => ({ list: [], hasMore: false, loaded: true, ...(b || {}), list: [...(b?.list || []), temp] })) }));
+    // (not marked loaded: a forward into a conversation that was never opened must still fetch its history when it opens)
+    set(s => ({ msgs: upd(s.msgs, key, b => ({ list: [], hasMore: false, ...(b || {}), list: [...(b?.list || []), temp] })) }));
     pendingAcks.set(n, key);
   }
   if (state.settings.sounds) playPackSound('send'); // (only when a message sound pack is on)
-  const sr = v.kind === 'dm' && state.statusReplyDraft && state.statusReplyDraft.username.toLowerCase() === String(v.username).toLowerCase() ? state.statusReplyDraft : null;
+  const sr = !noStatusReply && v.kind === 'dm' && state.statusReplyDraft && state.statusReplyDraft.username.toLowerCase() === String(v.username).toLowerCase() ? state.statusReplyDraft : null;
   if (sr) { temp.statusReply = sr.text; set({ statusReplyDraft: null }); }
   let ok;
   if (v.kind === 'modmail') { // staff writing as Velora Administrator
     apiFetch(`/chat/modmail/with/${encodeURIComponent(v.username)}`, { method: 'POST', body: JSON.stringify({ body: text }) })
       .then(d => set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: ordered(b.list.map(x => (x.nonce === n ? mmToMsg(d.message) : x))) }) })))
       .catch(e => set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? { ...x, failed: e.message } : x)) }) })));
-    return;
+    return n;
   }
   if (v.kind === 'channel') {
     const info = signingInfo(v.sid);
@@ -992,6 +1002,7 @@ export function sendMessage(v, text, { replyTo, attachments, uploads } = {}) {
   else ok = send({ type: 'roomMessage', room: v.room, message: wireText(text, attachments), reply_to: replyTo?.gid });
   if (!ok) set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? { ...x, failed: 'offline' } : x)) }) }));
   setTyping(v, false);
+  return n;
 }
 export function dropFailed(v, n) {
   const m = state.msgs[keyOf(v)]?.list.find(x => x.nonce === n);
@@ -1087,7 +1098,14 @@ export async function deleteMessage(v, m) {
   else if (v.kind === 'dm') {
     await apiFetch(`/im/${m.imId}`, { method: 'DELETE' });
     set(s => ({ msgs: upd(s.msgs, keyOf(v), b => b && { ...b, list: b.list.filter(x => x.id !== m.id) }) }));
+  } else if (v.kind === 'group' && m.gid) {
+    await apiFetch(`/groups/${encodeURIComponent(v.room)}/messages/${encodeURIComponent(m.gid)}`, { method: 'DELETE' }); // everyone gets room_message_deleted
+    dropGroupMessage(v.room, m.gid);
   }
+}
+function dropGroupMessage(room, gid) {
+  const id = `g${gid}`;
+  set(s => ({ msgs: upd(s.msgs, `g:${room}`, b => b && { ...b, list: b.list.filter(x => x.id !== id).map(x => (x.reply?.id === id ? { ...x, reply: null } : x)) }) }));
 }
 // a picture / video / audio file -> your Velora storage (it shows up in Saved Media too)
 export async function uploadMedia(file) {

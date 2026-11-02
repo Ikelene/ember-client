@@ -33,7 +33,8 @@ import { expiryAt, expiryLabel } from './temp-expiry.js';
 import { tempId, isCdnTemp } from './upload-dest.js';
 import { TempAttPopover } from './TempAttPopover.jsx';
 import { shortDays, daysText } from './temp-pick.js';
-import { BookmarkPlus, Smile, File as FileIcon, FileArchive, FileCode, FileText, Download, Coins, MessageSquareQuote } from 'lucide-react';
+import { BookmarkPlus, Smile, File as FileIcon, FileArchive, FileCode, FileText, Download, Coins, MessageSquareQuote, Forward } from 'lucide-react';
+import { messageCaps } from './msg-actions.js';
 
 // a "GIF" picture-frame icon (drawn, not text) for the GIF picker button
 function GifIcon() {
@@ -419,16 +420,15 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
   const replyBlocked = useBlocked(view.kind === 'channel' ? m.reply?.author : null, m.inst);
   const [unmasked, setUnmasked] = useState(false);
   const masked = blockedAuthor && !unmasked;
-  // replies work in channels you can post in, DMs (not Velora's notices) and group chats
-  const canReplyHere = !m.system && !m.ephemeral && (view.kind === 'channel' ? ctx.canPost : view.kind === 'group' ? !!m.gid : view.username !== 'System' && !!m.imId);
-  // reactions: server channels, real (saved) messages
-  const canReact = !m.pending && !m.system && !m.ephemeral && ((view.kind === 'channel' && /^\d+$/.test(String(m.id))) || (view.kind === 'dm' && view.username !== 'System' && !!m.imId));
+  const mine = !hook && isMineMsg(m);
+  // what this message can do here (menu + hover toolbar): msg-actions.js
+  const caps = messageCaps(view, m, { mine, canMod, canPost: ctx.canPost });
+  const canReplyHere = caps.reply, canReact = caps.react;
   const reactId = m.imId ? `dm:${m.imId}` : m.id;
   const starHere = useStarboardFor(view.sid, view.cid) && canReact && view.kind === 'channel';
   const starred = starHere && starredByMe(m, ctx.me);
   const forward = () => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'forward', message: m, from: view } }));
   const togglePin = () => apiFetch(`/chat/messages/${m.id}/pin`, { method: m.pinned ? 'DELETE' : 'PUT', inst: instOpt(m.channel) }).then(() => toast(m.pinned ? 'Unpinned.' : 'Pinned.', true)).catch(e => toast(errorText(e.message)));
-  const mine = !hook && isMineMsg(m);
   const { nodes, images, media, jumbo, links, invites } = useMemo(() => renderBody(m.body, ctx), [m.body, ctx]);
   const mentionsMe = isMention(m);
   const nameKey = useNameStyle(view.sid, aliasMember || author); // (an unmarked alias that matched a member: their colour + role icon)
@@ -483,9 +483,9 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
         if (m.ephemeral) { openMenu(e, [{ label: 'Dismiss message', icon: X, onClick: () => dismissEphemeral(view, m) }]); return; }
         const reactionAnchor = e.currentTarget.getBoundingClientRect();
         messageMenu(e, m, view, {
-          canReply: canReplyHere, onReply: () => onReply(m), onEdit: () => setEditing(m.id), onForward: forward,
+          me: ctx.me, canReply: canReplyHere, onReply: () => onReply(m), canEdit: caps.edit, onEdit: () => setEditing(m.id), onForward: caps.forward ? forward : null, canCopyLink: caps.copyLink,
           canPin: view.kind === 'channel' && canMod && !hook, onPin: togglePin,
-          canDelete: (mine || canMod) && view.kind !== 'group', onDelete: () => remove({ shiftKey: false }),
+          canDelete: caps.del, onDelete: () => remove({ shiftKey: false }),
           onReact: canReact ? () => openReactionPicker(reactId, reactionAnchor, instOpt(m.channel)) : null,
           onInfo: view.kind === 'channel' && canMod && !m.system ? () => messageInfo(m) : null, // staff only: who really sent it
         });
@@ -554,8 +554,9 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
           {canReact && <><QuickReactions id={reactId} inst={instOpt(m.channel)} selected={(m.reactions || []).filter(r => r.users?.includes(ctx.me)).map(r => r.emoji)} onDone={() => {}} limit={3} className="vc-tools-react" sid={view.kind === 'channel' ? view.sid : null} /><button type="button" title="Add reaction" onClick={e => openReactionPicker(reactId, e.currentTarget, instOpt(m.channel))}><SmilePlus size={16} /></button><span className="vc-tools-sep" aria-hidden="true" /></>}
           {starHere && <button type="button" title={starred ? 'Take your star back' : 'Star it (for the starboard)'} className={`vc-star-tool${starred ? ' on' : ''}`} onClick={() => setReaction(m.id, STAR, !starred, instOpt(m.channel))}><Star size={15} fill={starred ? 'currentColor' : 'none'} /></button>}
           {canReplyHere && <button type="button" title="Reply" onClick={() => onReply(m)}><Reply size={16} /></button>}
-          {mine && (view.kind === 'channel' || (view.kind === 'dm' && m.imId)) && <button type="button" title="Edit" onClick={() => setEditing(m.id)}><Pencil size={15} /></button>}
-          {(mine || canMod) && view.kind !== 'group' && <button type="button" className="danger" title="Delete (shift-click: no question)" onClick={remove}><Trash2 size={15} /></button>}
+          {caps.forward && <button type="button" title="Forward" onClick={forward}><Forward size={16} /></button>}
+          {caps.edit && <button type="button" title="Edit" onClick={() => setEditing(m.id)}><Pencil size={15} /></button>}
+          {caps.del && <button type="button" className="danger" title="Delete (shift-click: no question)" onClick={remove}><Trash2 size={15} /></button>}
         </div>
       )}
     </div>

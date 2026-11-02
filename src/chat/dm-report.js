@@ -9,7 +9,8 @@ export const DM_REPORT_REASONS = [
   ['threats', 'Threats or self-harm'],
   ['other', 'Something else'],
 ];
-export const DM_REPORT_NOTE = 'The message and a few messages around it (with attachments) will be sent to Nookara staff.';
+// (the numbers are BEFORE / AFTER in Nookara's dm-reports.js, and privacy policy section 5 says the same)
+export const DM_REPORT_NOTE = "Nookara staff will see this message and a short history of the chat around it: up to 10 messages before and 5 after, from everyone in this conversation, with their attachments. Staff don't see the rest of the chat, and the person you report isn't told who reported them.";
 
 // can this message in this view be reported to Nookara? (a DM or group message someone else sent, already saved)
 export function canReportDm(view, m, meName) {

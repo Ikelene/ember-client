@@ -9,10 +9,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronRight, Check, Hash, Copy, Link2, BellOff, Bell, CheckCheck, UserPlus, Settings, LogOut, Pencil, Trash2, Reply, User, MessageCircle, ExternalLink, Image as ImageIcon, Code2, Forward, Pin, Download, SmilePlus, BookmarkPlus, RefreshCw, LogIn, ShieldCheck, BellRing, Flag, Ban, Info } from 'lucide-react';
 import { apiFetch } from '../api.js';
-import { useChat, getState, setMenu, toggleBlock, toast, setNotify, notifyOf, go, markServerRead, markChannelRead, linkFor, isMineMsg } from './store.js';
+import { useChat, getState, setMenu, toggleBlock, toast, setNotify, notifyOf, go, markServerRead, markChannelRead, linkFor } from './store.js';
 import { bare, instOpt, isInst } from './ids.js';
 import { reportTo, reportDmMessage } from './report.js';
 import { canReportDm } from './dm-report.js';
+import { myReactions } from './msg-actions.js';
 import { setInstancePrefs } from './instances.js';
 import { roleMenuItems, modMenuItems, P, has } from './roles.jsx';
 import { viewPicture, copyImage, downloadImage } from './MediaViewer.jsx';
@@ -219,7 +220,7 @@ export function channelMenu(e, c, sid, { admin, onEdit, onDelete } = {}) {
     { label: 'Copy channel ID', icon: Code2, dev: true, onClick: () => copy(bare(c.cid), 'Channel ID copied') },
   ]);
 }
-export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, canReply, onForward, canPin, onPin, onReact, onInfo } = {}) {
+export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, canReply, canEdit, canCopyLink, onForward, canPin, onPin, onReact, onInfo, me } = {}) {
   const sel = String(getSelection?.() || '').trim();
   const link = e.target.closest?.('a[href]');
   const img = e.target.closest?.('img');
@@ -228,6 +229,7 @@ export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, 
   const mediaUrl = mediaEl?.dataset.mediaUrl || null;
   const mediaName = mediaEl?.dataset.mediaName || '';
   const pic = img && !/vc-(c|t)emoji|vc-av|vc-srv-ico/.test(`${img.className} ${img.parentElement?.className || ''}`) ? img : null; // a real picture, not an emoji or avatar
+  const authorId = m.author?.id || getState().people[m.author?.username]?.id; // (DM and group messages only carry the name)
   openMenu(e, [
     sel && { label: 'Copy', icon: Copy, onClick: () => copy(sel, 'Text copied') },
     link && { label: 'Open link', icon: ExternalLink, onClick: () => window.open(link.href, '_blank', 'noopener') },
@@ -242,17 +244,17 @@ export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, 
     onReact && { label: 'Add reaction', icon: SmilePlus, onClick: onReact },
     onForward && { label: 'Forward', icon: Forward, onClick: onForward },
     canPin && { label: m.pinned ? 'Unpin message' : 'Pin message', icon: Pin, onClick: onPin },
-    isMineMsg(m) && (view.kind === 'channel' || (view.kind === 'dm' && m.imId)) && { label: 'Edit message', icon: Pencil, onClick: onEdit },
-    { label: 'Copy text', icon: Copy, onClick: () => copy(m.body, 'Text copied') },
-    view.kind === 'channel' && { label: 'Copy message link', icon: Link2, onClick: () => copy(linkFor(view), 'Link copied') },
+    canEdit && { label: 'Edit message', icon: Pencil, onClick: onEdit },
+    m.body && { label: 'Copy text', icon: Copy, onClick: () => copy(m.body, 'Text copied') },
+    canCopyLink && { label: 'Copy message link', icon: Link2, onClick: () => copy(linkFor(view), 'Link copied') },
     canDelete && { label: 'Delete message', icon: Trash2, danger: true, onClick: onDelete },
-    view.kind === 'channel' && isInst(view.sid) && !isMineMsg(m) && !m.system && /^\d+$/.test(String(m.id)) && { label: 'Report message', icon: Flag, danger: true, onClick: () => reportTo(view.sid, { message_id: m.id }, 'this message', { target: m.author, message: m }) },
+    view.kind === 'channel' && isInst(view.sid) && !canEdit && !m.system && /^\d+$/.test(String(m.id)) && { label: 'Report message', icon: Flag, danger: true, onClick: () => reportTo(view.sid, { message_id: m.id }, 'this message', { target: m.author, message: m }) },
     canReportDm(view, m, getState().me?.username) && { label: 'Report message', icon: Flag, danger: true, onClick: () => reportDmMessage(view, m) },
     'sep',
     onInfo && { label: 'Message info', icon: Info, onClick: onInfo }, // Manage messages: the real sender (aliases included)
-    { label: 'Copy message ID', icon: Code2, dev: true, onClick: () => copy(m.imId || m.id, 'Message ID copied') },
-    m.author?.id && { label: 'Copy author ID', icon: Code2, dev: true, onClick: () => copy(m.author.id, 'Account ID copied') },
-  ], { reaction: onReact ? { id: m.imId ? `dm:${m.imId}` : m.id, inst: instOpt(m.channel), selected: (m.reactions || []).filter(r => r.users?.includes(me)).map(r => r.emoji) } : null });
+    { label: 'Copy message ID', icon: Code2, dev: true, onClick: () => copy(m.imId || m.gid || m.id, 'Message ID copied') },
+    authorId && { label: 'Copy author ID', icon: Code2, dev: true, onClick: () => copy(authorId, 'Account ID copied') },
+  ], { reaction: onReact ? { id: m.imId ? `dm:${m.imId}` : m.id, inst: instOpt(m.channel), selected: myReactions(m, me) } : null });
 }
 export function userMenu(e, username, { onProfile, sid, extra = [] } = {}) {
   const st = getState();

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canReportDm, dmReportBody, dmReportError, DM_REPORT_REASONS } from '../src/chat/dm-report.js';
+import { canReportDm, dmReportBody, dmReportError, DM_REPORT_REASONS, DM_REPORT_NOTE } from '../src/chat/dm-report.js';
 
 const dm = { kind: 'dm', username: 'bob' };
 const grp = { kind: 'group', room: 'grp_abc' };
@@ -25,6 +25,13 @@ test('the request body: DM by mail id, group by room + message id', () => {
   assert.equal(dmReportBody(dm, fromBob, 'nope', ''), null);
   assert.equal(dmReportBody(dm, fromBob, 'other', 'x'.repeat(2000)).details.length, 1000);
   assert.deepEqual(DM_REPORT_REASONS.map(r => r[0]), ['harassment', 'spam', 'nsfw', 'threats', 'other']);
+});
+
+test('the dialog says a short history goes to staff, as privacy policy section 5 does', () => {
+  assert.match(DM_REPORT_NOTE, /short history/);
+  assert.match(DM_REPORT_NOTE, /up to 10 messages before and 5 after/);
+  assert.match(DM_REPORT_NOTE, /attachments/);
+  assert.match(DM_REPORT_NOTE, /everyone in this conversation/);
 });
 
 test('server errors read as plain sentences', () => {

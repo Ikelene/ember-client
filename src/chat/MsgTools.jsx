@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Hash, UsersRound, Pin, X, Forward } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { instOpt } from './ids.js';
-import { useChat, getState, sendMessage, refreshServer, toast, errorText } from './store.js';
+import { useChat, getState, sendMessage, refreshServer, toast, errorText, dmErrorText, keyOf, dropFailed } from './store.js';
+import { forwardText, forwardLimit, forwardHasFiles, FORWARD_FILES_NOTE } from './forward.js';
 import { Dialog } from './Dialogs.jsx';
 import { Avatar } from './Profile.jsx';
 import { ChannelIcon, P, has } from './roles.jsx';
@@ -14,14 +15,15 @@ import { AliasMark, aliasOf, aliasFace, shownName } from './Alias.jsx';
 
 // ── forwarding ──
 // the forwarded copy says where it came from; @everyone / @here inside it never ping again
-function forwardText(m, from) {
+function forwardedBody(m, from, to) {
   const st = getState();
   let where = '';
   if (from.kind === 'channel') { const d = st.detail[from.sid]; const c = d?.channels.find(x => x.cid === from.cid); if (c) where = ` in #${c.name}${d ? ` (${d.server.name})` : ''}`; }
-  else if (from.kind === 'group') where = ` in ${st.groups.find(g => g.room === from.room)?.name || 'a group chat'}`;
-  const body = (from.kind === 'channel' ? decodeRoleMentions(m.body || '', from.sid) : String(m.body || ''))
-    .replace(/@(everyone|here)\b/g, '@​$1');
-  return `-# Forwarded from @${m.author?.username || 'Nookara'}${where}\n${body}`.trim();
+  else if (from.kind === 'group') where = ' in a group chat';
+  const body = from.kind === 'channel' ? decodeRoleMentions(m.body || '', from.sid) : String(m.body || '');
+  // (a channel message's attachments become links on the end of the text in a DM or group chat)
+  const extra = to.kind === 'channel' ? 0 : (m.attachments || []).reduce((n, a) => n + String(a.url || '').length + 80, 0);
+  return forwardText({ author: m.author?.username, where, body }, forwardLimit(to) - extra);
 }
 export function ForwardDialog({ message, from, onClose }) {
   const dms = useChat(s => s.dms);
@@ -29,6 +31,8 @@ export function ForwardDialog({ message, from, onClose }) {
   const groups = useChat(s => s.groups);
   const servers = useChat(s => s.servers);
   const detail = useChat(s => s.detail);
+  const blocks = useChat(s => s.blocks);
+  const msgs = useChat(s => s.msgs); // to see a forward the server refused (blocked, DM privacy, ...)
   const [q, setQ] = useState('');
   const [note, setNote] = useState('');
   const [sent, setSent] = useState({});
@@ -38,7 +42,7 @@ export function ForwardDialog({ message, from, onClose }) {
     const out = [];
     const seen = new Set();
     [...dms.map(c => c.username), ...friends.map(f => f.friend_username)].forEach(u => {
-      if (u === 'System' || seen.has(u.toLowerCase())) return;
+      if (u === 'System' || seen.has(u.toLowerCase()) || blocks?.some(b => String(b.username).toLowerCase() === u.toLowerCase())) return;
       seen.add(u.toLowerCase());
       out.push({ key: `d:${u}`, label: u, hint: 'Direct message', v: { kind: 'dm', username: u }, user: { username: u, pfp: getState().people[u]?.pfp } });
     });
@@ -47,11 +51,14 @@ export function ForwardDialog({ message, from, onClose }) {
       .forEach(c => out.push({ key: `c:${c.cid}`, label: c.name, hint: s.name, v: { kind: 'channel', sid: s.sid, cid: c.cid }, channel: c })));
     const t = q.trim().toLowerCase();
     return (t ? out.filter(x => x.label.toLowerCase().includes(t) || x.hint.toLowerCase().includes(t)) : out).slice(0, 60);
-  }, [dms, friends, groups, servers, detail, q]);
+  }, [dms, friends, groups, servers, detail, blocks, q]);
+  // the refusal for one destination, once the server has answered (a group chat has no per-message answer)
+  const failedOf = t => { const n = sent[t.key]?.[0]; return n ? msgs[keyOf(t.v)]?.list.find(x => x.nonce === n)?.failed : null; };
   function send(t) {
-    sendMessage(t.v, forwardText(message, from), { attachments: message.attachments || [] });
-    if (note.trim()) sendMessage(t.v, note.trim());
-    setSent(x => ({ ...x, [t.key]: true }));
+    (sent[t.key] || []).forEach(n => dropFailed(t.v, n)); // trying again: not a second failed copy in that conversation
+    const nonces = [sendMessage(t.v, forwardedBody(message, from, t.v), { attachments: message.attachments || [], noStatusReply: true })];
+    if (note.trim()) nonces.push(sendMessage(t.v, note.trim(), { noStatusReply: true }));
+    setSent(x => ({ ...x, [t.key]: nonces }));
   }
   return (
     <Dialog title="Forward message" onClose={onClose}>
@@ -61,16 +68,21 @@ export function ForwardDialog({ message, from, onClose }) {
             <span className="vc-fwd-from"><Forward size={13} /> {message.author?.username || 'Nookara'}</span>
             <FwdBody body={message.body || (message.attachments?.length ? '(attachment)' : '')} />
           </div>
+          {forwardHasFiles(message) && <p className="vc-dialog-sub">{FORWARD_FILES_NOTE}</p>}
           <input className="form-input" maxLength={2000} placeholder="Add a message (optional)" value={note} onChange={e => setNote(e.target.value)} />
           <label className="vc-search"><Search size={15} /><input autoFocus placeholder="Where to? Search people, groups and channels" value={q} onChange={e => setQ(e.target.value)} /></label>
           <div className="vc-fwd-list">
-            {targets.map(t => (
-              <div key={t.key} className="vc-fwd-row">
-                {t.user ? <Avatar user={t.user} size={28} /> : t.group ? <span className="vc-fwd-ico"><UsersRound size={16} /></span> : <span className="vc-fwd-ico"><ChannelIcon c={t.channel} size={16} /></span>}
-                <span className="vc-fwd-txt"><b>{t.channel ? `#${t.label}` : t.label}</b><small>{t.hint}</small></span>
-                <button type="button" className={`btn btn-sm ${sent[t.key] ? 'btn-surface' : 'btn-primary'}`} disabled={sent[t.key]} onClick={() => send(t)}>{sent[t.key] ? 'Sent' : 'Send'}</button>
-              </div>
-            ))}
+            {targets.map(t => {
+              const failed = failedOf(t);
+              const done = sent[t.key] && !failed;
+              return (
+                <div key={t.key} className="vc-fwd-row">
+                  {t.user ? <Avatar user={t.user} size={28} /> : t.group ? <span className="vc-fwd-ico"><UsersRound size={16} /></span> : <span className="vc-fwd-ico"><ChannelIcon c={t.channel} size={16} /></span>}
+                  <span className="vc-fwd-txt"><b>{t.channel ? `#${t.label}` : t.label}</b><small className={failed ? 'vc-fwd-failed' : undefined}>{failed ? (t.user ? dmErrorText(failed) : errorText(failed)) : t.hint}</small></span>
+                  <button type="button" className={`btn btn-sm ${done ? 'btn-surface' : 'btn-primary'}`} disabled={done} onClick={() => send(t)}>{done ? 'Sent' : failed ? 'Try again' : 'Send'}</button>
+                </div>
+              );
+            })}
             {!targets.length && <div className="vc-empty-note">Nowhere matches that.</div>}
           </div>
           <div className="vc-dialog-btns"><span className="grow" /><button type="button" className="btn btn-surface" onClick={close}>Done</button></div>
