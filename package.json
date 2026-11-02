@@ -8,11 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-<<<<<<< HEAD
-    "test": "node --test test/aliases.test.js test/hosted-alias.test.js test/attachments.test.js test/insights.test.js test/manage-users.test.js test/official-clients.test.js test/temp-expiry.test.js test/temp-pick.test.js test/unread.test.js test/upload-dest.test.js test/upload-links.test.js test/user-update.test.js test/dm-report.test.js test/dm-double.test.js test/text-images.test.js tests/reaction-usage.mjs && node tests/composer-scope.mjs"
-=======
-    "test": "node --test test/aliases.test.js test/hosted-alias.test.js test/attachments.test.js test/insights.test.js test/manage-users.test.js test/official-clients.test.js test/temp-expiry.test.js test/temp-pick.test.js test/unread.test.js test/upload-dest.test.js test/upload-links.test.js test/user-update.test.js test/dm-report.test.js test/msg-actions.test.js test/forward.test.js tests/reaction-usage.mjs && node tests/composer-scope.mjs"
->>>>>>> af410ae (full message menu in dms and group chats: fix the menu dying on messages with reactions, forward button + refusals + file note, delete own group messages, staff history spelled out in the report dialog)
+    "test": "node --test test/aliases.test.js test/hosted-alias.test.js test/attachments.test.js test/insights.test.js test/manage-users.test.js test/official-clients.test.js test/temp-expiry.test.js test/temp-pick.test.js test/unread.test.js test/upload-dest.test.js test/upload-links.test.js test/user-update.test.js test/dm-report.test.js test/dm-double.test.js test/text-images.test.js test/msg-actions.test.js test/forward.test.js tests/reaction-usage.mjs && node tests/composer-scope.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.441.0",
