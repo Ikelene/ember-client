@@ -7,12 +7,12 @@ import { UNI_EMOJI, Twemoji, nameOfChar } from './emoji.jsx';
 import { emojiDataSync } from './EmojiPicker.jsx';
 import { extractInvites } from './gameInvite.js';
 import { isHiddenInviteLine } from './inviteLink.js';
-import { VID, AUD, VUP, NOOKARA_FILE } from './uploadLinks.js'; // account uploads also live on cdn.nookara.cc (/uploads/ only)
+import { VID, AUD, VUP, NOOKARA_FILE, TEMP_FILE } from './uploadLinks.js'; // account uploads also live on cdn.nookara.cc (/uploads/ only)
 
 const IMG = /^https:\/\/\S+\.(png|jpe?g|gif|webp)(\?\S*)?(#\S*)?$/i;
-// Files sent in DMs live on Velora: temporary storage (/t/<id>/<name>, the name is in the path) or account storage
+// Files sent in DMs live on Velora: temporary storage (/t/<id>/<name>, or cdn.nookara.cc/temp/<id>/<name>, the name is in the path) or account storage
 // (/uploads/..., #n=<name> on the end = the real name). Pictures show as pictures, videos / sounds play, the rest is a file card.
-const TMP = /^https:\/\/(?:(?:ember\.)?nookara\.cc|velora\.ikelene\.net)\/t\/[A-Za-z0-9]{22}\/[^\s?#]+$/i;
+const TMP = TEMP_FILE;
 const isVel = u => TMP.test(u) || VUP.test(u);
 const velItem = full => {
   const [u, frag] = full.split('#');

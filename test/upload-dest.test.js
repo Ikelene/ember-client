@@ -33,3 +33,45 @@ test('tracking cleanup leaves temporary links alone', () => {
   assert.equal(cleanUrl(`${T}/cat.png`), `${T}/cat.png`);
   assert.equal(cleanUrl(`${T}/cat.png?dl=1`), `${T}/cat.png?dl=1`);
 });
+
+// ── temporary files in the CDN bucket: https://cdn.nookara.cc/temp/<id>/<name> ──
+const ID = 'Ab3dEfGhIjKlMnOpQrStUv';
+const CDN_T = `https://cdn.nookara.cc/temp/${ID}`;
+const TEMP_BAD = ['https://cdn.nookara.cc.evil.example', 'https://evilcdn.nookara.cc', 'https://cdn-nookara.cc', 'https://cdn.nookara.cc@evil.example', 'https://x.cdn.nookara.cc', 'http://cdn.nookara.cc', 'https://cdn.nookara.cc:444.evil.example', 'https://nookara.cc.evil.example', 'https://evil.example'];
+
+test('a CDN temp link is a temporary-storage link (same id, same /t/info lookup); /t/ links still are', async () => {
+  const { TEMP_LINK, tempId, isCdnTemp } = await import('../src/chat/upload-dest.js');
+  assert.equal(tempId(`${CDN_T}/cat.png`), ID);
+  assert.ok(TEMP_LINK.test(`${CDN_T}/a%20b.zip`));
+  assert.equal(tempId(`${T}/cat.png`), ID, '/t/ unchanged');
+  assert.equal(tempId(`https://velora.ikelene.net/t/${ID}/x`), ID);
+  assert.ok(isCdnTemp(`${CDN_T}/cat.png`) && !isCdnTemp(`${T}/cat.png`));
+  assert.ok(!isCdnTemp(`https://cdn.nookara.cc/uploads/images/${ID}/cat.png`));
+  assert.equal(tempId(`https://cdn.nookara.cc/temp/short/cat.png`), null);
+  assert.equal(tempId(`https://cdn.nookara.cc/t/${ID}/cat.png`), null, 'the CDN has no /t/');
+  assert.equal(tempId(`https://nookara.cc/temp/${ID}/cat.png`), null, '/temp/ is the CDN host only');
+  for (const h of TEMP_BAD) { assert.equal(tempId(`${h}/temp/${ID}/cat.png`), null, h); assert.ok(!isCdnTemp(`${h}/temp/${ID}/cat.png`), h); }
+});
+
+test('upload links: a CDN temp file can be saved and is never unfurled; look-alikes and other CDN paths are not', async () => {
+  const { SAVEABLE, NOOKARA_FILE, TEMP_FILE, VID, VUP } = await import('../src/chat/uploadLinks.js');
+  for (const re of [SAVEABLE, NOOKARA_FILE, TEMP_FILE]) {
+    assert.ok(re.test(`${CDN_T}/cat.png`), String(re));
+    assert.ok(re.test(`${T}/cat.png`), `${re} (/t/ unchanged)`);
+    for (const h of TEMP_BAD) assert.ok(!re.test(`${h}/temp/${ID}/cat.png`), `${h} ${re}`);
+    assert.ok(!re.test(`https://cdn.nookara.cc/t/${ID}/cat.png`));
+  }
+  assert.ok(!TEMP_FILE.test(`${CDN_T}/cat.png?dl=1`) && !TEMP_FILE.test(`${CDN_T}`), 'a message link is <id>/<name> with no query');
+  assert.ok(!TEMP_FILE.test(`${CDN_T}/`), 'the name is required');
+  assert.ok(!VID.test(`${CDN_T}/a.mp4`) && !VUP.test(`${CDN_T}/a.mp4`), 'not an /uploads/ link: the upload patterns are unchanged');
+  assert.ok(!SAVEABLE.test('https://cdn.nookara.cc/other/a.png'));
+});
+
+test('names and tracking cleanup for CDN temp links', () => {
+  assert.equal(nameInLink(`${CDN_T}/SPOILER_my%20cat.png`), 'SPOILER_my cat.png');
+  assert.ok(isSpoiler({ name: nameInLink(`${CDN_T}/SPOILER_x.png`) }));
+  assert.equal(nameInLink(`https://evil.example/temp/${ID}/x.png`), '');
+  assert.equal(nameInLink(`https://cdn.nookara.cc.evil.example/temp/${ID}/x.png`), '');
+  assert.equal(cleanUrl(`${CDN_T}/cat.png`), `${CDN_T}/cat.png`);
+  assert.equal(cleanUrl(`${CDN_T}/cat.png?utm_source=x`), `${CDN_T}/cat.png`);
+});

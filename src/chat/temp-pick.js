@@ -3,7 +3,7 @@
 // The rules themselves live on Velora (temp-files-policy.js); /chat/media/destinations hands us `temp` with the numbers.
 const MB = 1024 * 1024;
 
-// days the file lasts after the last time someone opens it (the normal, resetting expiry).
+// days the file lasts from the day it is sent (the normal lifetime; opening it never moves it).
 // days = destinations' temp.days ({ image, media, file, large }); kind = store.fileKind (image | gif | video | audio | file)
 export function normalDays(days, kind, size) {
   if (!days) return null;

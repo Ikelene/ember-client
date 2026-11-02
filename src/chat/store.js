@@ -1136,12 +1136,12 @@ export async function saveToMedia(url, name) {
   } catch (e) { toast(SAVE_ERR[e.message] || errorText(e.message)); }
 }
 // A file sent in a DM / group chat (anything not on an Ember instance) goes to one of two places on Velora:
-//   'temp'    Velora's temporary storage (/t/<id>/<name>): free, deleted after a while nobody opens it (every load resets the clock)
+//   'temp'    Velora's temporary storage (/t/<id>/<name>): free, deleted on a fixed date (opening it never moves it)
 //   'account' your Velora account storage: counts toward your storage, stays until you delete it
 // (pictures / videos / sounds show inline, the rest is a download card). Which one: the chat setting dm_upload_dest
 // ('ask' | 'account' | 'temp', synced to the account) with a copy in localStorage, or the picker below when it's 'ask'.
 // opts.expires: a picked expiry (days, or 'max') - Velora Pro only, the server refuses it otherwise (pro_required).
-// That date is fixed: opening the file doesn't move it. Left out = the normal expiry that starts over on every load.
+// Every file's date is fixed when it is sent and opening it never moves it. Left out = the normal lifetime for the file.
 export async function uploadTemp(file, opts = {}) {
   const fd = new FormData();
   if (opts.expires != null && opts.expires !== 'default') fd.append('expires_in_days', String(opts.expires));
@@ -1191,8 +1191,8 @@ export function answerUploadAsk(dest, remember) {
   if (dest && remember) setUploadDest(dest);
   a.resolve(dest || null);
 }
-// a temporary-storage link: { expires_in (seconds), ttl_days, at (when we asked) }, or 'gone' when it expired / was deleted,
-// or null when that couldn't be found out. /t/info doesn't count as opening the file. Answers are kept 10 minutes (a 'gone'
+// a temporary-storage link (/t/ or cdn.nookara.cc/temp/): { expires_in (seconds), ttl_days (null), at (when we asked) }, or 'gone' when it
+// expired / was deleted, or null when that couldn't be found out. Answers are kept 10 minutes (a 'gone'
 // forever), asked at most 4 at a time, and the same file in many messages is one request.
 export { TEMP_LINK };
 const TEMP_INFO_MS = 10 * 60 * 1000;
@@ -1235,15 +1235,6 @@ export function tempFileInfo(url) {
 // the answer we already have for a link (undefined = not asked / still asking), without asking
 export const tempFileInfoNow = url => { const e = tempInfos.get(tempId(url)); return e && (e.v === 'gone' || Date.now() - e.at < TEMP_INFO_MS) ? e.v : undefined; };
 export const onTempInfo = fn => { tempSubs.add(fn); return () => tempSubs.delete(fn); };
-// Opening a temporary file restarts its clock on Velora, so what we kept is stale: ask again a moment after the picture / video
-// loaded (Velora writes the reset while it sends the file, and only once per file per 10 minutes - so this shows what's really
-// stored, which can still be the older date if the reset was skipped).
-const tempRefreshing = new Map();
-export function refreshTempInfo(url, delay = 1500) {
-  const id = tempId(url);
-  if (!id || tempRefreshing.has(id) || tempInfos.get(id)?.v === 'gone') return;
-  tempRefreshing.set(id, setTimeout(() => { tempRefreshing.delete(id); if (tempInfos.get(id)?.v !== 'gone') tempLoad(id); }, delay));
-}
 async function prepareAttachments(v, attachments) {
   return prepareInstanceAttachments(attachments, instOf(v.sid), location.origin, a =>
     apiFetch(`/chat/media/import?sid=${v.sid}&cid=${v.cid}`, {

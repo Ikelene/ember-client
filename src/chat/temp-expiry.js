@@ -1,5 +1,5 @@
 // The "Expires ..." footer under a message's temporary-storage files (pure, no imports, so it can be tested on its own).
-// An entry is the moment (ms) the file is deleted unless someone opens it, 'gone' once it expired, or null when it
+// An entry is the moment (ms) the file is deleted, 'gone' once it expired, or null when it
 // couldn't be found out (those are left out). `now` and `locale` are passed in so the tests don't depend on the clock.
 const DAY = 86400000;
 const dayStart = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };

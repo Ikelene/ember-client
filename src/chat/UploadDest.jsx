@@ -42,7 +42,7 @@ export function UploadDestHost() {
           <Clock size={22} />
           <span>
             <b>Temporary storage</b>
-            <small>Free. Deleted after a while nobody opens it: pictures after about {days.image} days, videos and sounds {days.media}, other files {days.file}, files over 25 MB {days.large}. Every time someone opens it the clock starts over, and files lots of people open stay longer.</small>
+            <small>Free. Deleted a set time after you send it: pictures after about {days.image} days, videos and sounds {days.media}, other files {days.file}, files over 25 MB {days.large}. Opening a file never changes that.</small>
             {tmpWhy && <small className="why">{tmpWhy}</small>}
           </span>
         </button>

@@ -62,7 +62,7 @@ export function TempAttPopover({ att, rect, onExpires, onDest, onClose }) {
         <div className="vc-tpop-head"><HardDrive size={16} /><b>Kept on your account</b></div>
         <p className="vc-tpop-text">Stays until you delete it, and counts toward your Nookara storage{acc ? ` (${fmt(acc.remaining)} of ${fmt(acc.limit)} free)` : ''}.</p>
         <button type="button" className="vc-tpop-move" disabled={!!tmpWhy} onClick={() => { onDest('temp'); onClose(); }}>
-          <Clock size={15} /><span><b>Send as a temporary file instead</b><small>{tmpWhy || `Free, deleted after about ${daysText(normal) || 'a while'} unopened`}</small></span>
+          <Clock size={15} /><span><b>Send as a temporary file instead</b><small>{tmpWhy || `Free, deleted ${normal ? `after ${daysText(normal)}` : 'after a set time'}`}</small></span>
         </button>
       </>
     );
@@ -81,16 +81,16 @@ export function TempAttPopover({ att, rect, onExpires, onDest, onClose }) {
                   <button key={c.value} type="button" role="radio" aria-checked={on} className={`vc-tpop-choice${on ? ' on' : ''}`} onClick={() => onExpires(c.value, c.days)}>
                     <span className="vc-tpop-radio">{on && <Check size={11} strokeWidth={3} />}</span>
                     <span className="vc-tpop-label">{c.value === 'default' ? 'Default' : daysText(c.days)}{c.value === 'max' && <em> (longest)</em>}</span>
-                    <small>{c.value === 'default' ? (normal ? `${daysText(normal)} after it's last opened` : 'Starts over when opened') : dateIn(c.days)}</small>
+                    <small>{c.value === 'default' ? (normal ? `${daysText(normal)} after it's sent` : 'The normal time') : dateIn(c.days)}</small>
                   </button>
                 );
               })}
             </div>
-            <p className="vc-tpop-note">{pickedDays(picked, maxDays) ? 'A picked date is fixed: opening the file won\'t keep it longer.' : 'Default starts the clock over every time someone opens it.'}</p>
+            <p className="vc-tpop-note">{pickedDays(picked, maxDays) ? 'Deleted on that date, however often the file is opened.' : 'Deleted a set time after it is sent, however often the file is opened.'}</p>
           </>
         ) : (
           <>
-            <p className="vc-tpop-text">{normal ? `Deleted after ${daysText(normal)} without anyone opening it.` : 'Deleted after a while without anyone opening it.'} Opening it starts the clock over.</p>
+            <p className="vc-tpop-text">{normal ? `Deleted ${daysText(normal)} after you send it.` : 'Deleted a set time after you send it.'} Opening it doesn't change that.</p>
             <div className="vc-tpop-pro">
               <Sparkles size={15} />
               <span>

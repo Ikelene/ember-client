@@ -1,6 +1,7 @@
 import { siteHref } from './hosts.js';
 // The conversation: messages (grouped by person, with day dividers), the composer and who's typing.
 import { SAVEABLE } from './uploadLinks.js';
+import { saveMedia } from './mediaDownload.js';
 import { canAttachInChannel } from './attachment-permissions.js';
 import { apiFetch } from '../api.js';
 import { instOpt, isInst, instOf } from './ids.js';
@@ -29,7 +30,7 @@ import { GlintMark, NewTag, loadMyClips, liveClips } from './glint.jsx';
 import EmojiPicker, { loadEmojiData } from './EmojiPicker.jsx';
 import { TriangleAlert, Shield, Clock, HardDrive } from 'lucide-react';
 import { expiryAt, expiryLabel } from './temp-expiry.js';
-import { tempId } from './upload-dest.js';
+import { tempId, isCdnTemp } from './upload-dest.js';
 import { TempAttPopover } from './TempAttPopover.jsx';
 import { shortDays, daysText } from './temp-pick.js';
 import { BookmarkPlus, Smile, File as FileIcon, FileArchive, FileCode, FileText, Download, Coins, MessageSquareQuote } from 'lucide-react';
@@ -46,7 +47,7 @@ function GifIcon() {
   );
 }
 import { loadEmojis, loadMembers, loadCommands, clearStatusReply, useTimedOut, untilText, dismissEphemeral } from './store.js';
-import { takeJump, fileKind, uploadMedia, saveToMedia, isMineMsg, loadUploadLimits, getUploadLimits, chooseUploadDest, rememberedUploadDest, tempFileInfo, tempFileInfoNow, onTempInfo, refreshTempInfo, TEMP_LINK } from './store.js';
+import { takeJump, fileKind, uploadMedia, saveToMedia, isMineMsg, loadUploadLimits, getUploadLimits, chooseUploadDest, rememberedUploadDest, tempFileInfo, tempFileInfoNow, onTempInfo, TEMP_LINK } from './store.js';
 import { useStarboardFor, starredByMe, STAR } from './Starboard.jsx';
 import { CALL_LINE, callLineText } from './callText.js';
 import { setReaction } from './Reactions.jsx';
@@ -134,19 +135,25 @@ function useExpiryLabel(urls, enabled) {
   return expiryLabel(infos.map(i => expiryAt(i)), { now: Date.now(), locale: navigator.language });
 }
 export function ExpiredFile({ name }) {
-  return <div className="vc-filecard vc-att-expired"><FileIcon size={18} /><span><b>{shownName(name) || 'File'}</b><small>This file expired. Temporary files are deleted after a while nobody opens them.</small></span></div>;
+  return <div className="vc-filecard vc-att-expired"><FileIcon size={18} /><span><b>{shownName(name) || 'File'}</b><small>This file expired. Temporary files are deleted after a set time.</small></span></div>;
 }
 export function FileCard({ a, live = true }) {
   const name = shownName((() => { try { return decodeURIComponent(a.name || a.url.split('/').pop()); } catch { return a.name || 'file'; } })());
   const ext = (/\.([a-z0-9]{1,10})$/i.exec(name)?.[1] || /\.([a-z0-9]{1,10})$/i.exec(a.url)?.[1] || '').toLowerCase();
   const risky = RISKY.test(ext);
   const temp = useTempFile(a.url, live);
+  // A temporary file in the CDN bucket ignores ?dl=1 (nothing runs in front of the bucket), and a plain-text one would open in the tab instead of
+  // downloading: those are fetched and saved with their real name (mediaDownload.js, the same path the picture viewer uses; the Android app
+  // hands the https link to Download Manager). A /t/ link keeps ?dl=1. If the fetch is refused, the link opens in a new tab instead.
+  const cdn = isCdnTemp(a.url);
   const dl = /^https:\/\/files\.catbox\.moe\/[\w-]+\.[a-z0-9]{1,8}$/i.test(a.url) ? `/chat/dl?u=${encodeURIComponent(a.url)}&n=${encodeURIComponent(name)}`
-    : TEMP_LINK.test(a.url) ? `${a.url.split(/[?#]/)[0]}?dl=1` : a.url;
+    : TEMP_LINK.test(a.url) && !cdn ? `${a.url.split(/[?#]/)[0]}?dl=1` : a.url;
+  const fetchDl = () => saveMedia(a.url, name).catch(() => { toast("Couldn't save it directly - opening it instead."); window.open(a.url, '_blank', 'noopener,noreferrer'); });
   const open = async e => {
-    if (!risky) return; // the link just downloads
+    if (!risky && !cdn) return; // the link just downloads
     e.preventDefault();
-    if (await ask({ title: 'Download this program?', text: `${name} can run code on your computer. Only open files from people you trust.`, confirm: 'Download' })) location.href = dl;
+    if (risky && !(await ask({ title: 'Download this program?', text: `${name} can run code on your computer. Only open files from people you trust.`, confirm: 'Download' }))) return;
+    if (cdn) fetchDl(); else location.href = dl;
   };
   if (temp === 'gone') return <ExpiredFile name={name} />;
   const Ico = /^(zip|rar|7z|tar|gz|xz|bz2)$/.test(ext) ? FileArchive : /^(js|ts|jsx|tsx|py|json|html|css|c|cpp|cs|java|lua|sb3|pmp|sh|ps1)$/.test(ext) ? FileCode : /^(txt|md|pdf|doc|docx|rtf|odt|log)$/.test(ext) ? FileText : FileIcon;
@@ -155,7 +162,7 @@ export function FileCard({ a, live = true }) {
       <span className="vc-filecard-ico"><Ico size={26} />{ext && <b>{ext.slice(0, 4)}</b>}</span>
       <div className="vc-filecard-txt">
         <a className="vc-filecard-name" href={dl} download={name} onClick={open} title={name}>{name}</a>
-        <small>{[KIND_OF(ext), fmtSize(a.size)].filter(Boolean).join(' - ')}{temp?.left && <span className="vc-filecard-exp" title={`Temporary file: deleted ${temp.left} from now unless someone opens it (opening it starts the clock over)`}> - expires in {temp.left}</span>}</small>
+        <small>{[KIND_OF(ext), fmtSize(a.size)].filter(Boolean).join(' - ')}{temp?.left && <span className="vc-filecard-exp" title={`Temporary file: deleted ${temp.left} from now`}> - expires in {temp.left}</span>}</small>
       </div>
       <a className="vc-filecard-dl" href={dl} download={name} onClick={open} title={`Download ${name}`}><Download size={16} /><span>Download</span></a>
     </div>
@@ -174,7 +181,7 @@ function Attachments({ list: all, extra = [], m }) {
   // picture links in the text count too (a Klipy link = a GIF; a DM's catbox link carries its name, so its spoiler mark too)
   const pics = [...list.filter(a => a.type === 'image' || a.type === 'gif'), ...extra.map(u => ({ url: u, name: nameInLink(u) || undefined, type: KLIPY.test(u) || /\.gif(\?|$)/i.test(u) ? 'gif' : 'image' }))];
   const others = list.filter(a => a.type !== 'image' && a.type !== 'gif');
-  // the message's temporary-storage files: asked about once it scrolls into view, and again a moment after one of them loads (opening restarts its clock)
+  // the message's temporary-storage files: asked about once it scrolls into view (their date is fixed, so once is enough)
   const tempUrls = [...new Set([...pics, ...others].map(a => a.url).filter(u => TEMP_LINK.test(u)))];
   const wrap = useRef(null);
   const [seen, setSeen] = useState(false);
@@ -187,15 +194,6 @@ function Attachments({ list: all, extra = [], m }) {
     io.observe(el);
     return () => io.disconnect();
   }, [hasTemp, seen]);
-  useEffect(() => {
-    const el = wrap.current;
-    if (!hasTemp || !el) return undefined;
-    // load / loadedmetadata don't bubble, so listen while they travel down
-    const onLoad = e => { const u = e.target?.currentSrc || e.target?.src; if (u && TEMP_LINK.test(u)) refreshTempInfo(u); };
-    el.addEventListener('load', onLoad, true);
-    el.addEventListener('loadedmetadata', onLoad, true);
-    return () => { el.removeEventListener('load', onLoad, true); el.removeEventListener('loadedmetadata', onLoad, true); };
-  }, [hasTemp]);
   const expiry = useExpiryLabel(tempUrls, seen);
   if (!pics.length && !others.length && !gone.length) return null;
   const cover = a => hidden(a) && (
@@ -1070,7 +1068,7 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
     const mine = rememberedUploadDest();
     openMenu({ clientX: r.left, clientY: Math.max(6, r.top - 150), preventDefault() {}, stopPropagation() {} }, [
       ...(onVelora ? [ // DMs / group chats: pick where these files go (just this once - the remembered choice stays)
-        { label: 'Upload to temporary storage', hint: `Free, deleted after a while unopened - up to ${lim.server_mb} MB${mine === 'temp' ? ' (your default)' : ''}`, icon: Clock, onClick: () => pickOnce('temp') },
+        { label: 'Upload to temporary storage', hint: `Free, deleted after a set time - up to ${lim.server_mb} MB${mine === 'temp' ? ' (your default)' : ''}`, icon: Clock, onClick: () => pickOnce('temp') },
         { label: 'Upload to account storage', hint: `Kept on your Nookara account - up to ${lim.saved_mb} MB${mine === 'account' ? ' (your default)' : ''}`, icon: CloudUpload, onClick: () => pickOnce('account') },
       ] : [
         { label: 'Upload to server', hint: `Sent here - up to ${uploadCap()} MB`, icon: Upload, onClick: () => file.current?.click() },
