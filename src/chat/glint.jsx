@@ -1,6 +1,7 @@
 // Glint (ikelene.net/glint, Nat's game clipper) from Ember: the user's own clips (media picker "Game Clips" tab, hiding clip
 // videos from Saved Media), likes on clip cards, and the Glint mark. Glint's API takes the same Velora token Ember has.
 // Everything here fails quietly: if Glint can't be reached the picker just behaves as if there were no clips.
+import { uploadKey } from './uploadLinks.js';
 import { useEffect, useState } from 'react';
 import { getToken } from '../api.js';
 
@@ -64,10 +65,10 @@ export function glintMediaMatcher(list) {
   if (!Array.isArray(list) || !list.length) return () => false;
   const urls = new Set(), ids = new Set();
   for (const c of list) {
-    if (c.videoUrl) urls.add(String(c.videoUrl).split(/[?#]/)[0]);
+    if (c.videoUrl) urls.add(uploadKey(c.videoUrl)); // by /uploads/ path: the same clip file on nookara.cc and cdn.nookara.cc matches
     if (c.mediaId != null) ids.add(`u${c.mediaId}`);
   }
-  return m => ids.has(String(m.id)) || urls.has(String(m.url || '').split(/[?#]/)[0]);
+  return m => ids.has(String(m.id)) || urls.has(uploadKey(m.url));
 }
 
 // ── one clip's like state (GET /clips/:id, with the token so it says whether I liked it), cached per session ──

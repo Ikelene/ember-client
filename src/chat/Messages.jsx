@@ -1,5 +1,6 @@
 import { siteHref } from './hosts.js';
 // The conversation: messages (grouped by person, with day dividers), the composer and who's typing.
+import { SAVEABLE } from './uploadLinks.js';
 import { canAttachInChannel } from './attachment-permissions.js';
 import { apiFetch } from '../api.js';
 import { instOpt, isInst, instOf } from './ids.js';
@@ -212,7 +213,7 @@ function Attachments({ list: all, extra = [], m }) {
               {cover(a)}
               {a.type === 'gif' && !hidden(a) && <GifBadge />}
               {hidden(a) ? null : KLIPY.test(a.url) ? <StarButton gif={{ url: a.url, preview: a.url, title: a.name, width: a.width, height: a.height }} />
-                : /^https:\/\/((?:(?:ember\.)?nookara\.cc|velora\.ikelene\.net)\/(uploads|t)|files\.catbox\.moe)\//.test(a.url) && <button type="button" className="vc-att-save" title="Save to Saved Media" onClick={e => { e.preventDefault(); e.stopPropagation(); saveToMedia(a.url, a.name); }}><BookmarkPlus size={15} /></button>}
+                : SAVEABLE.test(a.url) && <button type="button" className="vc-att-save" title="Save to Saved Media" onClick={e => { e.preventDefault(); e.stopPropagation(); saveToMedia(a.url, a.name); }}><BookmarkPlus size={15} /></button>}
             </a>
           ))}
         </div>

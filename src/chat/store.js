@@ -11,6 +11,7 @@ import { callLinePlain } from './callText.js';
 import { inviteSummary } from './gameInvite.js';
 import { applyIdentity } from './identity.js';
 import { applyUserUpdate, instancesWithAccount } from './userUpdate.js';
+import { NAMED_LINK } from './uploadLinks.js';
 import { VELORA, K, parseK, instOf, bare, isInst, normOrigin, acctKey } from './ids.js';
 import { connections, sendTo, startInstances, loadInstanceData, retryInstances, renewVeloraSession, holdInstances } from './instances.js';
 import { attachmentRefs } from './signing-payload.js';
@@ -938,7 +939,7 @@ export async function catchUp(inst = VELORA) {
 
 // an attachment as a link (DMs / group chats are plain text). Files in Velora account storage (and old catbox ones) keep
 // their real name as #n=<name>; a temporary-storage link (/t/<id>/<name>) already carries it in the path.
-const attLink = a => (/^https:\/\/((files|litter)\.catbox\.moe|(?:(?:ember\.)?nookara\.cc|velora\.ikelene\.net)\/uploads)\//.test(a.url) && a.name && a.name !== decodeURIComponent(a.url.split('/').pop()) ? `${a.url}#n=${encodeURIComponent(a.name)}` : a.url);
+const attLink = a => (NAMED_LINK.test(a.url) && a.name && a.name !== decodeURIComponent(a.url.split('/').pop()) ? `${a.url}#n=${encodeURIComponent(a.name)}` : a.url);
 // my own accent colour is known right now: put it in the face cache an instance reads names through, so a message that is still
 // sending shows the accent straight away (not the role colour until my Velora face loads, then a flip)
 function seedMyFace(instUser) {
