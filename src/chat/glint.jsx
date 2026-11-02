@@ -18,14 +18,19 @@ export async function glintFetch(path, { method = 'GET', auth = true } = {}) {
   return data;
 }
 
-// the Glint mark (Velora's stacked bars + a play triangle); currentColor, square corners. Works as a menu icon too ({ size }).
+// the Glint mark (viewfinder corners + a play triangle, glint/web/static/glint-icon.svg); all currentColor, square corners. Works as a menu icon too ({ size }).
 export function GlintMark({ size = 14, className }) {
   return (
     <svg className={className} width={size} height={size} viewBox="0 0 100 100" aria-hidden="true">
-      <rect x="16" y="20" width="38" height="16" fill="currentColor" />
-      <rect x="16" y="42" width="38" height="16" fill="currentColor" fillOpacity=".7" />
-      <rect x="16" y="64" width="38" height="16" fill="currentColor" fillOpacity=".4" />
-      <polygon points="60,20 88,50 60,80" fill="currentColor" />
+      <rect x="12" y="12" width="26" height="6" fill="currentColor" />
+      <rect x="12" y="12" width="6" height="26" fill="currentColor" />
+      <rect x="62" y="12" width="26" height="6" fill="currentColor" />
+      <rect x="82" y="12" width="6" height="26" fill="currentColor" />
+      <rect x="12" y="82" width="26" height="6" fill="currentColor" />
+      <rect x="12" y="62" width="6" height="26" fill="currentColor" />
+      <rect x="62" y="82" width="26" height="6" fill="currentColor" />
+      <rect x="82" y="62" width="6" height="26" fill="currentColor" />
+      <polygon points="41,32 71,50 41,68" fill="currentColor" />
     </svg>
   );
 }
