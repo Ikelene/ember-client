@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Hash, UsersRound, Pin, X, Forward } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { instOpt } from './ids.js';
-import { useChat, getState, sendMessage, refreshServer, toast, errorText, dmErrorText, keyOf, dropFailed } from './store.js';
+import { useChat, getState, sendMessage, refreshServer, toast, errorText, dmErrorText, keyOf, dropFailed, imToMsg, groupToMsg } from './store.js';
+import { pinsKey, pinsPath, pinPath } from './msg-actions.js';
 import { forwardText, forwardLimit, forwardHasFiles, FORWARD_FILES_NOTE } from './forward.js';
 import { Dialog } from './Dialogs.jsx';
 import { Avatar } from './Profile.jsx';
@@ -93,23 +94,30 @@ export function ForwardDialog({ message, from, onClose }) {
 }
 
 // ── pinned messages (channel header button) ──
-export function PinsButton({ channel, sid }) {
+export function PinsButton({ channel, sid, view }) {
   const [open, setOpen] = useState(false);
   useEffect(() => { const f = () => setOpen(true); addEventListener('vc-open-pins', f); return () => removeEventListener('vc-open-pins', f); }, []);
-  useEffect(() => { setOpen(false); }, [channel.cid]);
+  const key = view ? pinsKey(view) : channel.cid;
+  useEffect(() => { setOpen(false); }, [key]);
   return (
     <span className="vc-pins-wrap">
       <button type="button" className={`vc-ico-btn${open ? ' on' : ''}`} title="Pinned messages" onClick={() => setOpen(o => !o)}><Pin size={18} /></button>
-      {open && <PinsPanel channel={channel} sid={sid} onClose={() => setOpen(false)} />}
+      {open && <PinsPanel channel={channel} sid={sid} view={view} onClose={() => setOpen(false)} />}
     </span>
   );
 }
-function PinsPanel({ channel, sid, onClose }) {
+// a channel: Manage messages pins. A DM or group chat (view): anyone in it does.
+function PinsPanel({ channel, sid, view, onClose }) {
   const [list, setList] = useState(null);
-  const ver = useChat(s => s.pinsVersion[channel.cid] || 0);
-  const canMod = useChat(s => has(s.detail[sid]?.server.perms, P.MANAGE_MESSAGES));
+  const key = view ? pinsKey(view) : channel.cid;
+  const ver = useChat(s => s.pinsVersion[key] || 0);
+  const modHere = useChat(s => has(s.detail[sid]?.server.perms, P.MANAGE_MESSAGES));
+  const canMod = view ? true : modHere;
   const box = useRef(null);
-  useEffect(() => { apiFetch(`/chat/channels/${channel.cid}/pins`).then(d => setList(d.messages)).catch(() => setList([])); }, [channel.cid, ver]);
+  useEffect(() => {
+    if (view) apiFetch(pinsPath(view)).then(d => setList(d.messages.map(view.kind === 'dm' ? imToMsg : groupToMsg))).catch(() => setList([]));
+    else apiFetch(`/chat/channels/${channel.cid}/pins`).then(d => setList(d.messages)).catch(() => setList([]));
+  }, [key, ver]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const off = e => { if (box.current && !box.current.contains(e.target) && !e.target.closest('.vc-pins-wrap')) onClose(); };
     const key = e => { if (e.key === 'Escape') onClose(); };
@@ -127,7 +135,7 @@ function PinsPanel({ channel, sid, onClose }) {
       <div className="vc-pins-head"><Pin size={15} /> <b>Pinned messages</b><span className="grow" /><button type="button" className="vc-ico-btn" onClick={onClose} title="Close"><X size={15} /></button></div>
       <div className="vc-pins-list">
         {list === null && <div className="vc-loading"><i /><i /><i /></div>}
-        {list?.length === 0 && <div className="vc-empty-note">Nothing pinned in #{channel.name} yet.{canMod ? ' Right-click a message and pick Pin message.' : ''}</div>}
+        {list?.length === 0 && <div className="vc-empty-note">Nothing pinned {view ? 'here' : `in #${channel.name}`} yet.{canMod ? ' Right-click a message and pick Pin message.' : ''}</div>}
         {list?.map((m, i) => (
           <div key={m.id} className="vc-pin vl-rise" style={{ '--i': Math.min(i, 10) }}>
             <div className="vc-pin-top">
@@ -136,7 +144,7 @@ function PinsPanel({ channel, sid, onClose }) {
               <small>{stampOf(m.created_at)}</small>
               <span className="grow" />
               <button type="button" className="vc-pin-jump" onClick={() => jump(m)}>Jump</button>
-              {canMod && <button type="button" className="vc-ico-btn" title="Unpin" onClick={() => apiFetch(`/chat/messages/${m.id}/pin`, { method: 'DELETE', inst: instOpt(m.channel || channel.cid) }).catch(e => toast(errorText(e.message)))}><X size={14} /></button>}
+              {canMod && <button type="button" className="vc-ico-btn" title="Unpin" onClick={() => apiFetch(view ? pinPath(view, m) : `/chat/messages/${m.id}/pin`, { method: 'DELETE', inst: view ? undefined : instOpt(m.channel || channel.cid) }).catch(e => toast(errorText(e.message)))}><X size={14} /></button>}
             </div>
             <PinBody body={m.body || (m.attachments?.length ? '(attachment)' : '')} ctx={{ channels: getState().detail[sid]?.channels, roles: getState().detail[sid]?.roles }} />
           </div>

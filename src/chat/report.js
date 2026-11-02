@@ -5,7 +5,7 @@ import { apiFetch, uploadFetch } from '../api.js';
 import { ask, toast, errorText, getState, linkFor } from './store.js';
 import { instOf } from './ids.js';
 import { hasVelora } from './session.js';
-import { DM_REPORT_REASONS, DM_REPORT_NOTE, dmReportBody, dmReportError } from './dm-report.js';
+import { DM_REPORT_REASONS, dmReportNote, dmReportBody, dmReportError } from './dm-report.js';
 
 const VELORA_CATEGORIES = ['Underage', 'NSFW / Explicit Content', 'Graphic Violence / Gore', 'Hate Speech / Harassment', 'Threats or Real-World Harm',
   'Spam or Bot Activity', 'Malware / Phishing / Scam', 'Copyright / Intellectual Property Violation', 'Other'];
@@ -67,7 +67,7 @@ export async function reportTo(sid, what, label, ctx = {}) {
 export async function reportDmMessage(view, m) {
   const a = await ask({
     title: 'Report message',
-    text: DM_REPORT_NOTE,
+    text: dmReportNote(),
     select: { label: "What's wrong?", options: DM_REPORT_REASONS },
     input: { placeholder: 'Anything staff should know? (optional)', value: '', optional: true, multiline: true, max: 1000 },
     confirm: 'Send report', danger: true,

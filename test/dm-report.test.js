@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canReportDm, dmReportBody, dmReportError, DM_REPORT_REASONS, DM_REPORT_NOTE } from '../src/chat/dm-report.js';
+import { canReportDm, dmReportBody, dmReportError, dmReportNote, DM_REPORT_REASONS, DM_REPORT_NOTE, DM_REPORT_NOTES } from '../src/chat/dm-report.js';
 
 const dm = { kind: 'dm', username: 'bob' };
 const grp = { kind: 'group', room: 'grp_abc' };
@@ -30,8 +30,19 @@ test('the request body: DM by mail id, group by room + message id', () => {
 test('the dialog says a short history goes to staff, as privacy policy section 5 does', () => {
   assert.match(DM_REPORT_NOTE, /short history/);
   assert.match(DM_REPORT_NOTE, /up to 10 messages before and 5 after/);
-  assert.match(DM_REPORT_NOTE, /attachments/);
   assert.match(DM_REPORT_NOTE, /everyone in this conversation/);
+});
+
+test('the dialog says media is copied for staff, in English, German and Portuguese, and picks by language', () => {
+  assert.match(DM_REPORT_NOTES.en, /copied for staff/);
+  assert.match(DM_REPORT_NOTES.en, /even if the sender deletes them/);
+  assert.match(DM_REPORT_NOTES.de, /kopiert/);
+  assert.match(DM_REPORT_NOTES.pt, /copiados/);
+  for (const n of Object.values(DM_REPORT_NOTES)) assert.match(n, /10\D+5/);
+  assert.equal(dmReportNote('de-AT'), DM_REPORT_NOTES.de);
+  assert.equal(dmReportNote('pt-BR'), DM_REPORT_NOTES.pt);
+  assert.equal(dmReportNote('fr'), DM_REPORT_NOTES.en);
+  assert.equal(dmReportNote(''), DM_REPORT_NOTES.en);
 });
 
 test('server errors read as plain sentences', () => {

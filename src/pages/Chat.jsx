@@ -574,6 +574,7 @@ function ChatPage() {
               )}
               {isServer && channel && (['text', 'logs', 'welcome', undefined].includes(channel.type) || (channel.type === 'game' && channel.config?.purpose === 'chat')) && <PinsButton channel={channel} sid={view.sid} />}
               {isServer && <button type="button" className={`vc-ico-btn${showMembers ? ' on' : ''}`} title={showMembers ? 'Hide members' : 'Show members'} onClick={() => setShowMembers(x => !x)}><Users size={19} /></button>}
+              {((view.kind === 'dm' && !sysDM) || view.kind === 'group') && <PinsButton view={view} />}
               {view.kind === 'dm' && !sysDM && staff && <button type="button" className="vc-ico-btn" title="Message them as Nookara Administrator (Nookara Moderator Chat)" onClick={() => go({ kind: 'modmail', username: view.username })}><ShieldCheck size={19} /></button>}
               {view.kind === 'dm' && !sysDM && <DmCallButton username={view.username} />}
               {view.kind === 'dm' && !sysDM && <button type="button" className="vc-ico-btn" title={`Report @${view.username} to Nookara staff`} aria-label={`Report @${view.username}`} onClick={() => reportDmUser(view.username)}><Flag size={19} /></button>}

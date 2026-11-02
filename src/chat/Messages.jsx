@@ -34,7 +34,7 @@ import { tempId, isCdnTemp } from './upload-dest.js';
 import { TempAttPopover } from './TempAttPopover.jsx';
 import { shortDays, daysText } from './temp-pick.js';
 import { BookmarkPlus, Smile, File as FileIcon, FileArchive, FileCode, FileText, Download, Coins, MessageSquareQuote, Forward } from 'lucide-react';
-import { messageCaps } from './msg-actions.js';
+import { messageCaps, reactionId, pinPath } from './msg-actions.js';
 
 // a "GIF" picture-frame icon (drawn, not text) for the GIF picker button
 function GifIcon() {
@@ -424,11 +424,11 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
   // what this message can do here (menu + hover toolbar): msg-actions.js
   const caps = messageCaps(view, m, { mine, canMod, canPost: ctx.canPost });
   const canReplyHere = caps.reply, canReact = caps.react;
-  const reactId = m.imId ? `dm:${m.imId}` : m.id;
+  const reactId = reactionId(m);
   const starHere = useStarboardFor(view.sid, view.cid) && canReact && view.kind === 'channel';
   const starred = starHere && starredByMe(m, ctx.me);
   const forward = () => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'forward', message: m, from: view } }));
-  const togglePin = () => apiFetch(`/chat/messages/${m.id}/pin`, { method: m.pinned ? 'DELETE' : 'PUT', inst: instOpt(m.channel) }).then(() => toast(m.pinned ? 'Unpinned.' : 'Pinned.', true)).catch(e => toast(errorText(e.message)));
+  const togglePin = () => apiFetch(pinPath(view, m), { method: m.pinned ? 'DELETE' : 'PUT', inst: instOpt(m.channel) }).then(() => toast(m.pinned ? 'Unpinned.' : 'Pinned.', true)).catch(e => toast(errorText(e.message)));
   const { nodes, images, media, jumbo, links, invites } = useMemo(() => renderBody(m.body, ctx), [m.body, ctx]);
   const mentionsMe = isMention(m);
   const nameKey = useNameStyle(view.sid, aliasMember || author); // (an unmarked alias that matched a member: their colour + role icon)
@@ -484,7 +484,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
         const reactionAnchor = e.currentTarget.getBoundingClientRect();
         messageMenu(e, m, view, {
           me: ctx.me, canReply: canReplyHere, onReply: () => onReply(m), canEdit: caps.edit, onEdit: () => setEditing(m.id), onForward: caps.forward ? forward : null, canCopyLink: caps.copyLink,
-          canPin: view.kind === 'channel' && canMod && !hook, onPin: togglePin,
+          canPin: caps.pin && !hook, onPin: togglePin,
           canDelete: caps.del, onDelete: () => remove({ shiftKey: false }),
           onReact: canReact ? () => openReactionPicker(reactId, reactionAnchor, instOpt(m.channel)) : null,
           onInfo: view.kind === 'channel' && canMod && !m.system ? () => messageInfo(m) : null, // staff only: who really sent it

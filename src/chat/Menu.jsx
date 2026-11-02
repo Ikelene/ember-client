@@ -13,6 +13,7 @@ import { useChat, getState, setMenu, toggleBlock, toast, setNotify, notifyOf, go
 import { bare, instOpt, isInst } from './ids.js';
 import { reportTo, reportDmMessage } from './report.js';
 import { canReportDm } from './dm-report.js';
+import { reactionId } from './msg-actions.js';
 import { myReactions } from './msg-actions.js';
 import { setInstancePrefs } from './instances.js';
 import { roleMenuItems, modMenuItems, P, has } from './roles.jsx';
@@ -254,7 +255,7 @@ export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, 
     onInfo && { label: 'Message info', icon: Info, onClick: onInfo }, // Manage messages: the real sender (aliases included)
     { label: 'Copy message ID', icon: Code2, dev: true, onClick: () => copy(m.imId || m.gid || m.id, 'Message ID copied') },
     authorId && { label: 'Copy author ID', icon: Code2, dev: true, onClick: () => copy(authorId, 'Account ID copied') },
-  ], { reaction: onReact ? { id: m.imId ? `dm:${m.imId}` : m.id, inst: instOpt(m.channel), selected: myReactions(m, me) } : null });
+  ], { reaction: onReact ? { id: reactionId(m), inst: instOpt(m.channel), selected: myReactions(m, me) } : null });
 }
 export function userMenu(e, username, { onProfile, sid, extra = [] } = {}) {
   const st = getState();

@@ -61,7 +61,7 @@ let state = {
   dmCalls: {},             // username (lower) -> { room, users, with } - calls going on with people
   dmCallWith: {},          // call room -> the other person
   incoming: [],            // calls ringing me: [{ callId, from, room }]
-  pinsVersion: {},         // cid -> bumped when its pins change
+  pinsVersion: {},         // cid, d:<name> or g:<room> -> bumped when its pins change
   voicePrefs: null,
   permUpdate: null,        // "New permission updates" dialog: { version, legacy, missing: [{id, name, reason}] }
   scopePrompt: null,       // "This needs a new permission" card: { name, reason }
@@ -457,6 +457,11 @@ function onEvent(m, inst = VELORA) {
     }
     case 'im_edited': // a DM was edited (m.with = the other person)
       set(s => ({ msgs: upd(s.msgs, `d:${String(m.with).toLowerCase()}`, b => b && { ...b, list: b.list.map(x => (x.imId === m.id ? { ...x, body: m.body, edited_at: m.edited_at } : x)) }) }));
+      bumpPins(`d:${String(m.with).toLowerCase()}`);
+      break;
+    case 'im_pins_update': // pinned or unpinned in a DM (m.with = the other person)
+      set(s => ({ msgs: upd(s.msgs, `d:${String(m.with).toLowerCase()}`, b => b && { ...b, list: b.list.map(x => (x.imId === m.id ? { ...x, pinned: !!m.pinned } : x)) }) }));
+      bumpPins(`d:${String(m.with).toLowerCase()}`);
       break;
     case 'im_reactions': // a reaction in a DM (m.with = the other person)
       set(s => ({ msgs: upd(s.msgs, `d:${String(m.with).toLowerCase()}`, b => b && { ...b, list: b.list.map(x => (x.imId === m.id ? { ...x, reactions: m.reactions.length ? m.reactions : undefined } : x)) }) }));
@@ -616,14 +621,28 @@ function onEvent(m, inst = VELORA) {
       break;
     case 'room_message_deleted': // someone took back their own group message
       dropGroupMessage(m.room, m.id);
+      bumpPins(`g:${m.room}`);
       loadGroups();
+      break;
+    case 'room_message_edited': // the author changed their group message
+      set(s => ({ msgs: upd(s.msgs, `g:${m.room}`, b => b && { ...b, list: b.list.map(x => (x.gid === m.id ? { ...x, body: m.message, edited_at: m.edited_at } : x.reply?.id === `g${m.id}` ? { ...x, reply: { ...x.reply, body: String(m.message).slice(0, 200) } } : x)) }) }));
+      bumpPins(`g:${m.room}`);
+      loadGroups();
+      break;
+    case 'room_message_reactions': // a reaction in a group chat
+      set(s => ({ msgs: upd(s.msgs, `g:${m.room}`, b => b && { ...b, list: b.list.map(x => (x.gid === m.id ? { ...x, reactions: m.reactions.length ? m.reactions : undefined } : x)) }) }));
+      break;
+    case 'room_pins_update': // pinned or unpinned in a group chat
+      set(s => ({ msgs: upd(s.msgs, `g:${m.room}`, b => b && { ...b, list: b.list.map(x => (x.gid === m.id ? { ...x, pinned: !!m.pinned } : x)) }) }));
+      bumpPins(`g:${m.room}`);
       break;
     case 'im_deleted': // the other side (or another device of mine) removed a DM
       set(s => ({ msgs: upd(s.msgs, `d:${String(m.with).toLowerCase()}`, b => b && { ...b, list: b.list.filter(x => x.imId !== m.id) }) }));
+      bumpPins(`d:${String(m.with).toLowerCase()}`);
       loadDMs();
       break;
     case 'group_update': case 'group_removed': loadGroups(); break;
-    case 'chat_pins_update': set(s => ({ pinsVersion: { ...s.pinsVersion, [m.channel]: (s.pinsVersion[m.channel] || 0) + 1 } })); break;
+    case 'chat_pins_update': bumpPins(m.channel); break;
     case 'friend_request': case 'friend_request_accepted': loadFriends(); break;
     case 'blocks_changed': loadBlocks(); break; // I blocked / unblocked someone (here or on another device)
     case 'notification_new': notificationNew(m); break;
@@ -837,16 +856,16 @@ export function imToMsg(m) {
     statusReply: m.status_reply?.text ? String(m.status_reply.text) : null,
     reply: m.reply ? { id: `im${m.reply.id}`, author: m.reply.gone ? null : { username: m.reply.from, pfp: state.people[m.reply.from]?.pfp || null }, body: m.reply.gone ? 'Original message was deleted' : m.reply.body } : null,
     author: m.from_system ? null : { username: m.from, pfp: fromMe ? state.me?.pfp : m.from_pfp, color: fromMe ? state.me?.color : state.people[m.from]?.color, rank: state.people[m.from]?.rank },
-    created_at: new Date(m.sent_at).getTime(), edited_at: m.edited_at ? new Date(m.edited_at).getTime() : null, reactions: m.reactions || undefined,
+    created_at: new Date(m.sent_at).getTime(), edited_at: m.edited_at ? new Date(m.edited_at).getTime() : null, reactions: m.reactions || undefined, pinned: !!m.pinned,
   };
 }
 export function groupToMsg(m) {
   const p = state.people[m.user] || {};
   return {
-    id: m.id ? `g${m.id}` : `g${m.timestamp}_${m.user}`, gid: m.id || null, body: m.message, attachments: [], system: !!m.system,
+    id: m.id ? `g${m.id}` : `g${m.timestamp}_${m.user}`, gid: m.id || null, room: m.room || null, body: m.message, attachments: [], system: !!m.system, sys_kind: m.sys_kind || undefined,
     reply: m.reply ? { id: `g${m.reply.id}`, author: { username: m.reply.user, pfp: state.people[m.reply.user]?.pfp || null }, body: m.reply.message } : null,
     author: m.system ? null : { username: m.user, pfp: p.pfp || null, color: p.color || null, rank: m.rank },
-    created_at: m.timestamp, edited_at: null,
+    created_at: m.timestamp, edited_at: m.edited_at || null, reactions: m.reactions?.length ? m.reactions : undefined, pinned: !!m.pinned_at,
   };
 }
 
@@ -1084,7 +1103,11 @@ export function signingInfo(sid) {
   const allow = c?.info?.accounts_mode === 'velora';
   return { allow, can: allow && canSign() && !!c.user?.velora_id };
 }
+// a conversation's pin list changed: an open panel loads it again (a channel by its cid, a DM by d:<name>, a group by g:<room>)
+function bumpPins(key) { set(s => ({ pinsVersion: { ...s.pinsVersion, [key]: (s.pinsVersion[key] || 0) + 1 } })); }
 export async function editMessage(id, text, m) {
+  // a group message: everyone gets room_message_edited
+  if (m?.gid && m?.room) { await apiFetch(`/groups/${encodeURIComponent(m.room)}/messages/${encodeURIComponent(m.gid)}`, { method: 'PATCH', body: JSON.stringify({ message: text }) }); return; }
   // a DM (im<id>): its own route; both people get im_edited
   if (/^im\d+$/.test(String(id))) { await apiFetch(`/im/${String(id).slice(2)}/edit`, { method: 'PATCH', body: JSON.stringify({ body: text }) }); return; }
   const inst = m?.channel ? instOf(m.channel) : VELORA;

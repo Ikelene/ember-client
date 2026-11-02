@@ -5,6 +5,7 @@ import { apiFetch } from '../api.js';
 import { instOpt, instOf } from './ids.js';
 import { toast, errorText, customEmoji, getState, useChat, timedOutIn, untilText } from './store.js';
 import { frequentReactions, recordReaction } from './reactionUsage.js';
+import { reactionId, reactionBase } from './msg-actions.js';
 import EmojiPicker, { emojiDataSync } from './EmojiPicker.jsx';
 import { Twemoji, nameOfChar } from './emoji.jsx';
 import './Reactions.css';
@@ -33,12 +34,13 @@ const ERR = { too_many_reactions: 'That message has as many different reactions 
 export async function setReaction(id, emoji, on, inst) {
   const account = accountOf(inst);
   const c = CUSTOM.exec(emoji);
-  // id: a channel message id, or dm:<id> for a DM; inst: the instance a message lives on (none = Velora)
-  const base = String(id).startsWith('dm:') ? `/chat/dm/${String(id).slice(3)}` : `/chat/messages/${id}`;
+  // id: a channel message id, dm:<id> for a DM, g:<room>:<id> for a group message; inst: the instance a message lives on (none = Velora)
+  const base = reactionBase(id);
+  const nookaraOnly = /^(dm|g):/.test(String(id)); // these keep a custom emoji's whole token, like a DM message does
   const out = on && inst && timedOutIn(getState().servers.find(x => x.inst === inst)?.sid); // (one instance = one server)
   if (out) { toast(`You're timed out until ${untilText(out)} - no reactions until then.`); return; }
   try {
-    await apiFetch(`${base}/reactions/${encodeURIComponent(inst ? stableKey(emoji) : c && !String(id).startsWith('dm:') ? c[3] : emoji)}`, { method: on ? 'PUT' : 'DELETE', inst });
+    await apiFetch(`${base}/reactions/${encodeURIComponent(inst ? stableKey(emoji) : c && !nookaraOnly ? c[3] : emoji)}`, { method: on ? 'PUT' : 'DELETE', inst });
     if (on) recordReaction(account, inst ? stableKey(emoji) : emoji);
     return true;
   } catch (e) { toast(ERR[e.message] || errorText(e.message)); return false; }
@@ -78,7 +80,7 @@ export function QuickReactions({ id, inst, selected = [], onDone, limit = 6, cla
 
 export function Reactions({ m, me, canReact }) {
   if (!m.reactions?.length) return null;
-  const rid = m.imId ? `dm:${m.imId}` : m.id;
+  const rid = reactionId(m);
   return (
     <div className="vc-reacts">
       {m.reactions.map(r => {
