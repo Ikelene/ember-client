@@ -25,7 +25,7 @@ function Chip({ via, list, tip, Icon }) {
   const tipData = tip ? JSON.stringify({ name: d.name, domain: d.domain, verified: d.verified, known: d.known, text: viaTitle(via, list) }) : undefined;
   return (
     <span className={`vc-via${d.verified ? ' official' : ''}`} data-tip-via={tipData} aria-label={viaTitle(via, list)}>
-      {Icon ? <Icon size={13} aria-hidden="true" /> : d.icon ? <img className="vc-via-icon" src={d.icon} alt="" /> : !d.verified && (via.token ? <Plug size={12} /> : <Globe size={12} />)}
+      {d.icon ? <img className="vc-via-icon" src={d.icon} alt="" /> : Icon ? <Icon size={13} aria-hidden="true" /> : !d.verified && (via.token ? <Plug size={12} /> : <Globe size={12} />)}
       <span className="vc-via-name">{d.name}</span>
       {d.verified && <BadgeCheck size={12} className="vc-via-check" aria-hidden="true" />}
     </span>
