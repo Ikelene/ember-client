@@ -4,7 +4,7 @@
 // its domain (or token name) with no badge.
 import { useEffect, useState } from 'react';
 import { BadgeCheck, Plug, Globe } from 'lucide-react';
-import { viaTitle, sessionLine, STATE_TEXT } from './clientViaText.js';
+import { viaTitle, sessionShort, sessionDetails, STATE_SHORT } from './clientViaText.js';
 import { describeVia, officialClients, loadOfficialClients, onOfficialClients } from './officialClients.js';
 
 // the official clients list (null until it's known), re-rendering when it arrives
@@ -80,11 +80,11 @@ export function ManageFacts({ presence }) {
         <div className="pe-fact vc-manage-fact">
           <b>{sessions.length > 1 ? 'Clients' : 'Client'}</b>
           {sessions.map((s, i) => (
-            <span key={i} className="vc-via-row">
+            <span key={i} className="vc-via-row" title={sessionDetails(s) || undefined}>
               {s.via ? <Chip via={s.via} list={list} /> : <span className="vc-via"><Globe size={12} /><span className="vc-via-name">Unknown client</span></span>}
-              {s.app && <small>{s.app}</small>}
-              {sessionLine(s) && <small>{sessionLine(s)}</small>}
-              {STATE_TEXT[s.state] && <small className="vc-via-state">{STATE_TEXT[s.state]}</small>}
+              {STATE_SHORT[s.state]
+                ? <small className="vc-via-state">{STATE_SHORT[s.state]}</small>
+                : sessionShort(s) && <small>{sessionShort(s)}</small>}
             </span>
           ))}
         </div>

@@ -15,4 +15,8 @@ export function viaTitle(via, list) {
   return via.url ? `Sent from ${via.url}` : 'Sent from an unknown client';
 }
 export const STATE_TEXT = { notifications: 'Notifications only, the app is not open', background: 'In the background' };
+export const STATE_SHORT = { notifications: 'Notifications only', background: 'Background' };
 export const sessionLine = s => [s.platform, s.device, s.browser && s.browser !== 'Electron' ? s.browser : null, s.version ? `v${String(s.version).slice(0, 12)}` : null].filter(Boolean).join(', ');
+// the short text beside a client: the browser if it has one, else the device or platform. The rest is in sessionDetails
+export const sessionShort = s => (s.browser && s.browser !== 'Electron' ? s.browser : s.device || s.platform) || '';
+export const sessionDetails = s => [s.app, sessionLine(s), STATE_TEXT[s.state]].filter(Boolean).join('\n');
