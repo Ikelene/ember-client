@@ -34,7 +34,7 @@ export function UploadDestHost() {
           <HardDrive size={22} />
           <span>
             <b>Nookara account storage</b>
-            <small>Stays until you delete it, and counts toward your storage.{acc ? ` ${fmt(acc.remaining)} of ${fmt(acc.limit)} free.` : ''}{acc && !acc.pro ? ' Nookara Pro has 2 GB.' : ''}</small>
+            <small>Stays until you delete it, and counts toward your storage.{acc ? ` ${fmt(acc.remaining)} of ${fmt(acc.limit)} free.` : ''}{acc && !acc.pro && acc.pro_limit ? ` Nookara Pro has ${fmt(acc.pro_limit)}.` : ''}</small>
             {accWhy && <small className="why">{accWhy}</small>}
           </span>
         </button>
