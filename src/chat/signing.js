@@ -3,6 +3,7 @@
 // message you receive is checked here against the author's Velora key, whatever the instance says. No Ed25519 in this browser = nothing is signed.
 import { apiFetch } from '../api.js';
 import { patchState, getState } from './store.js';
+import { serverNow } from './server-clock.js';
 
 export const SIGN_BIT = 32768;
 const enc = new TextEncoder();
@@ -62,7 +63,7 @@ export async function signMessage(fields) {
   if (!device) throw new Error('no_key');
   if (Date.now() - device.at > KEY_AGE) await refresh().catch(() => {});
   const go = async () => {
-    const ts = Date.now();
+    const ts = serverNow(); // instances refuse a time more than 5 min from theirs, so never the PC's own clock
     const nonce = b64u(crypto.getRandomValues(new Uint8Array(16)));
     const payload = payloadOf({ iss: SIG_ISS, ...fields, ts, nonce });
     const sig = await crypto.subtle.sign({ name: 'Ed25519' }, device.priv, bytesOf(payload));

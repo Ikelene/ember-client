@@ -1,4 +1,5 @@
 import { onWebClientPath } from './chat/hosts.js';
+import { noteServerClock } from './chat/server-clock.js';
 import { VELORA, registry, hooks, routePath, unNsBody, instPath, fromInstance } from './chat/ids.js';
 
 function getFingerprint() {
@@ -79,6 +80,7 @@ export async function apiFetch(path, options = {}) {
     ...(opts.headers || {}),
   };
   const res = await fetch(r.path, { ...opts, headers });
+  noteServerClock(res.headers.get('date'), res.headers.get('age'));
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(data.error || 'request_failed');
