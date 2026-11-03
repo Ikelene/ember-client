@@ -2,8 +2,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, Trash2 } from 'lucide-react';
 import { openMicrophone } from './voice.js';
+import { playSound } from './store.js';
 import { MAX_MS, SWIPE_CANCEL_PX, micErrorText, pickFormat, voiceFileName } from './voice-note.js';
 import { fmtTime } from './MediaPlayer.jsx';
+
+const START_CHIME_MS = 180;
 
 // phase: idle | starting (asking for the mic) | recording | full (hit the limit; it's kept until sent or discarded)
 export function useVoiceRecorder() {
@@ -31,6 +34,10 @@ export function useVoiceRecorder() {
       return false;
     }
     if (mine !== attempt.current) { stream.getTracks().forEach(t => t.stop()); return false; } // let go / discarded while the mic was opening
+    // the chime has to be over before the recorder listens, or it ends up at the start of the message
+    playSound('voice_start', 0.5);
+    await new Promise(done => setTimeout(done, START_CHIME_MS));
+    if (mine !== attempt.current) { stream.getTracks().forEach(t => t.stop()); return false; }
     try {
       const recorder = new MediaRecorder(stream, { mimeType: format.mime, audioBitsPerSecond: 48000 });
       const chunks = [];

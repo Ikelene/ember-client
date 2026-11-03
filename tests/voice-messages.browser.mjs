@@ -64,6 +64,7 @@ const sockStub = () => {
 async function open(ctxOpts = {}, query = '', init) {
   const ctx = await browser.newContext({ viewport: { width: 1100, height: 720 }, ...ctxOpts });
   await ctx.addInitScript(sockStub);
+  await ctx.addInitScript(() => { window.soundsPlayed = []; const A = window.Audio; window.Audio = function (u) { const a = new A(u); window.soundsPlayed.push(String(u)); a.play = () => Promise.resolve(); return a; }; });
   if (init) await ctx.addInitScript(init);
   await ctx.route('https://inst.test/uploads/**', route => route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'video/webm' }, body: uploads[uploads.length - 1]?.bytes || Buffer.alloc(0) }));
   await ctx.route('https://cdn.nookara.cc/**', route => {
@@ -136,6 +137,8 @@ try {
   await page.locator(`${SEND}.voice`).waitFor();
   await page.locator('.vc-input').waitFor();
   pass(`desktop send: uploaded ${uploads[0].name} (${uploads[0].bytes.length} bytes, ${uploads[0].type}) and sent it in the DM`);
+  assert.deepEqual(await page.evaluate(() => window.soundsPlayed.map(s => s.match(/(voice-\w+)\.mp3/)?.[1]).filter(Boolean)), ['voice-start', 'voice-send']);
+  pass('sounds: starting and sending each play once');
   // the recipient's side: the message as it comes back
   await page.evaluate(body => { const k = 'd:friend'; const s = window.chatState(); window.patchChat({ msgs: { ...s.msgs, [k]: { list: [{ id: 'im1', imId: 1, body, attachments: [], author: { username: 'Friend' }, created_at: Date.now() }], loaded: true, hasMore: false } } }); }, sent[0].message);
   await page.locator('.vc-mp.voice').waitFor({ timeout: 5000 });
@@ -172,6 +175,9 @@ try {
   await page.waitForTimeout(400);
   assert.equal(uploads.length, before); assert.equal((await frames(page)).length, 0);
   pass('desktop discard: the bin and Escape both drop it, nothing uploads or sends, the buttons come back');
+  const played = await page.evaluate(() => window.soundsPlayed.map(s => s.match(/([\w-]+)\.mp3/)?.[1]).filter(s => s?.startsWith('voice-')));
+  assert.deepEqual(played, ['voice-start', 'voice-delete', 'voice-start', 'voice-delete']);
+  pass('sounds: starting and deleting each play once, the bin and Escape alike');
   assert.deepEqual(page.errors, []);
   await page.context().close();
 

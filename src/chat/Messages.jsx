@@ -49,7 +49,8 @@ function GifIcon() {
     </svg>
   );
 }
-import { loadEmojis, loadMembers, loadCommands, clearStatusReply, useTimedOut, untilText, dismissEphemeral } from './store.js';
+import { packActive } from './messageSounds.js';
+import { playSound, loadEmojis, loadMembers, loadCommands, clearStatusReply, useTimedOut, untilText, dismissEphemeral } from './store.js';
 import { takeJump, fileKind, uploadMedia, saveToMedia, isMineMsg, loadUploadLimits, getUploadLimits, chooseUploadDest, rememberedUploadDest, tempFileInfo, tempFileInfoNow, onTempInfo, TEMP_LINK } from './store.js';
 import { useStarboardFor, starredByMe, STAR } from './Starboard.jsx';
 import { CALL_LINE, callLineText } from './callText.js';
@@ -845,7 +846,7 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
   useEffect(() => {
     if (!voice.active) return undefined;
     setPicker(false); setEmoji(false);
-    const esc = e => { if (e.key === 'Escape') { e.preventDefault(); voiceHold.current = null; setVoiceDrag(0); voice.discard(); } };
+    const esc = e => { if (e.key === 'Escape') { e.preventDefault(); voiceHold.current = null; setVoiceDrag(0); voiceDelete(); } };
     document.addEventListener('keydown', esc);
     return () => document.removeEventListener('keydown', esc);
   }, [voice.active]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1109,9 +1110,11 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
     const dest = onVelora ? rememberedUploadDest() || 'temp' : undefined; // no picker for a voice message: the usual place, else temporary storage
     const cap = uploadCap(dest);
     if (recorded.size > cap * 1024 * 1024) { toast(`That voice message is too big (${fmtSize(recorded.size)}) - files here go up to ${cap} MB.`); return; }
+    if (!packActive()) playSound('voice_send', 0.5); // (a message sound pack plays its own send sound)
     sendMessage(v, '', { replyTo: reply, uploads: [{ file: recorded, spoiler: false, dest }] });
     setReplyTo?.(null);
   }
+  function voiceDelete() { playSound('voice_delete', 0.5); voice.discard(); }
   function voicePress(e) {
     voiceTouch.current = false;
     if (e.pointerType === 'mouse' || !canVoice || voice.active) return;
@@ -1135,7 +1138,7 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
     setTimeout(() => { voiceTouch.current = false; }, 500); // (a browser may not add its click after a long press)
     const what = voice.phase === 'recording' || voice.phase === 'full' ? holdOutcome({ recordedMs: voice.elapsed(), dx: h.dx }) : 'too_short';
     if (what === 'send') { sendVoice(); return; }
-    voice.discard();
+    if (what === 'discard') voiceDelete(); else voice.discard();
     if (what === 'too_short') toast('Hold the button while you talk.');
   }
   // the system took the press away (a call, a permission prompt, the screen going off): never counts as "send"
@@ -1279,7 +1282,7 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
             if (e.key === 'Escape' && replyTo) setReplyTo(null);
           }}
         />
-        {voice.active && <VoiceBar voice={voice} mode={voiceHolding ? 'hold' : 'click'} dragX={voiceDrag} onDiscard={voice.discard} />}
+        {voice.active && <VoiceBar voice={voice} mode={voiceHolding ? 'hold' : 'click'} dragX={voiceDrag} onDiscard={voiceDelete} />}
         {!voice.active && <button type="button" className={`vc-ico-btn vc-gif-btn${picker ? ' on' : ''}`} title="Media (GIFs, Saved Media, Game Clips)" onClick={() => { setPicker(p => (p ? false : 'saved')); setEmoji(false); }}><GifIcon /></button>}
         {!voice.active && <button type="button" className={`vc-ico-btn vc-emoji-btn${emoji ? ' on' : ''}`} title="Emoji" onClick={() => { setEmoji(x => !x); setPicker(false); }}><Smile size={19} /></button>}
         {emoji && !voice.active && <EmojiPicker onClose={() => setEmoji(false)} onPick={t => { insertText(t); setEmoji(false); }} />}

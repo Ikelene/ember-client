@@ -7,7 +7,7 @@ import { getDesign, setDesign, subscribeDesign } from '../../chat/design.js';
 import { useRadio, setRadioVolume, toggleRadioPause } from '../../chat/Radio.jsx';
 // settings preview of the new-message sound (same files as chat/store.js)
 function previewNotifySound(kind) {
-  try { const a = new Audio({ long: '/assets/sounds/chat/notify.mp3?v=20261011', classic: '/assets/sounds/chat/message.mp3' }[kind] || '/assets/sounds/chat/notify-short.mp3?v=20261011'); a.volume = 0.6; a.play().catch(() => {}); } catch { /* no audio */ }
+  try { const a = new Audio({ long: '/assets/sounds/chat/notify.mp3?v=20261011', classic: '/assets/sounds/chat/message.mp3' }[kind] || '/assets/sounds/chat/message-new.mp3?v=20261103'); a.volume = 0.6; a.play().catch(() => {}); } catch { /* no audio */ }
 }
 import { apiFetch } from '../../api.js';
 import { useChat } from '../../chat/store.js';
