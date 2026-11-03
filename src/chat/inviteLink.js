@@ -42,13 +42,15 @@ export function paymentRef(href) {
   return null;
 }
 // Glint clips, shown as a clip card with Ember's player (LinkEmbeds.jsx GlintEmbed; unfurl.js reads the clip page):
-//   https://ikelene.net/glint/c/<10-char id>
+//   https://clips.nookara.cc/c/<10-char id>, or the old https://ikelene.net/glint/c/<10-char id> in older messages
 // -> { id, sure: true } or null
 export function glintRef(href) {
   let u;
   try { u = new URL(href); } catch { return null; }
-  if (u.protocol !== 'https:' || u.port || !/^(www\.)?ikelene\.net$/i.test(u.hostname)) return null;
-  const m = /^\/glint\/c\/([A-Za-z0-9]{10})\/?$/.exec(u.pathname);
+  if (u.protocol !== 'https:' || u.port) return null;
+  const onClips = /^clips\.nookara\.cc$/i.test(u.hostname);
+  if (!onClips && !/^(www\.)?ikelene\.net$/i.test(u.hostname)) return null;
+  const m = (onClips ? /^\/c\/([A-Za-z0-9]{10})\/?$/ : /^\/glint\/c\/([A-Za-z0-9]{10})\/?$/).exec(u.pathname);
   return m ? { id: m[1], sure: true } : null;
 }
 // what a link to a card is called where the card itself isn't shown (a reply preview)
