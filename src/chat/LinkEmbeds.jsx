@@ -5,7 +5,7 @@ import { siteHref } from './hosts.js';
 import { VideoPlayer, fmtTime } from './MediaPlayer.jsx';
 import { viewPicture } from './MediaViewer.jsx';
 import { useEffect, useRef, useState } from 'react';
-import { Play, Download, ShieldCheck, Eye, Loader2, Users, ExternalLink, BookmarkPlus, BookmarkCheck, Coins, Heart, Clock } from 'lucide-react';
+import { Play, Download, ShieldCheck, Eye, Loader2, Users, ExternalLink, BookmarkPlus, BookmarkCheck, JapaneseYen, Heart, Clock } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { useChat, getState, toast, errorText, openLink, saveSettings, loadMedia, hashFor } from './store.js';
 import { K } from './ids.js';
@@ -324,12 +324,12 @@ function ProfileEmbed({ e }) {
 const PAY_STATE = { pending: 'Waiting for payment', paid: 'Paid', cancelled: 'Cancelled', expired: 'Expired', failed: 'Failed' };
 function PaymentEmbed({ e, url }) {
   if (e.invalid) return <div className="vc-invite-card bad vl-rise"><b>Payment link</b><span>This payment link doesn't work any more.</span></div>;
-  const credits = n => `${Number(n).toLocaleString()} credit${Number(n) === 1 ? '' : 's'}`;
+  const credits = n => `¥${Number(n).toLocaleString()}`;
   const done = e.status && e.status !== 'pending';
   let title, sub, ico;
-  if (e.kind === 'user') { title = `Pay ${e.username}`; sub = 'Send Nookara credits to this person.'; ico = e.pfp ? <img src={e.pfp} alt="" /> : <Coins size={20} />; }
-  else if (e.kind === 'bot') { title = `${credits(e.amount)} to ${e.bot}`; sub = e.description || 'Payment request from a bot.'; ico = e.pfp ? <img src={e.pfp} alt="" /> : <Coins size={20} />; }
-  else { title = `${credits(e.amount)} to ${e.to}`; sub = `Requested by ${e.project}.`; ico = <Coins size={20} />; }
+  if (e.kind === 'user') { title = `Pay ${e.username}`; sub = 'Send Nookara credits to this person.'; ico = e.pfp ? <img src={e.pfp} alt="" /> : <JapaneseYen size={20} />; }
+  else if (e.kind === 'bot') { title = `${credits(e.amount)} to ${e.bot}`; sub = e.description || 'Payment request from a bot.'; ico = e.pfp ? <img src={e.pfp} alt="" /> : <JapaneseYen size={20} />; }
+  else { title = `${credits(e.amount)} to ${e.to}`; sub = `Requested by ${e.project}.`; ico = <JapaneseYen size={20} />; }
   return (
     <div className="vc-invite-card vc-pay-card vl-rise">
       <small className="vc-invite-kicker">{e.kind === 'user' ? 'Payment link' : 'Payment request'}</small>

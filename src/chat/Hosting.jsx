@@ -4,7 +4,7 @@
 // Plus is prepaid weeks and never renews by itself: when the time is up the server is overdue for 2 days, then read-only,
 // and a week later Velora keeps a backup in your account and shuts it down. Velora's side: /bonfire/hosting/* (PROTOCOL §19).
 import { useEffect, useRef, useState } from 'react';
-import { Check, Globe, Rocket, Sparkles, Users, Volume2, Upload, Smile, Bot, ArrowLeftRight, KeyRound, TriangleAlert, ScrollText, RefreshCw, Trash2, Coins, Server, ShieldCheck, Archive, Download, CalendarClock, X, Lock, HardDrive, Clock, Pencil } from 'lucide-react';
+import { Check, Globe, Rocket, Sparkles, Users, Volume2, Upload, Smile, Bot, ArrowLeftRight, KeyRound, TriangleAlert, ScrollText, RefreshCw, Trash2, JapaneseYen, Server, ShieldCheck, Archive, Download, CalendarClock, X, Lock, HardDrive, Clock, Pencil } from 'lucide-react';
 import { apiFetch, getToken } from '../api.js';
 import { Dialog } from './Dialogs.jsx';
 import { useChat, patchState, toast, errorText, ask, go } from './store.js';
@@ -43,7 +43,7 @@ export const HOSTING_TEXT = {
   hosting_failed: "Nookara couldn't do that on the server right now - try again in a bit.", backup_failed: "The backup didn't work, so nothing was deleted - try again in a bit.",
   insufficient_scope: 'Ember needs the "Spend Credits" permission for that. Sign out of Ember and sign in again, and tick it on the approval screen.', not_owner: "You aren't this server's owner.", backup_not_found: 'That backup is gone.',
 };
-const hostingError = e => (e?.error === 'insufficient_balance' && e.cost ? `That costs ${Number(e.cost).toLocaleString()} credits - you have ${Number(e.balance || 0).toLocaleString()}.` : (e?.detail && SLUG_DETAIL[e.detail]) || HOSTING_TEXT[e?.message || e] || errorText(e?.message || e));
+const hostingError = e => (e?.error === 'insufficient_balance' && e.cost ? `That costs ¥${Number(e.cost).toLocaleString()} - you have ¥${Number(e.balance || 0).toLocaleString()}.` : (e?.detail && SLUG_DETAIL[e.detail]) || HOSTING_TEXT[e?.message || e] || errorText(e?.message || e));
 
 // ── your hosted servers, shared by the settings page and the note at the bottom left (refreshed now and then) ──
 let hostedAt = 0;
@@ -87,7 +87,7 @@ function PlanCard({ plan, on, onPick, current, disabled, note, pro }) {
         <b>{plan.name}</b>
         {current && <small className="vc-chip">Current</small>}
         <span className="grow" />
-        <span className="bf-plan-price">{paid ? <><Coins size={13} /> {plan.price_credits.toLocaleString()}<small> / {per(plan)}</small></> : plan.price_credits > 0 ? <><Sparkles size={13} /> Free with Pro</> : 'Free'}</span>
+        <span className="bf-plan-price">{paid ? <><JapaneseYen size={13} /> {plan.price_credits.toLocaleString()}<small> / {per(plan)}</small></> : plan.price_credits > 0 ? <><Sparkles size={13} /> Free with Pro</> : 'Free'}</span>
       </span>
       {plan.free_with_pro && !pro && <small className="bf-plan-note">Free with Nookara Pro</small>}
       <ul>{(plan.self ? plan.lines : limitLines(plan.limits)).map(([I, t]) => <li key={t}><I size={14} /> {t}</li>)}</ul>
@@ -103,7 +103,7 @@ function WeeksPicker({ plan, weeks, setWeeks }) {
       <div className="bf-weeks">
         {WEEK_PICKS.map(w => <button type="button" key={w} className={weeks === w ? 'on' : ''} onClick={() => setWeeks(w)}>{plural(w, per(plan))}</button>)}
       </div>
-      <small className="vc-hint"><Coins size={12} className="vc-inline-ico" /> {(weeks * plan.price_credits).toLocaleString()} credits from your Nookara balance. It doesn't renew by itself - buy more time whenever you like.</small>
+      <small className="vc-hint"><JapaneseYen size={12} className="vc-inline-ico" /> {(weeks * plan.price_credits).toLocaleString()} from your Nookara credits. It doesn't renew by itself - buy more time whenever you like.</small>
     </div>
   );
 }
@@ -401,7 +401,7 @@ export function HostingPage({ origin }) {
   async function buy() {
     if (!plus) return;
     const cost = weeks * plus.price_credits;
-    if (!(await ask({ title: `Buy ${plural(weeks, per(plus))} of ${plus.name}?`, text: `${cost.toLocaleString()} credits from your Nookara balance.${h.plan === 'starter' ? ` ${h.name || h.slug} moves to ${plus.name} right away.` : ''} It doesn't renew by itself.`, confirm: `Pay ${cost.toLocaleString()} credits` }))) return;
+    if (!(await ask({ title: `Buy ${plural(weeks, per(plus))} of ${plus.name}?`, text: `¥${cost.toLocaleString()} from your Nookara credits.${h.plan === 'starter' ? ` ${h.name || h.slug} moves to ${plus.name} right away.` : ''} It doesn't renew by itself.`, confirm: `Pay ¥${cost.toLocaleString()}` }))) return;
     setBusy('buy');
     try { await apiFetch(`/bonfire/hosting/servers/${h.slug}/weeks`, { method: 'POST', body: JSON.stringify({ weeks }) }); await loadHosted(true); toast(h.billing === 'read_only' ? 'Paid - the server is open again.' : 'Paid. Thank you!', true); }
     catch (e) { toast(hostingError(e)); }
@@ -464,7 +464,7 @@ export function HostingPage({ origin }) {
               <div className="vc-dialog-btns">
                 {h.plan !== 'starter' && <button type="button" className="btn btn-surface" disabled={!!busy} onClick={toStarter}>Switch to the free plan</button>}
                 <span className="grow" />
-                <button type="button" className="btn btn-primary" disabled={!!busy} onClick={buy}><Coins size={14} /> {busy === 'buy' ? 'Paying...' : `Pay ${(weeks * plus.price_credits).toLocaleString()} credits`}</button>
+                <button type="button" className="btn btn-primary" disabled={!!busy} onClick={buy}><JapaneseYen size={14} /> {busy === 'buy' ? 'Paying...' : `Pay ¥${(weeks * plus.price_credits).toLocaleString()}`}</button>
               </div>
             </>
           )}
