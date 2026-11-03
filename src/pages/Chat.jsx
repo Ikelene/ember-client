@@ -27,6 +27,7 @@ import { EmojiInfoHost } from '../chat/EmojiInfo.jsx';
 import { ReactionPickerHost } from '../chat/Reactions.jsx';
 import { UpdatePopup } from '../chat/UpdatePopup.jsx';
 import { MobileAppPromo } from '../chat/MobileAppPromo.jsx';
+import { AppDownload, AppDownloadTip } from '../chat/AppDownload.jsx';
 import { AccountNotices } from '../chat/AccountNotices.jsx';
 import RockEgg from '../chat/RockEgg.jsx';
 import { PermissionPrompts } from '../chat/Permissions.jsx';
@@ -642,6 +643,7 @@ function ChatPage() {
       <RpcWarning />
       <UpdatePopup />
       <MobileAppPromo />
+      <AppDownloadTip onOpen={() => setDialog({ kind: 'app-download' })} />
       {signedIn && <AccountNotices onOpenSettings={page => setDialog({ kind: 'chat-settings', page })} />}
       <RockEgg enabled={!!settings.rock_easter_egg} />
       <PermissionPrompts />
@@ -651,6 +653,7 @@ function ChatPage() {
       {profileUI}
       <BigFromEvent />
       {dialog?.kind === 'discover' && <Discover onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'app-download' && <AppDownload onClose={() => setDialog(null)} />}
       {dialog?.kind === 'test-bot' && <TestBotDialog key={dialog.id} id={dialog.id} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'import' && <ImportServer onClose={() => setDialog(null)} />}
       {dialog?.kind === 'add-instance' && <AddInstance url={dialog.url} invite={dialog.invite} onClose={() => setDialog(null)} onSetup={origin => setDialog({ kind: 'setup', origin })} />}

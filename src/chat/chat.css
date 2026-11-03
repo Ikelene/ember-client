@@ -1915,6 +1915,21 @@ html.vc-radio .vc-main { background: transparent; }
 .vc-app-promo-logo { display: block; margin: 0 auto 14px; width: 72px; height: 72px; object-fit: cover; }
 .vc-app-promo .vc-dialog-btns { justify-content: center; }
 .vc-app-promo-note { z-index: 2200; }
+/* the app picker and the one-time note beside the rail's download button (AppDownload.jsx) */
+.vc-appdl-list { display: flex; flex-direction: column; gap: 8px; }
+.vc-appdl-opt { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; text-align: left; color: var(--dim); background: #151517; border: 1px solid var(--border-2); cursor: pointer; transition: border-color .15s, color .15s; }
+.vc-appdl-opt > svg { flex: none; }
+.vc-appdl-opt:hover { border-color: var(--dim); }
+.vc-appdl-opt.on { color: var(--accent); border-color: var(--accent); }
+.vc-appdl-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 12.5px; color: var(--dim); }
+.vc-appdl-txt b { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); }
+.vc-appdl-txt small { font-size: 11px; font-weight: 400; color: var(--accent); }
+.vc-appdl-ring { position: fixed; z-index: 2150; border: 2px solid var(--accent); pointer-events: none; animation: vc-appdl-pulse 1.6s ease-in-out infinite; }
+@keyframes vc-appdl-pulse { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 30%, transparent); } }
+.vc-appdl-tip { position: fixed; z-index: 2150; width: 270px; padding: 14px; color: var(--text); background: var(--box); border: 1px solid var(--accent); box-shadow: 0 16px 40px rgba(0, 0, 0, .55); animation: vc-pop .22s cubic-bezier(.2, .8, .2, 1); }
+.vc-appdl-tip b { font-size: 14px; color: #fff; }
+.vc-appdl-tip p { margin: 4px 0 0; font-size: 13px; color: var(--dim); }
+.vc-appdl-tip .vc-dialog-btns { margin-top: 12px; }
 /* one-time account notices (AccountNotices.jsx) */
 .vc-notice h3 { display: flex; align-items: center; gap: 8px; }
 .vc-notice h3 svg { flex: none; color: var(--accent); }

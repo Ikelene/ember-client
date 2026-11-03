@@ -1,4 +1,3 @@
-import { openSite } from './hosts.js';
 // The frame around the conversation: server rail, channel / DM sidebar, member list, your panel.
 import { BotTag } from './Bots.jsx';
 import { isDesktopApp } from './BonfireLogo.jsx';
@@ -9,11 +8,11 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 
 import { createPortal } from 'react-dom';
 import {
   Hash, Lock, Plus, Compass, ChevronDown, Settings, UserPlus, LogOut, Users, MessageCircle, Home,
-  Pencil, Trash2, Check, X, Circle, Moon, MinusCircle, EyeOff, Smile, UsersRound, Megaphone, FolderPlus, ShieldCheck, Download, Smartphone, Server, UserRound, Volume2, CircleArrowUp } from 'lucide-react';
+  Pencil, Trash2, Check, X, Circle, Moon, MinusCircle, EyeOff, Smile, UsersRound, Megaphone, FolderPlus, ShieldCheck, Download, Server, UserRound, Volume2, CircleArrowUp } from 'lucide-react';
 
 import { RetryIn } from './Gate.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
-import { useChat, retryNow, isMobileDevice, go, keyOf, setStatus, setCustom, isMuted, effectiveNotify, ask, refreshServer, toast, errorText, setDetailLayout, patchState, saveSettings, getState, statusOf, presenceFor, useFace, isBlockedPerson, isBlockedName, blockedFace, BLOCKED_NAME, loadMoreMembers } from './store.js';
+import { useChat, retryNow, go, keyOf, setStatus, setCustom, isMuted, effectiveNotify, ask, refreshServer, toast, errorText, setDetailLayout, patchState, saveSettings, getState, statusOf, presenceFor, useFace, isBlockedPerson, isBlockedName, blockedFace, BLOCKED_NAME, loadMoreMembers } from './store.js';
 import { P, has, ChannelIcon, useNameStyle, colorFrom, NameDecor } from './roles.jsx';
 import { serverMenu, instanceMenu, channelMenu, userMenu, openMenu, copy } from './Menu.jsx';
 import { apiFetch, getToken } from '../api.js';
@@ -256,9 +255,9 @@ export function Rail({ onDiscover, onAddInstance, onCreate }) {
       <RailItem title="Add a server by its address" onClick={onAddInstance}><span className="vc-srv-ico act"><Server size={20} /></span></RailItem>
       <RailItem title="Discover" onClick={onDiscover}><span className="vc-srv-ico act"><Compass size={20} /></span></RailItem>
 
-      {!isDesktopApp() && !window.bonfireMobile && (isMobileDevice()
-        ? <RailItem title="Get Ember for Android" onClick={() => { openSite('/bonfire/android/'); }}><span className="vc-srv-ico act"><Smartphone size={20} /></span></RailItem>
-        : <RailItem title="Get Ember for desktop" onClick={() => { openSite('/bonfire/download'); }}><span className="vc-srv-ico act"><Download size={20} /></span></RailItem>)}
+      {!isDesktopApp() && !window.bonfireMobile && (
+        <RailItem title="Get the Ember app" onClick={() => dialog('app-download')}><span className="vc-srv-ico act" data-app-download><Download size={20} /></span></RailItem>
+      )}
     </nav>
   );
 }
