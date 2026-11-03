@@ -44,3 +44,14 @@ test('describeVia: name + badge for official ones, domain / token for the rest',
   // icons: https or a Velora path only
   assert.equal(describeVia({ url: 'https://x.example' }, [{ name: 'X', origins: ['x.example'], kinds: [], app_ids: [], icon_url: 'javascript:alert(1)', verified: true }]).icon, null);
 });
+
+test('a registered app that is not verified: its logo from Nookara, no badge, and nothing an instance could plant', async () => {
+  const { describeVia } = await import('../src/chat/officialClients.js');
+  const logo = 'https://nookara.cc/uploads/app-logos/app_1-ab.webp';
+  const d = describeVia({ token: 'Toast Game', app: 'app_1', icon: logo }, []);
+  assert.equal(d.icon, logo); assert.equal(d.verified, false); assert.equal(d.name, 'Toast Game');
+  assert.equal(describeVia({ token: 'x', icon: 'https://evil.example/uploads/app-logos/a.webp' }, []).icon, null);
+  assert.equal(describeVia({ token: 'x', icon: 'https://nookara.cc/uploads/other.webp' }, []).icon, null);
+  const v = describeVia({ token: 'Toast Game', app: 'app_1' }, [{ name: 'Toast Game', app_ids: ['app_1'], origins: [], kinds: [], icon_url: logo, verified: true }]);
+  assert.equal(v.verified, true); assert.equal(v.icon, logo);
+});

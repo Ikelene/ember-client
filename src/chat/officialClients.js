@@ -54,7 +54,9 @@ export function describeVia(via, list) {
   const hit = matchClient(via, list);
   if (hit) return { name: hit.name, verified: !!hit.verified, icon: /^(https:\/\/|\/(?!\/))/.test(hit.icon_url || '') ? hit.icon_url : null, domain, known: true };
   if (!list && via.official) return { name: via.name || 'Ember', verified: true, icon: null, domain, known: true };
-  return { name: via.token || domain || 'Unknown client', verified: false, icon: null, domain: via.token ? domain : '', known: false };
+  // a registered app that isn't verified: its own logo, no badge. Only from Nookara's upload folder: an instance can write any `via` it likes
+  const icon = /^https:\/\/(nookara\.cc|velora\.ikelene\.net)\/uploads\/app-logos\/[\w.-]+$/.test(via.icon || '') ? via.icon : null;
+  return { name: via.token || domain || 'Unknown client', verified: false, icon, domain: via.token ? domain : '', known: false };
 }
 
 // ── the cached list ─────────────────────────────────────────────────────────
