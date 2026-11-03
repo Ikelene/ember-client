@@ -22,7 +22,8 @@ const BODY_CTX = { linkImages: false, bio: true };
 // local time from a UTC offset in minutes (what other people get), or from a time zone name (the editor's draft)
 export function localTimeFrom({ tzOffsetMin, timeZone }) {
   try {
-    if (timeZone) return new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone });
+    // (Alberta stays on UTC-6 since 2026-11-01, newer than browsers' time zone data)
+    if (timeZone) return new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: timeZone === 'America/Edmonton' ? 'Etc/GMT+6' : timeZone });
     if (Number.isFinite(tzOffsetMin)) return new Date(Date.now() + (tzOffsetMin + new Date().getTimezoneOffset()) * 60000).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   } catch { /* bad zone */ }
   return '';
