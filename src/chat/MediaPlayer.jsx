@@ -3,6 +3,7 @@
 // (space / k play, arrows seek + volume, m mute, f fullscreen). Only one thing plays at a time.
 import { useEffect, useRef, useState } from 'react';
 import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Minimize, PictureInPicture2, Loader2, RotateCcw, Music } from 'lucide-react';
+import { peaksOf, seededPeaks, voiceSeconds } from './voice-note.js';
 
 const VOL_KEY = 'bonfire_media_volume';
 const savedVol = () => { try { const v = JSON.parse(localStorage.getItem(VOL_KEY) || 'null'); return v && typeof v.volume === 'number' ? v : { volume: 0.8, muted: false }; } catch { return { volume: 0.8, muted: false }; } };
@@ -28,7 +29,7 @@ function useMedia(ref) {
     }));
     const onPlay = () => { dispatchEvent(new CustomEvent('bonfire-media-play', { detail: el })); up(); };
     const others = e => { if (e.detail !== el && !el.paused) el.pause(); };
-    const ev = { timeupdate: up, durationchange: up, progress: up, pause: up, ended: up, ratechange: up, loadedmetadata: up, play: onPlay,
+    const ev = { timeupdate: up, seeked: up, durationchange: up, progress: up, pause: up, ended: up, ratechange: up, loadedmetadata: up, play: onPlay,
       volumechange: () => { saveVol(el.volume, el.muted); up(); }, waiting: () => setSt(s => ({ ...s, waiting: true })), playing: () => setSt(s => ({ ...s, waiting: false })), canplay: () => setSt(s => ({ ...s, waiting: false })) };
     Object.entries(ev).forEach(([k, f]) => el.addEventListener(k, f));
     addEventListener('bonfire-media-play', others);
@@ -155,6 +156,79 @@ export function VideoPlayer({ src, poster, autoPlay, className = '', onError }) 
           <button type="button" className="vc-mp-btn" title={fs ? 'Exit fullscreen (f)' : 'Fullscreen (f)'} onClick={fullscreen}>{fs ? <Minimize size={17} /> : <Maximize size={17} />}</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── voice messages ──
+// bars for a file: decoded here (read once, two at a time), or steady made-up ones when the file can't be read from this page
+const VOICE_BARS = 44;
+const peakCache = new Map();
+const peakQueue = [];
+let peakBusy = 0;
+function nextPeak() {
+  if (peakBusy >= 2 || !peakQueue.length) return;
+  peakBusy++;
+  const { src, resolve } = peakQueue.shift();
+  (async () => {
+    const r = await fetch(src, { credentials: 'omit' });
+    if (!r.ok) throw new Error('fetch');
+    const buf = await new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 8000).decodeAudioData(await r.arrayBuffer());
+    return peaksOf(buf.getChannelData(0), VOICE_BARS);
+  })().catch(() => seededPeaks(src, VOICE_BARS)).then(resolve).finally(() => { peakBusy--; nextPeak(); });
+}
+const peaksFor = src => {
+  if (!peakCache.has(src)) { peakCache.set(src, new Promise(resolve => { peakQueue.push({ src, resolve }); nextPeak(); })); }
+  return peakCache.get(src);
+};
+export function VoicePlayer({ src, name }) {
+  const box = useRef(null);
+  const ref = useRef(null);
+  const m = useMedia(ref);
+  const { st } = m;
+  const [seen, setSeen] = useState(typeof IntersectionObserver === 'undefined');
+  const [peaks, setPeaks] = useState(() => seededPeaks(src, VOICE_BARS));
+  useEffect(() => { // nothing is read until it's near the screen: a long history of voice messages stays cheap
+    if (seen || !box.current) return undefined;
+    const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { setSeen(true); io.disconnect(); } }, { rootMargin: '300px' });
+    io.observe(box.current);
+    return () => io.disconnect();
+  }, [seen]);
+  useEffect(() => {
+    if (!seen) return undefined;
+    let live = true;
+    peaksFor(src).then(p => { if (live) setPeaks(p); });
+    return () => { live = false; };
+  }, [seen, src]);
+  // a recorded webm doesn't say how long it is. Asking for a spot past the end makes the browser work it out, and only then can it seek
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const meta = () => {
+      if (el.duration !== Infinity) return;
+      const back = () => { if (el.duration !== Infinity) { el.removeEventListener('durationchange', back); el.currentTime = 0; } };
+      el.addEventListener('durationchange', back);
+      el.currentTime = 1e7;
+    };
+    el.addEventListener('loadedmetadata', meta);
+    return () => el.removeEventListener('loadedmetadata', meta);
+  }, []);
+  const duration = Number.isFinite(st.duration) && st.duration > 0 ? st.duration : voiceSeconds(name);
+  const done = duration ? Math.min(1, st.time / duration) : 0;
+  const seekAt = e => {
+    const el = ref.current, r = e.currentTarget.getBoundingClientRect();
+    if (!el || !duration) return;
+    el.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * duration;
+  };
+  return (
+    <div ref={box} className="vc-mp voice" tabIndex={0} onKeyDown={e => keys(e, m, ref.current)}>
+      <audio ref={ref} src={seen ? src : undefined} preload="metadata" />
+      <button type="button" className="vc-mp-play" title={st.playing ? 'Pause' : 'Play voice message'} onClick={m.toggle}>{st.waiting ? <Loader2 size={18} className="vc-spin" /> : st.playing ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}</button>
+      <div className="vc-mp-vwave" role="slider" aria-label="Voice message position" aria-valuemin={0} aria-valuemax={Math.round(duration)} aria-valuenow={Math.round(st.time)} onPointerDown={seekAt}>
+        {peaks.map((p, i) => <i key={i} className={(i + 0.5) / peaks.length <= done ? 'on' : ''} style={{ height: `${Math.round(p * 100)}%` }} />)}
+      </div>
+      <span className="vc-mp-time">{fmtTime(st.time > 0 ? st.time : duration)}</span>
+      <SpeedCtl st={st} setRate={m.setRate} />
     </div>
   );
 }

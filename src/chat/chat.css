@@ -2404,3 +2404,30 @@ a.vc-glint-site:hover { color: var(--text); text-decoration: none; }
 .vc-tpop-move:disabled { opacity: .55; cursor: not-allowed; }
 .vc-tpop-help { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px; color: var(--muted); font-size: 12px; text-decoration: none; }
 .vc-tpop-help:hover { color: var(--text); text-decoration: underline; }
+
+/* voice messages: the record button, the bar that stands in for the text box, the player */
+.vc-ico-btn.send.voice:not(:disabled) { background: var(--accent); color: #fff; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.vc-ico-btn.send.voice:hover:not(:disabled) { background: var(--accent); color: #fff; filter: brightness(1.1); }
+.vc-composer.recording { border-color: var(--accent); }
+.vc-voice-bar { flex: 1; min-width: 0; min-height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 4px; color: var(--accent); }
+.vc-voice-bar.hold { padding-left: 8px; }
+.vc-voice-discard { flex: none; color: var(--dim); }
+.vc-voice-discard:hover:not(:disabled) { color: #f09090; background: rgba(224, 122, 122, .1); }
+.vc-voice-dot { flex: none; width: 8px; height: 8px; background: #e05a5a; animation: vc-voice-pulse 1.2s ease-in-out infinite; }
+.vc-voice-bar.starting .vc-voice-dot { background: var(--muted); animation: none; }
+@keyframes vc-voice-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .vc-voice-dot { animation: none; } }
+.vc-voice-time { flex: none; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text); }
+.vc-voice-wave { flex: 1; min-width: 0; height: 26px; display: block; color: var(--accent); }
+.vc-voice-hint { flex: none; display: inline-flex; align-items: center; gap: 2px; font-size: 12px; color: var(--dim); white-space: nowrap; }
+.vc-voice-bar.starting .vc-voice-hint { flex: 1; }
+.vc-voice-hint.armed { color: #f09090; }
+.vc-voice-error { color: #f09090; }
+.vc-voice-error > span { display: inline-flex; align-items: center; gap: 6px; }
+.vc-voice-error svg { flex: none; }
+.vc-mp.voice { display: flex; align-items: center; gap: 8px; width: min(380px, 100%); padding: 6px 8px; background: linear-gradient(180deg, #17171a, #121214); border: 1px solid var(--border); }
+.vc-mp-vwave { flex: 1; min-width: 0; height: 34px; display: flex; align-items: center; gap: 2px; cursor: pointer; touch-action: none; }
+.vc-mp-vwave i { flex: 1 1 0; min-width: 1px; background: var(--muted); pointer-events: none; }
+.vc-mp-vwave i.on { background: var(--accent); }
+.vc-mp.voice .vc-mp-time { flex: none; padding: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
+@media (max-width: 480px) { .vc-mp.voice .vc-mp-speed { display: none; } }

@@ -31,6 +31,8 @@ const missingDevice = e => ['OverconstrainedError', 'NotFoundError'].includes(e?
 // open the saved device; if it's gone (unplugged), fall back to the system default
 async function openDevice(constraints, id) { try { return await navigator.mediaDevices.getUserMedia(constraints(id)); } catch (e) { if (id && missingDevice(e)) return navigator.mediaDevices.getUserMedia(constraints('')); throw e; } }
 const micConstraints = id => ({ audio: { deviceId: id ? { exact: id } : undefined, echoCancellation: true, noiseSuppression: prefs().noiseSuppression !== false, autoGainControl: true, channelCount: 1 }, video: false });
+// a separate stream of the chosen mic (voice messages): stopping it leaves a call's own stream alone
+export const openMicrophone = () => openDevice(micConstraints, prefs().input);
 const camConstraints = id => ({ video: { deviceId: id ? { exact: id } : undefined, width: { ideal: 854, max: 1280 }, height: { ideal: 480, max: 720 }, frameRate: { ideal: 24, max: 30 } }, audio: false });
 
 // ── mic chain: raw mic -> input volume + noise gate (AudioWorklet) -> the track we send ──

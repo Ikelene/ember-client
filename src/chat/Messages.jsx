@@ -6,11 +6,13 @@ import { canAttachInChannel } from './attachment-permissions.js';
 import { apiFetch } from '../api.js';
 import { instOpt, isInst, instOf } from './ids.js';
 import { sigId } from './signing.js';
-import { VideoPlayer, AudioPlayer } from './MediaPlayer.jsx';
+import { VideoPlayer, AudioPlayer, VoicePlayer } from './MediaPlayer.jsx';
+import { useVoiceRecorder, VoiceBar } from './VoiceNote.jsx';
+import { holdOutcome, isVoiceAtt, isVoiceLink } from './voice-note.js';
 import { viewMedia } from './MediaViewer.jsx';
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Eye, EyeOff, Reply, Pencil, Trash2, Copy, Plus, X, SmilePlus, Lock, SendHorizontal, AlertCircle, ImageIcon, CornerUpRight, Music, Film, ArrowRight, ArrowLeft, Webhook, Phone, Pin, ChevronUp, Star, Upload, CloudUpload } from 'lucide-react';
+import { AudioLines, Eye, EyeOff, Reply, Pencil, Trash2, Copy, Plus, X, SmilePlus, Lock, SendHorizontal, AlertCircle, ImageIcon, CornerUpRight, Music, Film, ArrowRight, ArrowLeft, Webhook, Phone, Pin, ChevronUp, Star, Upload, CloudUpload } from 'lucide-react';
 import { Embeds } from './ChannelTypes.jsx';
 import { LinkEmbeds } from './LinkEmbeds.jsx';
 import { GameInvites } from './GameInvite.jsx';
@@ -59,7 +61,7 @@ import { renderBody, timeOf, stampOf, dayOf } from './text.jsx';
 import { embedLabel } from './inviteLink.js';
 import { Avatar, BlockedMark } from './Profile.jsx';
 import { messageMenu, userMenu, openMenu } from './Menu.jsx';
-import { mentionsMe as isMention, useFace, wantVeloraFaces, useBlocked, blockedFace, isBlockedName, faceOf, BLOCKED_NAME } from './store.js';
+import { useScope, mentionsMe as isMention, useFace, wantVeloraFaces, useBlocked, blockedFace, isBlockedName, faceOf, BLOCKED_NAME } from './store.js';
 import { useNameStyle, colorFrom, NameDecor, P, has } from './roles.jsx';
 import { suggestQuery, useSuggestItems, MentionPicker, encodeRoleMentions, decodeRoleMentions } from './Mentions.jsx';
 import { serialize, fill, caretToEnd, caretText, replaceBeforeCaret, insertAt, resolveWord, markdownShortcut, styleMarkdown } from './richInput.js';
@@ -218,7 +220,9 @@ function Attachments({ list: all, extra = [], m }) {
         </div>
       )}
       {others.map(a => {
-        const inner = a.type === 'file' ? <FileCard a={a} live={seen} /> : TEMP_LINK.test(a.url) ? <TempMedia a={a} live={seen} /> : a.type === 'video'
+        const inner = a.type === 'file' ? <FileCard a={a} live={seen} /> : TEMP_LINK.test(a.url) ? <TempMedia a={a} live={seen} /> : isVoiceAtt(a)
+          ? <div className="vc-media-wrap" data-media-url={a.url} data-media-name={shownName(a.name)}><VoicePlayer src={a.url} name={a.name} /></div>
+          : a.type === 'video'
           ? <div className="vc-media-wrap" data-media-url={a.url} data-media-name={shownName(a.name)}><VideoPlayer className="vc-att-video" src={a.url} /></div>
           : a.type === 'audio'
             ? <div className="vc-media-wrap" data-media-url={a.url} data-media-name={shownName(a.name)}><AudioPlayer src={a.url} name={shownName(a.name)} /></div>
@@ -233,6 +237,7 @@ function Attachments({ list: all, extra = [], m }) {
 function TempMedia({ a, live }) {
   const temp = useTempFile(a.url, live);
   if (temp === 'gone') return <ExpiredFile name={a.name} />;
+  if (isVoiceAtt(a)) return <div className="vc-media-wrap" data-media-url={a.url} data-media-name={shownName(a.name)}><VoicePlayer src={a.url} name={a.name} /></div>;
   return a.type === 'video'
     ? <div className="vc-media-wrap" data-media-url={a.url} data-media-name={shownName(a.name)}><VideoPlayer className="vc-att-video" src={a.url} /></div>
     : <div className="vc-media-wrap" data-media-url={a.url} data-media-name={shownName(a.name)}><AudioPlayer src={a.url} name={shownName(a.name)} /></div>;
@@ -261,7 +266,7 @@ function ReplyText({ body, ctx }) {
   const nodes = useMemo(() => {
     let t = inviteSummary(String(body || '')).replace(/<[^<>]*$/, ''); // (the server cuts long quotes: drop a half-cut <:emoji:id> / <@role>)
     t = t.replace(/```([\s\S]*?)```/g, (_, c) => `\`${c.trim().replace(/`/g, "'")}\``);
-    t = t.replace(URL_IN_TEXT, u => { const l = embedLabel(u); return l ? `*${l}*` : u; });
+    t = t.replace(URL_IN_TEXT, u => { const l = isVoiceLink(u) ? 'Voice message' : embedLabel(u); return l ? `*${l}*` : u; });
     t = t.replace(/\s*\n\s*/g, ' ').trim().replace(/^(?:#{1,3}\s+|-#\s+|>>>?\s+|[-*]\s+|\d{1,3}[.)]\s+)/, '');
     return t ? renderBody(t, { ...ctx, bio: true, linkImages: false }).nodes : null;
   }, [body, ctx]);
@@ -828,6 +833,22 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
     if (ta.current) ta.current.textContent = '';
     setText(''); setDraft(key, ''); setCmd(entry); setCsel(0); setMq(null);
   }
+  const voice = useVoiceRecorder();
+  const voiceHold = useRef(null); // { id, x, dx } while a finger holds the record button
+  const voiceTouch = useRef(false);
+  const [voiceHolding, setVoiceHolding] = useState(false);
+  const [voiceDrag, setVoiceDrag] = useState(0);
+  const canUploadMedia = useScope('MEDIA_UPLOAD');
+  // a recording belongs to the conversation it started in, and stops counting if posting here stops being allowed
+  useEffect(() => () => { voiceHold.current = null; setVoiceDrag(0); voice.discard(); voice.clearError(); }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (locked && voice.active) voice.discard(); }, [locked]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!voice.active) return undefined;
+    setPicker(false); setEmoji(false);
+    const esc = e => { if (e.key === 'Escape') { e.preventDefault(); voiceHold.current = null; setVoiceDrag(0); voice.discard(); } };
+    document.addEventListener('keydown', esc);
+    return () => document.removeEventListener('keydown', esc);
+  }, [voice.active]); // eslint-disable-line react-hooks/exhaustive-deps
   const [dropping, setDropping] = useState(false); // a file is being dragged over the window
   const saveFile = useRef(null);
   const destOnce = useRef(null); // the + menu's "Upload to ... storage": where the next picked files go
@@ -1079,6 +1100,52 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
         onClick: async () => { const list = liveClips(await loadMyClips()); setEmoji(false); if (list.length) setPicker('clips'); else setGlintIntro(true); } },
     ]);
   }
+  // Voice messages. An empty box turns the send button into the record button. The input decides how it works, not the screen size:
+  // a finger holds (let go sends, slide left deletes), a mouse or keyboard clicks once to start and again to send.
+  const canVoice = !cmd && !text.trim() && !atts.length && !busy && !locked && view.kind !== 'modmail' && view.username !== 'System' && (view.kind !== 'channel' || canAttach) && (!onVelora || canUploadMedia);
+  async function sendVoice() {
+    const v = view, reply = replyTo, recorded = await voice.finish();
+    if (!recorded) return;
+    const dest = onVelora ? rememberedUploadDest() || 'temp' : undefined; // no picker for a voice message: the usual place, else temporary storage
+    const cap = uploadCap(dest);
+    if (recorded.size > cap * 1024 * 1024) { toast(`That voice message is too big (${fmtSize(recorded.size)}) - files here go up to ${cap} MB.`); return; }
+    sendMessage(v, '', { replyTo: reply, uploads: [{ file: recorded, spoiler: false, dest }] });
+    setReplyTo?.(null);
+  }
+  function voicePress(e) {
+    voiceTouch.current = false;
+    if (e.pointerType === 'mouse' || !canVoice || voice.active) return;
+    voiceTouch.current = true;
+    voiceHold.current = { id: e.pointerId, x: e.clientX, dx: 0 };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* the release still lands on the button */ }
+    setVoiceHolding(true); setVoiceDrag(0); setPicker(false); setEmoji(false);
+    voice.start();
+  }
+  function voiceMove(e) {
+    const h = voiceHold.current;
+    if (!h || h.id !== e.pointerId) return;
+    h.dx = e.clientX - h.x;
+    setVoiceDrag(Math.min(0, h.dx));
+  }
+  function voiceRelease(e) {
+    const h = voiceHold.current;
+    if (!h || h.id !== e.pointerId) return;
+    voiceHold.current = null;
+    setVoiceDrag(0);
+    setTimeout(() => { voiceTouch.current = false; }, 500); // (a browser may not add its click after a long press)
+    const what = voice.phase === 'recording' || voice.phase === 'full' ? holdOutcome({ recordedMs: voice.elapsed(), dx: h.dx }) : 'too_short';
+    if (what === 'send') { sendVoice(); return; }
+    voice.discard();
+    if (what === 'too_short') toast('Hold the button while you talk.');
+  }
+  // the system took the press away (a call, a permission prompt, the screen going off): never counts as "send"
+  function voiceCancel(e) {
+    const h = voiceHold.current;
+    if (!h || h.id !== e.pointerId) return;
+    voiceHold.current = null;
+    setVoiceDrag(0);
+    voice.discard();
+  }
   if (timedOut) return <div className="vc-composer locked timed-out" role="status"><Clock size={15} /> <span><b>You're timed out</b> until {untilText(timedOut)}. You can read messages, but can't send any, react or join voice until then.</span></div>;
   if (locked) {
     return <div className="vc-composer locked"><Lock size={15} /> {lockedText || "This channel is locked - only the server's admins can post here."}</div>;
@@ -1150,8 +1217,14 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
           onExpires={(v, days) => patchAtt(popAtt.id, { expires: v, expiresDays: days })}
           onDest={d => patchAtt(popAtt.id, { dest: d, expires: 'default', expiresDays: null })} />
       )}
-      <div className={`vc-composer${replyTo || srActive ? ' replying' : ''}`}>
-        {(view.kind !== 'channel' || canAttach) && view.username !== 'System' && (
+      {voice.error && (
+        <div className="vc-replybar vc-voice-error" role="alert">
+          <span><AlertCircle size={13} aria-hidden="true" /> {voice.error}</span>
+          <button type="button" onClick={voice.clearError} title="Dismiss"><X size={14} /></button>
+        </div>
+      )}
+      <div className={`vc-composer${replyTo || srActive ? ' replying' : ''}${voice.active ? ' recording' : ''}`}>
+        {(view.kind !== 'channel' || canAttach) && view.username !== 'System' && !voice.active && (
           <button type="button" className="vc-ico-btn" title="Upload a file" onClick={uploadMenu}><Plus size={18} /></button>
         )}
         {mq && <MentionPicker items={mitems} sel={msel} setSel={setMsel} onPick={pickMention} sid={view.sid} />}
@@ -1161,7 +1234,7 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
         <input ref={file} type="file" multiple hidden onChange={e => { const once = destOnce.current; destOnce.current = null; addFiles(e.target.files, once); e.target.value = ''; }} />
         <input ref={saveFile} type="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm,video/quicktime,audio/*" onChange={e => { addSavedFiles(e.target.files); e.target.value = ''; }} />
         <div
-          ref={ta} className="vc-input" style={cmd ? { display: 'none' } : undefined} contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true"
+          ref={ta} className="vc-input" style={cmd || voice.active ? { display: 'none' } : undefined} contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true"
           data-placeholder={placeholder} spellCheck autoCorrect="on" autoCapitalize="sentences" inputMode="text"
           onInput={onInput}
           onCompositionStart={() => { composing.current = true; }}
@@ -1206,10 +1279,16 @@ export function Composer({ view, placeholder, locked: lockedBy, lockedText, repl
             if (e.key === 'Escape' && replyTo) setReplyTo(null);
           }}
         />
-        <button type="button" className={`vc-ico-btn vc-gif-btn${picker ? ' on' : ''}`} title="Media (GIFs, Saved Media, Game Clips)" onClick={() => { setPicker(p => (p ? false : 'saved')); setEmoji(false); }}><GifIcon /></button>
-        <button type="button" className={`vc-ico-btn vc-emoji-btn${emoji ? ' on' : ''}`} title="Emoji" onClick={() => { setEmoji(x => !x); setPicker(false); }}><Smile size={19} /></button>
-        {emoji && <EmojiPicker onClose={() => setEmoji(false)} onPick={t => { insertText(t); setEmoji(false); }} />}
-        <button type="button" className="vc-ico-btn send" title="Send" disabled={!cmd && !text.trim() && !atts.length} onPointerDown={e => e.preventDefault()} onMouseDown={e => e.preventDefault()} onClick={() => (cmd ? cmdSubmit.current?.() : submit())}><SendHorizontal size={18} /></button>
+        {voice.active && <VoiceBar voice={voice} mode={voiceHolding ? 'hold' : 'click'} dragX={voiceDrag} onDiscard={voice.discard} />}
+        {!voice.active && <button type="button" className={`vc-ico-btn vc-gif-btn${picker ? ' on' : ''}`} title="Media (GIFs, Saved Media, Game Clips)" onClick={() => { setPicker(p => (p ? false : 'saved')); setEmoji(false); }}><GifIcon /></button>}
+        {!voice.active && <button type="button" className={`vc-ico-btn vc-emoji-btn${emoji ? ' on' : ''}`} title="Emoji" onClick={() => { setEmoji(x => !x); setPicker(false); }}><Smile size={19} /></button>}
+        {emoji && !voice.active && <EmojiPicker onClose={() => setEmoji(false)} onPick={t => { insertText(t); setEmoji(false); }} />}
+        <button type="button" className={`vc-ico-btn send${canVoice || voice.active ? ' voice' : ''}`} title={voice.active ? 'Send voice message' : canVoice ? 'Record a voice message' : 'Send'} aria-label={voice.active ? 'Send voice message' : canVoice ? 'Record a voice message' : 'Send'} disabled={!voice.active && !canVoice && !cmd && !text.trim() && !atts.length}
+          onPointerDown={e => { e.preventDefault(); voicePress(e); }} onPointerMove={voiceMove} onPointerUp={voiceRelease} onPointerCancel={voiceCancel} onContextMenu={e => { if (canVoice || voice.active) e.preventDefault(); }} onMouseDown={e => e.preventDefault()}
+          onClick={() => {
+            if (voiceTouch.current) { voiceTouch.current = false; return; } // (the click a browser adds after a touch: the press already did it)
+            if (voice.active) sendVoice(); else if (canVoice) { setVoiceHolding(false); voice.start(); } else if (cmd) cmdSubmit.current?.(); else submit();
+          }}>{voice.active && !voiceHolding ? <SendHorizontal size={18} /> : canVoice || voice.active ? <AudioLines size={18} /> : <SendHorizontal size={18} />}</button>
         {picker && <MediaPicker key={picker} tab={picker === 'clips' ? 'clips' : undefined} onClose={() => setPicker(false)} onPick={a => { setPicker(false); sendMessage(view, '', { replyTo, attachments: [a] }); setReplyTo?.(null); }}
           onSendLink={url => { setPicker(false); sendMessage(view, url, { replyTo }); setReplyTo?.(null); }} />}
         {glintIntro && <GlintIntro onClose={() => setGlintIntro(false)} />}

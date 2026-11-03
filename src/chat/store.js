@@ -9,6 +9,7 @@ import { endSession, startSignIn } from './session.js';
 import { rememberedDest, TEMP_LINK, tempId } from './upload-dest.js';
 import { callLinePlain } from './callText.js';
 import { inviteSummary } from './gameInvite.js';
+import { isVoiceAtt, voiceSummary } from './voice-note.js';
 import { applyIdentity } from './identity.js';
 import { applyUserUpdate, instancesWithAccount } from './userUpdate.js';
 import { findPending, dropSettled, wireText, settle } from './pending.js';
@@ -486,12 +487,26 @@ function onEvent(m, inst = VELORA) {
     case 'chat_ack': {
       const key = pendingAcks.get(m.nonce);
       pendingAcks.delete(m.nonce);
+      signedSends.delete(m.nonce);
       if (key) set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: settle(b.list, m.nonce, m.message) }) }));
       if (m.message?.signature) watchSignature(m.message);
       break;
     }
     case 'chat_error': {
       if (m.error === 'bad_signature') refreshSigningKey(); // (a rotated key: "try again" then signs with the new one)
+      // the server turned the signature down: same choice as when signing fails here. The message stays pending while they decide
+      const resend = SIGN_REFUSED.has(m.error) && signedSends.get(m.nonce);
+      signedSends.delete(m.nonce);
+      if (resend) {
+        const nonce = m.nonce, box = pendingAcks.get(nonce);
+        const failed = why => { pendingAcks.delete(nonce); set(s => ({ msgs: upd(s.msgs, box, b => b && { ...b, list: b.list.map(x => (x.nonce === nonce ? { ...x, failed: why } : x)) }) })); };
+        askSendUnsigned().then(yes => {
+          if (!yes) { failed(m.error); return; }
+          set(s => ({ msgs: upd(s.msgs, box, b => b && { ...b, list: b.list.map(x => (x.nonce === nonce ? { ...x, unsigned: true } : x)) }) }));
+          if (!resend()) failed('offline');
+        });
+        break;
+      }
       // an instance session from before "Sign messages" (or uploads / voice) was approved: get a fresh one, then say what to do
       if (inst !== VELORA && m.error === 'insufficient_scope') {
         renewVeloraSession(inst).then(scopes => toast(scopes?.includes('sign') && scopes.includes('chat') ? 'Your login on this server was out of date - it is updated now, send it again.' : errorText('inst_scope')));
@@ -815,9 +830,9 @@ function ping(key, msg, everyMessage = false, quiet = false) {
   if (!hidden || mode === 'none' || (mode === 'mentions' && !direct && !mention)) return;
   if (overlayToastHook?.(key, msg)) return; // Ember desktop: in a game with the overlay up -> a toast there instead
   try {
-    if (key.startsWith('d:') && desktopNotify({ type: 'dm', from: msg.author?.username || 'Nookara', to: key.slice(2), body: inviteSummary(String(msg.body || 'sent a picture')).slice(0, 140), icon: msg.author?.pfp || '/assets/icon.png', tag: msg.id })) return;
+    if (key.startsWith('d:') && desktopNotify({ type: 'dm', from: msg.author?.username || 'Nookara', to: key.slice(2), body: inviteSummary(voiceSummary(String(msg.body || (msg.attachments?.some(isVoiceAtt) ? 'sent a voice message' : 'sent a picture')))).slice(0, 140), icon: msg.author?.pfp || '/assets/icon.png', tag: msg.id })) return;
     if (Notification.permission === 'granted') {
-      new Notification(shownName(msg), { body: inviteSummary(String(msg.body || 'sent a picture')).slice(0, 140), icon: shownPfp(msg) || '/assets/icon.png', tag: msg.id });
+      new Notification(shownName(msg), { body: inviteSummary(voiceSummary(String(msg.body || (msg.attachments?.some(isVoiceAtt) ? 'sent a voice message' : 'sent a picture')))).slice(0, 140), icon: shownPfp(msg) || '/assets/icon.png', tag: msg.id });
     }
   } catch { /* no notifications */ }
 }
@@ -1009,11 +1024,18 @@ export function sendMessage(v, text, { replyTo, attachments, uploads, noStatusRe
       ok = true;
       (async () => {
         attachments = await prepareAttachments(v, attachments || []);
-        const signature = info.can ? await signMessage({ instance: instOf(v.sid), community: bare(v.sid), channel: bare(v.cid), author: connections.get(instOf(v.sid)).user.velora_id, body: normBody(text), attachments: attachmentRefs(attachments), reply_to: replyTo?.id ?? null, edit_of: null }) : undefined;
+        let signature;
+        if (info.can) {
+          try { signature = await signMessage({ instance: instOf(v.sid), community: bare(v.sid), channel: bare(v.cid), author: connections.get(instOf(v.sid)).user.velora_id, body: normBody(text), attachments: attachmentRefs(attachments), reply_to: replyTo?.id ?? null, edit_of: null }); }
+          catch { if (!(await askSendUnsigned())) throw new Error('sign_failed'); }
+        }
+        if (signature) signedSends.set(n, () => frame(undefined));
+        else if (info.can) set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? { ...x, unsigned: true } : x)) }) }));
         if (!frame(signature)) throw new Error('offline');
       })().catch(e => {
         pendingAcks.delete(n);
-        toast(errorText(e.message));
+        signedSends.delete(n);
+        if (e.message !== 'sign_failed') toast(errorText(e.message)); // (they just said no: the message's own line says it)
         set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? { ...x, failed: e.message } : x)) }) }));
       });
     } else ok = frame();
@@ -1023,6 +1045,8 @@ export function sendMessage(v, text, { replyTo, attachments, uploads, noStatusRe
   setTyping(v, false);
   return n;
 }
+const SIGN_REFUSED = new Set(['bad_signature', 'signing_unavailable']);
+const signedSends = new Map(); // nonce -> send it again without a signature (until the instance has answered)
 export function dropFailed(v, n) {
   const m = state.msgs[keyOf(v)]?.list.find(x => x.nonce === n);
   if (m?.uploads) { uploadAborts.get(n)?.abort(); uploadAborts.delete(n); m.attachments.forEach(a => a.local && URL.revokeObjectURL(a.url)); }
@@ -1096,6 +1120,12 @@ export function setTyping(v, on = true) {
   if (v.kind === 'channel') send({ type: 'chat_typing', channel: v.cid, typing: on });
   else if (v.kind === 'dm') send({ type: 'dm_typing', to: v.username, typing: on });
 }
+// a message that couldn't be signed: the person decides, it's never dropped or sent unsigned behind their back
+export const askSendUnsigned = (edit = false) => ask({
+  title: edit ? "This edit couldn't be signed" : "This message couldn't be signed",
+  text: `Signing shows people it really came from your Nookara account, and it didn't work this time. You can ${edit ? 'save it' : 'send it'} without a signature, but people here will see it marked as unsigned.`,
+  confirm: edit ? 'Save unsigned' : 'Send unsigned',
+}).then(Boolean);
 // can this device sign in that community? (instances in Velora mode: signing is always allowed there, never required)
 export function signingInfo(sid) {
   const inst = instOf(sid || '');
@@ -1113,8 +1143,17 @@ export async function editMessage(id, text, m) {
   const inst = m?.channel ? instOf(m.channel) : VELORA;
   let signature;
   const info = m?.channel ? signingInfo(m.server) : null;
-  if (info?.can) signature = await signMessage({ instance: inst, community: bare(m.server), channel: bare(m.channel), author: connections.get(inst).user.velora_id, body: normBody(text), attachments: attachmentRefs(m.attachments || []), reply_to: m.reply_to ?? m.reply?.id ?? null, edit_of: id });
-  await apiFetch(`/chat/messages/${id}`, { method: 'PATCH', body: JSON.stringify({ message: text, signature }), inst: inst === VELORA ? undefined : inst });
+  if (info?.can) {
+    try { signature = await signMessage({ instance: inst, community: bare(m.server), channel: bare(m.channel), author: connections.get(inst).user.velora_id, body: normBody(text), attachments: attachmentRefs(m.attachments || []), reply_to: m.reply_to ?? m.reply?.id ?? null, edit_of: id }); }
+    catch { if (!(await askSendUnsigned(true))) throw new Error('sign_failed'); }
+  }
+  const patch = sig => apiFetch(`/chat/messages/${id}`, { method: 'PATCH', body: JSON.stringify({ message: text, signature: sig }), inst: inst === VELORA ? undefined : inst });
+  try { await patch(signature); } catch (e) {
+    if (!signature || !SIGN_REFUSED.has(e.message)) throw e;
+    refreshSigningKey();
+    if (!(await askSendUnsigned(true))) throw new Error('sign_failed');
+    await patch(undefined);
+  }
 }
 export async function deleteMessage(v, m) {
   if (v.kind === 'channel') await apiFetch(`/chat/messages/${m.id}`, { method: 'DELETE', inst: isInst(v.cid) ? instOf(v.cid) : undefined });
@@ -1685,6 +1724,7 @@ export function errorText(code) {
     scope_disabled: 'An admin has turned this off for your account.', account_restricted: RESTRICTED_TEXT, insufficient_scope: SCOPE_TEXT, name_required: 'It needs a name.',
     instance_not_linked: "That Minecraft server isn't linked to this Ember server.", already_linked: 'That Minecraft server is already linked.', too_many_instances: 'An Ember server can link up to 10 Minecraft servers.',
     cl_bad_url: 'That CloudLink address needs to start with wss:// (or ws://).', cl_bad_port: 'CloudLink bridges can only use the normal ports (80 / 443).', cl_private_address: "That address is on a private network - Ember can't connect to it.", too_many_cloudlink_bridges: 'A server can have up to 3 CloudLink bridges.', not_a_cloudlink_bridge: "That channel isn't a CloudLink bridge.",
+    sign_failed: "Not sent - it couldn't be signed.", bad_signature: "This server turned down the message's signature.",
     voice_unavailable: "Voice isn't set up on this server yet - ask its admins.", voice_cap_reached: 'This server used up its free voice minutes for the month - ask its admins.', sound_too_long: 'Sounds can be up to 5 seconds long.', not_in_voice: 'Join a voice channel first.', too_fast: 'Slow down a little!',
     velora_required: 'Paid roles need a Nookara account - this account only exists on this server.', payment_unavailable: "This server can't take credit payments right now.", not_subscribed: 'Add this server to your Ember list (signed in with Nookara) to pay for roles.', payee_unavailable: "The server owner can't receive credits right now.", too_many_requests: 'You have too many payments waiting - finish or cancel one first.',
     youtube_unavailable: "This server can't play YouTube videos.", invalid_token: "That bot token didn't work.", platform_unreachable: "Couldn't reach that platform - try again in a bit.", owner_not_velora: 'The owner has to be a Nookara account for that.', not_owner: "Nookara says you aren't this server's owner.", not_registered: "This server isn't registered with Nookara yet.", invalid_attestation: "That proof didn't check out - try again.", unknown_instance: "Nookara doesn't know this server yet - register it first.", instance_banned: 'Nookara has blocked this server.', not_connected: "That game server isn't connected any more.", bad_signature: "Your message's signature didn't check out - try again.", signing_unavailable: "Signing isn't available on this instance.", uploads_disabled: 'Uploads are turned off in this server.',

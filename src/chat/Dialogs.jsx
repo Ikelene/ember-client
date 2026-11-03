@@ -405,7 +405,7 @@ export function AskHost() {
     return a.choices ? { ...(typeof v === 'object' ? v : { text: '' }), choice: pick, category: cat, amount: Number(amount), unit } : v;
   };
   return (
-    <Dialog key={a.title} title={a.title} onClose={() => answerAsk(false)} className="vc-ask">
+    <Dialog key={a.title} title={a.title} onClose={() => { if (getState().ask === a) answerAsk(false); }} className="vc-ask">
       {close => (
         <form onSubmit={e => { e.preventDefault(); if (ok) { answerAsk(answer()); close(); } }}>
           {a.text && <p className="vc-dialog-sub">{a.text}</p>}
