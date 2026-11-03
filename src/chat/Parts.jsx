@@ -452,14 +452,23 @@ function applyLocal(sid, cats, order) {
 }
 
 // ── home: friends, DMs, group chats ─────────────────────────────────────────
-// Velora's connection is down (DMs, groups, friends live there): a small note where those lists are, with Retry now. Waits a
-// moment first, so a normal (re)connect doesn't flash it.
+// true once the home socket has been down for `ms` in a row. Short drops (a server restart, a network blip) reconnect by
+// themselves, so nothing should say so until then.
+export const CONN_LOST_MS = 15000;
+export function useConnLost(ms = CONN_LOST_MS) {
+  const up = useChat(s => s.conn === 'open');
+  const [lost, setLost] = useState(false);
+  useEffect(() => { if (up) { setLost(false); return undefined; } const t = setTimeout(() => setLost(true), ms); return () => clearTimeout(t); }, [up, ms]);
+  return !up && lost;
+}
+// Velora hasn't connected yet since the page loaded (DMs, groups, friends live there): a small note where those lists are, with
+// Retry now. Waits a moment first, so a normal connect doesn't flash it. Later drops get the popup in Chat.jsx instead.
 export function VeloraConnNote({ className = '' }) {
   const conn = useChat(s => s.conn);
   const at = useChat(s => s.connRetryAt);
-  const [late, setLate] = useState(false);
-  useEffect(() => { if (conn === 'open') { setLate(false); return undefined; } const t = setTimeout(() => setLate(true), 1500); return () => clearTimeout(t); }, [conn]);
-  if (conn === 'open' || !late || !getToken()) return null;
+  const connected = useChat(s => s.connected);
+  const late = useConnLost(1500);
+  if (connected || !late || !getToken()) return null;
   return (
     <div className={`vc-conn-note ${className}`} role="status">
       <i className="vc-gate-spin" />
@@ -673,6 +682,9 @@ export function UserPanel({ onSettings, onEditProfile }) {
   const signedIn = useChat(s => s.signedIn);
   const p = useChat(s => s.presence[s.me?.username]);
   const conn = useChat(s => s.conn);
+  const connected = useChat(s => s.connected);
+  const lost = useConnLost();
+  const showConn = conn !== 'open' && (lost || !connected); // a short drop keeps your status showing
   // the account of the server I'm looking at, when it's one of that server's own (not a Velora one): that's who I am there
   const view = useChat(s => s.view);
   const here = useChat(s => { const o = view.inst || (view.sid && isInst(view.sid) ? instOf(view.sid) : null); return o ? s.instances.find(i => i.origin === o) : null; });
@@ -700,10 +712,10 @@ export function UserPanel({ onSettings, onEditProfile }) {
   return (
     <div className="vc-me" ref={ref}>
       <button type="button" className={`vc-me-who${pop ? ' on' : ''}`} aria-expanded={!!pop} onClick={() => setPop(x => (x ? null : ref.current.getBoundingClientRect()))} title="Your profile and status">
-        <Avatar user={me} size={36} status={conn === 'open' ? status : 'offline'} />
+        <Avatar user={me} size={36} status={showConn ? 'offline' : status} />
         <span className="vc-me-txt">
           <b>{me.username}</b>
-          <small>{conn !== 'open' ? (conn === 'closed' ? 'Reconnecting...' : 'Connecting...') : (subtitle(p) || STATUS_LABEL[status])}</small>
+          <small>{showConn ? (conn === 'closed' ? 'Reconnecting...' : 'Connecting...') : (subtitle(p) || STATUS_LABEL[status])}</small>
         </span>
       </button>
       <QuickVoiceBtns />
