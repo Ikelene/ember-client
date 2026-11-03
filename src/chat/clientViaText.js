@@ -19,4 +19,12 @@ export const STATE_SHORT = { notifications: 'Notifications only', background: 'B
 export const sessionLine = s => [s.platform, s.device, s.browser && s.browser !== 'Electron' ? s.browser : null, s.version ? `v${String(s.version).slice(0, 12)}` : null].filter(Boolean).join(', ');
 // the short text beside a client: the browser if it has one, else the device or platform. The rest is in sessionDetails
 export const sessionShort = s => (s.browser && s.browser !== 'Electron' ? s.browser : s.device || s.platform) || '';
-export const sessionDetails = s => [s.app, sessionLine(s), STATE_TEXT[s.state]].filter(Boolean).join('\n');
+// which icon a client gets: 'mobile', 'desktop' (an installed app) or 'browser'. An Ember page in a phone's browser counts as mobile
+export const sessionKind = s => {
+  const kind = s.via?.kind;
+  if (s.mobile || kind === 'android' || kind === 'ios' || /^(android|ios)$/i.test(s.platform || '')) return 'mobile';
+  if (kind === 'desktop' || s.browser === 'Electron') return 'desktop';
+  return 'browser';
+};
+export const sessionIsIdle = s => !!STATE_SHORT[s.state];
+export const sessionDetails = s =>[s.app, sessionLine(s), STATE_TEXT[s.state]].filter(Boolean).join('\n');
