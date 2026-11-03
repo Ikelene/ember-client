@@ -385,7 +385,8 @@ function onEvent(m, inst = VELORA) {
       if (m.disabled_scopes !== undefined) applyDisabled(m.disabled_scopes, m.restriction_reason);
       if (state.locked) break; // (nothing to say hello for: the socket only waits to hear it's switched back on)
       if (!was) send({ type: 'chat_hello' }); // (just unlocked: unlockAccount said it)
-      noteBonfireActivity();
+      lastBonfireActivity = 0; // (a new socket: the server hasn't heard about this one yet)
+      if (pageFocused()) noteBonfireActivity(); // a window nobody is looking at reconnecting isn't someone using Ember
       if (rpcNow) send({ type: 'set_rich_presence', activity: { ...rpcNow, app: rpcNow.app || 'Discord RPC' } }); // a game status from the desktop app, again after a reconnect
       break;
     }
