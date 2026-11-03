@@ -134,10 +134,13 @@ body:has(.vc-sign-banner) .vc-notify-banner { top: 52px; } /* (the notifications
 .vc-tip-via .vc-via-check { color: var(--accent); flex: none; }
 .vc-tip-via small { font-size: 11px; font-weight: 500; color: var(--muted); }
 .vc-tip-via small.vc-tip-via-note { color: var(--dim); }
-.vc-via-row { display: flex; flex-direction: column; gap: 1px; margin-top: 3px; }
-.vc-via-row .vc-via { margin-left: 0; align-self: flex-start; }
-.vc-via-row small { font-size: 12px; color: var(--dim); }
-.vc-via-row .vc-via-state { color: var(--st-idle); }
+.vc-via-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 3px; }
+.vc-via-row .vc-via { margin-left: 0; padding: 0; gap: 5px; min-width: 0; color: var(--dim); background: none; border: 0; font-size: 12px; }
+.vc-via-row .vc-via-name { color: var(--text); }
+.vc-via-row .vc-via-check { color: var(--accent); }
+.vc-via-row small { flex: none; font-size: 12px; color: var(--dim); }
+.vc-via-row.idle { opacity: .6; }
+.vc-via-row.idle .vc-via-name, .vc-via-row.idle .vc-via-check { color: var(--dim); }
 
 /* ── you (bottom left) ── */
 .vc-me { position: relative; flex: none; height: 58px; display: flex; align-items: center; gap: 2px; padding: 0 8px; background: #0a0a0c; border-top: 1px solid var(--border); }
@@ -1912,6 +1915,21 @@ html.vc-radio .vc-main { background: transparent; }
 .vc-app-promo-logo { display: block; margin: 0 auto 14px; width: 72px; height: 72px; object-fit: cover; }
 .vc-app-promo .vc-dialog-btns { justify-content: center; }
 .vc-app-promo-note { z-index: 2200; }
+/* the app picker and the one-time note beside the rail's download button (AppDownload.jsx) */
+.vc-appdl-list { display: flex; flex-direction: column; gap: 8px; }
+.vc-appdl-opt { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; text-align: left; color: var(--dim); background: #151517; border: 1px solid var(--border-2); cursor: pointer; transition: border-color .15s, color .15s; }
+.vc-appdl-opt > svg { flex: none; }
+.vc-appdl-opt:hover { border-color: var(--dim); }
+.vc-appdl-opt.on { color: var(--accent); border-color: var(--accent); }
+.vc-appdl-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 12.5px; color: var(--dim); }
+.vc-appdl-txt b { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); }
+.vc-appdl-txt small { font-size: 11px; font-weight: 400; color: var(--accent); }
+.vc-appdl-ring { position: fixed; z-index: 2150; border: 2px solid var(--accent); pointer-events: none; animation: vc-appdl-pulse 1.6s ease-in-out infinite; }
+@keyframes vc-appdl-pulse { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 30%, transparent); } }
+.vc-appdl-tip { position: fixed; z-index: 2150; width: 270px; padding: 14px; color: var(--text); background: var(--box); border: 1px solid var(--accent); box-shadow: 0 16px 40px rgba(0, 0, 0, .55); animation: vc-pop .22s cubic-bezier(.2, .8, .2, 1); }
+.vc-appdl-tip b { font-size: 14px; color: #fff; }
+.vc-appdl-tip p { margin: 4px 0 0; font-size: 13px; color: var(--dim); }
+.vc-appdl-tip .vc-dialog-btns { margin-top: 12px; }
 /* one-time account notices (AccountNotices.jsx) */
 .vc-notice h3 { display: flex; align-items: center; gap: 8px; }
 .vc-notice h3 svg { flex: none; color: var(--accent); }
@@ -2058,6 +2076,9 @@ html.vc-radio .vc-main { background: transparent; }
 .vc-reconnect-bar { background: rgba(255, 255, 255, .03); border-bottom-color: var(--border-2); color: var(--dim); }
 .vc-reconnect-bar .vc-gate-spin { width: 14px; height: 14px; border-width: 2px; flex: none; }
 .vc-reconnect-bar small { margin-left: 6px; color: var(--muted); }
+.vc-reconnect-pop { right: 0; bottom: 96px; left: 0; z-index: 3000; margin: 0 auto; }
+.vc-reconnect-pop .vc-gate-spin { width: 20px; height: 20px; border-width: 2px; }
+.vc-reconnect-pop small { font-size: 12.5px; white-space: nowrap; }
 
 /* Velora's connection is down: a note on the DM list and Friends (Parts.jsx VeloraConnNote) */
 .vc-conn-note { display: flex; align-items: center; gap: 8px; margin: 4px 6px 8px; padding: 8px 10px; border: 1px solid var(--border-2); background: rgba(255, 255, 255, .03); color: var(--dim); font-size: 12.5px; }

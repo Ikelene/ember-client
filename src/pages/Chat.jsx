@@ -16,7 +16,7 @@ import { api, getToken, cachedMe, apiFetch, isWebBonfire } from '../api.js';
 import { applyAccentColor } from '../theme.js';
 import { jumpToMessage, loginAgain, retryNow } from '../chat/store.js';
 import { useChat, init, open, go, readHash, keyOf, loadGroups, loadMembers, toast, errorText, getState, ask, unreadTotals } from '../chat/store.js';
-import { Rail, ServerSidebar, HomeSidebar, MemberList, UserPanel, VoiceQuotaNote, OutdatedNote } from '../chat/Parts.jsx';
+import { Rail, ServerSidebar, HomeSidebar, MemberList, UserPanel, VoiceQuotaNote, OutdatedNote, useConnLost } from '../chat/Parts.jsx';
 
 import { MessageList, Composer } from '../chat/Messages.jsx';
 import { ProfileCard, useProfiles, subtitle, Avatar } from '../chat/Profile.jsx';
@@ -27,6 +27,7 @@ import { EmojiInfoHost } from '../chat/EmojiInfo.jsx';
 import { ReactionPickerHost } from '../chat/Reactions.jsx';
 import { UpdatePopup } from '../chat/UpdatePopup.jsx';
 import { MobileAppPromo } from '../chat/MobileAppPromo.jsx';
+import { AppDownload, AppDownloadTip } from '../chat/AppDownload.jsx';
 import { AccountNotices } from '../chat/AccountNotices.jsx';
 import RockEgg from '../chat/RockEgg.jsx';
 import { PermissionPrompts } from '../chat/Permissions.jsx';
@@ -198,17 +199,18 @@ function LegacyReadOnlyBar() {
     </div>
   );
 }
-// the home socket dropped: a slim strip while it reconnects by itself (it never signs you out for that)
-
-function ReconnectBar() {
-  const conn = useChat(s => s.conn);
+// the home socket has been down for a while: a popup while it reconnects by itself (it never signs you out for that)
+function ReconnectPopup() {
+  const lost = useConnLost();
+  const connecting = useChat(s => s.conn === 'connecting');
+  const connected = useChat(s => s.connected);
   const at = useChat(s => s.connRetryAt);
-  if (conn !== 'closed') return null;
+  if (!lost || !connected) return null;
   return (
-    <div className="vc-sign-banner vc-reconnect-bar" role="status">
-      <i className="vc-gate-spin" />
-      <span>Reconnecting to Nookara... <RetryIn at={at} /></span>
-      <button type="button" onClick={retryNow}>Retry now</button>
+    <div className="vc-upd vc-reconnect-pop" role="status">
+      <span className="vc-upd-ico"><i className="vc-gate-spin" /></span>
+      <div className="vc-upd-txt"><b>Reconnecting to Nookara...</b><span>Messages may not send or arrive until it's back. <RetryIn at={at} busy={connecting} /></span></div>
+      <div className="vc-upd-btns"><button type="button" className="btn btn-surface btn-sm" onClick={retryNow}>Retry now</button></div>
     </div>
   );
 }
@@ -536,7 +538,7 @@ function ChatPage() {
       <div className="vc-scrim" onClick={closeDrawer} />
 
       <main className="vc-main">
-        {signedIn && view.kind !== 'home' && <ReconnectBar />}{/* (Friends shows its own note) */}
+        {signedIn && <ReconnectPopup />}
         {signedIn && <SigningBanner />}
         <RestrictedBar />
         <ReadOnlyBar />
@@ -642,6 +644,7 @@ function ChatPage() {
       <RpcWarning />
       <UpdatePopup />
       <MobileAppPromo />
+      <AppDownloadTip onOpen={() => setDialog({ kind: 'app-download' })} />
       {signedIn && <AccountNotices onOpenSettings={page => setDialog({ kind: 'chat-settings', page })} />}
       <RockEgg enabled={!!settings.rock_easter_egg} />
       <PermissionPrompts />
@@ -651,6 +654,7 @@ function ChatPage() {
       {profileUI}
       <BigFromEvent />
       {dialog?.kind === 'discover' && <Discover onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'app-download' && <AppDownload onClose={() => setDialog(null)} />}
       {dialog?.kind === 'test-bot' && <TestBotDialog key={dialog.id} id={dialog.id} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'import' && <ImportServer onClose={() => setDialog(null)} />}
       {dialog?.kind === 'add-instance' && <AddInstance url={dialog.url} invite={dialog.invite} onClose={() => setDialog(null)} onSetup={origin => setDialog({ kind: 'setup', origin })} />}

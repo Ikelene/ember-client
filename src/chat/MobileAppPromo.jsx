@@ -1,11 +1,11 @@
-import { openSite } from './hosts.js';
-// A one-time "Ember has an app" popup for phones using the website. Download goes to the Android download page, Dismiss closes it for
+// A one-time "Ember has an app" popup for phones using the website. Download opens the app picker (AppDownload.jsx), Dismiss closes it for
 // good (kept per device in localStorage). After Dismiss a short notice says the rail's download button gets the app too, then it goes
 // away by itself. Never shown in the Android app, the desktop app, or on a computer.
 import { useEffect, useState } from 'react';
 import { Smartphone, Download, X } from 'lucide-react';
 import { isDesktopApp } from './BonfireLogo.jsx';
 import { isMobileDevice } from './store.js';
+import { dialog } from './Parts.jsx';
 
 const KEY = 'bf_app_promo';
 const NOTICE_MS = 7000;
@@ -29,9 +29,9 @@ export function MobileAppPromo() {
         <div className="vc-dialog vc-app-promo" role="dialog" aria-modal="true" aria-labelledby="vc-app-promo-t">
           <img className="vc-app-promo-logo" src="/assets/bonfire/logo-photo-96.jpg" alt="" width={72} height={72} draggable={false} />
           <h3 id="vc-app-promo-t">Ember has an app</h3>
-          <p className="vc-dialog-sub">Get Ember for Android for notifications, swipe gestures and a smoother phone experience.</p>
+          <p className="vc-dialog-sub">Get Ember for Android for notifications, swipe gestures and a smoother phone experience. There are desktop apps for macOS and Windows too.</p>
           <div className="vc-dialog-btns">
-            <button type="button" className="btn btn-primary" onClick={() => { markDismissed(); openSite('/bonfire/android/'); }}><Download size={15} /> Download</button>
+            <button type="button" className="btn btn-primary" onClick={() => { markDismissed(); setStep('none'); dialog('app-download'); }}><Download size={15} /> Download</button>
             <button type="button" className="btn btn-surface" onClick={dismiss}>Dismiss</button>
           </div>
         </div>

@@ -3,8 +3,8 @@
 // The name and verified badge come from Velora's official clients list (officialClients.js); anything not on it shows
 // its domain (or token name) with no badge.
 import { useEffect, useState } from 'react';
-import { BadgeCheck, Plug, Globe } from 'lucide-react';
-import { viaTitle, sessionLine, STATE_TEXT } from './clientViaText.js';
+import { BadgeCheck, Plug, Globe, Monitor, Smartphone } from 'lucide-react';
+import { viaTitle, sessionShort, sessionDetails, sessionKind, sessionIsIdle, STATE_SHORT } from './clientViaText.js';
 import { describeVia, officialClients, loadOfficialClients, onOfficialClients } from './officialClients.js';
 
 // the official clients list (null until it's known), re-rendering when it arrives
@@ -19,12 +19,13 @@ export function useOfficialClients() {
 }
 
 // the chip: [icon] name [verified badge]. Unknown clients: a globe (or plug for a token) + their domain / token name
-function Chip({ via, list, tip }) {
+const KIND_ICON = { mobile: Smartphone, desktop: Monitor, browser: Globe };
+function Chip({ via, list, tip, Icon }) {
   const d = describeVia(via, list);
   const tipData = tip ? JSON.stringify({ name: d.name, domain: d.domain, verified: d.verified, known: d.known, text: viaTitle(via, list) }) : undefined;
   return (
     <span className={`vc-via${d.verified ? ' official' : ''}`} data-tip-via={tipData} aria-label={viaTitle(via, list)}>
-      {d.icon ? <img className="vc-via-icon" src={d.icon} alt="" /> : !d.verified && (via.token ? <Plug size={12} /> : <Globe size={12} />)}
+      {d.icon ? <img className="vc-via-icon" src={d.icon} alt="" /> : Icon ? <Icon size={13} aria-hidden="true" /> : !d.verified && (via.token ? <Plug size={12} /> : <Globe size={12} />)}
       <span className="vc-via-name">{d.name}</span>
       {d.verified && <BadgeCheck size={12} className="vc-via-check" aria-hidden="true" />}
     </span>
@@ -80,11 +81,9 @@ export function ManageFacts({ presence }) {
         <div className="pe-fact vc-manage-fact">
           <b>{sessions.length > 1 ? 'Clients' : 'Client'}</b>
           {sessions.map((s, i) => (
-            <span key={i} className="vc-via-row">
-              {s.via ? <Chip via={s.via} list={list} /> : <span className="vc-via"><Globe size={12} /><span className="vc-via-name">Unknown client</span></span>}
-              {s.app && <small>{s.app}</small>}
-              {sessionLine(s) && <small>{sessionLine(s)}</small>}
-              {STATE_TEXT[s.state] && <small className="vc-via-state">{STATE_TEXT[s.state]}</small>}
+            <span key={i} className={`vc-via-row${sessionIsIdle(s) ? ' idle' : ''}`} title={sessionDetails(s) || undefined}>
+              {s.via ? <Chip via={s.via} list={list} Icon={KIND_ICON[sessionKind(s)]} /> : <span className="vc-via"><Globe size={13} /><span className="vc-via-name">Unknown client</span></span>}
+              {sessionIsIdle(s) ? <small>{STATE_SHORT[s.state]}</small> : sessionShort(s) && <small>{sessionShort(s)}</small>}
             </span>
           ))}
         </div>

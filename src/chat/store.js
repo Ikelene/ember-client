@@ -26,6 +26,7 @@ let state = {
   me: null,                // { username, pfp, color, rank } - null while signed out of Velora (web Ember works without it)
   signedIn: false,         // signed in with Velora: DMs, groups, friends, modmail, legacy servers, Velora-login instances
   conn: 'connecting',      // connecting | open | closed
+  connected: false,        // the home socket has been open at least once since the page loaded
   connRetryAt: 0,          // closed: when the next try is (it never gives up)
   servers: [],             // my servers
   detail: {},              // sid -> { server, channels }
@@ -385,7 +386,8 @@ function onEvent(m, inst = VELORA) {
       if (m.disabled_scopes !== undefined) applyDisabled(m.disabled_scopes, m.restriction_reason);
       if (state.locked) break; // (nothing to say hello for: the socket only waits to hear it's switched back on)
       if (!was) send({ type: 'chat_hello' }); // (just unlocked: unlockAccount said it)
-      noteBonfireActivity();
+      lastBonfireActivity = 0; // (a new socket: the server hasn't heard about this one yet)
+      if (pageFocused()) noteBonfireActivity(); // a window nobody is looking at reconnecting isn't someone using Ember
       if (rpcNow) send({ type: 'set_rich_presence', activity: { ...rpcNow, app: rpcNow.app || 'Discord RPC' } }); // a game status from the desktop app, again after a reconnect
       break;
     }
@@ -398,7 +400,7 @@ function onEvent(m, inst = VELORA) {
       if (m.error === 'invalid_token' || m.error === 'banned') { if (isWebBonfire()) authLost(); else location.href = '/login?next=/chat'; }
       break;
     case 'chat_ready':
-      set(s => ({ conn: 'open', presence: { ...s.presence, [m.you.username]: localizePresence(m.you.presence) } }));
+      set(s => ({ conn: 'open', connected: true, presence: { ...s.presence, [m.you.username]: localizePresence(m.you.presence) } }));
       rewatchPresence(); // (a new socket: the server forgot what this one was watching)
       catchUp();
       loadNotifCount(); // (anything that happened while the socket was down)
