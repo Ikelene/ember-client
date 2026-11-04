@@ -71,8 +71,7 @@ function OneEmbed({ url, inst }) {
 }
 
 // ── YouTube ──
-const PRO = ['pro', 'plus', 'admin', 'mod', 'owner'];
-const isPro = () => { const me = getState().me; return PRO.includes(me?.rank) || PRO.includes(me?.credit_tier); };
+const isPro = () => !!getState().me?.pro; // membership, not rank: being staff doesn't include Pro
 // who streams it: the instance (when its yt-dlp player works), else Velora (signed in), else nobody (YouTube's own player only)
 function useYtVia(inst) {
   const instYt = useChat(s => !!inst && !!s.instances.find(i => i.origin === inst)?.features?.youtube);

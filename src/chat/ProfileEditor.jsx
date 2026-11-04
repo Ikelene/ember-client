@@ -31,7 +31,7 @@ export default function ProfileEditor({ onDirty }) {
     // the rest of Ember (your panel, member lists, cached profile cards) picks up the new look
     const me = getState().me;
     if (me) {
-      patchState({ me: { ...me, username: d.account.username, pfp: d.profile.pfp || null, color: d.profile.color || null, rank: d.account.rank } });
+      patchState({ me: { ...me, username: d.account.username, pfp: d.profile.pfp || null, color: d.profile.color || null, rank: d.account.rank, pro: !!d.account.pro } });
       remember([{ username: d.account.username, pfp: d.profile.pfp || null, color: d.profile.color || null }]);
       forgetProfile(d.account.username);
       dispatchEvent(new CustomEvent('vc-profile-changed', { detail: { username: d.account.username } })); // message headers refetch your pronouns

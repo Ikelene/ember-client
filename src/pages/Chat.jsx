@@ -63,7 +63,7 @@ import { MaskIcon } from '../chat/Alias.jsx';
 import { aliasOf, shownName } from '../chat/aliases.js';
 
 function meFrom(d) {
-  return { id: d.account.id != null ? String(d.account.id) : undefined, username: d.account.username, pfp: d.profile.pfp || null, color: d.profile.color || null, rank: d.account.rank };
+  return { id: d.account.id != null ? String(d.account.id) : undefined, username: d.account.username, pfp: d.profile.pfp || null, color: d.profile.color || null, rank: d.account.rank, pro: !!d.account.pro };
 }
 
 // desktop app: the middle of its title bar says where you are (server / DM / group)

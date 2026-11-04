@@ -15,7 +15,6 @@ import { Avatar, STATUS_LABEL } from './Profile.jsx';
 import './ProfilePopout.css';
 
 const isHex = c => /^#[0-9a-f]{6}$/i.test(c || '');
-const PRO = new Set(['pro', 'plus', 'admin', 'mod', 'owner']);
 const hostOf = u => { try { return new URL(/^https?:\/\//i.test(u) ? u : `https://${u}`).hostname.replace(/^www\./, ''); } catch { return u; } };
 const BODY_CTX = { linkImages: false, bio: true };
 
@@ -52,7 +51,7 @@ export function PopoutCard({ p, status = 'online', custom, children, preview = f
       </div>
       <div className="bf-pp-head">
         <span className="bf-pp-av"><Avatar user={{ username: name, pfp: p?.pfp }} size={84} status={status} /></span>
-        {(badges.length > 0 || PRO.has(p?.rank)) && (
+        {(badges.length > 0 || p?.pro) && (
           <span className="bf-pp-badges">
             {badges.length ? badges.map(b => <img key={b.name} src={b.icon_url} alt={b.name} data-tip={b.description ? `${b.name} - ${b.description}` : b.name} />)
               : <Crown size={16} data-tip="Nookara Pro" />}
