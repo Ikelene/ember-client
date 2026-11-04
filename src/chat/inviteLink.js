@@ -51,16 +51,42 @@ export function glintRef(href) {
   const m = /^\/glint\/c\/([A-Za-z0-9]{10})\/?$/.exec(u.pathname);
   return m ? { id: m[1], sure: true } : null;
 }
+// Nookara Drive + Forums links, shown as their own cards (LinkEmbeds.jsx; service-embeds.js on the server makes the data). Only the real hosts over https with
+// nothing odd in the address count, so a lookalike can't get a card that looks like ours. Ember asks Nookara for these, never the instance a message is on.
+function serviceUrl(href, host) {
+  let u;
+  try { u = new URL(href); } catch { return null; }
+  return u.protocol === 'https:' && u.hostname.toLowerCase() === host && !u.port && !u.username && !u.password ? u : null;
+}
+//   https://drive.nookara.cc/#/s/<32 hex>[/<20 hex>]  a share link, or something inside a shared folder
+//   https://drive.nookara.cc/#/drive/<20 hex>         someone's own view of their Drive: its card only ever says "not available", so its link stays in the text
+// -> { service: 'drive', sure } or null
+export function driveRef(href) {
+  const u = serviceUrl(href, 'drive.nookara.cc');
+  if (!u || u.pathname !== '/' || u.search) return null;
+  if (/^#\/s\/[0-9a-f]{32}(\/[0-9a-f]{20})?\/?$/.test(u.hash)) return { service: 'drive', sure: true };
+  return /^#\/drive\/[0-9a-f]{20}\/?$/.test(u.hash) ? { service: 'drive', sure: false } : null;
+}
+//   https://forums.nookara.cc/t/<id>[?page=n][#p<id>], /c/<slug>, /u/<name>
+// -> { service: 'forum', sure: true } or null
+export function forumRef(href) {
+  const u = serviceUrl(href, 'forums.nookara.cc');
+  if (!u) return null;
+  const path = u.pathname.replace(/\/+$/, '');
+  return /^\/(t\/[1-9][0-9]{0,18}|c\/[^/]+|u\/[^/]+)$/.test(path) ? { service: 'forum', sure: true } : null;
+}
 // what a link to a card is called where the card itself isn't shown (a reply preview)
 export function embedLabel(href) {
   if (inviteRef(href)?.sure) return 'Server Invite';
   if (paymentRef(href)) return 'Payment';
   if (glintRef(href)) return 'Glint Clip';
+  if (driveRef(href)) return 'Nookara Drive';
+  if (forumRef(href)) return 'Nookara Forums';
   return null;
 }
-// a line that is only an invite / payment / Glint clip link: the link hides (the card replaces it)
+// a line that is only an invite / payment / Glint clip / Drive share / Forums link: the link hides (the card replaces it)
 export function isHiddenInviteLine(line) {
   const t = String(line || '').trim();
   if (!/^https?:\/\/\S+$/.test(t)) return false;
-  return !!(inviteRef(t)?.sure || paymentRef(t) || glintRef(t));
+  return !!(inviteRef(t)?.sure || paymentRef(t) || glintRef(t) || driveRef(t)?.sure || forumRef(t));
 }

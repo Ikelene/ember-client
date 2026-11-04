@@ -5,23 +5,31 @@ import { siteHref } from './hosts.js';
 import { VideoPlayer, fmtTime } from './MediaPlayer.jsx';
 import { viewPicture } from './MediaViewer.jsx';
 import { useEffect, useRef, useState } from 'react';
-import { Play, Download, ShieldCheck, Eye, Loader2, Users, ExternalLink, BookmarkPlus, BookmarkCheck, JapaneseYen, Heart, Clock } from 'lucide-react';
+import { Play, Download, ShieldCheck, Eye, Loader2, Users, ExternalLink, BookmarkPlus, BookmarkCheck, JapaneseYen, Heart, Clock, HardDrive, Folder, File as FileIcon, FileArchive, FileCode, FileText, Image as ImageIcon, Film, Music, MessagesSquare, MessageSquare, ArrowBigUp, Pin, Lock, Ban } from 'lucide-react';
 import { apiFetch } from '../api.js';
-import { useChat, getState, toast, errorText, openLink, saveSettings, loadMedia, hashFor } from './store.js';
+import { useChat, getState, toast, errorText, openLink, saveSettings, loadMedia, hashFor, ask } from './store.js';
 import { K } from './ids.js';
-import { inviteRef, paymentRef, glintRef } from './inviteLink.js';
+import { inviteRef, paymentRef, glintRef, driveRef, forumRef } from './inviteLink.js';
 import { GlintMark, GLINT_DOWNLOAD, clipLikes, setClipLike, openOutside } from './glint.jsx';
+import { fmtSize, RISKY, KIND_OF } from './fileKinds.js';
 
 const cache = new Map(); // inst|url -> promise of the embed
-function useUnfurl(url, inst) {
+// a Drive or Forums card can stop being true (link turned off, post removed), so those are only trusted for a little while. maxAge: 0 = for good
+const LIVE_CARD_MS = 2 * 60 * 1000;
+const cachedEntry = (k, maxAge) => {
+  const entry = cache.get(k);
+  if (entry?.done && maxAge && Date.now() - entry.at > maxAge) { cache.delete(k); return null; }
+  return entry || null;
+};
+function useUnfurl(url, inst, maxAge = 0) {
   const k = `${inst || ''}|${url}`;
-  const [e, setE] = useState(() => (cache.get(k)?.done ? cache.get(k).value : undefined));
+  const [e, setE] = useState(() => { const hit = cachedEntry(k, maxAge); return hit?.done ? hit.value : undefined; });
   useEffect(() => {
     let live = true;
-    if (!cache.has(k)) {
+    if (!cachedEntry(k, maxAge)) {
       const entry = { done: false };
       entry.p = apiFetch(`/chat/unfurl?url=${encodeURIComponent(url)}`, { inst }).then(d => d.embed).catch(() => null)
-        .then(v => { entry.done = true; entry.value = v; return v; });
+        .then(v => { entry.done = true; entry.at = Date.now(); entry.value = v; return v; });
       cache.set(k, entry);
     }
     cache.get(k).p.then(v => { if (live) setE(v); });
@@ -36,10 +44,14 @@ export function LinkEmbeds({ urls, inst }) {
   return urls.slice(0, 3).map(u => <OneEmbed key={u} url={u} inst={inst} />);
 }
 function OneEmbed({ url, inst }) {
-  const ref = inviteRef(url) || paymentRef(url) || glintRef(url);
-  // invite + payment + Glint cards are made by Velora even for a message on an instance (an invite asks the invited instance, see unfurl.js)
-  const e = useUnfurl(url, ref ? undefined : inst);
+  const service = driveRef(url) || forumRef(url);
+  const ref = service || inviteRef(url) || paymentRef(url) || glintRef(url);
+  // invite + payment + Glint + Drive + Forums cards are made by Velora even for a message on an instance (an invite asks the invited instance, see unfurl.js)
+  const e = useUnfurl(url, ref ? undefined : inst, service ? LIVE_CARD_MS : 0);
   if (!e) return e === null && ref?.sure ? <a className="vc-invite-fallback" href={url} target="_blank" rel="noopener noreferrer nofollow">{url}</a> : null; // (its link hides in the text, so show it if there is no card)
+  // these two only ever show for the real hosts, whatever an instance answers for some other link
+  if (e.type === 'drive') return service?.service === 'drive' ? <DriveEmbed e={e} url={url} /> : null;
+  if (e.type === 'forum') return service?.service === 'forum' ? <ForumEmbed e={e} url={url} /> : null;
   if (e.type === 'youtube') return <YouTubeEmbed e={e} inst={inst} />;
   if (e.type === 'glint') return <GlintEmbed e={e} />;
   if (e.type === 'invite') return <InviteEmbed e={e} />;
@@ -317,6 +329,147 @@ function ProfileEmbed({ e }) {
         <ExternalLink size={14} />
       </span>
     </a>
+  );
+}
+
+// ── Nookara Drive share links + Nookara Forums links ──
+// Velora makes the data (service-embeds.js) and says no more than opening the link would. An unavailable card has nothing in it to show: no name, no owner, no way to tell why.
+const safeColor = c => (/^#[0-9a-f]{6}$/i.test(c || '') ? c : undefined);
+const fmtDay = v => { const d = new Date(v); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); };
+const plural = (n, word, many = `${word}s`) => `${Number(n).toLocaleString()} ${n === 1 ? word : many}`;
+const hideBroken = ev => { ev.currentTarget.style.visibility = 'hidden'; };
+function SvcKicker({ icon, label }) {
+  return <small className="vc-svc-kicker">{icon}<span>{label}</span></small>;
+}
+function SvcOpen({ url }) {
+  return <a className="vc-svc-btn" href={url} target="_blank" rel="noopener noreferrer" onClick={outside(url)}><ExternalLink size={14} />Open</a>;
+}
+function SvcGone({ icon, service, title, text }) {
+  return (
+    <div className="vc-svc gone vl-rise">
+      <SvcKicker icon={icon} label={service} />
+      <div className="vc-svc-gone-row"><Ban size={18} /><span><b>{title}</b><small>{text}</small></span></div>
+    </div>
+  );
+}
+function SvcFace({ pfp, name }) {
+  const [broken, setBroken] = useState(false);
+  return pfp && !broken ? <img className="vc-svc-face" src={pfp} alt="" loading="lazy" onError={() => setBroken(true)} /> : <span className="vc-svc-face none">{String(name || '?').charAt(0).toUpperCase()}</span>;
+}
+const extOf = name => (/\.([a-z0-9]{1,10})$/i.exec(name || '')?.[1] || '').toLowerCase();
+function driveIcon(ext) {
+  if (/^(png|jpe?g|gif|webp|avif|bmp|svg)$/.test(ext)) return ImageIcon;
+  if (/^(mp4|mkv|webm|mov|avi|m4v|mpe?g)$/.test(ext)) return Film;
+  if (/^(mp3|m4a|wav|ogg|flac|opus|aac)$/.test(ext)) return Music;
+  if (/^(zip|rar|7z|tar|gz|xz|bz2)$/.test(ext)) return FileArchive;
+  if (/^(js|ts|jsx|tsx|py|json|html|css|c|cpp|cs|java|lua|sb3|pmp|sh|ps1)$/.test(ext)) return FileCode;
+  if (/^(txt|md|pdf|doc|docx|rtf|odt|log)$/.test(ext)) return FileText;
+  return FileIcon;
+}
+const DRIVE_KICKER = <HardDrive size={13} />;
+function DriveEmbed({ e, url }) {
+  const [busy, setBusy] = useState(false);
+  const [noThumb, setNoThumb] = useState(false);
+  if (e.unavailable) return <SvcGone icon={DRIVE_KICKER} service="Nookara Drive" title="Not available" text="This item is private, or its link was turned off or removed." />;
+  const folder = e.kind === 'folder';
+  const ext = folder ? '' : extOf(e.name);
+  const Ico = folder ? Folder : driveIcon(ext);
+  const line = folder ? ['Folder', plural(e.items || 0, 'item')] : [ext && KIND_OF(ext) === 'File' ? `${ext.toUpperCase()} file` : KIND_OF(ext), fmtSize(e.size)];
+  // the file's link is short-lived and the owner can turn it all off, so a click asks again rather than trusting what this card was given
+  async function download() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const d = await apiFetch(`/chat/unfurl?url=${encodeURIComponent(url)}`);
+      const fresh = d.embed;
+      if (!fresh || fresh.unavailable || !fresh.download) { toast('That file is not available any more.'); return; }
+      if (RISKY.test(extOf(fresh.name)) && !(await ask({ title: 'Download this program?', text: `${fresh.name} can run code on your computer. Only open files from people you trust.`, confirm: 'Download' }))) return;
+      if (window.bonfireDesktop?.openExternal) { openOutside(fresh.download); return; }
+      const a = document.createElement('a');
+      a.href = fresh.download; a.download = fresh.name;
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch (er) { toast(er.status === 429 ? 'Slow down a little.' : "Couldn't get that file right now."); }
+    finally { setBusy(false); }
+  }
+  return (
+    <div className="vc-svc vl-rise">
+      <SvcKicker icon={DRIVE_KICKER} label="Nookara Drive" />
+      <div className="vc-svc-main">
+        <span className="vc-svc-ico">{e.thumb && !noThumb ? <img src={e.thumb} alt="" loading="lazy" onError={() => setNoThumb(true)} /> : <Ico size={26} />}</span>
+        <div className="vc-svc-info">
+          <a className="vc-svc-title" href={url} target="_blank" rel="noopener noreferrer" onClick={outside(url)} title={e.name}>{e.name}</a>
+          <span className="vc-svc-meta">{line.filter(Boolean).join(' - ')}</span>
+          {e.owner?.username && <span className="vc-svc-by"><SvcFace pfp={e.owner.pfp} name={e.owner.username} />Shared by <b style={{ color: safeColor(e.owner.color) }}>{e.owner.username}</b></span>}
+        </div>
+        <div className="vc-svc-actions">
+          {e.download && <button type="button" className="vc-svc-btn main" onClick={download} disabled={busy}>{busy ? <Loader2 size={14} className="vc-spin" /> : <Download size={14} />}Download</button>}
+          <SvcOpen url={url} />
+        </div>
+      </div>
+    </div>
+  );
+}
+const FORUM_KICKER = <MessagesSquare size={13} />;
+function RankChip({ who }) {
+  return who?.rank_label && who.rank_label !== 'Member' ? <span className={`vc-svc-rank r-${String(who.rank || '').replace(/[^a-z]/g, '')}`}>{who.rank_label}</span> : null;
+}
+function ForumEmbed({ e, url }) {
+  if (e.unavailable) return <SvcGone icon={FORUM_KICKER} service="Nookara Forums" title="Not available" text="This was removed, is waiting for review, or isn't visible to you." />;
+  if (e.kind === 'community') {
+    return (
+      <div className="vc-svc vl-rise">
+        <SvcKicker icon={FORUM_KICKER} label="Nookara Forums community" />
+        <div className="vc-svc-main">
+          <span className="vc-svc-ico">{e.icon ? <img src={e.icon} alt="" loading="lazy" onError={hideBroken} /> : <MessagesSquare size={26} />}</span>
+          <div className="vc-svc-info">
+            <a className="vc-svc-title" href={url} target="_blank" rel="noopener noreferrer" onClick={outside(url)} title={e.name}>{e.name}</a>
+            {e.description && <span className="vc-svc-desc">{e.description}</span>}
+            <span className="vc-svc-meta">{plural(e.topics, 'topic')} - {plural(e.posts, 'post')}{e.locked && <span title="Locked"><Lock size={12} /></span>}</span>
+          </div>
+          <div className="vc-svc-actions"><SvcOpen url={url} /></div>
+        </div>
+      </div>
+    );
+  }
+  if (e.kind === 'user') {
+    return (
+      <div className="vc-svc vl-rise">
+        <SvcKicker icon={FORUM_KICKER} label="Nookara Forums profile" />
+        <div className="vc-svc-main">
+          <span className="vc-svc-ico bare"><SvcFace pfp={e.pfp} name={e.username} /></span>
+          <div className="vc-svc-info">
+            <span className="vc-svc-nameline"><a className="vc-svc-title" href={url} target="_blank" rel="noopener noreferrer" onClick={outside(url)} style={{ color: safeColor(e.color) }}>{e.username}</a><RankChip who={e} /></span>
+            <span className="vc-svc-meta">{plural(e.posts || 0, 'post')}{e.joined ? ` - joined ${fmtDay(e.joined)}` : ''}</span>
+          </div>
+          <div className="vc-svc-actions"><SvcOpen url={url} /></div>
+        </div>
+      </div>
+    );
+  }
+  const c = e.community;
+  return (
+    <div className="vc-svc topic vl-rise">
+      <small className="vc-svc-kicker">
+        {c?.icon ? <img src={c.icon} alt="" loading="lazy" onError={hideBroken} /> : FORUM_KICKER}
+        <span>{c?.name || 'Nookara Forums'}</span>
+        {e.pinned && <span title="Pinned"><Pin size={12} /></span>}
+        {e.locked && <span title="Locked"><Lock size={12} /></span>}
+      </small>
+      <div className="vc-svc-topic">
+        <div className="vc-svc-info">
+          <a className="vc-svc-title wrap" href={url} target="_blank" rel="noopener noreferrer" onClick={outside(url)}>{e.title}</a>
+          {e.excerpt && <span className="vc-svc-desc">{e.excerpt}</span>}
+        </div>
+        {e.image && <img className="vc-svc-pic" src={e.image} alt="" loading="lazy" onError={ev => { ev.currentTarget.remove(); }} />}
+      </div>
+      <div className="vc-svc-foot">
+        {e.author && <span className="vc-svc-by"><SvcFace pfp={e.author.pfp} name={e.author.username} /><b style={{ color: safeColor(e.author.color) }}>{e.author.username}</b><RankChip who={e.author} /></span>}
+        <span className="vc-svc-stat" title={plural(e.replies || 0, 'reply', 'replies')}><MessageSquare size={13} />{compact(e.replies || 0)}</span>
+        <span className="vc-svc-stat" title={plural(e.score || 0, 'upvote')}><ArrowBigUp size={15} />{compact(e.score || 0)}</span>
+        <span className="grow" />
+        <SvcOpen url={url} />
+      </div>
+    </div>
   );
 }
 

@@ -60,6 +60,7 @@ import { cleanText, hasTracking } from './cleanLinks.js';
 import { isSpoiler, spoilerName, shownName, nameInLink } from './spoiler.js';
 import { renderBody, timeOf, stampOf, dayOf } from './text.jsx';
 import { embedLabel } from './inviteLink.js';
+import { fmtSize, RISKY, KIND_OF } from './fileKinds.js';
 import { Avatar, BlockedMark } from './Profile.jsx';
 import { messageMenu, userMenu, openMenu } from './Menu.jsx';
 import { useScope, mentionsMe as isMention, useFace, wantVeloraFaces, useBlocked, blockedFace, isBlockedName, faceOf, BLOCKED_NAME } from './store.js';
@@ -103,11 +104,6 @@ function KlipyPageGif({ url }) {
   );
 }
 // a file (zip, pdf, exe...): what it is, its name + size, and a Download button. Programs / scripts ask first.
-const fmtSize = n => (!n ? '' : n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
-const RISKY = /^(exe|msi|bat|cmd|com|scr|ps1|vbs|vbe|js|jse|wsf|hta|jar|apk|dll|lnk|reg|cpl|msix|appx)$/;
-const KIND_OF = ext => (/^(zip|rar|7z|tar|gz|xz|bz2)$/.test(ext) ? 'Archive' : /^(exe|msi|msix|appx|apk|dmg|deb|appimage)$/.test(ext) ? 'Program'
-  : /^(pdf)$/.test(ext) ? 'PDF' : /^(txt|md|rtf|log)$/.test(ext) ? 'Text' : /^(doc|docx|odt)$/.test(ext) ? 'Document' : /^(sb3|pmp|sb2)$/.test(ext) ? 'Scratch project'
-  : /^(js|ts|jsx|tsx|py|json|html|css|c|cpp|cs|java|lua|sh|bat|cmd|ps1)$/.test(ext) ? 'Code' : 'File');
 // a file in Velora's temporary storage: { left: 'N days' } while it's there, 'gone' once it expired, null = don't know (yet)
 const leftText = s => (s < 3600 ? 'under an hour' : s < 86400 ? `${Math.round(s / 3600)} hours` : `${Math.round(s / 86400)} days`);
 // re-renders when the answers for these temporary-storage links arrive or change; `enabled` = start asking (a message scrolled into view)
