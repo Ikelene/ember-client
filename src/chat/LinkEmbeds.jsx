@@ -198,7 +198,7 @@ function VeloraPlayer({ id, via }) {
   return <VideoPlayer src={src} autoPlay className="vc-yt-video" onError={() => setErr('That video stopped working - try playing it again.')} />;
 }
 
-// ── Glint clips (ikelene.net/glint/c/<id>) ──
+// ── Glint clips (clips.nookara.cc/c/<id>) ──
 // Velora reads the clip page (its glint:* meta, or just its OpenGraph video) and re-hosts the pictures; the video itself is a
 // file on Velora / ikelene.net and plays in Ember's player only after a click (nothing loads before that). Likes go to
 // Glint's API with Ember's token; whether I liked it is asked once the card scrolls into view.
