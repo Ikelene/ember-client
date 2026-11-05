@@ -23,6 +23,11 @@ export const clientUrl = hash => `${clientPath() === '/' ? '/' : '/chat'}${hash 
 // a path on the Nookara website (/me, /u/name, /upgrade...). ember.nookara.cc serves only the chat, so there it becomes an
 // absolute nookara.cc link (callers open it in a new tab); elsewhere it stays relative.
 export const siteHref = p => (onEmberHost() ? `${NOOKARA_ORIGIN}${p}` : p);
+export const notifLinkUrl = link => {
+  const l = typeof link === 'string' ? link.trim() : '';
+  if (l.startsWith('/') && !l.startsWith('//')) return `${NOOKARA_ORIGIN}${l}`;
+  return /^https?:\/\//i.test(l) ? l : null;
+};
 export const openSite = p => { window.open(siteHref(p), '_blank', 'noopener,noreferrer'); };
 // "Sign in with Nookara" on ember.nookara.cc: a popup on nookara.cc posts the token back (no navigation, no site login page)
 export const AUTH_POPUP_URL = () => `${NOOKARA_ORIGIN}/auth/popup?client=ember&origin=${encodeURIComponent(location.origin)}`;

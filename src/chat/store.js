@@ -1,6 +1,6 @@
 // Ember's state + its connection (one Velora socket when signed in with Velora, the /chat, /im and /groups APIs, and one socket per server instance).
 // Components read it with useChat(selector) and change it through the actions below.
-import { shareLink, clientUrl } from './hosts.js';
+import { shareLink, clientUrl, notifLinkUrl } from './hosts.js';
 import { packActive, playPackSound } from './messageSounds.js';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import serverCreationPolicy from '../server-creation-policy.json';
@@ -1924,14 +1924,16 @@ export async function readNotifs(ids) {
     if (typeof d?.unread === 'number') set({ notifUnread: d.unread });
   } catch { loadNotifCount(); }
 }
-// a notification's link: /chat#... stays in Ember, other site paths load in this tab (the desktop app keeps /me inside
-// and sends anything else to the browser itself), a full https link opens a new tab
+// a notification's link: /chat#... stays in Ember, anything else opens in the browser
 export function followNotifLink(link) {
   const l = typeof link === 'string' ? link.trim() : '';
   if (!l) return;
-  if (l.startsWith('/chat#')) openLink(l.slice(5));
-  else if (l.startsWith('/') && !l.startsWith('//')) location.assign(l);
-  else if (/^https?:\/\//i.test(l)) window.open(l, '_blank', 'noopener,noreferrer');
+  if (l.startsWith('/chat#')) { openLink(l.slice(5)); return; }
+  const url = notifLinkUrl(l);
+  if (!url) return;
+  const d = window.bonfireDesktop;
+  if (d?.openExternal) Promise.resolve(d.openExternal(url)).catch(() => {});
+  else window.open(url, '_blank', 'noopener,noreferrer');
 }
 function notificationNew(m) {
   const n = m.notification;
