@@ -35,6 +35,7 @@ import { expiryAt, expiryLabel } from './temp-expiry.js';
 import { tempId, isCdnTemp } from './upload-dest.js';
 import { TempAttPopover } from './TempAttPopover.jsx';
 import { shortDays, daysText } from './temp-pick.js';
+import { viaProxy } from './mediaProxy.js';
 import { BookmarkPlus, Smile, File as FileIcon, FileArchive, FileCode, FileText, Download, Coins, MessageSquareQuote, Forward } from 'lucide-react';
 import { messageCaps, reactionId, pinPath } from './msg-actions.js';
 
@@ -97,7 +98,7 @@ function KlipyPageGif({ url }) {
   return (
     <a href={g.url} target="_blank" rel="noopener noreferrer" data-media-url={g.url} data-media-name={g.title || ''} className="vc-att gif"
       onClick={e => { if (e.ctrlKey || e.metaKey || e.shiftKey || e.button || e.target.closest('.vc-star')) return; e.preventDefault(); viewMedia({ items: [item], index: 0 }); }}>
-      <img src={g.url} alt={g.title || ''} loading="lazy" style={g.width ? { aspectRatio: `${g.width} / ${g.height}` } : undefined} />
+      <img src={viaProxy(g.url)} alt={g.title || ''} loading="lazy" style={g.width ? { aspectRatio: `${g.width} / ${g.height}` } : undefined} />
       <GifBadge />
       <StarButton gif={{ url: g.url, preview: g.url, title: g.title, width: g.width, height: g.height }} />
     </a>
@@ -207,7 +208,7 @@ function Attachments({ list: all, extra = [], m }) {
           {pics.map((a, i) => (KLIPY_PAGE.test(a.url) ? <KlipyPageGif key={a.url} url={a.url} /> : deadPics.has(a.url) ? <ExpiredFile key={a.url} name={a.name || nameInLink(a.url)} /> :
             <a key={a.url} href={a.url} target="_blank" rel="noopener noreferrer" data-media-url={a.url} data-media-name={shownName(a.name)} className={`vc-att${a.type === 'gif' ? ' gif' : ''}${hidden(a) ? ' spoiler' : ''}`}
               onClick={e => { if (hidden(a)) { e.preventDefault(); reveal(a); return; } if (e.ctrlKey || e.metaKey || e.shiftKey || e.button) return; if (e.target.closest('.vc-star')) return; e.preventDefault(); viewMedia({ items: pics.filter(p => !hidden(p) || p === a), index: pics.filter(p => !hidden(p) || p === a).indexOf(a), author: m?.author, at: m?.created_at }); }}>
-              <img src={a.url} alt={hidden(a) ? 'Spoiler' : shownName(a.name)} loading="lazy" onError={() => picFailed(a)} />
+              <img src={viaProxy(a.url)} alt={hidden(a) ? 'Spoiler' : shownName(a.name)} loading="lazy" onError={() => picFailed(a)} />
               {cover(a)}
               {a.type === 'gif' && !hidden(a) && <GifBadge />}
               {hidden(a) ? null : KLIPY.test(a.url) ? <StarButton gif={{ url: a.url, preview: a.url, title: a.name, width: a.width, height: a.height }} />
