@@ -280,7 +280,7 @@ export default function Chat() {
     const link = document.querySelector('link[rel~="icon"]');
     const old = { title: document.title, href: link?.href };
     document.title = 'Ember';
-    if (link) link.href = '/assets/bonfire/favicon-circle-64.png';
+    if (link) link.href = '/assets/bonfire/favicon-circle-64.png?v=2';
     return () => { document.title = old.title; if (link && old.href) link.href = old.href; };
   }, []);
   return <CrashGuard><ChatPage /></CrashGuard>;
@@ -290,7 +290,7 @@ let faceImg = null;
 function drawTabIcon(count, pings) {
   const link = document.querySelector('link[rel~="icon"]');
   if (!link) return;
-  if (!count && !pings) { link.href = '/assets/bonfire/favicon-circle-64.png'; return; }
+  if (!count && !pings) { link.href = '/assets/bonfire/favicon-circle-64.png?v=2'; return; }
   const paint = () => {
     const c = document.createElement('canvas');
     c.width = c.height = 64;
@@ -316,7 +316,7 @@ function drawTabIcon(count, pings) {
     try { link.href = c.toDataURL('image/png'); } catch { /* fine */ }
   };
   if (faceImg?.complete && faceImg.naturalWidth) { paint(); return; }
-  if (!faceImg) { faceImg = new Image(); faceImg.src = '/assets/bonfire/favicon-circle-64.png'; }
+  if (!faceImg) { faceImg = new Image(); faceImg.src = '/assets/bonfire/favicon-circle-64.png?v=2'; }
   faceImg.addEventListener('load', () => { const t = drawTabIcon.want; if (t) drawTabIcon(t[0], t[1]); }, { once: true });
 }
 function useTabBadge() {

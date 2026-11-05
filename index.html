@@ -24,7 +24,7 @@
       (function () {
         var t = -(Math.round(performance.now()) % 2600);
         try { if (localStorage.getItem('bf_design') === 'rounded') document.documentElement.classList.add('vc-rounded'); } catch (e) { /* square */ }
-        document.getElementById('root').innerHTML = '<div class="vc-boot" role="status" aria-label="Loading Ember"><div class="vc-boot-in"><img class="vc-boot-logo" src="/assets/bonfire/logo-photo-256.jpg" alt="" width="112" height="112" draggable="false" style="--boot-t:' + t + 'ms"><span class="vc-boot-name">Ember</span></div></div>';
+        document.getElementById('root').innerHTML = '<div class="vc-boot" role="status" aria-label="Loading Ember"><div class="vc-boot-in"><img class="vc-boot-logo" src="/assets/bonfire/logo-photo-256.jpg?v=2" alt="" width="112" height="112" draggable="false" style="--boot-t:' + t + 'ms"><span class="vc-boot-name">Ember</span></div></div>';
       })();
     </script>
     <script type="module" src="/src/main.jsx"></script>

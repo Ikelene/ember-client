@@ -235,7 +235,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate }) {
   return (
     <nav className="vc-rail" aria-label="Servers">
       <RailItem active={home} unread={homeUnread && !home} title="Home - friends and direct messages" onClick={() => go({ kind: 'home' })}>
-        <span className="vc-rail-home"><img src="/assets/bonfire/logo-photo-96.jpg" alt="" width={44} height={44} draggable={false} /></span>
+        <span className="vc-rail-home"><img src="/assets/bonfire/logo-photo-96.jpg?v=2" alt="" width={44} height={44} draggable={false} /></span>
       </RailItem>
       {newDMs.map(c => (
         <RailItem key={`dm-${c.username}`} unread badge={c.unread} onContextMenu={e => userMenu(e, c.username)} title={`${c.username === 'System' ? 'Nookara' : c.username} - ${c.unread} new`} onClick={() => go({ kind: 'dm', username: c.username })}>

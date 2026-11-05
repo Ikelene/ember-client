@@ -27,7 +27,7 @@ export function MobileAppPromo() {
     return (
       <div className="vc-modal-back" role="presentation">
         <div className="vc-dialog vc-app-promo" role="dialog" aria-modal="true" aria-labelledby="vc-app-promo-t">
-          <img className="vc-app-promo-logo" src="/assets/bonfire/logo-photo-96.jpg" alt="" width={72} height={72} draggable={false} />
+          <img className="vc-app-promo-logo" src="/assets/bonfire/logo-photo-96.jpg?v=2" alt="" width={72} height={72} draggable={false} />
           <h3 id="vc-app-promo-t">Ember has an app</h3>
           <p className="vc-dialog-sub">Get Ember for Android for notifications, swipe gestures and a smoother phone experience. There are desktop apps for macOS and Windows too.</p>
           <div className="vc-dialog-btns">
