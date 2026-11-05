@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { StarboardSettings } from './Starboard.jsx';
 import { GameTypeSettings } from './GameServer.jsx';
-import { Hash, ScrollText, BadgeCheck, DoorOpen, ExternalLink, Volume2, Star, Gamepad2, Webhook, Copy, RefreshCw, Trash2, Plus, JapaneseYen, Check, X, Upload, Cloud, Users } from 'lucide-react';
+import { Hash, ScrollText, BadgeCheck, DoorOpen, ExternalLink, Volume2, Star, Gamepad2, Webhook, Copy, RefreshCw, Trash2, Plus, Coins, Check, X, Upload, Cloud, Users } from 'lucide-react';
 import { apiFetch, uploadFetch } from '../api.js';
 import { useChat, useScopeStatus, scopeTip, scopeBlocked, toast, errorText, ask } from './store.js';
 import { renderBody } from './text.jsx';
@@ -199,7 +199,7 @@ function ShopSettings({ config, setConfig, sid }) {
             <div key={it.rid} className="vc-shop-row">
               <b style={{ color: r.color || undefined }}>{r.name}</b>
               <input className="form-input" maxLength={200} placeholder="What's it for? (optional)" value={it.desc || ''} onChange={e => set(i, { desc: e.target.value })} />
-              <label className="vc-price"><JapaneseYen size={13} /><input className="form-input" type="number" min={0} max={1000000} value={it.price || 0} onChange={e => set(i, { price: Math.max(0, Math.trunc(Number(e.target.value) || 0)) })} /></label>
+              <label className="vc-price"><Coins size={13} /><input className="form-input" type="number" min={0} max={1000000} value={it.price || 0} onChange={e => set(i, { price: Math.max(0, Math.trunc(Number(e.target.value) || 0)) })} /></label>
               <button type="button" className="vc-ico-btn" title="Take out of the shop" onClick={() => setConfig({ ...config, items: items.filter((_, j) => j !== i) })}><X size={15} /></button>
             </div>
           );
@@ -281,7 +281,7 @@ export function RoleShop({ channel }) {
     if (!onInst && !it.has && payLack) { await scopeBlocked('CURRENCY_PAY'); return; }
     if (!it.has && !it.owned && it.price > 0) {
       if (onInst && d?.payments === 'velora_required') { toast(errorText('velora_required')); return; }
-      if (!(await ask({ title: `Buy ${it.role.name}?`, text: `¥${it.price} goes to the server owner${onInst ? ' through Nookara - you approve the payment next' : ''}. You keep it after that - take it off and put it back on whenever you like.${onInst ? (credits != null ? ` You have ¥${credits}.` : '') : readLack || d?.balance == null ? '' : ` You have ¥${d.balance}.`}`, confirm: onInst ? 'Continue' : `Buy for ¥${it.price}` }))) return;
+      if (!(await ask({ title: `Buy ${it.role.name}?`, text: `${it.price} credits goes to the server owner${onInst ? ' through Nookara - you approve the payment next' : ''}. You keep it after that - take it off and put it back on whenever you like.${onInst ? (credits != null ? ` You have ${credits} credits.` : '') : readLack || d?.balance == null ? '' : ` You have ${d.balance} credits.`}`, confirm: onInst ? 'Continue' : `Buy for ${it.price} credits` }))) return;
     }
     setBusy(it.role.rid);
     try {
@@ -291,10 +291,10 @@ export function RoleShop({ channel }) {
     } catch (e) { toast(errorText(e.message)); load(); }
     setBusy(null);
   }
-  const balance = onInst ? (credits != null ? <span className="vc-balance"><JapaneseYen size={15} /> {credits.toLocaleString()}</span> : null)
+  const balance = onInst ? (credits != null ? <span className="vc-balance"><Coins size={15} /> {credits.toLocaleString()}</span> : null)
     : d && (readLack || d.balance == null
-      ? <span className="vc-balance vc-scope-locked" role="button" tabIndex={0} aria-disabled="true" data-tip={scopeTip(readLack, 'Your credit balance') || 'Your balance is hidden from this login.'} onClick={() => scopeBlocked('CURRENCY_READ')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') scopeBlocked('CURRENCY_READ'); }}><JapaneseYen size={15} /> Balance hidden</span>
-      : <span className="vc-balance"><JapaneseYen size={15} /> {d.balance.toLocaleString()}</span>);
+      ? <span className="vc-balance vc-scope-locked" role="button" tabIndex={0} aria-disabled="true" data-tip={scopeTip(readLack, 'Your credit balance') || 'Your balance is hidden from this login.'} onClick={() => scopeBlocked('CURRENCY_READ')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') scopeBlocked('CURRENCY_READ'); }}><Coins size={15} /> Balance hidden</span>
+      : <span className="vc-balance"><Coins size={15} /> {d.balance.toLocaleString()}</span>);
   const paidOff = onInst && d && d.payments !== 'velora';
   return (
     <div className="vc-shop">
@@ -319,7 +319,7 @@ export function RoleShop({ channel }) {
               </div>
               {it.desc && <p>{it.desc}</p>}
               <div className="vc-shop-foot">
-                <span className="vc-shop-price">{it.price > 0 ? (it.owned ? 'Bought' : <><JapaneseYen size={13} /> {it.price.toLocaleString()}</>) : 'Free'}</span>
+                <span className="vc-shop-price">{it.price > 0 ? (it.owned ? 'Bought' : <><Coins size={13} /> {it.price.toLocaleString()}</>) : 'Free'}</span>
                 <button type="button" className={`btn btn-sm ${it.has ? 'btn-surface' : 'btn-primary'}${locked ? ' vc-scope-locked' : ''}`} aria-disabled={locked ? 'true' : undefined} data-tip={!it.has && !onInst ? scopeTip(payLack, 'Getting a role') : undefined} disabled={busy === it.role.rid} onClick={() => toggle(it)}>
                   {it.has ? 'Take off' : it.pending ? 'Finish paying' : !it.price ? 'Get role' : it.owned ? 'Put on' : 'Buy'}
                 </button>
@@ -383,7 +383,7 @@ function PayRequest({ channel, it, req, onDone }) {
   }
   const over = PAY_DONE[state.status];
   return (
-    <Dialog title={over ? 'Payment not made' : `Approve payment of ¥${Number(req.amount || it.price).toLocaleString()}`} sub={`${it.role.name} - #${channel.name}`} onClose={() => onDone(state.view || null)}>
+    <Dialog title={over ? 'Payment not made' : `Approve payment of ${Number(req.amount || it.price).toLocaleString()} credits`} sub={`${it.role.name} - #${channel.name}`} onClose={() => onDone(state.view || null)}>
       {close => (over ? (
         <>
           <p className="vc-dialog-sub">{over}</p>
@@ -392,13 +392,13 @@ function PayRequest({ channel, it, req, onDone }) {
       ) : (
         <>
           <p className="vc-dialog-sub">The credits go from your Nookara account to the server owner. Once Nookara confirms the payment, the role is yours.{req.expires_at ? ` This request runs out at ${new Date(req.expires_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.` : ''}</p>
-          {!signedIn && <p className="vc-note"><JapaneseYen size={14} /> Sign in to Ember with Nookara to pay here, or approve it on Nookara's payment page.</p>}
+          {!signedIn && <p className="vc-note"><Coins size={14} /> Sign in to Ember with Nookara to pay here, or approve it on Nookara's payment page.</p>}
           <div className="vc-game-wait"><span className="vc-game-spin" aria-hidden="true" /> {state.status === 'confirming' ? 'Paid - waiting for the server to hand out the role...' : 'Waiting for your approval...'}</div>
           <div className="vc-dialog-btns">
             <button type="button" className="btn btn-surface" onClick={async () => { await decline(); close(); }}>Cancel payment</button>
             <span className="grow" />
             {page && <a className="btn btn-surface" href={page} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> Payment page</a>}
-            {signedIn && <button ref={btn} type="button" className={`btn btn-primary${payLack ? ' vc-scope-locked' : ''}`} data-tip={scopeTip(payLack, 'Paying')} disabled={busy || state.status === 'confirming'} onClick={approve}><JapaneseYen size={14} /> {busy ? 'Paying...' : 'Pay now'}</button>}
+            {signedIn && <button ref={btn} type="button" className={`btn btn-primary${payLack ? ' vc-scope-locked' : ''}`} data-tip={scopeTip(payLack, 'Paying')} disabled={busy || state.status === 'confirming'} onClick={approve}><Coins size={14} /> {busy ? 'Paying...' : 'Pay now'}</button>}
           </div>
         </>
       ))}

@@ -35,7 +35,7 @@ import { expiryAt, expiryLabel } from './temp-expiry.js';
 import { tempId, isCdnTemp } from './upload-dest.js';
 import { TempAttPopover } from './TempAttPopover.jsx';
 import { shortDays, daysText } from './temp-pick.js';
-import { BookmarkPlus, Smile, File as FileIcon, FileArchive, FileCode, FileText, Download, JapaneseYen, MessageSquareQuote, Forward } from 'lucide-react';
+import { BookmarkPlus, Smile, File as FileIcon, FileArchive, FileCode, FileText, Download, Coins, MessageSquareQuote, Forward } from 'lucide-react';
 import { messageCaps, reactionId, pinPath } from './msg-actions.js';
 
 // a "GIF" picture-frame icon (drawn, not text) for the GIF picker button
@@ -463,7 +463,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
   if (m.ephemeral && !m.interaction_id) {
     return (
       <div className="vc-msg vc-sys vc-eph vl-in">
-        <span className="vc-sys-ico"><JapaneseYen size={15} /></span>
+        <span className="vc-sys-ico"><Coins size={15} /></span>
         <div className="vc-sys-body">{m.body}<span className="vc-eph-tag">Only you can see this - <a href={siteHref("/me#chat")} target="_blank" rel="noopener noreferrer">turn these off</a></span></div>
       </div>
     );

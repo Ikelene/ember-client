@@ -4,12 +4,12 @@ import { siteHref } from './hosts.js';
 // clicking one marks it read and follows its link. Everything else (history, settings) lives on the site under /me.
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell, Settings, Megaphone, ShieldAlert, JapaneseYen, UserPlus, ShoppingBag, Gem, Award, Server, LifeBuoy, UserCheck, MessageCircle, Gift, Info, Star, Heart, CheckCheck } from 'lucide-react';
+import { Bell, Settings, Megaphone, ShieldAlert, Coins, UserPlus, ShoppingBag, Gem, Award, Server, LifeBuoy, UserCheck, MessageCircle, Gift, Info, Star, Heart, CheckCheck } from 'lucide-react';
 import { useChat, getState, loadNotifs, closeNotifs, readNotifs, followNotifLink } from './store.js';
 
 // the category icon names Velora sends (lucide names) -> the components; anything else is a bell
 const ICONS = {
-  megaphone: Megaphone, 'shield-alert': ShieldAlert, coins: JapaneseYen, 'user-plus': UserPlus, 'shopping-bag': ShoppingBag, gem: Gem, award: Award,
+  megaphone: Megaphone, 'shield-alert': ShieldAlert, coins: Coins, 'user-plus': UserPlus, 'shopping-bag': ShoppingBag, gem: Gem, award: Award,
   server: Server, 'life-buoy': LifeBuoy, 'user-check': UserCheck, 'message-circle': MessageCircle, gift: Gift, info: Info, star: Star, heart: Heart, bell: Bell,
 };
 
