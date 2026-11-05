@@ -61,11 +61,11 @@ export function OpenedAttachments({ list, extra, m, Attachments }) {
 }
 
 // Link previews are off in settings: nothing is fetched until someone asks. In a DM, say what asking does: the server makes previews, so Nookara sees that link.
-export function PreviewOnAsk({ urls, inst, dm }) {
+export function PreviewOnAsk({ urls, inst, priv }) {
   const [on, setOn] = useState(false);
   if (!urls?.length) return null;
-  if (on) return <LinkEmbeds urls={urls} inst={inst} />;
-  return <div className="e2-msg-note"><Link2 size={13} /> <span><button type="button" onClick={() => setOn(true)}>Show link preview</button>{dm && ' (Nookara fetches it, so Nookara sees the link)'}</span></div>;
+  if (on) return <LinkEmbeds urls={urls} inst={inst} priv={priv} />;
+  return <div className="e2-msg-note"><Link2 size={13} /> <span><button type="button" onClick={() => setOn(true)}>Show link preview</button>{priv && ' (Nookara fetches it, so Nookara sees the link)'}</span></div>;
 }
 
 export function E2eeComposerNotes({ view }) {

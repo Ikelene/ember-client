@@ -21,14 +21,16 @@ const cachedEntry = (k, maxAge) => {
   if (entry?.done && maxAge && Date.now() - entry.at > maxAge) { cache.delete(k); return null; }
   return entry || null;
 };
-function useUnfurl(url, inst, maxAge = 0) {
+function useUnfurl(url, inst, maxAge = 0, priv = false) {
   const k = `${inst || ''}|${url}`;
   const [e, setE] = useState(() => { const hit = cachedEntry(k, maxAge); return hit?.done ? hit.value : undefined; });
   useEffect(() => {
     let live = true;
     if (!cachedEntry(k, maxAge)) {
       const entry = { done: false };
-      entry.p = apiFetch(`/chat/unfurl?url=${encodeURIComponent(url)}`, { inst }).then(d => d.embed).catch(() => null)
+      // Velora takes the link in the body, which keeps it out of web server logs. Instances only have the GET
+      const asked = inst ? apiFetch(`/chat/unfurl?url=${encodeURIComponent(url)}`, { inst }) : apiFetch('/chat/unfurl', { method: 'POST', body: JSON.stringify({ url, private: priv }) });
+      entry.p = asked.then(d => d.embed).catch(() => null)
         .then(v => { entry.done = true; entry.at = Date.now(); entry.value = v; return v; });
       cache.set(k, entry);
     }
@@ -38,16 +40,16 @@ function useUnfurl(url, inst, maxAge = 0) {
   return e;
 }
 
-// inst: the instance a message is on (its previews come from there), undefined for Velora's own
-export function LinkEmbeds({ urls, inst }) {
+// inst: the instance a message is on (its previews come from there), undefined for Velora's own. priv: from a DM or group chat, so Velora doesn't store the link
+export function LinkEmbeds({ urls, inst, priv }) {
   if (!urls?.length) return null;
-  return urls.slice(0, 3).map(u => <OneEmbed key={u} url={u} inst={inst} />);
+  return urls.slice(0, 3).map(u => <OneEmbed key={u} url={u} inst={inst} priv={priv} />);
 }
-function OneEmbed({ url, inst }) {
+function OneEmbed({ url, inst, priv }) {
   const service = driveRef(url) || forumRef(url);
   const ref = service || inviteRef(url) || paymentRef(url) || glintRef(url);
   // invite + payment + Glint + Drive + Forums cards are made by Velora even for a message on an instance (an invite asks the invited instance, see unfurl.js)
-  const e = useUnfurl(url, ref ? undefined : inst, service ? LIVE_CARD_MS : 0);
+  const e = useUnfurl(url, ref ? undefined : inst, service ? LIVE_CARD_MS : 0, priv);
   if (!e) return e === null && ref?.sure ? <a className="vc-invite-fallback" href={url} target="_blank" rel="noopener noreferrer nofollow">{url}</a> : null; // (its link hides in the text, so show it if there is no card)
   // these two only ever show for the real hosts, whatever an instance answers for some other link
   if (e.type === 'drive') return service?.service === 'drive' ? <DriveEmbed e={e} url={url} /> : null;

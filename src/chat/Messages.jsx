@@ -540,7 +540,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
         )}
         <GameInvites invites={invites} />
         <Embeds list={m.embeds} ctx={ctx} />
-        {!m.embeds?.length && !m.pending && (linkPreviews ? <LinkEmbeds urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} /> : <PreviewOnAsk urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} dm={view.kind === 'dm'} />)}
+        {!m.embeds?.length && !m.pending && (linkPreviews ? <LinkEmbeds urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group'} /> : <PreviewOnAsk urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group'} />)}
         <E2eeMessageNote m={m} view={view} />
         <OpenedAttachments list={[...(m.attachments || []), ...media]} extra={images} m={m} Attachments={Attachments} />
         {m.uploading && <UploadBar m={m} view={view} />}
