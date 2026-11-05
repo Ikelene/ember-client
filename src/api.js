@@ -223,7 +223,6 @@ export const api = {
   getConversations: () => apiFetch('/im/conversations'),
   getThread: (username, before) => apiFetch(`/im/with/${encodeURIComponent(username)}?limit=100${before ? `&before=${before}` : ''}`),
   markConversationRead: (username) => apiFetch(`/im/with/${encodeURIComponent(username)}/read`, { method: 'POST' }),
-  sendMessage: (to, message) => apiFetch('/im/send', { method: 'POST', body: JSON.stringify({ to, message }) }),
   deleteMessage: (id) => apiFetch(`/im/${id}`, { method: 'DELETE' }),
 
   // group chats (members-only chat rooms)

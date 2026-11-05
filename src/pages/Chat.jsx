@@ -29,6 +29,7 @@ import { UpdatePopup } from '../chat/UpdatePopup.jsx';
 import { MobileAppPromo } from '../chat/MobileAppPromo.jsx';
 import { AppDownload, AppDownloadTip } from '../chat/AppDownload.jsx';
 import { AccountNotices } from '../chat/AccountNotices.jsx';
+import { E2eeGate } from '../chat/E2ee.jsx';
 import RockEgg from '../chat/RockEgg.jsx';
 import { PermissionPrompts } from '../chat/Permissions.jsx';
 import { RadioHost } from '../chat/Radio.jsx';
@@ -674,6 +675,7 @@ function ChatPage() {
       {dialog?.kind === 'chat-settings' && <SettingsDialog key={dialog.page || 'settings'} page={dialog.page} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'forward' && <ForwardDialog message={dialog.message} from={dialog.from} onClose={() => setDialog(null)} />}
       <AskHost />
+      {signedIn && <E2eeGate />}
       <UploadDestHost />
     </div>
   );

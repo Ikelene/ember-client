@@ -15,6 +15,7 @@ import { createPortal } from 'react-dom';
 import { AudioLines, Eye, EyeOff, Reply, Pencil, Trash2, Copy, Plus, X, SmilePlus, Lock, SendHorizontal, AlertCircle, ImageIcon, CornerUpRight, Music, Film, ArrowRight, ArrowLeft, Webhook, Phone, Pin, ChevronUp, Star, Upload, CloudUpload } from 'lucide-react';
 import { Embeds } from './ChannelTypes.jsx';
 import { LinkEmbeds } from './LinkEmbeds.jsx';
+import { E2eeMessageNote, OpenedAttachments, PreviewOnAsk, E2eeComposerNotes, E2eeLockedPanel } from './E2eeMessage.jsx';
 import { GameInvites } from './GameInvite.jsx';
 import { inviteSummary } from './gameInvite.js';
 import { PlatformIcon, PLATFORM_NAMES } from './platforms.jsx';
@@ -537,8 +538,9 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
         )}
         <GameInvites invites={invites} />
         <Embeds list={m.embeds} ctx={ctx} />
-        {!m.embeds?.length && !m.pending && <LinkEmbeds urls={links} inst={instOpt(m.channel)} />}
-        <Attachments list={[...(m.attachments || []), ...media]} extra={images} m={m} />
+        {!m.embeds?.length && !m.pending && (view.kind === 'dm' ? <PreviewOnAsk urls={links} /> : <LinkEmbeds urls={links} inst={instOpt(m.channel)} />)}
+        <E2eeMessageNote m={m} view={view} />
+        <OpenedAttachments list={[...(m.attachments || []), ...media]} extra={images} m={m} Attachments={Attachments} />
         {m.uploading && <UploadBar m={m} view={view} />}
         <Reactions m={m} me={ctx.me} canReact={canReact} />
         <MessageComponents m={m} view={view} />
@@ -576,7 +578,7 @@ export function MessageList({ view, onUser, onReply, canPost, canMod, channels, 
   const prevH = useRef(0);
   const [editing, setEditing] = useState(null);
   // a message that is still sending stays out of sight until the server has it (then it appears and animates in once); failed ones and uploads with progress show
-  const list = useMemo(() => (box?.list || []).filter(m => !m.pending || m.failed || m.uploading || m.uploads), [box?.list]);
+  const list = useMemo(() => (box?.list || []).filter(m => !m.pending || m.failed || m.uploading || m.uploads || m.waiting), [box?.list]);
   const linkImages = useChat(s => s.settings.link_images);
   const roles = useChat(s => (view.sid ? s.detail[view.sid]?.roles : null));
   const blocks = useChat(s => s.blocks);
@@ -786,7 +788,15 @@ function setDraft(key, v) {
 }
 addEventListener('beforeunload', () => { if (draftMem) try { localStorage.setItem(draftKey(), JSON.stringify(draftMem)); } catch { /* fine */ } });
 
-export function Composer({ view, placeholder, locked: lockedBy, lockedText, replyTo, setReplyTo }) {
+// a DM needs this device unlocked. Every DM and group chat says what kind of privacy it has.
+export function Composer(props) {
+  const status = useChat(s => s.e2eeStatus);
+  const { view } = props;
+  const dm = view.kind === 'dm' && view.username !== 'System';
+  if (dm && status !== 'ready') return <E2eeLockedPanel />;
+  return <><E2eeComposerNotes view={view} /><ComposerBox {...props} /></>;
+}
+function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo, setReplyTo }) {
   const timedOut = useTimedOut(view.kind === 'channel' ? view.sid : null); // (on an instance: a timeout hides the box until it ends)
   const locked = lockedBy || !!timedOut;
   const [text, setText] = useState('');

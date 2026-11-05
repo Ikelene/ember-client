@@ -103,6 +103,7 @@ export const SIGNIN_TEXT = { declined: 'Sign-in was cancelled.', state: "That si
 // forget Ember's Velora sign-in (and the sessions it opened on Velora-login servers) and start over signed out
 export function endSession(notice) {
   dropVeloraSessions(); // (while bonfire_user still says whose sessions they are)
+  try { indexedDB.deleteDatabase('nke1'); window.BonfireNotifications?.postMessage(JSON.stringify({ type: 'dm_key', kid: '', jwk: null })); } catch { /* */ } // this device's DM keys go too, it takes a PIN to read them again
   try { forgetAccount(localStorage.getItem('bonfire_user') || ''); localStorage.removeItem('bonfire_token'); localStorage.removeItem('bonfire_user'); localStorage.removeItem('bonfire_me_cache_v2'); if (notice) sessionStorage.setItem('bonfire_notice', notice); } catch { /* fine */ }
   history.replaceState(null, '', clientUrl('#/home'));
   location.reload();

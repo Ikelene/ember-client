@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import serverCreationPolicy from '../server-creation-policy.json';
 import { apiFetch, getToken, onScopeError, onAuthLost, isWebBonfire, uploadFetch } from '../api.js';
 import { endSession, startSignIn } from './session.js';
+import * as E2EE from './e2ee/session.js';
+import { fileKindOfMime } from './e2ee/files.js';
 import { rememberedDest, TEMP_LINK, tempId } from './upload-dest.js';
 import { callLinePlain } from './callText.js';
 import { inviteSummary } from './gameInvite.js';
@@ -24,6 +26,9 @@ import { shownName, shownPfp } from './aliases.js';
 
 let state = {
   me: null,                // { username, pfp, color, rank } - null while signed out of Velora (web Ember works without it)
+  e2eeStatus: 'loading',   // end-to-end encrypted DMs on this device: loading | none (no keys yet) | locked | ready
+  e2eeGate: null,          // the set up / unlock popup is open
+  e2eeKeyChanged: {},      // username (lower) -> their key changed since I last saw it
   signedIn: false,         // signed in with Velora: DMs, groups, friends, modmail, legacy servers, Velora-login instances
   conn: 'connecting',      // connecting | open | closed
   connected: false,        // the home socket has been open at least once since the page loaded
@@ -400,6 +405,8 @@ function onEvent(m, inst = VELORA) {
       if (m.error === 'invalid_token' || m.error === 'banned') { if (isWebBonfire()) authLost(); else location.href = '/login?next=/chat'; }
       break;
     case 'chat_ready':
+      if (inst === VELORA && state.e2eeStatus === 'loading' && state.signedIn) E2EE.init().catch(() => {});
+      else if (inst === VELORA) E2EE.flushOutbox();
       set(s => ({ conn: 'open', connected: true, presence: { ...s.presence, [m.you.username]: localizePresence(m.you.presence) } }));
       rewatchPresence(); // (a new socket: the server forgot what this one was watching)
       catchUp();
@@ -459,8 +466,16 @@ function onEvent(m, inst = VELORA) {
       break;
     }
     case 'im_edited': // a DM was edited (m.with = the other person)
-      set(s => ({ msgs: upd(s.msgs, `d:${String(m.with).toLowerCase()}`, b => b && { ...b, list: b.list.map(x => (x.imId === m.id ? { ...x, body: m.body, edited_at: m.edited_at } : x)) }) }));
-      bumpPins(`d:${String(m.with).toLowerCase()}`);
+      E2EE.openMessage({ id: m.id, from_id: m.from_id, to_id: m.to_id, from: m.with, body: m.body, enc: m.enc, edited_at: m.edited_at }).then(o => {
+        set(s => ({ msgs: upd(s.msgs, `d:${String(m.with).toLowerCase()}`, b => b && { ...b, list: b.list.map(x => (x.imId === m.id ? { ...x, body: o.body, sealed: o.sealed, attachments: sealedAtts(o), edited_at: m.edited_at } : x)) }) }));
+        bumpPins(`d:${String(m.with).toLowerCase()}`);
+      });
+      break;
+    case 'e2ee_keys_changed': // someone's keys or linked clients changed (or they just set up, so messages held for them can go)
+      if (m.username) { E2EE.forgetBundle(m.username); E2EE.flushOutbox(m.username); }
+      break;
+    case 'e2ee_link_request':
+      if (state.e2eeStatus === 'ready') toast(m.kind === 'device' ? 'A device is asking to read your DMs. To approve it, go to Settings, Privacy.' : `${m.label} is asking to read your DMs. To approve it, go to Settings, Privacy.`);
       break;
     case 'im_pins_update': // pinned or unpinned in a DM (m.with = the other person)
       set(s => ({ msgs: upd(s.msgs, `d:${String(m.with).toLowerCase()}`, b => b && { ...b, list: b.list.map(x => (x.imId === m.id ? { ...x, pinned: !!m.pinned } : x)) }) }));
@@ -613,21 +628,28 @@ function onEvent(m, inst = VELORA) {
       break;
     case 'im_received':
     case 'im_sent': {
-      const msg = imToMsg(m.message);
-      if (m.nonce || m.message.nonce) msg.nonce = m.nonce || m.message.nonce;
-      const other = m.type === 'im_sent' || msg.author?.username === state.me?.username ? m.message.to : m.message.from;
-      addMessage(`d:${String(other).toLowerCase()}`, msg);
-      if (m.type === 'im_received') typingFrom(`d:${String(other).toLowerCase()}`, other, false);
-      loadDMs();
+      E2EE.openMessage(m.message).then(opened => {
+        const msg = imToMsg(opened);
+        if (m.nonce || m.message.nonce) msg.nonce = m.nonce || m.message.nonce;
+        const other = m.type === 'im_sent' || msg.author?.username === state.me?.username ? m.message.to : m.message.from;
+        addMessage(`d:${String(other).toLowerCase()}`, msg);
+        if (m.type === 'im_received') typingFrom(`d:${String(other).toLowerCase()}`, other, false);
+        loadDMs();
+      });
       break;
     }
     case 'im_ack': {
       const key = pendingAcks.get(m.nonce);
       pendingAcks.delete(m.nonce);
-      if (key) set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: settle(b.list, m.nonce, imToMsg(m.message)) }) }));
+      dmSends.delete(m.nonce);
+      if (key) E2EE.openMessage(m.message).then(opened => set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: settle(b.list, m.nonce, imToMsg(opened)) }) })));
       break;
     }
     case 'im_error': {
+      // the keys I sealed to were out of date (a new client, or a new key): once more with fresh ones. No keys any more: back to waiting.
+      const again = dmSends.get(m.nonce);
+      if (again && (m.error === 'stale_keys' || m.error === 'recipient_no_keys') && !again.retried) { again.retried = true; E2EE.forgetBundle(again.to); E2EE.forgetBundle(state.me?.username); sendDm(again); break; }
+      dmSends.delete(m.nonce);
       const key = pendingAcks.get(m.nonce);
       pendingAcks.delete(m.nonce);
       if (key) set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === m.nonce ? { ...x, failed: m.error } : x)) }) }));
@@ -865,11 +887,16 @@ function typingFrom(key, username, on = true, inst = VELORA) {
     set(s => ({ typing: { ...s.typing, [key]: cur } }));
   }, 7100);
 }
+// a DM's files, from its opened message (E2EE.openMessage): their links go to Messages.jsx, which opens them on the way to the screen
+function sealedAtts(m) {
+  return (m.sealed?.files || []).map(link => { const f = E2EE.parseFileLink(link); return f ? { url: link, sealed: true, name: f.name, type: fileKindOfMime(f.mime) } : null; }).filter(Boolean);
+}
 export function imToMsg(m) {
   const meName = state.me?.username;
   const fromMe = m.from === meName;
   return {
-    id: `im${m.id}`, imId: m.id, body: m.body, attachments: [], system: !!m.from_system,
+    id: `im${m.id}`, imId: m.id, body: m.body, attachments: sealedAtts(m), system: !!m.from_system, sealed: m.sealed || null, notEncrypted: !m.enc && !m.from_system && !/^\[Voice call\]/i.test(m.body || ''),
+    wire: m.sealed?.wire, fromId: m.from_id, toId: m.to_id, quote: m.sealed?.quote || null,
     statusReply: m.status_reply?.text ? String(m.status_reply.text) : null,
     reply: m.reply ? { id: `im${m.reply.id}`, author: m.reply.gone ? null : { username: m.reply.from, pfp: state.people[m.reply.from]?.pfp || null }, body: m.reply.gone ? 'Original message was deleted' : m.reply.body } : null,
     author: m.from_system ? null : { username: m.from, pfp: fromMe ? state.me?.pfp : m.from_pfp, color: fromMe ? state.me?.color : state.people[m.from]?.color, rank: state.people[m.from]?.rank },
@@ -921,7 +948,7 @@ export async function loadMessages(v, { older = false } = {}) {
       list = d.messages; hasMore = d.has_more;
     } else if (v.kind === 'dm') {
       const d = await apiFetch(`/im/with/${encodeURIComponent(v.username)}?limit=50${first ? `&before=${first.imId}` : ''}`);
-      list = d.messages.map(imToMsg); hasMore = d.has_more;
+      list = (await Promise.all(d.messages.map(E2EE.openMessage))).map(imToMsg); hasMore = d.has_more;
     } else if (v.kind === 'modmail') {
       const d = await apiFetch(v.username ? `/chat/modmail/with/${encodeURIComponent(v.username)}` : '/chat/modmail');
       list = d.messages.map(mmToMsg);
@@ -1041,16 +1068,72 @@ export function sendMessage(v, text, { replyTo, attachments, uploads, noStatusRe
         set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? { ...x, failed: e.message } : x)) }) }));
       });
     } else ok = frame();
-  } else if (v.kind === 'dm') ok = send({ type: 'im_send', to: v.username, message: wireText(text, attachments), reply_to: replyTo?.imId, status_reply: sr ? { text: sr.text } : undefined, nonce: n });
-  else ok = send({ type: 'roomMessage', room: v.room, message: wireText(text, attachments), reply_to: replyTo?.gid });
+  } else if (v.kind === 'dm') { // encrypted first, so it goes when that's done: failures come back the same way the server's would
+    ok = true;
+    sendDm({ nonce: n, to: v.username, key, wire: wireText(text, attachments), reply_to: replyTo?.imId, quote: replyTo ? { from: replyTo.author?.username || '', s: String(replyTo.body || '').slice(0, 200) } : null, status_reply: sr ? { text: sr.text } : undefined });
+  } else ok = send({ type: 'roomMessage', room: v.room, message: wireText(text, attachments), reply_to: replyTo?.gid });
   if (!ok) set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? { ...x, failed: 'offline' } : x)) }) }));
   setTyping(v, false);
   return n;
 }
+// ── encrypted DMs going out ──
+const dmSends = new Map(); // nonce -> what it was, until the server took it
+async function sendDm(d) {
+  dmSends.set(d.nonce, d);
+  const patch = f => set(s => ({ msgs: upd(s.msgs, d.key, b => b && { ...b, list: b.list.map(x => (x.nonce === d.nonce ? f(x) : x)) }) }));
+  try {
+    const enc = await E2EE.seal(d.to, d.wire, { replyQuote: d.quote, fresh: !!d.retried });
+    if (!send({ type: 'im_send', to: d.to, enc, reply_to: d.reply_to, status_reply: d.status_reply, nonce: d.nonce })) throw new Error('offline');
+    pendingAcks.set(d.nonce, d.key);
+    patch(x => (x.waiting ? { ...x, waiting: false } : x));
+    E2EE.release(d.nonce);
+  } catch (e) {
+    dmSends.delete(d.nonce);
+    if (e.message === 'no_keys') { // they haven't set up encrypted DMs: it stays on this device and goes by itself when they have
+      const { key, retried, ...keep } = d;
+      E2EE.hold({ ...keep, created_at: Date.now() }).catch(() => {});
+      patch(x => ({ ...x, waiting: true }));
+      return;
+    }
+    pendingAcks.delete(d.nonce);
+    patch(x => ({ ...x, failed: e.message }));
+  }
+}
+E2EE.setOutboxSender(h => sendDm({ ...h, key: `d:${String(h.to).toLowerCase()}` }));
+// held messages show in their conversation again after a reload
+async function showHeld() {
+  for (const h of await E2EE.held()) {
+    const key = `d:${String(h.to).toLowerCase()}`;
+    if (state.msgs[key]?.list.some(x => x.nonce === h.nonce)) continue;
+    const lines = String(h.wire).split('\n');
+    const links = lines.filter(l => E2EE.parseFileLink(l.trim()));
+    const temp = { id: h.nonce, nonce: h.nonce, pending: true, waiting: true, body: lines.filter(l => !E2EE.parseFileLink(l.trim())).join('\n'), wire: h.wire, attachments: sealedAtts({ sealed: { files: links.map(l => l.trim()) } }), system: false, author: { username: state.me?.username, pfp: state.me?.pfp, color: state.me?.color, rank: state.me?.rank }, created_at: h.created_at };
+    set(s => ({ msgs: upd(s.msgs, key, b => ({ list: [], hasMore: false, ...(b || {}), list: [...(b?.list || []), temp] })) }));
+  }
+}
+E2EE.onChange(st => {
+  const was = state.e2eeStatus;
+  set({ e2eeStatus: st });
+  if (st === 'ready' && was !== 'ready') { // what was locked can be opened now
+    set(s => ({ msgs: Object.fromEntries(Object.entries(s.msgs).filter(([k]) => !k.startsWith('d:'))) }));
+    if (state.view?.kind === 'dm') loadMessages(state.view);
+    loadDMs();
+    showHeld();
+  }
+  if (st === 'none' || st === 'locked') { // says so once a visit, and "Later" is always there
+    let seen = true; try { seen = !!sessionStorage.getItem('ember.e2eeAsked'); sessionStorage.setItem('ember.e2eeAsked', '1'); } catch { /* private mode: ask each load */ seen = false; }
+    if (!seen && !was.startsWith('r')) set({ e2eeGate: 'auto' });
+  }
+});
+E2EE.onKeyChange(username => set(s => ({ e2eeKeyChanged: { ...s.e2eeKeyChanged, [String(username).toLowerCase()]: true } })));
+export const openE2eeGate = (mode = 'auto') => set({ e2eeGate: mode });
+export const closeE2eeGate = () => set({ e2eeGate: null });
+export const dismissKeyChange = username => set(s => { const k = { ...s.e2eeKeyChanged }; delete k[String(username).toLowerCase()]; return { e2eeKeyChanged: k }; });
 const SIGN_REFUSED = new Set(['bad_signature', 'signing_unavailable']);
 const signedSends = new Map(); // nonce -> send it again without a signature (until the instance has answered)
 export function dropFailed(v, n) {
   const m = state.msgs[keyOf(v)]?.list.find(x => x.nonce === n);
+  if (m?.waiting) E2EE.release(n);
   if (m?.uploads) { uploadAborts.get(n)?.abort(); uploadAborts.delete(n); m.attachments.forEach(a => a.local && URL.revokeObjectURL(a.url)); }
   set(s => ({ msgs: upd(s.msgs, keyOf(v), b => b && { ...b, list: b.list.filter(x => x.nonce !== n) }) }));
 }
@@ -1141,7 +1224,13 @@ export async function editMessage(id, text, m) {
   // a group message: everyone gets room_message_edited
   if (m?.gid && m?.room) { await apiFetch(`/groups/${encodeURIComponent(m.room)}/messages/${encodeURIComponent(m.gid)}`, { method: 'PATCH', body: JSON.stringify({ message: text }) }); return; }
   // a DM (im<id>): its own route; both people get im_edited
-  if (/^im\d+$/.test(String(id))) { await apiFetch(`/im/${String(id).slice(2)}/edit`, { method: 'PATCH', body: JSON.stringify({ body: text }) }); return; }
+  if (/^im\d+$/.test(String(id))) {
+    const wire = [text, ...(m?.sealed?.files || [])].filter(Boolean).join('\n'); // (the text changes, the files stay)
+    const peer = String(m.fromId) === String(m.toId) ? state.me?.username : (m.author?.username === state.me?.username ? state.view?.username : m.author?.username);
+    const enc = await E2EE.sealEdit({ fromId: m.fromId, toId: m.toId, imId: m.imId, peer, quote: m.quote }, wire);
+    await apiFetch(`/im/${String(id).slice(2)}/edit`, { method: 'PATCH', body: JSON.stringify({ enc }) });
+    return;
+  }
   const inst = m?.channel ? instOf(m.channel) : VELORA;
   let signature;
   const info = m?.channel ? signingInfo(m.server) : null;
@@ -1330,6 +1419,11 @@ export async function uploadAttachment(v, file, opts = {}) {
   }
   // DMs / group chats: opts.dest picked in the composer (a file without one, e.g. a command option, follows the setting)
   const dest = opts.dest || rememberedUploadDest() || 'temp';
+  if (v.kind === 'dm') { // encrypted here first: Nookara stores a file it can't open, its key travels inside the encrypted message
+    const { upload, key, iv } = await E2EE.sealFile(file);
+    const a = await (dest === 'account' ? uploadAccount(upload, opts) : uploadTemp(upload, opts));
+    return { url: E2EE.fileLink(a.url, { key, iv, name: file.name, mime: file.type }), sealed: true, type: fileKindOfMime(file.type), name: file.name, size: file.size };
+  }
   return dest === 'account' ? uploadAccount(file, opts) : uploadTemp(file, opts);
 }
 // custom emojis of my Velora servers + every connected instance's (each listed under its own namespaced sid)
@@ -1457,6 +1551,11 @@ const viewingDm = () => (state.view.kind === 'dm' && document.visibilityState ==
 export async function loadDMs() {
   const d = await apiFetch('/im/conversations').catch(() => null);
   if (!d) return;
+  d.conversations = await Promise.all(d.conversations.map(async c => {
+    if (!c.last_message?.enc) return c;
+    const o = await E2EE.openMessage(c.last_message);
+    return { ...c, last_message: { ...o, body: o.sealed?.state === 'open' ? (o.body || (o.sealed.files?.length ? 'Sent a file' : '')) : 'Encrypted message' } };
+  }));
   const here = viewingDm();
   if (here) d.conversations = d.conversations.map(c => (c.username.toLowerCase() === here.toLowerCase() && c.unread ? (markDmRead(here), { ...c, unread: 0 }) : c));
   remember(d.conversations.filter(c => c.username !== 'System').map(c => ({ username: c.username, pfp: c.pfp || undefined })));
@@ -1713,6 +1812,9 @@ export function clearStatusReply() { if (state.statusReplyDraft) set({ statusRep
 export const DM_FAIL_TEXT = 'Failed to send this message due to the users privacy settings';
 export const dmErrorText = code => (code === 'user_blocked' || code === 'dm_privacy' ? DM_FAIL_TEXT : errorText(code));
 export function errorText(code) {
+  if (code === 'cannot_dm_persona') return "This account doesn't take DMs.";
+  if (code === 'e2ee_locked') return 'Unlock your DMs on this device first.';
+  if (code === 'bad_key_list') return "That person's encryption keys don't check out, so nothing was sent. Try again later.";
   if (code === 'server_creation_paused') return `${serverCreationPolicy.title}. ${serverCreationPolicy.notice.join(' ')}`;
   return ({
     operator_terms_required: 'Accept the Ember Server Operator Terms first.', dm_privacy: DM_FAIL_TEXT, user_blocked: "You can't do that with this person - one of you has blocked the other.", cannot_block_self: "You can't block yourself.", cannot_block_staff: "Nookara staff can't be blocked.",

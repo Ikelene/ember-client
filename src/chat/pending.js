@@ -7,6 +7,7 @@ export const encName = n => encodeURIComponent(n).replace(/[!'()*]/g, c => `%${c
 // an attachment as a link (DMs / group chats are plain text). Files in account storage (and old catbox ones) keep
 // their real name as #n=<name>; a temporary-storage link (/t/<id>/<name>) already carries it in the path.
 export const attLink = a => {
+  if (a.sealed) return a.url; // an encrypted file: everything it needs is already in its link
   const tail = a.url.split('/').pop();
   let last = tail;
   try { last = decodeURIComponent(tail); } catch { /* as it is */ }
@@ -20,7 +21,7 @@ export const wireText = (text, attachments) => text + (attachments?.length ? `${
 // text as sent. Index in list, or -1.
 export function findPending(list, msg) {
   if (msg.nonce) { const i = list.findIndex(x => x.pending && x.nonce === msg.nonce); if (i >= 0) return i; }
-  return list.findIndex(x => x.pending && !x.uploads && !x.failed && (x.wire ?? x.body) === msg.body);
+  return list.findIndex(x => x.pending && !x.uploads && !x.failed && (x.wire ?? x.body) === (msg.wire ?? msg.body));
 }
 
 // A fresh fetch of the conversation: drop pending copies whose real message is already in `fetched` (the ack can be lost
@@ -30,7 +31,7 @@ export function dropSettled(live, fetched, isMine, slack = 120000) {
   const used = new Set();
   return live.filter(p => {
     if (!p.pending || p.uploads || p.failed) return true;
-    const i = fetched.findIndex((m, k) => !used.has(k) && isMine(m) && m.body === (p.wire ?? p.body) && Number(m.created_at) >= Number(p.created_at) - slack);
+    const i = fetched.findIndex((m, k) => !used.has(k) && isMine(m) && (m.wire ?? m.body) === (p.wire ?? p.body) && Number(m.created_at) >= Number(p.created_at) - slack);
     if (i < 0) return true;
     used.add(i);
     return false;

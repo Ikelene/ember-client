@@ -5,6 +5,7 @@ import { apiFetch } from '../api.js';
 import { instOpt } from './ids.js';
 import { useChat, getState, sendMessage, refreshServer, toast, errorText, dmErrorText, keyOf, dropFailed, imToMsg, groupToMsg } from './store.js';
 import { pinsKey, pinsPath, pinPath } from './msg-actions.js';
+import { openMessage } from './e2ee/session.js';
 import { forwardText, forwardLimit, forwardHasFiles, FORWARD_FILES_NOTE } from './forward.js';
 import { Dialog } from './Dialogs.jsx';
 import { Avatar } from './Profile.jsx';
@@ -57,7 +58,8 @@ export function ForwardDialog({ message, from, onClose }) {
   const failedOf = t => { const n = sent[t.key]?.[0]; return n ? msgs[keyOf(t.v)]?.list.find(x => x.nonce === n)?.failed : null; };
   function send(t) {
     (sent[t.key] || []).forEach(n => dropFailed(t.v, n)); // trying again: not a second failed copy in that conversation
-    const nonces = [sendMessage(t.v, forwardedBody(message, from, t.v), { attachments: message.attachments || [], noStatusReply: true })];
+    // an encrypted file's key is in its link, so it can only go on inside another encrypted DM
+    const nonces = [sendMessage(t.v, forwardedBody(message, from, t.v), { attachments: (message.attachments || []).filter(a => !a.sealed || t.v.kind === 'dm'), noStatusReply: true })];
     if (note.trim()) nonces.push(sendMessage(t.v, note.trim(), { noStatusReply: true }));
     setSent(x => ({ ...x, [t.key]: nonces }));
   }
@@ -69,7 +71,7 @@ export function ForwardDialog({ message, from, onClose }) {
             <span className="vc-fwd-from"><Forward size={13} /> {message.author?.username || 'Nookara'}</span>
             <FwdBody body={message.body || (message.attachments?.length ? '(attachment)' : '')} />
           </div>
-          {forwardHasFiles(message) && <p className="vc-dialog-sub">{FORWARD_FILES_NOTE}</p>}
+          {forwardHasFiles(message) && <p className="vc-dialog-sub">{message.attachments?.some(a => a.sealed) ? 'Encrypted files only go along to other DMs. Forwarded to a group or a channel, just the text goes.' : FORWARD_FILES_NOTE}</p>}
           <input className="form-input" maxLength={2000} placeholder="Add a message (optional)" value={note} onChange={e => setNote(e.target.value)} />
           <label className="vc-search"><Search size={15} /><input autoFocus placeholder="Where to? Search people, groups and channels" value={q} onChange={e => setQ(e.target.value)} /></label>
           <div className="vc-fwd-list">
@@ -115,7 +117,7 @@ function PinsPanel({ channel, sid, view, onClose }) {
   const canMod = view ? true : modHere;
   const box = useRef(null);
   useEffect(() => {
-    if (view) apiFetch(pinsPath(view)).then(d => setList(d.messages.map(view.kind === 'dm' ? imToMsg : groupToMsg))).catch(() => setList([]));
+    if (view) apiFetch(pinsPath(view)).then(async d => setList(view.kind === 'dm' ? (await Promise.all(d.messages.map(openMessage))).map(imToMsg) : d.messages.map(groupToMsg))).catch(() => setList([]));
     else apiFetch(`/chat/channels/${channel.cid}/pins`).then(d => setList(d.messages)).catch(() => setList([]));
   }, [key, ver]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {

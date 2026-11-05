@@ -1,3 +1,4 @@
+import { E2eeSettings } from '../../chat/E2ee.jsx';
 import { siteHref } from '../../chat/hosts.js';
 import AboutBonfire from '../../chat/AboutBonfire.jsx';
 import { useEffect, useState, useRef } from 'react';
@@ -348,6 +349,7 @@ export default function ChatSettingsTab({ embedded = false, onLogout, onLogin, w
         </div>
       ))}
       {s && category === 'Notifications' && (desktop ? <DesktopNotifications /> : inAndroidApp() ? <AndroidNotifications /> : <><PushPrompt /><NotificationsTab /></>)}
+      {category === 'Privacy' && <><h4 className="bf-settings-title">Encrypted DMs</h4><E2eeSettings /></>}
       {category === 'Messages' && <DesignSettings />}
       {s && category === 'Extras' && <MessageSoundsSettings />}
       {s && category === 'Extras' && <RadioSettings s={s} change={change} saving={saving} />}
