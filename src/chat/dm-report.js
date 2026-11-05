@@ -5,6 +5,7 @@
 export const DM_REPORT_REASONS = [
   ['harassment', 'Harassment'],
   ['spam', 'Spam'],
+  ['child_safety', 'Child sexual abuse material'],
   ['nsfw', 'NSFW / explicit content'],
   ['threats', 'Threats or self-harm'],
   ['other', 'Something else'],
