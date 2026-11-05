@@ -895,7 +895,7 @@ export function imToMsg(m) {
   const meName = state.me?.username;
   const fromMe = m.from === meName;
   return {
-    id: `im${m.id}`, imId: m.id, body: m.body, attachments: sealedAtts(m), system: !!m.from_system, sealed: m.sealed || null, notEncrypted: !m.enc && !m.from_system && !/^\[Voice call\]/i.test(m.body || ''),
+    id: `im${m.id}`, imId: m.id, body: m.body, attachments: sealedAtts(m), system: !!m.from_system, sealed: m.sealed || null, notEncrypted: !m.enc && !m.from_system && !m.from_bot && !/^\[Voice call\]/i.test(m.body || ''),
     wire: m.sealed?.wire, fromId: m.from_id, toId: m.to_id, quote: m.sealed?.quote || null,
     statusReply: m.status_reply?.text ? String(m.status_reply.text) : null,
     reply: m.reply ? { id: `im${m.reply.id}`, author: m.reply.gone ? null : { username: m.reply.from, pfp: state.people[m.reply.from]?.pfp || null }, body: m.reply.gone ? 'Original message was deleted' : m.reply.body } : null,
