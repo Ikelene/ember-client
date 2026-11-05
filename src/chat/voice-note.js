@@ -1,7 +1,8 @@
 // Voice messages, the parts that are just rules. A voice message is an ordinary audio attachment whose file name says what it is
 // (voice-message-<when>-<length in ms>.<ext>), so servers, DMs and group chats need nothing new and old clients still get a player.
 // The length in the name matters: a recorded webm has no duration in it, so a browser reports Infinity until it has read the whole file.
-const NAME = /^voice-message-\d{10,16}(?:-(\d{1,8}))?(?:[^/]*)\.(weba|webm|m4a|mp4|ogg|opus|mp3|aac)$/i;
+// (a plain voice-message.ogg too: some senders end up with that name, and it has no length in it)
+const NAME = /^voice-message(?:-\d{10,16}(?:-(\d{1,8}))?(?:[^/]*)| ?(?:\(\d+\))?)\.(weba|webm|m4a|mp4|ogg|opus|mp3|aac)$/i;
 const clean = n => String(n || '').replace(/^(SPOILER_)+/, '');
 export const isVoiceName = n => NAME.test(clean(n));
 export const isVoiceAtt = a => !!a && (a.type === 'audio' || a.type === 'video') && isVoiceName(a.name);

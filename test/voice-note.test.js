@@ -10,7 +10,7 @@ test('names: the file name is what marks a voice message', () => {
   assert.ok(isVoiceName('SPOILER_' + n));
   assert.ok(isVoiceName('voice-message-1793700000000.m4a'), 'no length in it is still one');
   assert.equal(voiceSeconds('voice-message-1793700000000.m4a'), 0);
-  for (const no of ['voice-message.weba', 'song.weba', 'voice-message-1793700000000-1.exe', 'voice-message-1793700000000-1.html', 'my-voice-message-1793700000000.mp3', '']) assert.ok(!isVoiceName(no), no);
+  for (const no of ['song.weba', 'voice-message-1793700000000-1.exe', 'voice-message-1793700000000-1.html', 'my-voice-message-1793700000000.mp3', '']) assert.ok(!isVoiceName(no), no);
 });
 test('attachments: audio, or video because a server that sniffs the bytes calls webm video; never a file card', () => {
   const name = 'voice-message-1793700000000-4512.weba';
@@ -60,4 +60,10 @@ test('bars: scaled to the loudest, none empty, stable for the same file', () => 
   assert.deepEqual(seededPeaks('a', 8), seededPeaks('a', 8));
   assert.notDeepEqual(seededPeaks('a', 8), seededPeaks('b', 8));
   assert.ok(seededPeaks('a', 50).every(v => v >= 0.2 && v <= 0.9));
+});
+
+test('a plain voice-message file counts, a look-alike name does not', () => {
+  for (const n of ['voice-message.ogg', 'voice-message (1).ogg', 'voice-message-1793800000000-25000.ogg']) assert.equal(isVoiceName(n), true, n);
+  for (const n of ['voice-messages.ogg', 'my-voice-message.ogg', 'voice-message-final.ogg', 'voice-message.png']) assert.equal(isVoiceName(n), false, n);
+  assert.equal(isVoiceLink('https://cdn.nookara.cc/temp/UyHKx6NMJoFTERslhD8Xhh/voice-message.ogg'), true);
 });

@@ -32,6 +32,18 @@ const cbItem = full => {
     : { url: u, type: 'file', name, host: /litter\./i.test(u) ? 'litterbox' : 'catbox' };
 };
 const noFrag = u => (CB.test(u) ? u.split('#')[0] : u);
+// a stored file's name can hold ( ) ' , which cut URL_RE's match short: "Download (2).mp4" came out as a second file called "Download (2".
+// The whole word instead, without what's really sentence punctuation (a closing bracket counts only when nothing in the link opened it).
+function wholeLink(text, at) {
+  let w = /^\S+/.exec(text.slice(at))?.[0] || '';
+  for (;;) {
+    const last = w[w.length - 1];
+    if ('.,;:!?"'.includes(last)) { w = w.slice(0, -1); continue; }
+    if (last === ')' && w.split(')').length > w.split('(').length) { w = w.slice(0, -1); continue; }
+    if (last === ']' && w.split(']').length > w.split('[').length) { w = w.slice(0, -1); continue; }
+    return w;
+  }
+}
 // a message that's only emoji (up to 27) shows them big
 const EMOJI_ONE = /<a?:[A-Za-z0-9_]{1,32}:e[0-9a-f]{10}>|\p{Regional_Indicator}{2}|\p{Extended_Pictographic}(\uFE0F|\u200D\p{Extended_Pictographic}|[\u{1F3FB}-\u{1F3FF}])*/gu;
 const JUMBO = /^\s*(?:(?:<a?:[A-Za-z0-9_]{1,32}:e[0-9a-f]{10}>|\p{Regional_Indicator}{2}|\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic}|[\u{1F3FB}-\u{1F3FF}])*)\s*)+$/u;
@@ -230,8 +242,9 @@ export function renderBody(body, ctx) {
     if (bi % 2 === 1) return;
     const text = b.replace(/`[^`\n]+`/g, ' ');
     for (const m of text.matchAll(URL_RE)) {
-      const u = m[0];
+      let u = m[0];
       if (text[m.index - 1] === '<' && text[m.index + u.length] === '>') continue;
+      if (isVel(u)) { const w = wholeLink(text, m.index); if (isVel(w)) u = w; }
       // a picture already taken whole from its own line (its name can hold ) ' which cut the match short here): not again
       if (inLinks(images, u)) continue;
       // catbox links in the middle of a sentence keep their text, and still get shown underneath

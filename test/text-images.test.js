@@ -44,6 +44,16 @@ test('a file with ( ) in its name stays one file card', () => {
   assert.deepEqual(r.images, []);
 });
 
+test('a temporary video with ( ) in its name is one video, with no extra file card', () => {
+  const url = 'https://cdn.nookara.cc/temp/UyHKx6NMJoFTERslhD8Xhh/Download%20(2).mp4';
+  for (const body of [url, `look ${url} here`, `(${url})`]) {
+    const r = renderBody(body, {});
+    assert.equal(r.media.length, 1, body);
+    assert.equal(r.media[0].type, 'video', body);
+    assert.equal(r.media[0].url, url, body);
+  }
+});
+
 test('two different pictures are still two pictures', () => {
   const r = renderBody(`${UP}#n=a%20(1).png\nhttps://cdn.nookara.cc/uploads/images/other.png#n=a%20(1).png`, {});
   assert.equal(r.images.length, 2);
