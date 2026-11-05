@@ -2,6 +2,7 @@
 // Media, Saved Media = starred GIFs + every picture / video / audio file on your Velora account (minus Glint clip videos), and
 // Game Clips = your Glint clips (only when you have some) - picking one sends its link, which shows as the Glint clip card.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { viaProxy } from './mediaProxy.js';
 import { Search, Star, X, Upload, Music, Play, Loader2, Eye, Lock, ExternalLink } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { useChat, getState, toast, errorText, ask, loadMedia, saveGif, unsaveGif, deleteMedia, saveFilesToMedia, getUploadLimits } from './store.js';
@@ -105,7 +106,7 @@ function Gifs({ onPick }) {
           {(list || []).map((g, i) => (
             <button type="button" key={g.id} className="vc-gif-tile vl-rise" style={{ '--i': Math.min(i % 30, 12), aspectRatio: g.width && g.height ? `${g.width} / ${g.height}` : undefined }}
               onClick={() => onPick({ url: g.url, type: 'gif', name: g.title, width: g.width, height: g.height })} title={g.title}>
-              <img src={g.preview} alt={g.title} loading="lazy" />
+              <img src={viaProxy(g.preview)} alt={g.title} loading="lazy" />
               <GifBadge />
               <StarButton gif={g} />
             </button>
@@ -147,7 +148,7 @@ function Saved({ onPick, add, uploading, clips }) {
             <div key={m.id} className={`vc-saved vl-rise k-${m.kind}`} style={{ '--i': Math.min(i, 12) }}>
               <button type="button" className="vc-saved-main" title={m.name} onClick={() => onPick({ url: m.url, type: m.kind, name: m.name, width: m.width, height: m.height, size: m.size })}
                 onMouseEnter={e => e.currentTarget.querySelector('video')?.play().catch(() => {})} onMouseLeave={e => e.currentTarget.querySelector('video')?.pause()}>
-                {(m.kind === 'gif' || m.kind === 'image') && <img src={m.preview || m.url} alt="" loading="lazy" />}
+                {(m.kind === 'gif' || m.kind === 'image') && <img src={viaProxy(m.preview || m.url)} alt="" loading="lazy" />}
                 {m.kind === 'video' && <><video src={`${m.url}#t=0.1`} muted loop playsInline preload="metadata" /><span className="vc-saved-play"><Play size={14} /></span></>}
                 {m.kind === 'audio' && <span className="vc-saved-audio"><Music size={22} /><small>{m.name}</small></span>}
                 {m.kind === 'gif' && <GifBadge />}

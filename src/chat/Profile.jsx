@@ -1,4 +1,5 @@
 import { siteHref } from './hosts.js';
+import { viaProxy } from './mediaProxy.js';
 // People: square avatars with a status square, the mini profile (the same card as the
 // profile editor's preview) and the large profile it expands into.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -84,7 +85,7 @@ export function Avatar({ user, size = 32, status, className = '', ghost: ghostPr
   const pfp = user?.pfp;
   return (
     <span className={`vc-av ${className}`} style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}>
-      {pfp && !bad ? <img src={pfp} alt="" loading="lazy" onError={() => setBad(true)} /> : <span className="vc-av-l">{(user?.username || '?').charAt(0).toUpperCase()}</span>}
+      {pfp && !bad ? <img src={viaProxy(pfp)} alt="" loading="lazy" onError={() => setBad(true)} /> : <span className="vc-av-l">{(user?.username || '?').charAt(0).toUpperCase()}</span>}
       {status && <i className={`vc-st ${status === 'invisible' ? 'offline' : status}${consoleOn ? ' console' : mobile ? ' mobile' : ''}${ghost ? ' ghost' : ''}`} title={ghost ? 'Invisible (really online)' : STATUS_LABEL[status] + (consoleOn ? ' (console)' : mobile ? ' (mobile)' : '')}>{consoleOn ? <ConsoleMark /> : mobile && <PhoneMark />}</i>}
     </span>
   );
@@ -125,7 +126,7 @@ export function ActivityCard({ a, compact = false }) {
     <div className={`vc-act${compact ? ' compact' : ''}`}>
       <div className="vc-act-head">{plat ? <><Icon3DS /> Playing on {plat}</> : a.type === 'custom' ? 'Activity' : (VERB[a.type] || 'Playing')}{a.app ? <span> via {a.app}</span> : null}</div>
       <div className="vc-act-row">
-        <span className="vc-act-art">{a.image || a.icon ? <img src={a.image || a.icon} alt="" /> : <Icon size={compact ? 20 : 26} className={plat ? 'vc-3ds' : undefined} />}</span>
+        <span className="vc-act-art">{a.image || a.icon ? <img src={viaProxy(a.image || a.icon)} alt="" /> : <Icon size={compact ? 20 : 26} className={plat ? 'vc-3ds' : undefined} />}</span>
         <span className="vc-act-txt">
           <b>{a.url ? <a href={a.url} target="_blank" rel="noopener noreferrer nofollow">{a.name}</a> : a.name}</b>
           {a.details && <span>{a.details}</span>}

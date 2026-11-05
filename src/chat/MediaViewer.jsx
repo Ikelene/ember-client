@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Download, ExternalLink, Link2, RotateCw } from 'lucide-react';
 import { Avatar } from './Profile.jsx';
+import { viaProxy } from './mediaProxy.js';
 import { stampOf } from './text.jsx';
 import { toast } from './store.js';
 import { saveMedia } from './mediaDownload.js';
@@ -174,7 +175,7 @@ else zoomAt(() => Math.max(2.5, 1 / fitRef.current), e.clientX - r.left - r.widt
       </div>
       <div className={`vc-mv-stage${z.s > 1 ? ' zoomed' : ''}${dragging ? ' dragging' : ''}`} ref={stage} onPointerDown={down}>
         {!loaded && <div className="vc-loading vc-mv-spin"><i /><i /><i /></div>}
-        <img key={it.url} className={`vc-mv-img${loaded ? ' on' : ''}`} src={it.url} alt={it.name || ''} draggable={false}
+        <img key={it.url} className={`vc-mv-img${loaded ? ' on' : ''}`} src={viaProxy(it.url)} alt={it.name || ''} draggable={false}
 onLoad={e => { setNat({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight }); setLoaded(true); }} onError={() => setLoaded(true)} onDoubleClick={dbl}
 style={nat ? { width: nat.w, height: nat.h, transform: `translate(-50%, -50%) translate(${z.x}px, ${z.y}px) scale(${fit * z.s}) rotate(${rot}deg)` } : undefined} />
         {many && <>
@@ -186,7 +187,7 @@ style={nat ? { width: nat.w, height: nat.h, transform: `translate(-50%, -50%) tr
         <div className="vc-mv-strip">
           <span className="vc-mv-count">{v.index + 1} / {v.items.length}</span>
           {v.items.map((x, i) => (
-            <button type="button" key={x.url + i} className={i === v.index ? 'on' : ''} onClick={() => setIndex(i)}><img src={x.url} alt="" loading="lazy" /></button>
+            <button type="button" key={x.url + i} className={i === v.index ? 'on' : ''} onClick={() => setIndex(i)}><img src={viaProxy(x.url)} alt="" loading="lazy" /></button>
           ))}
         </div>
       )}

@@ -2,6 +2,7 @@
 // A message gets on the board once it has enough ⭐ (the star button on messages, the ⭐ reaction, or votes here -
 // they're all the same reaction) and then stays, even if it loses stars later. Top starred + a random throwback up top.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { viaProxy } from './mediaProxy.js';
 import { Star, CornerDownRight, Shuffle, Trophy, History, Check } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { useChat, toast, errorText, go, openLink, jumpToMessage } from './store.js';
@@ -83,7 +84,7 @@ function Post({ m, sid, ctx, onVote, big, label, rank }) {
       {label && <div className="vc-stb-label">{label}</div>}
       {pics.length > 0 && (
         <button type="button" className={`vc-stb-pic${isSpoiler(pics[0]) ? ' spoiler' : ''}`} onClick={() => viewMedia({ items: pics, index: 0, author: m.author, at: m.created_at })}>
-          <img src={pics[0].url} alt="" loading="lazy" />
+          <img src={viaProxy(pics[0].url)} alt="" loading="lazy" />
           {pics.length > 1 && <span className="vc-stb-more">+{pics.length - 1}</span>}
         </button>
       )}

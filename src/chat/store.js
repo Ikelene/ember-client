@@ -652,7 +652,7 @@ function onEvent(m, inst = VELORA) {
       dmSends.delete(m.nonce);
       const key = pendingAcks.get(m.nonce);
       pendingAcks.delete(m.nonce);
-      if (key) set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === m.nonce ? { ...x, failed: m.error } : x)) }) }));
+      if (key) set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === m.nonce ? { ...x, failed: m.request_sent ? 'dm_request_sent' : m.error } : x)) }) }));
       break;
     }
     case 'roomMessage':
@@ -1810,7 +1810,8 @@ export function startStatusReply(username, text) {
 export function clearStatusReply() { if (state.statusReplyDraft) set({ statusReplyDraft: null }); }
 // a DM that didn't go through because of blocking or the other person's DM privacy: one text for both (the server never says which)
 export const DM_FAIL_TEXT = 'Failed to send this message due to the users privacy settings';
-export const dmErrorText = code => (code === 'user_blocked' || code === 'dm_privacy' ? DM_FAIL_TEXT : errorText(code));
+export const DM_REQUEST_TEXT = 'Your message request was sent. You can message them once they accept.';
+export const dmErrorText = code => (code === 'dm_request_sent' ? DM_REQUEST_TEXT : code === 'user_blocked' || code === 'dm_privacy' ? DM_FAIL_TEXT : errorText(code));
 export function errorText(code) {
   if (code === 'cannot_dm_persona') return "This account doesn't take DMs.";
   if (code === 'e2ee_locked') return 'Unlock your DMs on this device first.';

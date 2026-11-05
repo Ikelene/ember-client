@@ -4,6 +4,7 @@
 // Server settings > Game servers (unlink + audit log) and the compact join/leave/death lines in chat.
 // Live data comes in as window 'vc-game' events (store.js), never through zustand, so big logs stay out of state.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { viaProxy } from './mediaProxy.js';
 import {
   Gamepad2, Server, Terminal, Users, Copy, Download, ExternalLink, Unlink, Radar, Search, Info, Check, X, Clock,
   ChevronRight, Network, LogIn, LogOut, Skull, Award, ArrowRightLeft, Power, Pickaxe, ArrowLeft, ScrollText, ArrowDown, TriangleAlert,
@@ -28,7 +29,7 @@ const errText = code => GAME_ERRORS[code] || errorText(code);
 const PLATFORM_LABEL = { paper: 'Paper', spigot: 'Spigot', fabric: 'Fabric', velocity: 'Velocity', forge: 'Forge' };
 const PURPOSE_LABEL = { info: 'Join info', console: 'Console', chat: 'Synced chat' };
 const PURPOSE_ICON = { info: Info, console: Terminal, chat: Gamepad2 };
-const head = (p, size) => `https://mc-heads.net/avatar/${p.uuid && !/^00000000-0000-0000-/.test(p.uuid) ? p.uuid : encodeURIComponent(String(p.name || 'MHF_Steve').replace(/^\./, ''))}/${size}`;
+const head = (p, size) => viaProxy(`https://mc-heads.net/avatar/${p.uuid && !/^00000000-0000-0000-/.test(p.uuid) ? p.uuid : encodeURIComponent(String(p.name || 'MHF_Steve').replace(/^\./, ''))}/${size}`);
 function ago(t) {
   if (!t) return 'a while ago';
   const s = Math.max(0, Math.round((Date.now() - t) / 1000));
