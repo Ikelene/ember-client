@@ -15,6 +15,19 @@ export default function Home({ onUser }) {
   const [msg, setMsg] = useState(null);
   const loadReqs = () => apiFetch('/friends/requests').then(setReqs).catch(() => {});
   useEffect(() => { loadReqs(); }, []);
+  // message requests (dm-privacy.js): someone who isn't a friend asks before they can DM you. Nothing they wrote comes with it
+  const [dmReqs, setDmReqs] = useState(null);
+  const loadDmReqs = () => apiFetch('/account/dm-requests').then(setDmReqs).catch(() => {});
+  useEffect(() => { loadDmReqs(); }, [tab]);
+  async function answerDm(id, yes) {
+    try { await apiFetch(`/account/dm-requests/${id}/${yes ? 'accept' : 'decline'}`, { method: 'POST' }); loadDmReqs(); }
+    catch (e) { toast(errorText(e.message)); }
+  }
+  async function setDmOn(on) {
+    try { setDmReqs(await apiFetch('/account/dm-requests/settings', { method: 'POST', body: JSON.stringify({ requests_on: on }) }).then(d => ({ ...dmReqs, ...d }))); }
+    catch (e) { toast(errorText(e.message)); }
+  }
+  const dmIn = dmReqs?.requests || [];
 
   const st = f => presence[f.friend_username]?.status || 'offline';
   const list = friends
@@ -37,7 +50,7 @@ export default function Home({ onUser }) {
     try { await apiFetch(`/friends/request/${id}/${yes ? 'accept' : 'decline'}`, { method: 'PATCH' }); loadReqs(); loadFriends(); }
     catch (e) { toast(errorText(e.message)); }
   }
-  const tabs = [['online', 'Online'], ['all', 'All'], ['pending', `Pending${reqs.incoming.length ? ` (${reqs.incoming.length})` : ''}`], ['add', 'Add friend']];
+  const tabs = [['online', 'Online'], ['all', 'All'], ['pending', `Pending${reqs.incoming.length + dmIn.length ? ` (${reqs.incoming.length + dmIn.length})` : ''}`], ['add', 'Add friend']];
   return (
     <div className="vc-home">
       <div className="vc-home-main">
@@ -73,6 +86,21 @@ export default function Home({ onUser }) {
                   <span className="vc-friend-txt"><b>{r.to_username}</b><small>Waiting for them to answer</small></span>
                 </div>
               ))}
+              <div className="vc-cat-name static">Message requests - {dmIn.length}</div>
+              {dmIn.map((r, i) => (
+                <div key={r.id} className="vc-friend vl-rise" style={{ '--i': i }}>
+                  <Avatar user={{ username: r.username, pfp: r.pfp }} size={36} />
+                  <span className="vc-friend-txt"><b>{r.username}</b><small>Wants to message you</small></span>
+                  <button type="button" className="vc-round ok" title="Accept" onClick={() => answerDm(r.id, true)}><Check size={17} /></button>
+                  <button type="button" className="vc-round no" title="Decline" onClick={() => answerDm(r.id, false)}><X size={17} /></button>
+                </div>
+              ))}
+              {dmReqs?.can_turn_off && (
+                <label className="vc-friend">
+                  <input type="checkbox" checked={dmReqs.requests_on} onChange={e => setDmOn(e.target.checked)} />
+                  <span className="vc-friend-txt"><small>Ask me before people I don't know can message me</small></span>
+                </label>
+              )}
             </>
           )}
           {(tab === 'online' || tab === 'all') && (
