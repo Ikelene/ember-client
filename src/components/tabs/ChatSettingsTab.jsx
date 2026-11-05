@@ -32,6 +32,7 @@ export const GROUPS = [
   ['Messages', [
     ['show_typing', 'Show typing indicators', 'See who is typing, in the conversation and next to channels in the list.'],
     ['strip_tracking', 'Remove tracking from links', 'Cleans tracking junk (like ?utm_source=, ?si= or fbclid) off links you paste or send. Only the junk goes; the link still works the same.'],
+    ['link_previews', 'Show link previews', "A card with the page's title and picture under messages with links, DMs included. Nookara fetches the page, so it sees that link, even in an encrypted DM. Off = a button to show one when you want it."],
     ['link_images', 'Show pictures from links', 'Links to pictures show as the picture instead of a link.'],
     ['yt_mode', 'Play YouTube videos', "Through Nookara: Nookara streams the video for you - no ads, no trackers. YouTube's player: starts instantly, but YouTube can track you and show ads.", [['ask', 'Ask each time'], ['velora', 'Through Nookara'], ['youtube', "YouTube's player"]]],
     ['dm_upload_dest', 'Where files in DMs go', "Nookara account storage: kept until you delete them, counts toward your storage. Temporary storage: free, deleted a set time after you send them (pictures about 30 days, videos and sounds 14, other files 7). The + button can always pick once.", [['ask', 'Ask every time'], ['account', 'Account storage'], ['temp', 'Temporary storage']]],

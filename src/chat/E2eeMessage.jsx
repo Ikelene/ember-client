@@ -60,12 +60,12 @@ export function OpenedAttachments({ list, extra, m, Attachments }) {
   );
 }
 
-// Link previews are made by the server, which would tell Nookara what links are in an encrypted chat. So in a DM they wait for someone to ask.
-export function PreviewOnAsk({ urls }) {
+// Link previews are off in settings: nothing is fetched until someone asks. In a DM, say what asking does: the server makes previews, so Nookara sees that link.
+export function PreviewOnAsk({ urls, inst, dm }) {
   const [on, setOn] = useState(false);
   if (!urls?.length) return null;
-  if (on) return <LinkEmbeds urls={urls} />;
-  return <div className="e2-msg-note"><Link2 size={13} /> <span><button type="button" onClick={() => setOn(true)}>Show link preview</button> (Nookara fetches it, so Nookara sees the link)</span></div>;
+  if (on) return <LinkEmbeds urls={urls} inst={inst} />;
+  return <div className="e2-msg-note"><Link2 size={13} /> <span><button type="button" onClick={() => setOn(true)}>Show link preview</button>{dm && ' (Nookara fetches it, so Nookara sees the link)'}</span></div>;
 }
 
 export function E2eeComposerNotes({ view }) {

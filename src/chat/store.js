@@ -60,7 +60,7 @@ let state = {
   srvMentions: {},         // sid -> the same, per server
   notify: {},              // target (cid / sid) -> { level, muted_until, push }
   toastOk: false,
-  settings: { show_typing: true, share_typing: true, share_activity: true, sounds: true, notify_sound: 'short', notifications: 'mentions', dm_privacy: 'everyone', compact: false, animations: true, link_images: true, developer_mode: false, allow_vc_calls: true, yt_mode: 'ask', dm_upload_dest: 'ask', radio_enabled: false, radio_url: 'https://www.clubfmserver.be/pink.mp3', strip_tracking: null },
+  settings: { show_typing: true, share_typing: true, share_activity: true, sounds: true, notify_sound: 'short', notifications: 'mentions', dm_privacy: 'everyone', compact: false, animations: true, link_images: true, link_previews: true, developer_mode: false, allow_vc_calls: true, yt_mode: 'ask', dm_upload_dest: 'ask', radio_enabled: false, radio_url: 'https://www.clubfmserver.be/pink.mp3', strip_tracking: null },
   lastCid: {},             // sid -> cid
   error: null,
   voice: null,             // the voice channel / call I'm in: { room, info, status, users, muted, deafened, speaking, ringing }

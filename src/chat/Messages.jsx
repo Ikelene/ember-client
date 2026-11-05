@@ -403,6 +403,7 @@ function messageInfo(m) {
     .then(ok => { if (ok && au.id) navigator.clipboard?.writeText(String(au.id)).then(() => toast('Author ID copied', true)).catch(() => {}); });
 }
 function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, setEditing, view, fresh }) {
+  const linkPreviews = useChat(s => s.settings.link_previews !== false);
   const hook = !!m.author?.webhook;
   // on an instance: Velora people get their Velora profile, local accounts / bots a plain card (never a Velora lookup by name)
   // an aliased bot message: the card is the real bot's, with a "Posting as alias" line. An unmarked alias (server setting) whose
@@ -539,7 +540,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
         )}
         <GameInvites invites={invites} />
         <Embeds list={m.embeds} ctx={ctx} />
-        {!m.embeds?.length && !m.pending && (view.kind === 'dm' ? <PreviewOnAsk urls={links} /> : <LinkEmbeds urls={links} inst={instOpt(m.channel)} />)}
+        {!m.embeds?.length && !m.pending && (linkPreviews ? <LinkEmbeds urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} /> : <PreviewOnAsk urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} dm={view.kind === 'dm'} />)}
         <E2eeMessageNote m={m} view={view} />
         <OpenedAttachments list={[...(m.attachments || []), ...media]} extra={images} m={m} Attachments={Attachments} />
         {m.uploading && <UploadBar m={m} view={view} />}
