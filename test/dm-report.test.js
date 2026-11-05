@@ -24,7 +24,7 @@ test('the request body: DM by mail id, group by room + message id', () => {
   assert.deepEqual(dmReportBody(grp, gFromBob, 'threats', '  please look '), { room: 'grp_abc', message_id: 'a1b2', reason: 'threats', details: 'please look' });
   assert.equal(dmReportBody(dm, fromBob, 'nope', ''), null);
   assert.equal(dmReportBody(dm, fromBob, 'other', 'x'.repeat(2000)).details.length, 1000);
-  assert.deepEqual(DM_REPORT_REASONS.map(r => r[0]), ['harassment', 'spam', 'nsfw', 'threats', 'other']);
+  assert.deepEqual(DM_REPORT_REASONS.map(r => r[0]), ['harassment', 'spam', 'child_safety', 'nsfw', 'threats', 'other']);
 });
 
 test('the dialog says a short history goes to staff, as privacy policy section 5 does', () => {
