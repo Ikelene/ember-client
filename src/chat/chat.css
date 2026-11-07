@@ -2489,6 +2489,8 @@ a.vc-glint-site:hover { color: var(--text); text-decoration: none; }
 .vc-svc-btn:disabled { opacity: .7; cursor: default; }
 .vc-svc-topic { display: flex; align-items: flex-start; gap: 12px; }
 .vc-svc-pic { flex: none; width: 76px; height: 76px; object-fit: cover; background: #1c1c20; }
+.vc-svc-banner { display: block; width: 100%; max-height: 220px; margin: 8px 0 2px; object-fit: cover; background: #1c1c20; cursor: zoom-in; }
+.vc-svc-sub { margin-left: 6px; color: #8a8a94; font-weight: 400; }
 .vc-svc-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin-top: 9px; padding-top: 8px; border-top: 1px solid #26262c; }
 .vc-svc-foot .grow { flex: 1; }
 .vc-svc-stat { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12.5px; }

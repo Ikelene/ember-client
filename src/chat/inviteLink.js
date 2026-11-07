@@ -77,6 +77,13 @@ export function forumRef(href) {
   const path = u.pathname.replace(/\/+$/, '');
   return /^\/(t\/[1-9][0-9]{0,18}|c\/[^/]+|u\/[^/]+)$/.test(path) ? { service: 'forum', sure: true } : null;
 }
+//   https://s-<name>.nookara.cc/<any page>  a Nookara Site (custom addresses are only known to Nookara: their card is trusted when Nookara made it, see LinkEmbeds.jsx)
+// -> { service: 'site', sure: false } or null (not sure: a site can have its own preview turned on, then the link is a plain one)
+export function siteRef(href) {
+  let u;
+  try { u = new URL(href); } catch { return null; }
+  return u.protocol === 'https:' && !u.port && !u.username && !u.password && /^s-[a-z0-9](?:[a-z0-9-]{0,59}[a-z0-9])?\.nookara\.cc$/i.test(u.hostname) && !/--/.test(u.hostname) ? { service: 'site', sure: false } : null;
+}
 // what a link to a card is called where the card itself isn't shown (a reply preview)
 export function embedLabel(href) {
   if (inviteRef(href)?.sure) return 'Server Invite';

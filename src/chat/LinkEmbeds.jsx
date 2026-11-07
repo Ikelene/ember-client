@@ -5,11 +5,11 @@ import { siteHref } from './hosts.js';
 import { VideoPlayer, fmtTime } from './MediaPlayer.jsx';
 import { viewPicture } from './MediaViewer.jsx';
 import { useEffect, useRef, useState } from 'react';
-import { Play, Download, ShieldCheck, Eye, Loader2, Users, ExternalLink, BookmarkPlus, BookmarkCheck, Coins, Heart, Clock, HardDrive, Folder, File as FileIcon, FileArchive, FileCode, FileText, Image as ImageIcon, Film, Music, MessagesSquare, MessageSquare, ArrowBigUp, Pin, Lock, Ban } from 'lucide-react';
+import { Play, Download, ShieldCheck, Eye, Loader2, Users, ExternalLink, BookmarkPlus, BookmarkCheck, Coins, Heart, Clock, HardDrive, Folder, File as FileIcon, FileArchive, FileCode, FileText, Image as ImageIcon, Film, Music, MessagesSquare, MessageSquare, ArrowBigUp, Pin, Lock, Ban, Globe, KeyRound, FileX } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { useChat, getState, toast, errorText, openLink, saveSettings, loadMedia, hashFor, ask } from './store.js';
 import { K } from './ids.js';
-import { inviteRef, paymentRef, glintRef, driveRef, forumRef } from './inviteLink.js';
+import { inviteRef, paymentRef, glintRef, driveRef, forumRef, siteRef } from './inviteLink.js';
 import { GlintMark, GLINT_DOWNLOAD, clipLikes, setClipLike, openOutside } from './glint.jsx';
 import { fmtSize, RISKY, KIND_OF } from './fileKinds.js';
 
@@ -46,7 +46,7 @@ export function LinkEmbeds({ urls, inst, priv }) {
   return urls.slice(0, 3).map(u => <OneEmbed key={u} url={u} inst={inst} priv={priv} />);
 }
 function OneEmbed({ url, inst, priv }) {
-  const service = driveRef(url) || forumRef(url);
+  const service = driveRef(url) || forumRef(url) || siteRef(url);
   const ref = service || inviteRef(url) || paymentRef(url) || glintRef(url);
   // invite + payment + Glint + Drive + Forums cards are made by Velora even for a message on an instance (an invite asks the invited instance, see unfurl.js)
   const e = useUnfurl(url, ref ? undefined : inst, service ? LIVE_CARD_MS : 0, priv);
@@ -54,6 +54,8 @@ function OneEmbed({ url, inst, priv }) {
   // these two only ever show for the real hosts, whatever an instance answers for some other link
   if (e.type === 'drive') return service?.service === 'drive' ? <DriveEmbed e={e} url={url} /> : null;
   if (e.type === 'forum') return service?.service === 'forum' ? <ForumEmbed e={e} url={url} /> : null;
+  // a site's card: an s- address, or a custom address when the card came from Nookara itself (never an instance's word for it)
+  if (e.type === 'site') return service?.service === 'site' || !inst ? <SiteEmbed e={e} url={url} /> : null;
   if (e.type === 'youtube') return <YouTubeEmbed e={e} inst={inst} />;
   if (e.type === 'glint') return <GlintEmbed e={e} />;
   if (e.type === 'invite') return <InviteEmbed e={e} />;
@@ -467,6 +469,68 @@ function ForumEmbed({ e, url }) {
         {e.author && <span className="vc-svc-by"><SvcFace pfp={e.author.pfp} name={e.author.username} /><b style={{ color: safeColor(e.author.color) }}>{e.author.username}</b><RankChip who={e.author} /></span>}
         <span className="vc-svc-stat" title={plural(e.replies || 0, 'reply', 'replies')}><MessageSquare size={13} />{compact(e.replies || 0)}</span>
         <span className="vc-svc-stat" title={plural(e.score || 0, 'upvote')}><ArrowBigUp size={15} />{compact(e.score || 0)}</span>
+        <span className="grow" />
+        <SvcOpen url={url} />
+      </div>
+    </div>
+  );
+}
+
+// ── Nookara Sites: what the page says (public sites only), who made it and a little about the site ──
+const SITE_KICKER = <Globe size={13} />;
+const SITE_ACCESS = { signed_in: 'Only for people signed in to Nookara', people: 'Only for people its owner picked', password: 'Needs a password', private: 'Private' };
+function SiteEmbed({ e, url }) {
+  const [noPic, setNoPic] = useState(false);
+  if (e.unavailable) return <SvcGone icon={SITE_KICKER} service="Nookara Sites" title="Not available" text="There's no site here, or it's turned off or taken down." />;
+  const info = [plural(e.pages || 0, 'page'), e.updated ? `updated ${fmtDay(e.updated)}` : ''].filter(Boolean).join(' - ');
+  const by = e.owner?.username && <span className="vc-svc-by"><SvcFace pfp={e.owner.pfp} name={e.owner.username} />By <b style={{ color: safeColor(e.owner.color) }}>{e.owner.username}</b></span>;
+  const kicker = <small className="vc-svc-kicker">{SITE_KICKER}<span>{e.host}</span>{e.host !== `${e.label}.nookara.cc` && <span className="vc-svc-sub">{e.label}</span>}</small>;
+  if (e.kind === 'closed') {
+    return (
+      <div className="vc-svc vl-rise">
+        {kicker}
+        <div className="vc-svc-main">
+          <span className="vc-svc-ico">{e.access === 'password' ? <KeyRound size={26} /> : <Lock size={26} />}</span>
+          <div className="vc-svc-info">
+            <a className="vc-svc-title" href={url} target="_blank" rel="noopener noreferrer" onClick={outside(url)}>{e.host}</a>
+            <span className="vc-svc-meta">{SITE_ACCESS[e.access] || 'Not public'}</span>
+            {by}
+          </div>
+          <div className="vc-svc-actions"><SvcOpen url={url} /></div>
+        </div>
+      </div>
+    );
+  }
+  if (e.kind === 'missing' || e.kind === 'file') {
+    return (
+      <div className="vc-svc vl-rise">
+        {kicker}
+        <div className="vc-svc-main">
+          <span className="vc-svc-ico">{e.kind === 'file' && e.image && !noPic ? <img src={e.image} alt="" loading="lazy" onError={() => setNoPic(true)} /> : e.kind === 'file' ? (() => { const I = driveIcon(extOf(e.name)); return <I size={26} />; })() : <FileX size={26} />}</span>
+          <div className="vc-svc-info">
+            <a className="vc-svc-title" href={url} target="_blank" rel="noopener noreferrer" onClick={outside(url)}>{e.kind === 'file' ? e.name : 'Page not found'}</a>
+            <span className="vc-svc-meta">{e.kind === 'file' ? fmtSize(e.size) : `Nothing at ${e.path} on ${e.host}`}</span>
+            {by}
+          </div>
+          <div className="vc-svc-actions"><SvcOpen url={url} /></div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="vc-svc topic site vl-rise" style={safeColor(e.color) ? { borderLeftColor: e.color } : undefined}>
+      {kicker}
+      {e.image && !noPic && <img className="vc-svc-banner vc-viewable" src={e.image} alt="" loading="lazy" onError={() => setNoPic(true)} onClick={() => viewPicture(e.image)} />}
+      <div className="vc-svc-topic">
+        <div className="vc-svc-info">
+          <a className="vc-svc-title wrap" href={url} target="_blank" rel="noopener noreferrer" onClick={outside(url)}>{e.title || e.heading || e.host}</a>
+          {e.heading && e.title && <span className="vc-svc-meta">{e.heading}</span>}
+          {(e.description || e.excerpt) && <span className="vc-svc-desc">{e.description || e.excerpt}</span>}
+        </div>
+      </div>
+      <div className="vc-svc-foot">
+        {by}
+        <span className="vc-svc-stat">{info}</span>
         <span className="grow" />
         <SvcOpen url={url} />
       </div>
