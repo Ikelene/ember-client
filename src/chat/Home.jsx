@@ -1,15 +1,17 @@
-// Home: your friends (with what they're doing), requests, and "Active now".
+// Home: the dashboard (Dashboard.jsx, the default tab), your friends (with what they're doing), requests, and "Active now".
 import { useEffect, useState } from 'react';
-import { MessageCircle, UserPlus, Check, X, Users } from 'lucide-react';
+import { MessageCircle, UserPlus, Check, X, House } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { useChat, go, loadFriends, toast, errorText } from './store.js';
 import { Avatar, subtitle, ActivityCard } from './Profile.jsx';
 import { VeloraConnNote } from './Parts.jsx';
+import Dashboard from './Dashboard.jsx';
+import './dashboard.css';
 
 export default function Home({ onUser }) {
   const friends = useChat(s => s.friends);
   const presence = useChat(s => s.presence);
-  const [tab, setTab] = useState('online');
+  const [tab, setTab] = useState('home');
   const [reqs, setReqs] = useState({ incoming: [], outgoing: [] });
   const [add, setAdd] = useState('');
   const [msg, setMsg] = useState(null);
@@ -50,16 +52,17 @@ export default function Home({ onUser }) {
     try { await apiFetch(`/friends/request/${id}/${yes ? 'accept' : 'decline'}`, { method: 'PATCH' }); loadReqs(); loadFriends(); }
     catch (e) { toast(errorText(e.message)); }
   }
-  const tabs = [['online', 'Online'], ['all', 'All'], ['pending', `Pending${reqs.incoming.length + dmIn.length ? ` (${reqs.incoming.length + dmIn.length})` : ''}`], ['add', 'Add friend']];
+  const tabs = [['home', 'Home'], ['online', 'Online'], ['all', 'All'], ['pending', `Pending${reqs.incoming.length + dmIn.length ? ` (${reqs.incoming.length + dmIn.length})` : ''}`], ['add', 'Add friend']];
   return (
     <div className="vc-home">
       <div className="vc-home-main">
         <div className="vc-head">
-          <Users size={20} className="vc-head-ico" /><b className="vc-head-name">Friends</b>
+          <House size={20} className="vc-head-ico" /><b className="vc-head-name">{tab === 'home' ? 'Home' : 'Friends'}</b>
           <div className="vc-tabs inline">{tabs.map(([k, l]) => <button type="button" key={k} className={`${tab === k ? 'on' : ''}${k === 'add' ? ' add' : ''}`} onClick={() => setTab(k)}>{l}</button>)}</div>
         </div>
-        <div className="vc-home-body" key={tab}>
+        <div className={`vc-home-body${tab === 'home' ? ' dash' : ''}`} key={tab}>
           <VeloraConnNote className="wide" />
+          {tab === 'home' && <Dashboard onUser={onUser} onTab={setTab} />}
           {tab === 'add' && (
             <form className="vc-add vl-rise" onSubmit={sendReq}>
               <h3>Add a friend</h3>
@@ -129,7 +132,7 @@ export default function Home({ onUser }) {
           )}
         </div>
       </div>
-      <aside className="vc-active">
+      {tab !== 'home' && <aside className="vc-active">
         <h3>Active now</h3>
         {!active.length && <div className="vc-active-empty"><b>It's quiet for now...</b><p>When friends start playing something - a Hyperfocus game, or anything that shares its activity with Nookara - it'll show here.</p></div>}
         {active.map((f, i) => (
@@ -138,7 +141,7 @@ export default function Home({ onUser }) {
             {presence[f.friend_username].activities.map((a, activityIndex) => <ActivityCard key={`${a.name}-${activityIndex}`} a={a} compact />)}
           </button>
         ))}
-      </aside>
+      </aside>}
     </div>
   );
 }

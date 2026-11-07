@@ -7,7 +7,7 @@ import { openLinkChannel } from './ChannelTypes.jsx';
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Hash, Lock, Plus, Compass, ChevronDown, Settings, UserPlus, LogOut, Users, MessageCircle, Home,
+  Hash, Lock, Plus, Compass, ChevronDown, Settings, UserPlus, LogOut, House, MessageCircle, Home,
   Pencil, Trash2, Check, X, Circle, Moon, MinusCircle, EyeOff, Smile, UsersRound, Megaphone, FolderPlus, ShieldCheck, Download, Server, UserRound, Volume2, CircleArrowUp } from 'lucide-react';
 
 import { RetryIn } from './Gate.jsx';
@@ -505,7 +505,7 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
     <div className="vc-side">
       <div className="vc-side-head"><button type="button" className="vc-quick" onClick={onQuick}><span>Quick switcher</span><kbd>Ctrl</kbd><kbd>K</kbd></button></div>
       <div className="vc-side-list">
-        <button type="button" className={`vc-ch vc-home-link${view.kind === 'home' ? ' on' : ''}`} onClick={() => go({ kind: 'home' })}><Users size={18} /> <span>Friends</span></button>
+        <button type="button" className={`vc-ch vc-home-link${view.kind === 'home' ? ' on' : ''}`} onClick={() => go({ kind: 'home' })}><House size={18} /> <span>Home</span></button>
         <div className="vc-cat-name static">Direct messages <span className="vc-cat-add" role="button" tabIndex={0} title="New message" onClick={onNewDM}><Plus size={14} /></span></div>
         <VeloraConnNote />
         {modmail.messages.length > 0 && (

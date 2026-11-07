@@ -59,6 +59,7 @@ import { BootScreen } from '../chat/Boot.jsx';
 import { applyDesign, clearDesign } from '../chat/design.js';
 import '../chat/chat.css';
 import '../chat/rounded.css';
+import '../chat/modern.css';
 import '../chat/boot.css';
 import { MaskIcon } from '../chat/Alias.jsx';
 import { aliasOf, shownName } from '../chat/aliases.js';
@@ -78,7 +79,7 @@ function DesktopTitle() {
     : view.kind === 'dm' ? (view.username === 'System' ? 'Nookara' : `@${view.username}`)
       : view.kind === 'group' ? group || 'Group chat'
         : view.kind === 'modmail' ? 'Nookara Moderator Chat'
-          : view.kind === 'home' ? 'Friends' : '';
+          : view.kind === 'home' ? 'Home' : '';
   const raw = view.kind === 'channel' || view.kind === 'server' ? srvIcon : view.kind === 'dm' ? (view.username === 'System' ? '/assets/bonfire/logo-256.png' : pfp) : view.kind === 'modmail' ? '/assets/bonfire/logo-256.png' : null;
   const icon = raw ? new URL(raw, location.origin).href : '';
   useEffect(() => { window.bonfireDesktop?.setTitle?.(text, icon); }, [text, icon]);
@@ -456,7 +457,7 @@ function ChatPage() {
   const dmPresence = useChat(s => (view.kind === 'dm' ? s.presence[view.username] : null));
   const unreadCount = useTabBadge();
   const gateName = useChat(s => (view.kind === 'instance' ? s.instances.find(i => i.origin === view.inst)?.name : null));
-  useEffect(() => { document.title = `${unreadCount ? `(${unreadCount > 999 ? '999+' : unreadCount}) ` : ''}${channel ? `#${channel.name} - ${detail.server.name}` : view.kind === 'instance' ? gateName || 'Server' : view.kind === 'dm' ? `@${view.username}` : group ? group.name : 'Friends'} | Ember`; }, [unreadCount, channel, detail, view, group, gateName]);
+  useEffect(() => { document.title = `${unreadCount ? `(${unreadCount > 999 ? '999+' : unreadCount}) ` : ''}${channel ? `#${channel.name} - ${detail.server.name}` : view.kind === 'instance' ? gateName || 'Server' : view.kind === 'dm' ? `@${view.username}` : group ? group.name : 'Home'} | Ember`; }, [unreadCount, channel, detail, view, group, gateName]);
   const signedIn = useChat(s => s.signedIn);
   const locked = useChat(s => s.locked); // staff switched Ember and DMs off for the account (store.js lockAccount)
 

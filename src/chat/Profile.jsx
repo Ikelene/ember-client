@@ -84,7 +84,7 @@ export function Avatar({ user, size = 32, status, className = '', ghost: ghostPr
   const ghost = ghostProp ?? looked;
   const pfp = user?.pfp;
   return (
-    <span className={`vc-av ${className}`} style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}>
+    <span className={`vc-av ${className}`} style={{ width: `calc(${size}px * var(--av-k, 1))`, height: `calc(${size}px * var(--av-k, 1))`, fontSize: `calc(${Math.round(size * 0.42)}px * var(--av-k, 1))` }}>
       {pfp && !bad ? <img src={viaProxy(pfp)} alt="" loading="lazy" onError={() => setBad(true)} /> : <span className="vc-av-l">{(user?.username || '?').charAt(0).toUpperCase()}</span>}
       {status && <i className={`vc-st ${status === 'invisible' ? 'offline' : status}${consoleOn ? ' console' : mobile ? ' mobile' : ''}${ghost ? ' ghost' : ''}`} title={ghost ? 'Invisible (really online)' : STATUS_LABEL[status] + (consoleOn ? ' (console)' : mobile ? ' (mobile)' : '')}>{consoleOn ? <ConsoleMark /> : mobile && <PhoneMark />}</i>}
     </span>

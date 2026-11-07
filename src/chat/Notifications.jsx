@@ -21,7 +21,7 @@ export function NotifText({ text }) {
   return parts.map((p, i) => <Fragment key={i}>{i % 2 === 0 ? p : open && i === parts.length - 1 ? `**${p}` : <b>{p}</b>}</Fragment>);
 }
 
-function ago(t) {
+export function ago(t) {
   const at = new Date(t).getTime();
   if (!at) return '';
   const s = Math.max(0, Math.round((Date.now() - at) / 1000));
@@ -32,7 +32,7 @@ function ago(t) {
   return new Date(at).toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-function NotifIcon({ n }) {
+export function NotifIcon({ n }) {
   const [bad, setBad] = useState(false);
   const Icon = ICONS[n.icon] || Bell;
   if (n.actor?.pfp_url && !bad) return <span className="vc-notif-av"><img src={n.actor.pfp_url} alt="" loading="lazy" onError={() => setBad(true)} /></span>;
