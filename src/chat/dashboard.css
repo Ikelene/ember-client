@@ -7,7 +7,7 @@
 .vc-dash-hello small { color: var(--muted); font-size: 12.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
 .vc-dash-hello h2 { margin: 2px 0 4px; font-size: 26px; letter-spacing: -.02em; color: #fff; overflow-wrap: anywhere; }
 .vc-dash-hello p { margin: 0; color: var(--dim); font-size: 14.5px; }
-.vc-dash-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.vc-dash-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
 .vc-dash-stat { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 12px; align-items: center; padding: 12px 14px; background: rgba(0, 0, 0, .28); border: 1px solid var(--border); color: var(--dim); text-align: left; cursor: pointer; animation: vc-up .35s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i, 0) * 50ms); transition: border-color .15s, background .15s; }
 .vc-dash-stat:hover { border-color: var(--accent); background: rgba(0, 0, 0, .4); }
 .vc-dash-stat-ico { grid-row: span 2; display: grid; place-items: center; width: 36px; height: 36px; background: var(--surface-3); color: var(--muted); }
@@ -73,6 +73,9 @@
 
 @media (max-width: 1100px) {
   .vc-dash-grid { grid-template-columns: minmax(0, 1fr); }
+  .vc-dash-hello > .vc-av { display: none; }
+  .vc-home .vc-head-name, .vc-home .vc-head-ico { display: none; }
+  .vc-home .vc-tabs.inline { margin-left: 0; }
 }
 @media (max-width: 760px) {
   .vc-home-body.dash { padding: 10px 10px 20px; }
@@ -81,7 +84,9 @@
   .vc-dash-hello h2 { font-size: 21px; }
   .vc-dash-hello p { font-size: 13.5px; }
   .vc-dash-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .vc-dash-stat { padding: 10px; column-gap: 10px; }
+  .vc-dash-stat { padding: 10px; column-gap: 10px; row-gap: 6px; grid-template-rows: auto auto; }
+  .vc-dash-stat-ico { grid-row: auto; width: 30px; height: 30px; }
+  .vc-dash-stat small { grid-column: 1 / -1; white-space: normal; line-height: 1.25; }
   .vc-dash-stat b { font-size: 19px; }
   .vc-dash-grid, .vc-dash-col { gap: 12px; }
 }
@@ -129,11 +134,14 @@ html.vc-rounded .vc-dash-online > small, html.vc-rounded .vc-dash-faces small { 
 html.vc-rounded .vc-dash-empty { padding: 16px 12px; font-size: 14.5px; }
 html.vc-rounded .vc-dash-foot { padding: 10px 10px 4px; font-size: 13.5px; }
 html.vc-rounded .vc-dash-notif .vc-notif-av, html.vc-rounded .vc-dash-notif .vc-notif-av img { border-radius: 50%; }
+@media (max-width: 1100px) { html.vc-rounded .vc-home .vc-tabs.inline { margin-left: 0; } }
 @media (max-width: 760px) {
   html.vc-rounded .vc-dash-hero { padding: 18px; border-radius: 18px; }
   html.vc-rounded .vc-dash-hello h2 { font-size: 24px; }
   html.vc-rounded .vc-dash-hello p { font-size: 14.5px; }
   html.vc-rounded .vc-dash-stat { padding: 12px; }
+  html.vc-rounded .vc-dash-stat-ico { width: 32px; height: 32px; border-radius: 10px; }
+  html.vc-rounded .vc-home .vc-tabs.inline { gap: 4px; }
   html.vc-rounded .vc-dash-stat b { font-size: 22px; }
   html.vc-rounded .vc-dash-card { border-radius: 18px; }
   html.vc-rounded .vc-dash-grid, html.vc-rounded .vc-dash-col { gap: 14px; }

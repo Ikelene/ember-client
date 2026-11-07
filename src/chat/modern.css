@@ -315,3 +315,12 @@ html.vc-rounded .vc-active-card:hover { box-shadow: 0 0 0 2px var(--accent); tra
   html.vc-rounded .vc-dialog { padding: 22px; }
   html.vc-rounded .vc-members, html.vc-rounded .vc-dm-side, html.vc-rounded .vc-results { width: min(320px, 88vw); }
 }
+
+/* ── odds and ends that still had square corners or old surfaces ── */
+html.vc-rounded .vc-bell-n { min-width: 18px; height: 18px; border-radius: 99px; font-size: 11px; top: 0; right: -2px; box-shadow: 0 0 0 2px var(--m-raised); }
+html.vc-rounded .e2-panel { margin: 0 20px 20px; border: 0; border-radius: 16px; background: var(--m-raised); padding: 16px 18px; }
+html.vc-rounded .e2-panel .btn { border-radius: 10px; }
+html.vc-rounded .e2-row, html.vc-rounded .e2-warn, html.vc-rounded .e2-keychange, html.vc-rounded .e2-code, html.vc-rounded .e2-file { border-radius: 12px; }
+html.vc-rounded .vc-dm-side .pe-card { background: var(--m-side); border-top-width: 4px; }
+html.vc-rounded .vc-dm-side .pe-card :is(.btn, button.pe-msg, .pe-msg) { border-radius: 10px; }
+html.vc-rounded .vc-dm-side .pe-card :is(.vc-act, .vc-activity, .pe-fact) { border-radius: 12px; }
