@@ -379,8 +379,8 @@ function useDistrust(m) {
 // (inside a stack only a bad signature is marked: a stack never mixes signed and unsigned messages, so its head has the shield)
 function SigBadge({ m, inStack }) {
   const v = useChat(s => (m.signature ? s.sigs[sigId(m)] : null));
-  if (v === 'bad') return <span className="vc-sig bad" title="Signature doesn't match"><TriangleAlert size={14} /></span>;
-  if (!inStack && isUnsigned(m)) return <span className="vc-sig unsigned" title={`Sent unsigned - Nookara can't confirm this came from ${m.author.username}`}><Shield size={14} /></span>;
+  if (v === 'bad') return <span className="vc-sig bad" data-tip-title="Signature doesn't match" data-tip-kind="danger" data-tip={`This message says it's from ${m.author?.username || 'someone'}, but its signature doesn't check out. It may have been changed or faked.`}><TriangleAlert size={14} /></span>;
+  if (!inStack && isUnsigned(m)) return <span className="vc-sig unsigned" data-tip-title="Not signed" data-tip-kind="warn" data-tip={`This message came without a signature, so Nookara can't confirm it really came from ${m.author.username}.`}><Shield size={14} /></span>;
   return null;
 }
 // Message info (Manage messages only): the real author behind a message - most of all an alias, marked or not

@@ -20,7 +20,7 @@ export const Card = ({ title, icon: I, children, className = '' }) => (
 
 // label: "Server settings" / "Channel settings"; groups: [[group, [[id, label, Icon, search words], ...]], ...] (memoised);
 // head: the identity block under the search; gone: the thing was deleted, close; children(page, { onDirty, goTo, close })
-export function SettingsShell({ label, groups, startTab, onClose, gone, head, children }) {
+export function SettingsShell({ label, groups, startTab, onClose, gone, head, crumb, children }) {
   const lower = label.toLowerCase();
   const all = groups.flatMap(([, items]) => items);
   const narrow = useNarrow();
@@ -118,7 +118,8 @@ export function SettingsShell({ label, groups, startTab, onClose, gone, head, ch
         <div className="bf-sd-main">
           <header className="bf-sd-head">
             <button type="button" className="bf-sd-backbtn" aria-label={`Back to ${lower}`} onClick={backToList}><ChevronLeft size={22} /></button>
-            <h2>{Icon && <Icon size={19} />} {cur?.[1] || label}</h2>
+            <h2 className="bf-ss-title">{Icon && <Icon size={19} />} {cur?.[1] || label}</h2>
+            <h2 className="bf-sd-crumbs bf-ss-crumbs"><span>{crumb || label}</span><ChevronRight size={14} /><span>{groups.find(([, items]) => items.some(it => it[0] === page))?.[0]}</span><ChevronRight size={14} /><b>{cur?.[1]}</b></h2>
             <button type="button" className="bf-sd-x" aria-label={`Close ${lower}`} data-tip="Close (Esc)" onClick={() => close()}><X size={18} /></button>
           </header>
           <div className="bf-sd-content bf-ss-content" ref={content} key={page}>

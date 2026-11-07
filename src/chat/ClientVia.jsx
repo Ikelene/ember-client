@@ -1,9 +1,9 @@
-// Which client someone is using. Velora only sends this to people with the Manage users permission:
-// `via` on a message, and `sessions` / `last_online` / `notifications_only` on a presence (people also get `sessions` for themselves). Ember servers send `via` the same way.
+// Which client someone is using. `via` on a message goes to everyone (since 2026-11-07);
+// on a presence, and `sessions` / `last_online` / `notifications_only` on a presence (people also get `sessions` for themselves). Ember servers send `via` the same way.
 // The name and verified badge come from Velora's official clients list (officialClients.js); anything not on it shows
 // its domain (or token name) with no badge.
 import { useEffect, useState } from 'react';
-import { BadgeCheck, Plug, Globe, Monitor, Smartphone } from 'lucide-react';
+import { BadgeCheck, Plug, Globe, Monitor, Smartphone, Clock } from 'lucide-react';
 import { viaTitle, sessionShort, sessionDetails, sessionKind, sessionIsIdle, STATE_SHORT } from './clientViaText.js';
 import { describeVia, officialClients, loadOfficialClients, onOfficialClients } from './officialClients.js';
 
@@ -20,14 +20,14 @@ export function useOfficialClients() {
 
 // the chip: [icon] name [verified badge]. Unknown clients: a globe (or plug for a token) + their domain / token name
 const KIND_ICON = { mobile: Smartphone, desktop: Monitor, browser: Globe };
-function Chip({ via, list, tip, Icon }) {
+function Chip({ via, list, tip, Icon, iconOnly }) {
   const d = describeVia(via, list);
-  const tipData = tip ? JSON.stringify({ name: d.name, domain: d.domain, verified: d.verified, known: d.known, text: viaTitle(via, list) }) : undefined;
+  const tipData = tip ? JSON.stringify({ name: d.name, domain: d.domain, verified: d.verified, known: d.known, text: viaTitle(via, list), icon: d.icon || null }) : undefined;
   return (
-    <span className={`vc-via${d.verified ? ' official' : ''}`} data-tip-via={tipData} aria-label={viaTitle(via, list)}>
-      {d.icon ? <img className="vc-via-icon" src={d.icon} alt="" /> : Icon ? <Icon size={13} aria-hidden="true" /> : !d.verified && (via.token ? <Plug size={12} /> : <Globe size={12} />)}
-      <span className="vc-via-name">{d.name}</span>
-      {d.verified && <BadgeCheck size={12} className="vc-via-check" aria-hidden="true" />}
+    <span className={`vc-via${d.verified ? ' official' : ''}${iconOnly ? ' icon-only' : ''}`} data-tip-via={tipData} aria-label={viaTitle(via, list)}>
+      {d.icon ? <img className="vc-via-icon" src={d.icon} alt="" /> : Icon ? <Icon size={13} aria-hidden="true" /> : iconOnly ? <Globe size={13} /> : !d.verified && (via.token ? <Plug size={12} /> : <Globe size={12} />)}
+      {!iconOnly && <span className="vc-via-name">{d.name}</span>}
+      {!iconOnly && d.verified && <BadgeCheck size={12} className="vc-via-check" aria-hidden="true" />}
     </span>
   );
 }
@@ -36,16 +36,18 @@ function Chip({ via, list, tip, Icon }) {
 export function ViaBadge({ via }) {
   const list = useOfficialClients();
   if (!via) return null;
-  return <Chip via={via} list={list} tip />;
+  return <Chip via={via} list={list} tip iconOnly />; // (everyone sees it since 2026-11-07: just the app's icon, or a globe; the name is in the hover card)
 }
 // the hover card (Tooltip.jsx, data-tip-via): "Sent from <name>", the domain in small text
 export function ViaTip({ t }) {
   if (!t) return null;
   return (
-    <div className="vc-tip-via">
-      <span>{t.known ? <>Sent from <b>{t.name}</b></> : t.text}{t.verified && <BadgeCheck size={12} className="vc-via-check" aria-label="Verified client" />}</span>
-      {t.domain && t.known && <small>{t.domain}</small>}
-      <small className="vc-tip-via-note">Only people with Manage users see this</small>
+    <div className="vc-tip-card vc-tip-via">
+      {t.icon ? <img className="vc-tip-via-ico" src={t.icon} alt="" /> : <Globe size={17} />}
+      <div>
+        <b>{t.known ? <>Sent from {t.name}</> : t.text}{t.verified && <BadgeCheck size={13} className="vc-via-check" aria-label="Verified client" />}</b>
+        <span>{t.verified ? 'An official Ember app.' : t.known ? 'The app this message was sent with.' : "This client isn't on Nookara's list of known apps."}{t.domain && t.known ? ` ${t.domain}` : ''}</span>
+      </div>
     </div>
   );
 }
@@ -58,10 +60,17 @@ function agoText(at) {
   return new Intl.RelativeTimeFormat(undefined, { numeric: 'always' }).format(-Math.floor(sec / n), u);
 }
 // the "Last online" row: "Online now", or how long ago with the full date on hover
+// Classic: a "Last online" row. Modern: a clock icon line like the profile dates (CSS shows one or the other)
 function LastOnlineRow({ online, at }) {
-  if (online) return <div className="pe-fact vc-manage-fact"><b>Last online</b><span>Online now</span></div>;
-  if (!(at > 0)) return null;
-  return <div className="pe-fact vc-manage-fact"><b>Last online</b><span title={new Date(at).toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'medium' })}>{agoText(at)}</span></div>;
+  if (!online && !(at > 0)) return null;
+  const full = at > 0 ? new Date(at).toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'medium' }) : '';
+  return (
+    <>
+      {online ? <div className="pe-fact vc-manage-fact vc-fact-classic"><b>Last online</b><span>Online now</span></div>
+        : <div className="pe-fact vc-manage-fact vc-fact-classic"><b>Last online</b><span title={full}>{agoText(at)}</span></div>}
+      <div className="vc-pf-dates"><span data-tip={online ? 'Online right now' : `Last online ${full}`}><Clock size={15} /> {online ? 'Online now' : `Last online ${agoText(at)}`}</span></div>
+    </>
+  );
 }
 // an instance's members (their member row carries last_online + online; presence is Velora's)
 export function LastOnlineFact({ member }) {

@@ -33,6 +33,8 @@ import { PlanCtx, buildPlanCtx, PlanUsage, PlanGate, usePlan } from './PlanGate.
 import { SettingsShell, Card } from './SettingsShell.jsx';
 import { useUnsaved, UnsavedBar } from './unsaved.jsx';
 import './SettingsDialog.css';
+import QRCode from 'qrcode';
+import { linkFor } from './store.js';
 
 // [id, label, icon, words the search box answers to]
 function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, owner, legacyDefault, hosted }) {
@@ -93,7 +95,7 @@ export function ServerSettings({ sid, onClose, tab: startTab }) {
   const groups = useMemo(() => pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, owner, legacyDefault: !!srv?.is_default, hosted }), [onInst, canServer, canRoles, canMod, canReports, instAdmin, owner, srv?.is_default, hosted]);
 
   return (
-    <SettingsShell label="Server settings" groups={groups} startTab={startTab} onClose={onClose} gone={!d}
+    <SettingsShell label="Server settings" crumb={srv?.name} groups={groups} startTab={startTab} onClose={onClose} gone={!d}
       head={srv && <>
         <span className="vc-srv-ico">{srv.icon ? <img src={srv.icon} alt="" /> : initials(srv.name)}</span>
         <span><b>{srv.name}</b><small>{onInst ? <><Globe size={11} /> {inst?.host || origin}</> : 'Hosted by Nookara'}</small></span>
@@ -194,6 +196,7 @@ function Overview({ sid, origin, instAdmin, onDirty, goTo }) {
   const dir = v.directory || {};
   return (
     <div className="bf-ss-page">
+      <ServerCard sid={sid} srv={srv} origin={origin} goTo={goTo} />
       <Card title="Server profile" icon={LayoutGrid}>
         <div className="vc-settings-imgs">
           <div className="vc-field"><span>Icon</span>
@@ -379,5 +382,36 @@ function AdvancedCard({ sid }) {
         </>
       )}
     </Card>
+  );
+}
+
+// Overview (Modern): the server as people see it - banner, icon and name - with its invite link, a QR code of it, and the
+// server's address. Classic keeps just the editing cards below (CSS hides this card there).
+function ServerCard({ sid, srv, origin, goTo }) {
+  const [qr, setQr] = useState('');
+  const link = srv?.invite ? linkFor({ kind: 'invite', code: srv.invite, inst: instOf(sid) }) : '';
+  useEffect(() => { if (!link) return; QRCode.toString(link, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#111111', light: '#ffffff' } }).then(setQr).catch(() => setQr('')); }, [link]);
+  if (!srv) return null;
+  const copy = (t, what) => navigator.clipboard?.writeText(t).then(() => toast(`${what} copied.`, true), () => toast("Couldn't copy that."));
+  const address = origin ? origin.replace(/^https?:\/\//, '') : null;
+  return (
+    <section className="bf-ss-hero">
+      <div className="bf-ss-hero-banner">{srv.banner && <img src={srv.banner} alt="" />}</div>
+      <div className="bf-ss-hero-id">
+        <span className="vc-srv-ico lg">{srv.icon ? <img src={srv.icon} alt="" /> : initials(srv.name)}</span>
+        <b>{srv.name}</b>
+      </div>
+      {link && (
+        <div className="bf-ss-hero-invite">
+          {qr && <span className="bf-ss-qr" aria-label="QR code of the invite link" dangerouslySetInnerHTML={{ __html: qr }} />}
+          <div className="bf-ss-hero-link">
+            <input className="form-input" readOnly value={link} onFocus={e => e.target.select()} aria-label="Invite link" />
+            <button type="button" className="btn btn-surface" onClick={() => copy(link, 'Invite link')}><Copy size={15} /> Copy link</button>
+            {isInst(sid) && <button type="button" className="vc-link-btn bf-ss-hero-more" onClick={() => goTo('join')}>Change how people join</button>}
+          </div>
+        </div>
+      )}
+      {address && <div className="bf-ss-hero-addr">Server address: <code>{address}</code><button type="button" className="vc-ico-btn" data-tip="Copy the address" onClick={() => copy(address, 'Address')}><Copy size={14} /></button></div>}
+    </section>
   );
 }

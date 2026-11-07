@@ -609,6 +609,12 @@ html.vc-rounded.vc-light .vc-msg.hov { background: rgba(0, 0, 0, 0.036); }
 html.vc-rounded.vc-light .vc-recent .vc-av { box-shadow: 0 0 0 2px var(--m-side, #f4f4f7); }
 html.vc-rounded.vc-light .vc-ch:hover .vc-recent .vc-av { box-shadow: 0 0 0 2px var(--m-hover, #ebebee); }
 html.vc-rounded.vc-light .vc-ch.on .vc-recent .vc-av { box-shadow: 0 0 0 2px var(--m-on, #e5e5e8); }
+html.vc-rounded.vc-light .vc-tooltip.k-warn .vc-tip-card > svg { color: #857147; }
+html.vc-rounded.vc-light .vc-tooltip.k-danger .vc-tip-card > svg { color: #8b5353; }
+html.vc-rounded.vc-light .vc-tooltip.k-ok .vc-tip-card > svg { color: #407853; }
+html.vc-rounded.vc-light .vc-tip-card b { color: #16161b; }
+html.vc-rounded.vc-light .vc-side-head.banner .vc-side-acts .vc-ico-btn { color: #16161b; }
+html.vc-rounded.vc-light .bf-ss-qr { background: #ffffff; }
 
 /* ── src/chat/dashboard.css ── */
 html.vc-rounded.vc-light .vc-dash-hero { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, #f3f3f6), #f4f4f7 60%); }

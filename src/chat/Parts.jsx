@@ -7,11 +7,12 @@ import { openLinkChannel } from './ChannelTypes.jsx';
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Hash, Lock, Plus, Compass, ChevronDown, Settings, UserPlus, LogOut, House, MessageCircle, Home,
+  Share2, Hash, Lock, Plus, Compass, ChevronDown, Settings, UserPlus, LogOut, House, MessageCircle, Home,
   Pencil, Trash2, Check, X, Circle, Moon, MinusCircle, EyeOff, Smile, UsersRound, Megaphone, FolderPlus, ShieldCheck, Download, Server, UserRound, Volume2, CircleArrowUp } from 'lucide-react';
 
 import { RetryIn } from './Gate.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
+import { linkFor } from './store.js';
 import { useChat, retryNow, go, keyOf, setStatus, setCustom, isMuted, effectiveNotify, ask, refreshServer, toast, errorText, setDetailLayout, patchState, saveSettings, getState, statusOf, presenceFor, useFace, isBlockedPerson, isBlockedName, blockedFace, BLOCKED_NAME, loadMoreMembers } from './store.js';
 import { P, has, ChannelIcon, useNameStyle, colorFrom, NameDecor } from './roles.jsx';
 import { serverMenu, instanceMenu, channelMenu, userMenu, openMenu, copy } from './Menu.jsx';
@@ -381,6 +382,12 @@ export function ServerSidebar({ sid, onInvite, onSettings, onChannel, onLeave, o
         <button type="button" className="vc-side-title" onClick={() => setMenu(m => !m)}>
           <span>{d.server.name}</span><ChevronDown size={16} className={menu ? 'flip' : ''} />
         </button>
+        {/* Modern: quick actions on the banner (Classic keeps just the menu) */}
+        <span className="vc-side-acts">
+          {d.server.invite && <button type="button" className="vc-ico-btn" data-tip="Share invite link" onClick={() => shareInvite(d.server, sid)}><Share2 size={17} /></button>}
+          <button type="button" className="vc-ico-btn" data-tip="Invite people" onClick={onInvite}><UserPlus size={17} /></button>
+          {canSettings && <button type="button" className="vc-ico-btn" data-tip="Server settings" onClick={onSettings}><Settings size={17} /></button>}
+        </span>
         {menu && (
           <div className="vc-menu vc-srv-menu">
             <button type="button" onClick={() => { setMenu(false); onInvite(); }}><UserPlus size={15} /> Invite people</button>
@@ -784,4 +791,11 @@ function RecentPosters({ cid, base }) {
       {list.map(p => <Avatar key={p.username} user={{ username: p.username, pfp: p.pfp || people[p.username]?.pfp }} size={18} />)}
     </span>
   );
+}
+
+// the banner's share button: the system share sheet where there is one, otherwise copy the invite link
+function shareInvite(server, sid) {
+  const link = linkFor({ kind: 'invite', code: server.invite, inst: instOf(sid) });
+  if (navigator.share && matchMedia('(pointer: coarse)').matches) { navigator.share({ title: server.name, url: link }).catch(() => {}); return; }
+  navigator.clipboard?.writeText(link).then(() => toast('Invite link copied.', true), () => toast("Couldn't copy the link."));
 }

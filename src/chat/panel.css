@@ -212,3 +212,61 @@ html.vc-rounded .vc-pf-dates span { display: inline-flex; align-items: center; g
 html.vc-rounded .vc-pf-dates svg { color: var(--muted); }
 html.vc-rounded .pe-banner:not(.has-img), html.vc-rounded .vc-big-banner:not(.has-img) { background: var(--m-on) !important; }
 html.vc-rounded .pe-card, html.vc-rounded .vc-dm-side .pe-card, html.vc-rounded .vc-panel-profile .pe-card { border-top: 0; }
+
+/* ── card tooltips (data-tip-title): an icon, a bold title and a line of text, like a small popup ── */
+.vc-tooltip.card { max-width: 320px; padding: 10px 12px; font-weight: 400; text-align: left; }
+.vc-tip-card { display: flex; align-items: flex-start; gap: 10px; }
+.vc-tip-card > svg { flex: none; margin-top: 1px; color: var(--accent); }
+.vc-tooltip.k-warn .vc-tip-card > svg { color: #e5c27a; }
+.vc-tooltip.k-danger .vc-tip-card > svg { color: #f08f8f; }
+.vc-tooltip.k-ok .vc-tip-card > svg { color: #6fcf8f; }
+.vc-tip-card b { display: block; margin-bottom: 2px; font-size: 13.5px; font-weight: 700; color: #fff; }
+.vc-tip-card span { display: block; font-size: 12.5px; line-height: 1.45; color: var(--dim); }
+html.vc-rounded .vc-tooltip.card { padding: 12px 14px; border-radius: calc(10px * var(--rk, 1)); background: var(--m-raised); box-shadow: var(--sh-3); }
+html.vc-rounded .vc-tip-card b { font-size: 14px; font-weight: 600; }
+html.vc-rounded .vc-tip-card span { font-size: 13px; }
+/* the client icon on a message: just the app's picture (or a globe), the name is in the hover card */
+.vc-via.icon-only { gap: 0; padding: 0; width: 18px; height: 18px; justify-content: center; background: none; border: 0; color: var(--muted); }
+.vc-via.icon-only .vc-via-icon { width: 15px; height: 15px; object-fit: contain; }
+html.vc-rounded .vc-via.icon-only .vc-via-icon { border-radius: calc(4px * var(--rk, 1)); }
+
+/* ── server header (Modern): name on the banner with quick actions on the right ── */
+.vc-side-acts { display: none; }
+html.vc-rounded .vc-side-head { display: flex; align-items: center; }
+html.vc-rounded .vc-side-title { flex: 1; min-width: 0; }
+html.vc-rounded .vc-side-title svg { display: none; }
+html.vc-rounded .vc-side-acts { position: relative; z-index: 2; display: flex; align-items: center; gap: 2px; padding-right: 8px; }
+html.vc-rounded .vc-side-acts .vc-ico-btn { width: 32px; height: 32px; color: var(--dim); }
+html.vc-rounded .vc-side-head.banner { height: 150px; align-items: flex-start; }
+html.vc-rounded .vc-side-head.banner .vc-side-acts { padding-top: 11px; }
+html.vc-rounded .vc-side-head.banner .vc-side-acts .vc-ico-btn { color: #fff; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .7)); }
+html.vc-rounded .vc-side-head.banner .vc-side-acts .vc-ico-btn:hover { background: rgba(0, 0, 0, .35); }
+html.vc-rounded .vc-side-head.banner::after { background: linear-gradient(180deg, rgba(0, 0, 0, .55), transparent 45%, transparent 70%, color-mix(in srgb, var(--m-side) 80%, transparent)); }
+
+/* ── server settings (Modern): server card on top of the sidebar, breadcrumbs, the Overview hero ── */
+.bf-ss-crumbs, .bf-ss-hero { display: none !important; }
+html.vc-rounded .bf-ss-title { display: none; }
+html.vc-rounded .bf-ss-crumbs { display: flex !important; }
+html.vc-rounded .bf-ss .bf-ss-srv { order: -1; margin-bottom: 10px; }
+html.vc-rounded .bf-ss-hero { display: block !important; margin-bottom: 16px; overflow: hidden; border-radius: calc(12px * var(--rk, 1)); background: var(--m-raised); }
+.bf-ss-hero-banner { height: 140px; background: var(--m-on); }
+.bf-ss-hero-banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bf-ss-hero-id { display: flex; align-items: flex-end; gap: 14px; margin-top: -40px; padding: 0 18px; }
+.bf-ss-hero-id .vc-srv-ico.lg { width: 80px; height: 80px; border: 5px solid var(--m-raised); border-radius: 50%; background: var(--m-on); font-size: 22px; }
+.bf-ss-hero-id b { padding-bottom: 10px; font-size: 20px; color: var(--text); }
+.bf-ss-hero-invite { display: flex; align-items: flex-start; gap: 16px; padding: 16px 18px 18px; }
+.bf-ss-qr { flex: none; width: 130px; height: 130px; padding: 6px; background: #fff; border-radius: calc(10px * var(--rk, 1)); }
+.bf-ss-qr svg { display: block; width: 100%; height: 100%; }
+.bf-ss-hero-link { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding-top: 12px; }
+.bf-ss-hero-link .form-input { width: 100%; }
+.bf-ss-hero-more { padding: 0; text-decoration: underline; }
+.bf-ss-hero-addr { display: flex; align-items: center; gap: 8px; padding: 0 18px 16px; color: var(--muted); font-size: 13px; }
+.bf-ss-hero-addr code { color: var(--text); }
+@media (max-width: 700px) { .bf-ss-hero-invite { flex-direction: column; align-items: center; } .bf-ss-hero-link { align-items: stretch; } }
+.vc-tooltip:has(.vc-tip-via) { max-width: 320px; padding: 10px 12px; text-align: left; font-weight: 400; }
+html.vc-rounded .vc-tooltip:has(.vc-tip-via) { padding: 12px 14px; border-radius: calc(10px * var(--rk, 1)); background: var(--m-raised); box-shadow: var(--sh-3); }
+.vc-tip-via-ico { flex: none; width: 18px; height: 18px; object-fit: contain; }
+.vc-tip-via b { display: inline-flex; align-items: center; gap: 5px; }
+.vc-tip-card.vc-tip-via { flex-direction: row; align-items: flex-start; gap: 10px; }
+.vc-tip-card.vc-tip-via > svg { color: var(--accent); }
+html.vc-rounded .bf-ss-hero-id .vc-srv-ico.lg { border-radius: 50%; overflow: hidden; }

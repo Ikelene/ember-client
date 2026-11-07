@@ -5,7 +5,7 @@
 // the "sent from" card of a message's client chip (ClientVia.jsx).
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AtSign, Globe } from 'lucide-react';
+import { AtSign, Globe, TriangleAlert, Info, ShieldAlert, CircleCheck } from 'lucide-react';
 import { useChat, statusOf, loadMembers } from './store.js';
 import { AliasTip } from './Alias.jsx';
 import { ViaTip } from './ClientVia.jsx';
@@ -41,7 +41,7 @@ export function TooltipHost() {
       timer = setTimeout(() => {
         if (cur !== el || !document.contains(el)) return;
         shownAt = Date.now();
-        setTip({ el, text, server, alias, via, side: el.getAttribute('data-tip-side') || 'top', rect: el.getBoundingClientRect() });
+        setTip({ el, text, server, alias, via, title: el.getAttribute('data-tip-title'), kind: el.getAttribute('data-tip-kind'), side: el.getAttribute('data-tip-side') || 'top', rect: el.getBoundingClientRect() });
       }, quick ? 40 : 380);
     };
     const hide = () => { cur = null; clearTimeout(timer); setTip(null); };
@@ -104,9 +104,9 @@ function Tip({ tip }) {
     setPos({ left: clampedLeft, top: Math.max(pad, Math.min(innerHeight - h - pad, top)), side, arrow: side === 'right' ? null : r.left + r.width / 2 - clampedLeft });
   }, [tip]);
   return (
-    <div ref={ref} className={`vc-tooltip side-${pos?.side || tip.side}${tip.server ? ' rich' : ''}${tip.alias ? ' alias' : ''}`} role="tooltip"
+    <div ref={ref} className={`vc-tooltip side-${pos?.side || tip.side}${tip.server ? ' rich' : ''}${tip.alias ? ' alias' : ''}${tip.title ? ` card k-${tip.kind || 'info'}` : ''}`} role="tooltip"
       style={pos ? { left: pos.left, top: pos.top, '--ax': pos.arrow != null ? `${pos.arrow}px` : undefined } : { left: -9999, top: -9999 }}>
-      {tip.server ? <ServerTip sid={tip.server} /> : tip.alias ? <AliasTip a={tip.alias} /> : tip.via ? <ViaTip t={tip.via} /> : tip.text}
+      {tip.server ? <ServerTip sid={tip.server} /> : tip.alias ? <AliasTip a={tip.alias} /> : tip.via ? <ViaTip t={tip.via} /> : tip.title ? <CardTip title={tip.title} text={tip.text} kind={tip.kind} /> : tip.text}
     </div>
   );
 }
@@ -130,4 +130,11 @@ function ServerTip({ sid }) {
       {(s.mentions > 0) && <small><AtSign size={11} /> {s.mentions} mention{s.mentions === 1 ? '' : 's'} waiting</small>}
     </div>
   );
+}
+
+// a "card" tip (data-tip-title + data-tip-kind warn | danger | ok | info): an icon, a bold title and a line of text
+const CARD_ICON = { warn: TriangleAlert, danger: ShieldAlert, ok: CircleCheck, info: Info };
+function CardTip({ title, text, kind }) {
+  const Icon = CARD_ICON[kind] || Info;
+  return <div className="vc-tip-card"><Icon size={17} /><div><b>{title}</b>{text && <span>{text}</span>}</div></div>;
 }
