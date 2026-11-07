@@ -1,0 +1,94 @@
+/* Home (Home.jsx). Square by default (Classic); Modern softens. */
+.vc-home-body.hm { padding: 18px 22px 28px; }
+.hm-wrap { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.hm-hello { display: flex; align-items: center; gap: 14px; }
+.hm-hello h2 { margin: 0; font-size: 24px; color: #fff; letter-spacing: -.015em; }
+.hm-hello p { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; }
+.hm-tip { display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--box); border: 1px solid var(--border); }
+.hm-tip-ico { flex: none; width: 40px; height: 40px; display: grid; place-items: center; background: var(--accent-dim); color: var(--accent); }
+.hm-tip > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.hm-tip b { font-size: 14.5px; color: var(--text); }
+.hm-tip > div > span { font-size: 13px; color: var(--muted); }
+.hm-tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; align-self: flex-start; max-width: 100%; background: #0d0d0f; border: 1px solid var(--border); }
+.hm-tabs button { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; background: none; border: 0; color: var(--dim); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.hm-tabs button:hover { color: var(--text); background: rgba(255, 255, 255, .04); }
+.hm-tabs button.on { color: #fff; background: rgba(255, 255, 255, .08); }
+.hm-tabs i { min-width: 18px; padding: 0 5px; background: var(--surface-3); color: var(--dim); font-style: normal; font-size: 11px; font-weight: 700; text-align: center; }
+.hm-tabs i.hot { background: var(--red); color: #fff; }
+.hm-search { display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 6px 0 12px; background: #0d0d0f; border: 1px solid var(--border); color: var(--muted); }
+.hm-search:focus-within { border-color: var(--accent); }
+.hm-search input { flex: 1; min-width: 0; height: 100%; background: none; border: 0; outline: none; color: var(--text); font: inherit; font-size: 14px; }
+.hm-search-add { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; background: none; border: 0; color: var(--dim); cursor: pointer; }
+.hm-search-add:hover:not(:disabled) { color: var(--accent); }
+.hm-search-add:disabled { opacity: .35; cursor: default; }
+.hm-body { display: flex; flex-direction: column; gap: 8px; animation: vc-swap .25s cubic-bezier(.2, .8, .2, 1); }
+.hm-body.dash { gap: 0; }
+.hm-sub { margin-top: 8px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.hm-none { color: var(--muted); font-size: 13px; }
+.hm-recent { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.hm-tile { position: relative; flex: none; width: 128px; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 10px 14px; background: var(--box); border: 1px solid var(--border); color: var(--text); cursor: pointer; transition: border-color .15s, transform .15s; }
+.hm-tile:hover { border-color: var(--accent); transform: translateY(-2px); }
+.hm-tile b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
+.hm-tile > i { position: absolute; top: 8px; right: 8px; min-width: 18px; padding: 0 5px; background: var(--red); color: #fff; font-style: normal; font-size: 11px; font-weight: 700; text-align: center; }
+.hm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; padding: 8px; background: var(--box); border: 1px solid var(--border); }
+.hm-grid:empty { display: none; }
+.hm-grid.off .hm-friend-who { opacity: .55; }
+.hm-grid.off .hm-friend:hover .hm-friend-who { opacity: .9; }
+.hm-friend { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 8px; background: none; border: 0; color: var(--text); text-align: left; transition: background .12s; font: inherit; }
+button.hm-friend { cursor: pointer; }
+.hm-friend:hover { background: rgba(255, 255, 255, .04); }
+.hm-friend-who { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 0; background: none; border: 0; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+.hm-friend-who > span:last-child { min-width: 0; display: flex; flex-direction: column; }
+.hm-friend-who b, .hm-friend-who small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm-friend-who b { font-size: 14px; font-weight: 600; }
+.hm-friend-who small { font-size: 12px; color: var(--muted); }
+.hm-friend-msg { flex: none; width: 32px; height: 32px; display: grid; place-items: center; padding: 0; background: none; border: 0; color: var(--muted); cursor: pointer; opacity: 0; transition: opacity .12s, color .12s; }
+.hm-friend:hover .hm-friend-msg, .hm-friend-msg:focus-visible { opacity: 1; }
+.hm-friend-msg:hover { color: var(--accent); }
+.hm-ico { flex: none; width: 34px; height: 34px; display: grid; place-items: center; background: var(--surface-3); color: var(--dim); }
+.hm-new .hm-ico { background: var(--accent-dim); color: var(--accent); }
+.hm-chev { flex: none; color: var(--muted); }
+.hm-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 16px; color: var(--muted); text-align: center; font-size: 13.5px; }
+.hm-empty b { color: var(--text); font-size: 15px; }
+.hm-check { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: var(--dim); font-size: 13px; }
+.hm-saved { max-width: 760px; }
+@media (max-width: 760px) {
+  .vc-home-body.hm { padding: 12px 12px 22px; }
+  .hm-hello h2 { font-size: 20px; }
+  .hm-tip { flex-wrap: wrap; }
+  .hm-tip .btn { width: 100%; }
+  .hm-tabs { flex-wrap: nowrap; overflow-x: auto; align-self: stretch; scrollbar-width: none; }
+  .hm-grid { grid-template-columns: 1fr; }
+  .hm-friend-msg { opacity: 1; }
+}
+
+html.vc-rounded .hm-hello h2 { font-size: 28px; font-weight: 700; }
+html.vc-rounded .hm-hello p { font-size: 14.5px; }
+html.vc-rounded .hm-hello .vc-av, html.vc-rounded .hm-hello .vc-av img { border-radius: 50%; }
+html.vc-rounded .hm-tip { border: 0; border-radius: calc(12px * var(--rk, 1)); background: var(--m-raised); padding: 16px 18px; }
+html.vc-rounded .hm-tip-ico { border-radius: calc(10px * var(--rk, 1)); }
+html.vc-rounded .hm-tip b { font-size: 15.5px; font-weight: 600; }
+html.vc-rounded .hm-tabs { border: 0; border-radius: calc(10px * var(--rk, 1)); background: var(--m-raised); }
+html.vc-rounded .hm-tabs button { border-radius: calc(8px * var(--rk, 1)); font-size: 14px; font-weight: 500; }
+html.vc-rounded .hm-tabs button:hover { background: var(--m-hover); }
+html.vc-rounded .hm-tabs button.on { background: var(--m-on); }
+html.vc-rounded .hm-tabs i { border-radius: 99px; background: var(--m-on); }
+html.vc-rounded .hm-tabs i.hot { background: var(--red); }
+html.vc-rounded .hm-search { height: 46px; border: 0; border-radius: calc(10px * var(--rk, 1)); background: var(--m-raised); }
+html.vc-rounded .hm-search:focus-within { box-shadow: 0 0 0 2px var(--accent); }
+html.vc-rounded .hm-search input { font-size: 15px; }
+html.vc-rounded .hm-search-add { border-radius: calc(8px * var(--rk, 1)); }
+html.vc-rounded .hm-search-add:hover:not(:disabled) { background: var(--m-on); }
+html.vc-rounded .hm-tile { border: 0; border-radius: calc(12px * var(--rk, 1)); background: var(--m-raised); --av-k: 1.1; }
+html.vc-rounded .hm-tile:hover { box-shadow: inset 0 0 0 2px var(--accent); transform: none; }
+html.vc-rounded .hm-tile .vc-av, html.vc-rounded .hm-tile .vc-av img, html.vc-rounded .hm-friend .vc-av, html.vc-rounded .hm-friend .vc-av img { border-radius: 50%; }
+html.vc-rounded .hm-tile > i { border-radius: 99px; }
+html.vc-rounded .hm-grid { border: 0; border-radius: calc(12px * var(--rk, 1)); background: var(--m-raised); padding: 10px; }
+html.vc-rounded .hm-friend { border-radius: calc(8px * var(--rk, 1)); padding: 8px 10px; --av-k: 1.05; }
+html.vc-rounded .hm-friend:hover { background: var(--m-hover); }
+html.vc-rounded .hm-friend-who b { font-size: 15px; font-weight: 500; }
+html.vc-rounded .hm-friend-who small { font-size: 12.5px; }
+html.vc-rounded .hm-friend-msg { border-radius: calc(8px * var(--rk, 1)); }
+html.vc-rounded .hm-friend-msg:hover { background: var(--m-on); }
+html.vc-rounded .hm-ico { border-radius: calc(10px * var(--rk, 1)); background: var(--m-on); }
+html.vc-rounded .hm-sub { font-size: 12px; font-weight: 600; letter-spacing: .04em; }

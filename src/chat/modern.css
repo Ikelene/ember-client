@@ -347,3 +347,20 @@ html.vc-rounded .vc-text:not(.jumbo) :is(.vc-cemoji, .vc-temoji) { width: var(--
 html.vc-rounded .vc-st:not(.mobile):not(.console), html.vc-rounded .vc-st-sq:not(.mobile):not(.console) { border-radius: calc(2px * var(--rk, 1)); transform: rotate(45deg) scale(.82); }
 /* client icons off (both looks) */
 html.vc-no-client-icons .vc-msg-head .vc-via { display: none; }
+
+/* ── Light themes (look.js sets html.vc-light). Tokens here; every literal colour is flipped in the generated light.css ── */
+html.vc-rounded.vc-light {
+  color-scheme: light;
+  --m-line: rgba(0, 0, 0, .08); --m-line-2: rgba(0, 0, 0, .14);
+  --text: var(--m-text-color, #1d1d23); --dim: #4b4b57; --muted: #6f6f7c;
+  --surface-3: color-mix(in srgb, var(--m-raised) 88%, #000 7%);
+  --sh-2: 0 6px 18px rgba(20, 20, 40, .12);
+  --sh-3: 0 16px 40px rgba(20, 20, 40, .16), 0 0 0 1px rgba(0, 0, 0, .07);
+  --st-offline: #9a9aa6;
+}
+html.vc-rounded.vc-light body { background: var(--m-app); }
+html.vc-rounded.vc-light .vc-text { color: var(--m-text-color, #1d1d23); }
+html.vc-rounded.vc-light .vc-msg:hover, html.vc-rounded.vc-light .vc-msg.hov { background: rgba(0, 0, 0, .035); }
+html.vc-rounded.vc-light .vc-modal-back { background: rgba(30, 30, 45, .35); }
+html.vc-rounded.vc-light.vc-page ::-webkit-scrollbar-thumb { background-color: rgba(0, 0, 0, .22); }
+html.vc-rounded.vc-light .vc-disc-hero h1 { -webkit-text-fill-color: #fff; }

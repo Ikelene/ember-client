@@ -3,6 +3,7 @@ import { clientUrl } from '../chat/hosts.js';
 import { ForwardDialog } from '../chat/MsgTools.jsx';
 import { SidePanel, useInboxCount } from '../chat/SidePanel.jsx';
 import DiscoverPage from '../chat/DiscoverPage.jsx';
+import { loadBeta } from '../chat/beta.js';
 import { TooltipHost } from '../chat/Tooltip.jsx';
 import { MediaViewerHost, viewPicture, copyImage, downloadImage } from '../chat/MediaViewer.jsx';
 import { VoicePanel, VoiceView, DmCallBar, DmCallButton, IncomingCalls } from '../chat/VoiceParts.jsx';
@@ -63,6 +64,7 @@ import '../chat/chat.css';
 import '../chat/rounded.css';
 import '../chat/modern.css';
 import '../chat/panel.css';
+import '../chat/light.css';
 import '../chat/boot.css';
 import { MaskIcon } from '../chat/Alias.jsx';
 import { aliasOf, shownName } from '../chat/aliases.js';
@@ -463,6 +465,9 @@ function ChatPage() {
   const gateName = useChat(s => (view.kind === 'instance' ? s.instances.find(i => i.origin === view.inst)?.name : null));
   useEffect(() => { document.title = `${unreadCount ? `(${unreadCount > 999 ? '999+' : unreadCount}) ` : ''}${channel ? `#${channel.name} - ${detail.server.name}` : view.kind === 'instance' ? gateName || 'Server' : view.kind === 'dm' ? `@${view.username}` : group ? group.name : 'Home'} | Ember`; }, [unreadCount, channel, detail, view, group, gateName]);
   const signedIn = useChat(s => s.signedIn);
+  // Ember Beta (chat/beta.js): signed out = not in; signed in = asked with the account, and again when Ember comes back into focus
+  useEffect(() => { if (ready && !signedIn) loadBeta({ signedIn: false }); }, [ready, signedIn]);
+  useEffect(() => { if (!signedIn) return undefined; const f = () => loadBeta(); addEventListener('focus', f); return () => removeEventListener('focus', f); }, [signedIn]);
   const locked = useChat(s => s.locked); // staff switched Ember and DMs off for the account (store.js lockAccount)
 
   if (!ready) return <BootScreen />;
@@ -547,6 +552,8 @@ function ChatPage() {
           </>
         ) : (
           <>
+            <div className="vc-mainrow">
+            <div className="vc-maincol">
             <header className="vc-head">
               <button type="button" className="vc-ico-btn vc-burger" onClick={openDrawer} title="Menu"><Menu size={19} /></button>
               <button type="button" className="vc-ico-btn vc-back" onClick={openDrawer} title="Back to your chats" aria-label="Back to your chats"><ChevronLeft size={22} /></button>
@@ -587,6 +594,8 @@ function ChatPage() {
  replyTo={replyTo} setReplyTo={setReplyTo}
                   placeholder={modView ? `Message ${view.username} as Nookara Administrator` : isServer ? `Message #${channel?.name || ''}${channel?.type === 'game' ? ' (also shows in Minecraft)' : ''}` : view.kind === 'dm' ? `Message @${view.username}` : `Message ${group?.name || 'the group'}`} /></>}
               </div>
+            </div>
+            </div>
               {showMembers && (isServer || (view.kind === 'dm' && view.username !== 'System') || (view.kind === 'group' && group)) && (
                 <SidePanel view={view} channel={channel} detail={detail} group={group} onUser={openMini} onLeaveGroup={leaveGroup} />
               )}

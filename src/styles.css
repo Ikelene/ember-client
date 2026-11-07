@@ -2453,3 +2453,4 @@ a.acct-nav-item { text-decoration: none }
 /* Native account elements on the Velora homepage. */
 .home-maker > velora-card { width:340px;max-width:100% }
 .home-contributors > velora-card { width:auto;max-width:100% }
+.cs-beta-note { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; }

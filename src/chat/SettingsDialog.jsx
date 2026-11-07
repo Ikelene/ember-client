@@ -8,7 +8,9 @@ import { X, ChevronLeft, ChevronRight, Search, UserRound, CircleUser, Shield, Be
 import { AccountsPage, HostingPage } from './settings/AccountsPages.jsx';
 import VoicePage from './settings/VoicePage.jsx';
 import { ThemePage, TextLayoutPage, BlockingPage, NotifLevels } from './settings/LookPages.jsx';
-import { getDesign, subscribeDesign } from './design.js';
+import { effectiveDesign, subscribeDesign } from './design.js';
+import BetaPage from './settings/BetaPage.jsx';
+import { FlaskConical } from 'lucide-react';
 import ChatSettingsTab, { GROUPS, matches, useDesktopMac, desktopAppTitle } from '../components/tabs/ChatSettingsTab.jsx';
 import ProfileEditor from './ProfileEditor.jsx';
 import { useChat, ask, getState } from './store.js';
@@ -39,6 +41,9 @@ const PAGES = [
   ['Chat & calls', [
     ['Messages', 'Messages', MessageSquare, [...rowText('Messages'), 'Design', 'Look', 'Classic', 'Modern', 'Rounded', 'Square', 'Corners', 'Theme']],
     ['voice', 'Voice & video', Mic, ['Microphone', 'Mic', 'Input', 'Output', 'Speakers', 'Headphones', 'Camera', 'Video', 'Sensitivity', 'Noise suppression', 'Mic test', 'Volume', 'Soundboard']],
+  ]],
+  ['Ember Beta', [
+    ['beta', 'Beta', FlaskConical, ['Beta', 'Early access', 'Ember Beta', 'Preview', 'Modern', 'New features', 'Subscription']],
   ]],
   ['App settings', [
     ['Windows app', 'Windows app', Monitor, ['Desktop app', 'Start with Windows', 'Start minimized', 'Minimize to tray', 'Discord game status', 'RPC', 'Detect games I play'], 'desktop'],
@@ -97,8 +102,8 @@ export default function SettingsDialog({ page: startPage, onClose }) {
 
   // pages that exist here, and the ones that match the search
   // signed out of Velora (web Ember): only the pages that don't need an account
-  const [design, setDesignState] = useState(getDesign);
-  useEffect(() => subscribeDesign(setDesignState), []);
+  const [design, setDesignState] = useState(() => effectiveDesign());
+  useEffect(() => subscribeDesign(() => setDesignState(effectiveDesign())), []);
   const groups = useMemo(() => PAGES.map(([g, items]) => [g, items.filter(it => (it[4] !== 'desktop' || desktop) && (it[4] !== 'modern' || design === 'rounded') && (signedIn || ['Account', 'About', 'theme', 'text', 'voice', 'accounts'].includes(it[0])))
     .map(it => (it[4] === 'desktop' && mac ? [it[0], desktopAppTitle(true), it[2], MAC_APP_WORDS, it[4]] : it))]).filter(([, items]) => items.length), [desktop, signedIn, mac, design]);
   const shown = useMemo(() => groups.map(([g, items]) => [g, items.filter(([, label, , words]) => matches(q, label, ...words))]).filter(([, items]) => items.length), [groups, q]);
@@ -215,7 +220,7 @@ export default function SettingsDialog({ page: startPage, onClose }) {
         <div className="bf-sd-main">
           <header className="bf-sd-head">
             <button type="button" className="bf-sd-backbtn" aria-label="Back to settings" onClick={backToList}><ChevronLeft size={22} /></button>
-            {['accounts', 'hosting', 'voice', 'theme', 'text', 'blocking'].includes(page)
+            {['accounts', 'hosting', 'voice', 'theme', 'text', 'blocking', 'beta'].includes(page)
               ? <h2 className="bf-sd-crumbs"><span>Settings</span><ChevronRight size={14} /><span>{groups.find(([, items]) => items.some(it => it[0] === page))?.[0]}</span><ChevronRight size={14} /><b>{current?.[1]}</b></h2>
               : <h2>{Icon && <Icon size={19} />} {current?.[1] || 'Settings'}</h2>}
             <button type="button" className="bf-sd-x" aria-label="Close settings" data-tip="Close (Esc)" onClick={() => close()}><X size={18} /></button>
@@ -224,6 +229,7 @@ export default function SettingsDialog({ page: startPage, onClose }) {
             {page === 'profile' ? <ProfileEditor onDirty={(on, nudge) => { dirty.current = { on, nudge }; }} />
               : page === 'accounts' ? <AccountsPage onClose={() => close()} />
                 : page === 'hosting' ? <HostingPage onClose={() => close()} />
+                  : page === 'beta' ? <BetaPage />
                   : page === 'voice' ? <VoicePage />
                     : page === 'theme' ? <ThemePage />
                       : page === 'text' ? <TextLayoutPage />

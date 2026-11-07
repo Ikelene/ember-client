@@ -184,7 +184,7 @@ function UnreadList({ rows }) {
   return rows.map(r => <InboxRow key={r.k} unread face={r.face} icon={r.icon} title={r.title} where={r.where} time={r.time} text={r.text} onClick={() => go(r.go)} />);
 }
 
-function SavedList() {
+export function SavedList() {
   const box = useChat(s => s.savedMsgs);
   useEffect(() => { loadSaved(); }, []);
   const list = box?.list || [];

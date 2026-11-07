@@ -4,7 +4,7 @@ import { viaProxy } from './mediaProxy.js';
 // profile editor's preview) and the large profile it expands into.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { MessageCircle, Maximize2, X, UserPlus, Check, Clock, ExternalLink, Globe, Gamepad2, Music, Tv, Trophy, Radio, MoreHorizontal, Pencil, ShieldCheck, Crown, UserMinus, Ban, Link as LinkIcon } from 'lucide-react';
+import { MessageCircle, Maximize2, X, UserPlus, Check, Clock, ExternalLink, Globe, Gamepad2, Music, Tv, Trophy, Radio, MoreHorizontal, Pencil, CalendarDays, LogIn, ShieldCheck, Crown, UserMinus, Ban, Link as LinkIcon } from 'lucide-react';
 import { apiFetch, getToken } from '../api.js';
 import { BotTag, AddBotButton, TrustedIn } from './Bots.jsx';
 import { useChat, lookup, go, wantPresence, toast, errorText, getState, setCustom, ask, loadFriends, toggleBlock, memberRef, faceOf, botPresenceOf, loadMembers, onUserUpdate } from './store.js';
@@ -278,7 +278,7 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
 
   return (
     <div className={`pe-card vc-card${plain ? ' plain' : ''}`} ref={setRef} style={color ? { '--pe-accent': color } : undefined} onContextMenu={e => { if (!e.target.closest('input, textarea')) userMenu(e, username, { sid }); }}>
-      <div className="pe-banner" style={color ? { background: `linear-gradient(135deg, ${color}55, ${color}11)` } : undefined}>
+      <div className={`pe-banner${!plain && p?.banner_url ? ' has-img' : ''}`} style={color ? { background: `linear-gradient(135deg, ${color}55, ${color}11)` } : undefined}>
         {!plain && p?.banner_url && <img src={p.banner_url} alt="" />}
         <div className="vc-card-tools">
           {onExpand && !plain && <button type="button" title="Open the full profile" onClick={() => onExpand(ref.current?.getBoundingClientRect())}><Maximize2 size={14} /></button>}
@@ -336,8 +336,9 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
             {localTime && <div className="pe-fact"><b>Local time</b><span>{localTime}</span></div>}
             {!plain && <ManageFacts presence={presence} />}
             {plain && <LastOnlineFact member={member} />}
-            {member?.joined_at && <div className="pe-fact"><b>Joined this server</b><span>{new Date(member.joined_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span></div>}
-            {!plain && p?.created_at && <div className="pe-fact"><b>Nookara member since</b><span>{new Date(p.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span></div>}
+            {member?.joined_at && <div className="pe-fact vc-fact-classic"><b>Joined this server</b><span>{new Date(member.joined_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span></div>}
+            {!plain && p?.created_at && <div className="pe-fact vc-fact-classic"><b>Nookara member since</b><span>{new Date(p.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span></div>}
+            <ProfileDates joined={member?.joined_at} since={!plain ? p?.created_at : null} />
           </>
         )}
         {!p && <div className="vc-skel" />}
@@ -457,7 +458,7 @@ export function ProfileModal({ username: shown, from, sid, who, onClose }) {
     <div className={`vc-modal-back${closing ? ' out' : ''}`} onMouseDown={e => { if (e.target === e.currentTarget) close(); }}>
       <div className="vc-big" ref={card} style={color ? { '--pe-accent': color } : undefined}>
         <button type="button" className="vc-big-x" onClick={close} title="Close"><X size={18} /></button>
-        <div className="vc-big-banner" style={color ? { background: `linear-gradient(135deg, ${color}66, ${color}11)` } : undefined}>
+        <div className={`vc-big-banner${p?.banner_url ? ' has-img' : ''}`} style={color ? { background: `linear-gradient(135deg, ${color}66, ${color}11)` } : undefined}>
           {p?.banner_url && <img src={p.banner_url} alt="" />}
         </div>
         <div className="vc-big-head">
@@ -513,7 +514,8 @@ export function ProfileModal({ username: shown, from, sid, who, onClose }) {
                     {p?.country_code && <div className="pe-fact"><b>Country</b><span className="pe-country"><img className="pe-flag" src={`/assets/flags/${p.country_code.toLowerCase()}.png`} alt="" onError={e => { e.currentTarget.style.display = 'none'; }} /> {regionName(p.country_code)}</span></div>}
                     {localTime && <div className="pe-fact"><b>Local time</b><span>{localTime}</span></div>}
                     <ManageFacts presence={presence} />
-                    {p?.created_at && <div className="pe-fact"><b>Nookara member since</b><span>{new Date(p.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</span></div>}
+                    {p?.created_at && <div className="pe-fact vc-fact-classic"><b>Nookara member since</b><span>{new Date(p.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</span></div>}
+                    <ProfileDates since={p?.created_at} />
                     {p?.website && <div className="pe-fact"><b>Website</b><span><a className="pe-link" href={/^https?:/i.test(p.website) ? p.website : `https://${p.website}`} target="_blank" rel="noopener noreferrer nofollow"><Globe size={13} /> {p.website.replace(/^https?:\/\/(www\.)?/i, '')}</a></span></div>}
                   </div>
                   {p?.connections?.length > 0 && (
@@ -563,3 +565,17 @@ export function useProfiles() {
   return { openMini, openBig: (username, from) => setBig({ username, from, sid }), ui };
 }
 export const meName = () => getState().me?.username;
+
+// Modern look: the dates as one quiet line of icons (month + year; the full date on hover) instead of labelled rows.
+// Classic keeps the labelled rows (.vc-fact-classic); CSS shows one or the other.
+function ProfileDates({ joined, since }) {
+  if (!joined && !since) return null;
+  const month = t => new Date(t).toLocaleDateString(undefined, { year: 'numeric', month: 'long' });
+  const full = t => new Date(t).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  return (
+    <div className="vc-pf-dates">
+      {since && <span data-tip={`On Nookara since ${full(since)}`}><CalendarDays size={15} /> {month(since)}</span>}
+      {joined && <span data-tip={`Joined this server ${full(joined)}`}><LogIn size={15} /> {month(joined)}</span>}
+    </div>
+  );
+}

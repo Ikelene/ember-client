@@ -17,6 +17,10 @@ export const THEMES = {
   rose: { name: 'Rosé', app: '#150b10', side: '#1d1017', main: '#23131c', raised: '#2e1925', hover: '#321b28', on: '#432435', text: '#f6e6ee', accent: '#f39ac7' },
   mocha: { name: 'Mocha', app: '#11111b', side: '#181825', main: '#1e1e2e', raised: '#28283b', hover: '#2b2b3f', on: '#36364d', text: '#cdd6f4', accent: '#cba6f7' },
   sunset: { name: 'Sunset', app: '#160c0a', side: '#1f110e', main: '#261612', raised: '#331e18', hover: '#38211a', on: '#4a2c22', text: '#f8e7df', accent: '#ff9966' },
+  // light themes (html.vc-light: modern.css light tokens + the generated light.css)
+  light: { name: 'Light', light: true, app: '#e4e4ea', side: '#f0f0f4', main: '#ffffff', raised: '#f3f3f6', hover: '#eaeaef', on: '#dedee6', text: '#1d1d23', accent: '#c94f8a' },
+  paper: { name: 'Paper', light: true, app: '#e9e3d8', side: '#f3eee5', main: '#fbf8f2', raised: '#f1ebe0', hover: '#ebe4d8', on: '#e1d8c9', text: '#2b241c', accent: '#b5562b' },
+  frost: { name: 'Frost', light: true, app: '#dde6ee', side: '#eaf0f5', main: '#f8fbfd', raised: '#edf2f7', hover: '#e4ebf2', on: '#d6e0ea', text: '#17212b', accent: '#2f6fd1' },
 };
 export const RADIUS = { none: 0, small: 0.5, medium: 1, large: 1.6 };
 export const FONTS = {
@@ -86,7 +90,7 @@ export function applyLook() {
   if (!modern) {
     VARS.forEach(v => root.style.removeProperty(v));
     body?.style.removeProperty('--accent'); body?.style.removeProperty('--accent-dim');
-    root.classList.remove('vc-hide-scroll', 'vc-recent-off', 'vc-has-bgimg');
+    root.classList.remove('vc-hide-scroll', 'vc-recent-off', 'vc-has-bgimg', 'vc-light');
     return;
   }
   const t = THEMES[L.theme] || THEMES.dark;
@@ -118,4 +122,5 @@ export function applyLook() {
   root.classList.toggle('vc-has-bgimg', !!img);
   root.classList.toggle('vc-hide-scroll', !!L.hideScroll);
   root.classList.toggle('vc-recent-off', !L.recentPosters);
+  root.classList.toggle('vc-light', !!t.light);
 }

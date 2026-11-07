@@ -41,7 +41,7 @@ function Empty({ icon: Icon, children }) {
   return <div className="vc-dash-empty"><Icon size={20} /><span>{children}</span></div>;
 }
 
-export default function Dashboard({ onUser, onTab }) {
+export default function Dashboard({ onUser, onTab, bare = false }) {
   const me = useChat(s => s.me);
   const dms = useChat(s => s.dms);
   const groups = useChat(s => s.groups);
@@ -153,14 +153,14 @@ export default function Dashboard({ onUser, onTab }) {
   return (
     <div className="vc-dash">
       <div className="vc-dash-hero vl-rise">
-        <div className="vc-dash-hello">
+        {!bare && <div className="vc-dash-hello">
           {me && <Avatar user={me} size={56} />}
           <div>
             <small>{now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}</small>
             <h2>{hourWord(now.getHours())}{me ? `, ${me.username}` : ''}</h2>
             <p>{summary}</p>
           </div>
-        </div>
+        </div>}
         <div className="vc-dash-stats">
           {stats.map((x, i) => (
             <button type="button" key={x.k} className={`vc-dash-stat${x.n ? ' hot' : ''} k-${x.k}`} style={{ '--i': i }} onClick={x.go}>

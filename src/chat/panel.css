@@ -192,3 +192,23 @@ html.vc-rounded .bf-create-tabs button { border-radius: calc(8px * var(--rk, 1))
 .vc-recent .vc-av + .vc-av { margin-left: -6px; }
 .vc-ch:hover .vc-recent .vc-av { box-shadow: 0 0 0 2px var(--m-hover, #222226); }
 .vc-ch.on .vc-recent .vc-av { box-shadow: 0 0 0 2px var(--m-on, #2c2c32); }
+
+/* the side panel runs the full height of the conversation area, its tabs level with the header */
+.vc-mainrow { position: relative; flex: 1; min-height: 0; display: flex; }
+.vc-maincol { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.vc-mainrow > .vc-panel { border-left: 1px solid var(--border); }
+.vc-panel-tabs { height: 52px; box-sizing: border-box; align-items: center; padding: 0 8px; }
+.vc-panel-tabs > button { height: 36px; }
+html.vc-rounded .vc-panel-tabs { height: 54px; padding: 0 8px; }
+html.vc-rounded .vc-mainrow > .vc-panel { border-left: 1px solid var(--m-line); }
+@media (max-width: 1100px) { .vc-mainrow > .vc-panel { position: absolute; top: 0; right: 0; bottom: 0; } }
+@media (max-width: 760px) { html.vc-rounded .vc-panel-tabs { height: 58px; } }
+
+/* ── profiles: dates as an icon line in Modern (Profile.jsx ProfileDates), grey banner when there's no picture ── */
+.vc-pf-dates { display: none; }
+html.vc-rounded .vc-fact-classic { display: none; }
+html.vc-rounded .vc-pf-dates { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 4px; color: var(--text); font-size: 13.5px; font-weight: 500; }
+html.vc-rounded .vc-pf-dates span { display: inline-flex; align-items: center; gap: 7px; cursor: default; }
+html.vc-rounded .vc-pf-dates svg { color: var(--muted); }
+html.vc-rounded .pe-banner:not(.has-img), html.vc-rounded .vc-big-banner:not(.has-img) { background: var(--m-on) !important; }
+html.vc-rounded .pe-card, html.vc-rounded .vc-dm-side .pe-card, html.vc-rounded .vc-panel-profile .pe-card { border-top: 0; }
