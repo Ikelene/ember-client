@@ -364,3 +364,19 @@ html.vc-rounded.vc-light .vc-msg:hover, html.vc-rounded.vc-light .vc-msg.hov { b
 html.vc-rounded.vc-light .vc-modal-back { background: rgba(30, 30, 45, .35); }
 html.vc-rounded.vc-light.vc-page ::-webkit-scrollbar-thumb { background-color: rgba(0, 0, 0, .22); }
 html.vc-rounded.vc-light .vc-disc-hero h1 { -webkit-text-fill-color: #fff; }
+
+/* ── the long tail the corner sweep found (staging audit of every visible box in Modern) ── */
+html.vc-rounded :is(.vc-patt-dest, .vc-patt-spoiler, .vc-patt-x, .vc-patt button) { border-radius: calc(6px * var(--rk, 1)); }
+html.vc-rounded .vc-patt, html.vc-rounded .vc-patt.thumb, html.vc-rounded .vc-patt.card, html.vc-rounded .vc-patt.busy { border-radius: calc(10px * var(--rk, 1)); overflow: hidden; }
+html.vc-rounded .vc-patt-kind, html.vc-rounded .vc-patt-ico b { border-radius: calc(4px * var(--rk, 1)); }
+html.vc-rounded .vc-updest-card { border-radius: calc(10px * var(--rk, 1)); }
+html.vc-rounded .vc-appdl-tip { border-radius: calc(12px * var(--rk, 1)); }
+html.vc-rounded .vc-appdl-ring { border-radius: calc(14px * var(--rk, 1)); }
+html.vc-rounded :is(.pe-msg, .vc-btn-msg, .bf-pp-copy, .bf-pe-swatch) { border-radius: calc(8px * var(--rk, 1)); }
+html.vc-rounded :is(.pe-badges, .vc-card-badges, .bf-pp-badges) { border-radius: calc(8px * var(--rk, 1)); }
+html.vc-rounded .vc-big-banner, html.vc-rounded .vc-big-banner img { border-radius: var(--r-xl) var(--r-xl) 0 0; }
+html.vc-rounded :is(.pe-banner, .bf-pp-banner) img { border-radius: inherit; }
+html.vc-rounded .vc-em-sec { border-radius: calc(8px * var(--rk, 1)); }
+@media (max-width: 1100px) {
+  html.vc-rounded .vc-mainrow > .vc-panel { border-radius: var(--m-card) 0 0 var(--m-card); overflow: hidden; }
+}
