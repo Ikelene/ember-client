@@ -350,8 +350,7 @@ export async function flushOutbox(onlyFor = null) {
   try {
     for (const h of await held()) {
       if (onlyFor && String(h.to).toLowerCase() !== String(onlyFor).toLowerCase()) continue;
-      const v = await bundleFor(h.to, { fresh: true }).catch(() => null);
-      if (v?.b) await sender(h);
+      await sender(h); // (held from before: it goes now, encrypted or, if they still haven't set up, not)
     }
   } finally { flushing = false; }
 }

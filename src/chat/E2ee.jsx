@@ -191,8 +191,8 @@ export function E2eeLockedPanel() {
     <div className="e2-panel">
       <Lock size={22} />
       <div>
-        <b>{status === 'none' ? 'Set up encrypted DMs to read and send messages' : 'Unlock your DMs on this device'}</b>
-        <p>{status === 'none' ? 'Only you and the person you talk to can read your DMs, not even Nookara.' : 'Your messages are encrypted. This device needs your PIN, password or recovery code, or a link from another device.'}</p>
+        <b>{status === 'none' ? 'Set up encrypted DMs to reply' : 'Unlock your DMs on this device'}</b>
+        <p>{status === 'none' ? "Messages to you aren't encrypted until you do. Once you've set up, only you and the person you talk to can read your DMs, not even Nookara." : 'Your messages are encrypted. This device needs your PIN, password or recovery code, or a link from another device.'}</p>
       </div>
       <button type="button" className="btn btn-primary" onClick={() => openE2eeGate()}>{status === 'none' ? 'Set up' : 'Unlock'}</button>
     </div>
@@ -200,7 +200,8 @@ export function E2eeLockedPanel() {
 }
 
 // a line under the conversation's header: what kind of privacy this conversation has
-export function E2eeLabel({ kind, username }) {
+export function E2eeLabel({ kind, username, plain }) {
+  if (plain) return <div className="e2-label off"><LockOpen size={13} /> Not encrypted: @{username} hasn't set up encrypted DMs yet. They can read this, and have to set up to reply.</div>;
   if (kind === 'group') return <div className="e2-label off"><LockOpen size={13} /> Not end-to-end encrypted. Nookara can read group chats.</div>;
   return <button type="button" className="e2-label" onClick={() => openSafety(username)} title="Compare keys with them"><Lock size={13} /> End-to-end encrypted. Only you two can read this.</button>;
 }
