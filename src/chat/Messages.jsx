@@ -412,11 +412,23 @@ let hovId = null;
 export const setHovered = id => { if (id === hovId) return; hovId = id; hoverSubs.forEach(f => f()); };
 const subHover = f => { hoverSubs.add(f); return () => hoverSubs.delete(f); };
 const useHovered = id => useSyncExternalStore(subHover, () => hovId === id);
+// holding Shift turns the hover toolbar into quick Edit + Delete buttons (Delete then skips the "are you sure")
+let shiftDown = false;
+const shiftSubs = new Set();
+const setShift = v => { if (v === shiftDown) return; shiftDown = v; shiftSubs.forEach(f => f()); };
+if (typeof window !== 'undefined') {
+  addEventListener('keydown', e => { if (e.key === 'Shift') setShift(true); }, true);
+  addEventListener('keyup', e => { if (e.key === 'Shift') setShift(false); }, true);
+  addEventListener('blur', () => setShift(false));
+  document.addEventListener('visibilitychange', () => setShift(false));
+}
+const useShift = () => useSyncExternalStore(f => { shiftSubs.add(f); return () => shiftSubs.delete(f); }, () => shiftDown);
 const ToolsHost = createContext(null);
 
 function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, setEditing, view, fresh }) {
   const toolsEl = useContext(ToolsHost);
   const hovered = useHovered(String(m.id));
+  const shift = useShift() && hovered;
   const rootRef = useRef(null);
   const [tr, setTr] = useState(null); // a translation shown under the text: { loading } | { text, from, same, local }
   const linkPreviews = useChat(s => s.settings.link_previews !== false);
@@ -586,12 +598,17 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
         )}
       </div>
       {hovered && toolsEl && !m.pending && !m.failed && !editing && !m.ephemeral && createPortal(
-        <div className="vc-tools" key={m.id}>
+        shift && (caps.edit || caps.del) ? (
+          <div className="vc-tools vc-tools-quick" key={`${m.id}-quick`}>
+            {caps.edit && <button type="button" title="Edit" onClick={() => setEditing(m.id)}><Pencil size={16} /><span>Edit</span></button>}
+            {caps.del && <button type="button" className="danger" title="Delete now (no question while Shift is held)" onClick={() => remove({ shiftKey: true })}><Trash2 size={16} /><span>Delete</span></button>}
+          </div>
+        ) : <div className="vc-tools" key={m.id}>
           {canReact && <><QuickReactions id={reactId} inst={instOpt(m.channel)} selected={(m.reactions || []).filter(r => r.users?.includes(ctx.me)).map(r => r.emoji)} onDone={() => {}} limit={4} className="vc-tools-react" sid={view.kind === 'channel' ? view.sid : null} /><button type="button" title="Add reaction" onClick={e => openReactionPicker(reactId, e.currentTarget, instOpt(m.channel))}><SmilePlus size={17} /></button><span className="vc-tools-sep" aria-hidden="true" /></>}
           {starHere && <button type="button" title={starred ? 'Take your star back' : 'Star it (for the starboard)'} className={`vc-star-tool${starred ? ' on' : ''}`} onClick={() => setReaction(m.id, STAR, !starred, instOpt(m.channel))}><Star size={15} fill={starred ? 'currentColor' : 'none'} /></button>}
           {canReplyHere && <button type="button" title="Reply" onClick={() => onReply(m)}><Reply size={17} /></button>}
           {caps.edit && <button type="button" title="Edit" onClick={() => setEditing(m.id)}><Pencil size={16} /></button>}
-          <button type="button" title="More" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); openMsgMenu({ clientX: Math.max(8, r.right - 250), clientY: r.bottom + 6, target: e.currentTarget, preventDefault() {}, stopPropagation() {} }); }}><Ellipsis size={17} /></button>
+          <button type="button" title="More (hold Shift for quick edit and delete)" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); openMsgMenu({ clientX: Math.max(8, r.right - 250), clientY: r.bottom + 6, target: e.currentTarget, preventDefault() {}, stopPropagation() {} }); }}><Ellipsis size={17} /></button>
         </div>, toolsEl)}
     </div>
   );

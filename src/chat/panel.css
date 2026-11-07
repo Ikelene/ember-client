@@ -311,3 +311,12 @@ html.vc-rounded .bf-ss-hero-id .vc-srv-ico.lg { border-radius: 50%; overflow: hi
 html.vc-rounded .bf-ss .bf-ss-srv { display: flex; align-items: center; gap: 12px; padding: 10px 12px; }
 html.vc-rounded .bf-ss .bf-ss-srv .vc-srv-ico { flex: none; width: 40px; height: 40px; overflow: hidden; border-radius: calc(12px * var(--rk, 1)); background: var(--m-on); font-size: 13px; }
 html.vc-rounded .bf-ss .bf-ss-srv > span:last-child { min-width: 0; display: flex; flex-direction: column; text-align: left; }
+
+/* Shift held over a message: quick Edit + Delete */
+.vc-tools.vc-tools-quick { animation: vc-fade .12s; }
+.vc-tools.vc-tools-quick button { width: auto; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; font: inherit; font-size: 13px; font-weight: 600; }
+.vc-tools.vc-tools-quick button.danger { color: #f08f8f; }
+.vc-tools.vc-tools-quick button.danger:hover { background: rgba(212, 92, 92, .18); color: #ffb3b3; }
+html.vc-rounded .vc-tools.vc-tools-quick button, .vc .vc-tools.vc-tools-quick button { width: auto; min-width: 0; height: 32px; padding: 0 12px; }
+.vc-panel-tabs > .vc-panel-close { display: none; }
+@media (max-width: 1100px) { .vc-panel-tabs > .vc-panel-close { display: grid; flex: none; } }

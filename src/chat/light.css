@@ -615,6 +615,8 @@ html.vc-rounded.vc-light .vc-tooltip.k-ok .vc-tip-card > svg { color: #407853; }
 html.vc-rounded.vc-light .vc-tip-card b { color: #16161b; }
 html.vc-rounded.vc-light .vc-side-head.banner .vc-side-acts .vc-ico-btn { color: #16161b; }
 html.vc-rounded.vc-light .bf-ss-qr { background: #ffffff; }
+html.vc-rounded.vc-light .vc-tools.vc-tools-quick button.danger { color: #8b5353; }
+html.vc-rounded.vc-light .vc-tools.vc-tools-quick button.danger:hover { color: #946868; }
 
 /* ── src/chat/dashboard.css ── */
 html.vc-rounded.vc-light .vc-dash-hero { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, #f3f3f6), #f4f4f7 60%); }
