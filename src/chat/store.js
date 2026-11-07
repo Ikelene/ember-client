@@ -472,7 +472,7 @@ function onEvent(m, inst = VELORA) {
       });
       break;
     case 'e2ee_keys_changed': // someone's keys or linked clients changed (or they just set up, so messages held for them can go)
-      if (m.username) { E2EE.forgetBundle(m.username); E2EE.flushOutbox(m.username); }
+      if (m.username) { E2EE.forgetBundle(m.username); E2EE.flushOutbox(m.username); dispatchEvent(new CustomEvent('e2ee-keys-changed', { detail: m.username })); }
       break;
     case 'e2ee_link_request':
       if (state.e2eeStatus === 'ready') toast(m.kind === 'device' ? 'A device is asking to read your DMs. To approve it, go to Settings, Privacy.' : `${m.label} is asking to read your DMs. To approve it, go to Settings, Privacy.`);
@@ -1089,10 +1089,14 @@ async function sendDm(d) {
     E2EE.release(d.nonce);
   } catch (e) {
     dmSends.delete(d.nonce);
-    if (e.message === 'no_keys') { // they haven't set up encrypted DMs: it stays on this device and goes by itself when they have
-      const { key, retried, ...keep } = d;
-      E2EE.hold({ ...keep, created_at: Date.now() }).catch(() => {});
-      patch(x => ({ ...x, waiting: true }));
+    if (e.message === 'no_keys') { // they haven't set up encrypted DMs: it goes unencrypted, and says so (Ikelene, 2026-11-06). They set up to reply.
+      // (a file that was encrypted for this message would put its key in plain text: those only go once they have keys)
+      if (/#nke=/.test(d.wire)) { pendingAcks.delete(d.nonce); patch(x => ({ ...x, failed: 'plain_files' })); return; }
+      dmSends.set(d.nonce, d);
+      if (!send({ type: 'im_send', to: d.to, message: d.wire, reply_to: d.reply_to, status_reply: d.status_reply, nonce: d.nonce })) { dmSends.delete(d.nonce); pendingAcks.delete(d.nonce); patch(x => ({ ...x, failed: 'offline' })); return; }
+      pendingAcks.set(d.nonce, d.key);
+      patch(x => (x.waiting ? { ...x, waiting: false } : x));
+      E2EE.release(d.nonce);
       return;
     }
     pendingAcks.delete(d.nonce);
@@ -1225,6 +1229,11 @@ export async function editMessage(id, text, m) {
   if (m?.gid && m?.room) { await apiFetch(`/groups/${encodeURIComponent(m.room)}/messages/${encodeURIComponent(m.gid)}`, { method: 'PATCH', body: JSON.stringify({ message: text }) }); return; }
   // a DM (im<id>): its own route; both people get im_edited
   if (/^im\d+$/.test(String(id))) {
+    // an unencrypted DM to someone who still hasn't set up stays unencrypted
+    if (!m?.sealed && m?.author?.username === state.me?.username && (await E2EE.bundleFor(state.view?.username, { fresh: true }).catch(() => ({}))).none) {
+      await apiFetch(`/im/${String(id).slice(2)}/edit`, { method: 'PATCH', body: JSON.stringify({ body: text }) });
+      return;
+    }
     const wire = [text, ...(m?.sealed?.files || [])].filter(Boolean).join('\n'); // (the text changes, the files stay)
     const peer = String(m.fromId) === String(m.toId) ? state.me?.username : (m.author?.username === state.me?.username ? state.view?.username : m.author?.username);
     const enc = await E2EE.sealEdit({ fromId: m.fromId, toId: m.toId, imId: m.imId, peer, quote: m.quote }, wire);
@@ -1419,7 +1428,8 @@ export async function uploadAttachment(v, file, opts = {}) {
   }
   // DMs / group chats: opts.dest picked in the composer (a file without one, e.g. a command option, follows the setting)
   const dest = opts.dest || rememberedUploadDest() || 'temp';
-  if (v.kind === 'dm') { // encrypted here first: Nookara stores a file it can't open, its key travels inside the encrypted message
+  // encrypted here first: Nookara stores a file it can't open, its key travels inside the encrypted message. Not to someone who hasn't set up: their DM isn't encrypted
+  if (v.kind === 'dm' && !(await E2EE.bundleFor(v.username).catch(() => ({ none: false }))).none) {
     const { upload, key, iv } = await E2EE.sealFile(file);
     const a = await (dest === 'account' ? uploadAccount(upload, opts) : uploadTemp(upload, opts));
     return { url: E2EE.fileLink(a.url, { key, iv, name: file.name, mime: file.type }), sealed: true, type: fileKindOfMime(file.type), name: file.name, size: file.size };
@@ -1813,6 +1823,8 @@ export const DM_FAIL_TEXT = 'Failed to send this message due to the users privac
 export const DM_REQUEST_TEXT = 'Your message request was sent. You can message them once they accept.';
 export const dmErrorText = code => (code === 'dm_request_sent' ? DM_REQUEST_TEXT : code === 'user_blocked' || code === 'dm_privacy' ? DM_FAIL_TEXT : errorText(code));
 export function errorText(code) {
+  if (code === 'plain_files') return "They haven't set up encrypted DMs, so this file can't go encrypted. Remove it and send it again.";
+  if (code === 'sender_no_keys') return 'Set up encrypted DMs to send messages.';
   if (code === 'cannot_dm_persona') return "This account doesn't take DMs.";
   if (code === 'e2ee_locked') return 'Unlock your DMs on this device first.';
   if (code === 'bad_key_list') return "That person's encryption keys don't check out, so nothing was sent. Try again later.";

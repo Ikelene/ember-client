@@ -17,7 +17,7 @@ export function E2eeMessageNote({ m, view }) {
   if (m.waiting) return (
     <div className="e2-msg-note"><Clock size={13} /> <span>Waiting for @{view.username} to set up encrypted DMs. It sends by itself once they have, while Ember is open on this device. <button type="button" onClick={() => dropFailed(view, m.nonce)}>Remove</button></span></div>
   );
-  if (m.notEncrypted && !m.pending && view.kind === 'dm') return <div className="e2-msg-note"><LockOpen size={13} /> Not encrypted yet: sent before encrypted DMs, and it's encrypted once you've both set up.</div>;
+  if (m.notEncrypted && !m.pending && view.kind === 'dm') return <div className="e2-msg-note"><LockOpen size={13} /> Not encrypted: sent before you'd both set up encrypted DMs. It's encrypted once you've both set up.</div>;
   if (!s) return null;
   if (s.state === 'locked') return <div className="e2-msg-note"><Lock size={13} /> <span>Encrypted. <button type="button" onClick={() => openE2eeGate()}>Unlock your DMs</button> to read this.</span></div>;
   if (s.state === 'failed') return <div className="e2-msg-note bad"><AlertTriangle size={13} /> This device can't open this message. It was sealed to a key you don't have any more.</div>;
@@ -69,6 +69,16 @@ export function PreviewOnAsk({ urls, inst, priv }) {
 }
 
 export function E2eeComposerNotes({ view }) {
+  // has the other person set up? (they haven't: what's sent now isn't encrypted)
+  const [unset, setUnset] = useState(false);
+  useEffect(() => {
+    let live = true;
+    setUnset(false);
+    if (view.kind === 'dm' && view.username !== 'System') E2EE.bundleFor(view.username).then(v => { if (live) setUnset(!!v.none); }).catch(() => {});
+    const again = e => { if (String(e.detail || '').toLowerCase() === String(view.username).toLowerCase()) E2EE.bundleFor(view.username, { fresh: true }).then(v => live && setUnset(!!v.none)).catch(() => {}); };
+    addEventListener('e2ee-keys-changed', again);
+    return () => { live = false; removeEventListener('e2ee-keys-changed', again); };
+  }, [view.kind, view.username]);
   const changed = useChat(s => (view.kind === 'dm' ? s.e2eeKeyChanged[String(view.username).toLowerCase()] : false));
   if (view.kind !== 'dm' && view.kind !== 'group') return null;
   if (view.kind === 'dm' && view.username === 'System') return null;
@@ -79,7 +89,7 @@ export function E2eeComposerNotes({ view }) {
           <span>@{view.username}'s encryption key changed. They may have started over or lost their old one. <button type="button" onClick={() => openSafety(view.username)}>Compare keys</button> <button type="button" onClick={() => dismissKeyChange(view.username)}>Dismiss</button></span>
         </div>
       )}
-      <E2eeLabel kind={view.kind} username={view.username} />
+      <E2eeLabel kind={view.kind} username={view.username} plain={view.kind === 'dm' && !!unset} />
     </>
   );
 }
