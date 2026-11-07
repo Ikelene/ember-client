@@ -22,7 +22,6 @@ import { removeInstance, reorderInstances, reconnect as reconnectInstance } from
 import { startSignIn } from './session.js';
 import { Avatar, subtitle, RoleChip, STATUS_LABEL, BlockedMark } from './Profile.jsx';
 import { MePopout } from './ProfilePopout.jsx';
-import { NotificationBell } from './Notifications.jsx';
 import Logo from '../components/Logo.jsx';
 
 // who's typing in a conversation right now
@@ -50,7 +49,7 @@ function TypingMark({ names, people, sid }) {
 // Every server is one plain icon: Velora-hosted ones (only while signed in with Velora) first, then the servers on instances in
 // the order of the instance list. Each group is dragged within itself. An instance icon's tooltip names the server and its address.
 const localRailOrder = () => { try { const v = JSON.parse(localStorage.getItem('bf_rail_order') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
-export function Rail({ onDiscover, onAddInstance, onCreate }) {
+export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }) {
 
   const servers = useChat(s => s.servers);
   const allInstances = useChat(s => s.instances);
@@ -234,8 +233,8 @@ export function Rail({ onDiscover, onAddInstance, onCreate }) {
   };
   return (
     <nav className="vc-rail" aria-label="Servers">
-      <RailItem active={home} unread={homeUnread && !home} title="Home - friends and direct messages" onClick={() => go({ kind: 'home' })}>
-        <span className="vc-rail-home"><img src="/assets/bonfire/logo-photo-96.jpg?v=2" alt="" width={44} height={44} draggable={false} /></span>
+      <RailItem active={home && !discoverOn} unread={homeUnread && !home} title="Home - friends and direct messages" onClick={() => go({ kind: 'home' })}>
+        <span className="vc-srv-ico vc-rail-dm"><MessageCircle size={24} /></span>
       </RailItem>
       {newDMs.map(c => (
         <RailItem key={`dm-${c.username}`} unread badge={c.unread} onContextMenu={e => userMenu(e, c.username)} title={`${c.username === 'System' ? 'Nookara' : c.username} - ${c.unread} new`} onClick={() => go({ kind: 'dm', username: c.username })}>
@@ -252,8 +251,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate }) {
 
       {(legacy.length > 0 || instances.length > 0) && <div className="vc-rail-sep" />}
       <RailItem title="Create a server" onClick={onCreate}><span className="vc-srv-ico act"><Plus size={22} /></span></RailItem>
-      <RailItem title="Add a server by its address" onClick={onAddInstance}><span className="vc-srv-ico act"><Server size={20} /></span></RailItem>
-      <RailItem title="Discover" onClick={onDiscover}><span className="vc-srv-ico act"><Compass size={20} /></span></RailItem>
+      <RailItem title="Discover" active={discoverOn} onClick={onDiscover}><span className="vc-srv-ico act"><Compass size={20} /></span></RailItem>
 
       {!isDesktopApp() && !window.bonfireMobile && (
         <RailItem title="Get the Ember app" onClick={() => dialog('app-download')}><span className="vc-srv-ico act" data-app-download><Download size={20} /></span></RailItem>
@@ -557,7 +555,7 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
 }
 
 // ── member list (grouped: owner / admins / online / offline) ────────────────
-export function MemberList({ sid, onUser }) {
+export function MemberList({ sid, onUser, embedded = false }) {
   const members = useChat(s => s.members[sid]);
   const more = useChat(s => s.membersMore[sid]); // a big Velora-hosted server: more pages to load (as you scroll)
   const presence = useChat(s => s.presence);
@@ -566,6 +564,8 @@ export function MemberList({ sid, onUser }) {
   const [shown, setShown] = useState(60);
   const roles = useChat(s => s.detail[sid]?.roles);
   const blocks = useChat(s => s.blocks); // people I blocked: masked below
+  const [shut, setShut] = useState(() => new Set()); // collapsed groups (by title)
+  const flip = k => setShut(x => { const n = new Set(x); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const groups = useMemo(() => {
     if (!members) return [];
     const st = m => statusOf(sid, m) || 'offline';
@@ -585,14 +585,18 @@ export function MemberList({ sid, onUser }) {
     out.push(['Offline', members.filter(m => !none(m) && st(m) === 'offline').sort(by)]);
     return out.filter(([, l]) => l.length);
   }, [members, presence, roles, names, signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!members) return <aside className="vc-members"><div className="vc-loading"><i /><i /><i /></div></aside>;
+  const cls = `vc-members${embedded ? ' embedded' : ''}`;
+  if (!members) return <aside className={cls}><div className="vc-loading"><i /><i /><i /></div></aside>;
   let n = 0;
   return (
-    <aside className="vc-members" key={sid} onScroll={more != null ? e => { const el = e.currentTarget; if (el.scrollTop + el.clientHeight > el.scrollHeight - 400) loadMoreMembers(sid); } : undefined}>
+    <aside className={cls} key={sid} onScroll={more != null ? e => { const el = e.currentTarget; if (el.scrollTop + el.clientHeight > el.scrollHeight - 400) loadMoreMembers(sid); } : undefined}>
       {groups.map(([title, list, role]) => (
         <div key={role?.rid || title} className="vc-mgroup">
-          <div className="vc-cat-name static">{role?.icon && <img className="vc-role-ico" src={role.icon} alt="" />}{title} - {list.length}</div>
-          {list.map(m => {
+          <button type="button" className="vc-cat-name vc-mgroup-head" aria-expanded={!shut.has(title)} onClick={() => flip(title)} style={role?.color ? { '--role': role.color } : undefined}>
+            {role?.icon && <img className="vc-role-ico" src={role.icon} alt="" />}<span className="vc-mgroup-t">{title}</span><span className="vc-mgroup-n"> - {list.length}</span>
+            <span className="grow" /><ChevronDown size={14} className={shut.has(title) ? 'shut' : ''} />
+          </button>
+          {!shut.has(title) && list.map(m => {
             n++;
             if (title === 'Offline' && n > shown) return null;
             const p = presenceFor(sid, m);
@@ -719,7 +723,6 @@ export function UserPanel({ onSettings, onEditProfile }) {
         </span>
       </button>
       <QuickVoiceBtns />
-      <NotificationBell />
       <button type="button" className="vc-ico-btn" onClick={onSettings} title="Settings"><Settings size={17} /></button>
       {pop && <MePopout anchor={pop} onClose={() => setPop(null)} onEditProfile={onEditProfile} onCustomStatus={() => { setPop(null); setCustomOpen(true); }} />}
       {custom && <CustomStatus current={p?.custom || ''} onClose={() => setCustomOpen(false)} />}

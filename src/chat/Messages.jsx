@@ -10,7 +10,7 @@ import { VideoPlayer, AudioPlayer, VoicePlayer } from './MediaPlayer.jsx';
 import { useVoiceRecorder, VoiceBar } from './VoiceNote.jsx';
 import { holdOutcome, isVoiceAtt, isVoiceLink } from './voice-note.js';
 import { viewMedia } from './MediaViewer.jsx';
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { AudioLines, Eye, EyeOff, Reply, Pencil, Trash2, Copy, Plus, X, SmilePlus, Lock, SendHorizontal, AlertCircle, ImageIcon, CornerUpRight, Music, Film, ArrowRight, ArrowLeft, Webhook, Phone, Pin, ChevronUp, Star, Upload, CloudUpload } from 'lucide-react';
 import { Embeds } from './ChannelTypes.jsx';
@@ -37,6 +37,8 @@ import { tempId, isCdnTemp } from './upload-dest.js';
 import { TempAttPopover } from './TempAttPopover.jsx';
 import { shortDays, daysText } from './temp-pick.js';
 import { viaProxy } from './mediaProxy.js';
+import { Ellipsis, Languages } from 'lucide-react';
+import { saveRef, savedIdOf, saveMessage, unsaveMessage, translate, langName } from './inbox.js';
 import { BookmarkPlus, Smile, File as FileIcon, FileArchive, FileCode, FileText, Download, Coins, MessageSquareQuote, Forward } from 'lucide-react';
 import { messageCaps, reactionId, pinPath } from './msg-actions.js';
 
@@ -402,7 +404,20 @@ function messageInfo(m) {
   ask({ title: 'Message info', text, confirm: au.id ? 'Copy author ID' : 'OK', cancel: 'Close' })
     .then(ok => { if (ok && au.id) navigator.clipboard?.writeText(String(au.id)).then(() => toast('Author ID copied', true)).catch(() => {}); });
 }
+// one hover toolbar per message list: it glides to the message under the mouse instead of each message drawing its own
+// (MessageList moves it; the hovered Message portals its buttons into it)
+const hoverSubs = new Set();
+let hovId = null;
+export const setHovered = id => { if (id === hovId) return; hovId = id; hoverSubs.forEach(f => f()); };
+const subHover = f => { hoverSubs.add(f); return () => hoverSubs.delete(f); };
+const useHovered = id => useSyncExternalStore(subHover, () => hovId === id);
+const ToolsHost = createContext(null);
+
 function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, setEditing, view, fresh }) {
+  const toolsEl = useContext(ToolsHost);
+  const hovered = useHovered(String(m.id));
+  const rootRef = useRef(null);
+  const [tr, setTr] = useState(null); // a translation shown under the text: { loading } | { text, from, same, local }
   const linkPreviews = useChat(s => s.settings.link_previews !== false);
   const hook = !!m.author?.webhook;
   // on an instance: Velora people get their Velora profile, local accounts / bots a plain card (never a Velora lookup by name)
@@ -434,6 +449,15 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
   const starred = starHere && starredByMe(m, ctx.me);
   const forward = () => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'forward', message: m, from: view } }));
   const togglePin = () => apiFetch(pinPath(view, m), { method: m.pinned ? 'DELETE' : 'PUT', inst: instOpt(m.channel) }).then(() => toast(m.pinned ? 'Unpinned.' : 'Pinned.', true)).catch(e => toast(errorText(e.message)));
+  const sref = saveRef(view, m);
+  const toggleSave = () => { const id = savedIdOf(sref); if (id) unsaveMessage(id); else saveMessage(view, m); };
+  const toggleTranslate = () => {
+    if (tr) { setTr(null); return; }
+    setTr({ loading: true });
+    translate(m.body, { encrypted: !!m.sealed || (view.kind === 'dm' && !m.notEncrypted) })
+      .then(r => setTr(r ? (r.same ? { ...r, text: null } : r) : null))
+      .catch(e => { setTr(null); toast(e.message === 'translate_unavailable' ? "Translation isn't available right now." : e.message === 'rate_limited' ? 'Too many translations - try again in a minute.' : "Couldn't translate that."); });
+  };
   const { nodes, images, media, jumbo, links, invites } = useMemo(() => renderBody(m.body, ctx), [m.body, ctx]);
   const mentionsMe = isMention(m);
   const nameKey = useNameStyle(view.sid, aliasMember || author); // (an unmarked alias that matched a member: their colour + role icon)
@@ -479,22 +503,24 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
       </div>
     );
   }
-  const name = m.author?.username || 'Unknown';
-  return (
-    <div className={`vc-msg${head ? ' head' : ''}${m.pending ? ' pending' : ''}${m.failed ? ' failed' : ''}${mentionsMe ? ' mention' : ''}${editing ? ' editing' : ''} ${fresh === 'live' ? (isMineMsg(m) ? 'vc-in-mine' : 'vc-in-live') : fresh === 'done' ? '' : 'vl-in'}`} data-id={m.id}
-      onContextMenu={e => {
-        if (e.target.closest('textarea, input, [contenteditable]') || m.pending) return;
+  const openMsgMenu = e => {
+    if (e.target.closest('textarea, input, [contenteditable]') || m.pending) return;
         if (!hook && e.target.closest('.vc-msg-av, .vc-msg-name')) { const el = e.target.closest('.vc-msg-av, .vc-msg-name'); userMenu(e, aliasMember?.username || name, { sid: view.sid, onProfile: () => onUser(name, el) }); return; }
         if (m.ephemeral) { openMenu(e, [{ label: 'Dismiss message', icon: X, onClick: () => dismissEphemeral(view, m) }]); return; }
-        const reactionAnchor = e.currentTarget.getBoundingClientRect();
+        const reactionAnchor = rootRef.current.getBoundingClientRect();
         messageMenu(e, m, view, {
           me: ctx.me, canReply: canReplyHere, onReply: () => onReply(m), canEdit: caps.edit, onEdit: () => setEditing(m.id), onForward: caps.forward ? forward : null, canCopyLink: caps.copyLink,
           canPin: caps.pin && !hook, onPin: togglePin,
           canDelete: caps.del, onDelete: () => remove({ shiftKey: false }),
           onReact: canReact ? () => openReactionPicker(reactId, reactionAnchor, instOpt(m.channel)) : null,
           onInfo: view.kind === 'channel' && canMod && !m.system ? () => messageInfo(m) : null, // staff only: who really sent it
+          onSave: sref ? toggleSave : null, saved: !!savedIdOf(sref), onTranslate: m.body ? toggleTranslate : null, translated: !!tr,
         });
-      }}>
+  };
+  const name = m.author?.username || 'Unknown';
+  return (
+    <div className={`vc-msg${head ? ' head' : ''}${m.pending ? ' pending' : ''}${m.failed ? ' failed' : ''}${mentionsMe ? ' mention' : ''}${editing ? ' editing' : ''} ${hovered ? ' hov' : ''} ${fresh === 'live' ? (isMineMsg(m) ? 'vc-in-mine' : 'vc-in-live') : fresh === 'done' ? '' : 'vl-in'}`} data-id={m.id}
+      ref={rootRef} onContextMenu={e => openMsgMenu(e)}>
       {m.statusReply && (
         <div className="vc-reply-to vc-status-reply">
           <span className="vc-reply-line" />
@@ -538,6 +564,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
         {m.interaction?.thinking ? <Thinking m={m} /> : editing ? <EditMessageInput m={m} view={view} onSave={saveEdit} onCancel={() => setEditing(null)} /> : (
           (nodes.length > 0) && <div className={`vc-text${jumbo ? ' jumbo' : ''}`}>{nodes}{!head && <SigBadge m={m} inStack />}{m.edited_at && <span className="vc-edited" title={stampOf(m.edited_at)}>(edited)</span>}</div>
         )}
+        {tr && <Translation tr={tr} ctx={ctx} onHide={() => setTr(null)} />}
         <GameInvites invites={invites} />
         <Embeds list={m.embeds} ctx={ctx} />
         {!m.embeds?.length && !m.pending && (linkPreviews ? <LinkEmbeds urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group'} /> : <PreviewOnAsk urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group'} />)}
@@ -555,16 +582,27 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
           </div>
         )}
       </div>
-      {!m.pending && !m.failed && !editing && !m.ephemeral && (
-        <div className="vc-tools">
-          {canReact && <><QuickReactions id={reactId} inst={instOpt(m.channel)} selected={(m.reactions || []).filter(r => r.users?.includes(ctx.me)).map(r => r.emoji)} onDone={() => {}} limit={3} className="vc-tools-react" sid={view.kind === 'channel' ? view.sid : null} /><button type="button" title="Add reaction" onClick={e => openReactionPicker(reactId, e.currentTarget, instOpt(m.channel))}><SmilePlus size={16} /></button><span className="vc-tools-sep" aria-hidden="true" /></>}
+      {hovered && toolsEl && !m.pending && !m.failed && !editing && !m.ephemeral && createPortal(
+        <div className="vc-tools" key={m.id}>
+          {canReact && <><QuickReactions id={reactId} inst={instOpt(m.channel)} selected={(m.reactions || []).filter(r => r.users?.includes(ctx.me)).map(r => r.emoji)} onDone={() => {}} limit={4} className="vc-tools-react" sid={view.kind === 'channel' ? view.sid : null} /><button type="button" title="Add reaction" onClick={e => openReactionPicker(reactId, e.currentTarget, instOpt(m.channel))}><SmilePlus size={17} /></button><span className="vc-tools-sep" aria-hidden="true" /></>}
           {starHere && <button type="button" title={starred ? 'Take your star back' : 'Star it (for the starboard)'} className={`vc-star-tool${starred ? ' on' : ''}`} onClick={() => setReaction(m.id, STAR, !starred, instOpt(m.channel))}><Star size={15} fill={starred ? 'currentColor' : 'none'} /></button>}
-          {canReplyHere && <button type="button" title="Reply" onClick={() => onReply(m)}><Reply size={16} /></button>}
-          {caps.forward && <button type="button" title="Forward" onClick={forward}><Forward size={16} /></button>}
-          {caps.edit && <button type="button" title="Edit" onClick={() => setEditing(m.id)}><Pencil size={15} /></button>}
-          {caps.del && <button type="button" className="danger" title="Delete (shift-click: no question)" onClick={remove}><Trash2 size={15} /></button>}
-        </div>
-      )}
+          {canReplyHere && <button type="button" title="Reply" onClick={() => onReply(m)}><Reply size={17} /></button>}
+          {caps.edit && <button type="button" title="Edit" onClick={() => setEditing(m.id)}><Pencil size={16} /></button>}
+          <button type="button" title="More" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); openMsgMenu({ clientX: Math.max(8, r.right - 250), clientY: r.bottom + 6, target: e.currentTarget, preventDefault() {}, stopPropagation() {} }); }}><Ellipsis size={17} /></button>
+        </div>, toolsEl)}
+    </div>
+  );
+}
+
+function Translation({ tr, ctx, onHide }) {
+  const r = useMemo(() => (tr.text ? renderBody(tr.text, ctx) : null), [tr.text, ctx]);
+  return (
+    <div className="vc-translation">
+      <div className="vc-translation-top"><Languages size={13} />
+        <span>{tr.loading ? 'Translating...' : tr.same ? `Already in ${langName(tr.from)}` : `Translated${tr.from ? ` from ${langName(tr.from)}` : ''}${tr.local ? ' on this device' : ''}`}</span>
+        {!tr.loading && <button type="button" onClick={onHide}>Hide</button>}
+      </div>
+      {r && <div className="vc-text">{r.nodes}</div>}
     </div>
   );
 }
@@ -579,6 +617,28 @@ export function MessageList({ view, onUser, onReply, canPost, canMod, channels, 
   const stick = useRef(true);
   const prevH = useRef(0);
   const [editing, setEditing] = useState(null);
+  // the hover toolbar: one element that glides to the message under the mouse, fades out when the mouse leaves the list
+  const [toolsEl, setToolsEl] = useState(null);
+  const hideTimer = useRef(null);
+  const onHoverMove = e => {
+    if (e.pointerType !== 'mouse' || !toolsEl) return;
+    if (toolsEl.contains(e.target)) { clearTimeout(hideTimer.current); return; }
+    const el = e.target.closest?.('.vc-msg[data-id]');
+    if (!el || el.classList.contains('vc-sys') || el.classList.contains('editing')) return;
+    clearTimeout(hideTimer.current);
+    const top = el.offsetTop;
+    const first = !toolsEl.classList.contains('on');
+    if (first) toolsEl.style.transition = 'none';
+    toolsEl.style.transform = `translateY(${top}px)`;
+    if (first) { void toolsEl.offsetHeight; toolsEl.style.transition = ''; }
+    toolsEl.classList.add('on');
+    setHovered(el.dataset.id);
+  };
+  const onHoverLeave = () => {
+    clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(() => { toolsEl?.classList.remove('on'); hideTimer.current = setTimeout(() => { if (!toolsEl?.classList.contains('on')) setHovered(null); }, 180); }, 120);
+  };
+  useEffect(() => () => { clearTimeout(hideTimer.current); setHovered(null); }, [key]);
   // a message that is still sending stays out of sight until the server has it (then it appears and animates in once); failed ones and uploads with progress show
   const list = useMemo(() => (box?.list || []).filter(m => !m.pending || m.failed || m.uploading || m.uploads || m.waiting), [box?.list]);
   const linkImages = useChat(s => s.settings.link_images);
@@ -730,7 +790,8 @@ export function MessageList({ view, onUser, onReply, canPost, canMod, channels, 
           <i className="vc-unread-time" onAnimationEnd={() => setUnreadBar(b => (b ? { ...b, out: true } : b))} />
         </div>
       )}
-      <div className="vc-msgs" ref={content}><div className="vc-msgs-col" ref={column}>
+      <div className="vc-msgs" ref={content} onPointerMove={onHoverMove} onPointerLeave={onHoverLeave}><div className="vc-msgs-col" ref={column}>
+        <div className="vc-tools-float" ref={setToolsEl} />
         {box?.loaded && !box.hasMore && (
           <div className="vc-start vl-in">
             <div className="vc-start-ico">{title.icon}</div>
@@ -740,7 +801,7 @@ export function MessageList({ view, onUser, onReply, canPost, canMod, channels, 
         )}
         {box?.loading && <div className="vc-loading"><i /><i /><i /></div>}
         {box?.error && <div className="vc-empty-note">Couldn't load these messages ({errorText(box.error)}).</div>}
-        {rows}
+        <ToolsHost.Provider value={toolsEl}>{rows}</ToolsHost.Provider>
       </div></div>
     </div>
   );

@@ -1,6 +1,8 @@
 import { clientUrl } from '../chat/hosts.js';
 // Ember (/chat): servers + channels, DMs and group chats in one place, with presence.
-import { ForwardDialog, PinsButton } from '../chat/MsgTools.jsx';
+import { ForwardDialog } from '../chat/MsgTools.jsx';
+import { SidePanel, useInboxCount } from '../chat/SidePanel.jsx';
+import DiscoverPage from '../chat/DiscoverPage.jsx';
 import { TooltipHost } from '../chat/Tooltip.jsx';
 import { MediaViewerHost, viewPicture, copyImage, downloadImage } from '../chat/MediaViewer.jsx';
 import { VoicePanel, VoiceView, DmCallBar, DmCallButton, IncomingCalls } from '../chat/VoiceParts.jsx';
@@ -60,6 +62,7 @@ import { applyDesign, clearDesign } from '../chat/design.js';
 import '../chat/chat.css';
 import '../chat/rounded.css';
 import '../chat/modern.css';
+import '../chat/panel.css';
 import '../chat/boot.css';
 import { MaskIcon } from '../chat/Alias.jsx';
 import { aliasOf, shownName } from '../chat/aliases.js';
@@ -331,6 +334,7 @@ function ChatPage() {
   const view = useChat(s => s.view);
   const error = useChat(s => s.error);
   const [dialog, setDialog] = useState(null); // { kind, ... }
+  const [discover, setDiscover] = useState(false); // the full-page Discovery (DiscoverPage.jsx) instead of the conversation
   const [showMembers, setShowMembers] = useState(() => { try { return innerWidth >= 1100 && localStorage.getItem('velora_chat_members') !== '0'; } catch { return innerWidth >= 1100; } });
   const [drawer, setDrawer] = useState(false);
   useEffect(() => initSheets(), []); // phones: pop-ups and menus open as bottom sheets
@@ -356,8 +360,7 @@ function ChatPage() {
     return () => { vv.removeEventListener('resize', fit); vv.removeEventListener('scroll', fit); root.style.removeProperty('--vc-vh'); };
   }, []);
   const [replyTo, setReplyTo] = useState(null);
-  const [search, setSearch] = useState(null); // { q, results }
-  const [scope, setScope] = useState('server'); // search: whole server or just this channel
+  useEffect(() => { const f = () => setShowMembers(true); addEventListener('vc-open-pins', f); addEventListener('vc-panel-tab', f); return () => { removeEventListener('vc-open-pins', f); removeEventListener('vc-panel-tab', f); }; }, []);
   const staff = useChat(s => s.staff); // Velora staff: Moderator chat button in DMs
   const { openMini, ui: profileUI } = useProfiles();
 
@@ -406,7 +409,8 @@ function ChatPage() {
     }
     open(v);
   }, [ready]);
-  useEffect(() => { setReplyTo(null); setSearch(null); setDrawer(!!history.state?.vcDrawer && innerWidth <= 760); }, [view.kind, view.cid, view.username, view.room]);
+  useEffect(() => { setDiscover(false); }, [view]); // any navigation (even to where you already are) leaves Discovery
+  useEffect(() => { setReplyTo(null); setDrawer(!!history.state?.vcDrawer && innerWidth <= 760); }, [view.kind, view.cid, view.username, view.room]);
   // invite links (from messages, the address bar...) open the invite pop-up here
   useEffect(() => {
     const on = e => setDialog({ kind: 'invite-join', code: e.detail?.code ?? e.detail, inst: e.detail?.inst });
@@ -472,15 +476,6 @@ function ChatPage() {
 
   const ChIcon = ({ size, className }) => <span className={className} style={{ display: 'inline-flex' }}><ChannelIcon c={channel} size={size} /></span>; // the channel's own icon / type icon
 
-  // search this channel, or the whole server (from:name in:channel has:image|video|file|link|embed)
-  async function runSearch(q, sc = scope) {
-    if (!q.trim() || !channel) { setSearch(null); return; }
-    setSearch({ q, scope: sc, results: null });
-    try {
-      const d = sc === 'server' ? await apiFetch(`/chat/servers/${view.sid}/search?q=${encodeURIComponent(q)}`) : await apiFetch(`/chat/channels/${channel.cid}/search?q=${encodeURIComponent(q)}`);
-      setSearch({ q, scope: sc, results: d.messages, total: d.total ?? d.messages.length });
-    } catch (e) { toast(errorText(e.message)); setSearch(null); }
-  }
   async function leaveServer() {
     const srv = detail.server;
     if (!(await ask({ title: `Leave ${srv.name}?`, text: srv.inst ? (srv.join_policy === 'open' ? 'You can join again whenever you like.' : "You'll need to ask again, or have an invite, to get back in.") : srv.discoverable || srv.is_default ? 'You can join again from Discover.' : "You'll need an invite to get back in.", confirm: 'Leave server', danger: true }))) return;
@@ -521,7 +516,7 @@ function ChatPage() {
       {signedIn && <NotificationBanner />}
       <GifPauseGate />
       <div className="vc-left" onClick={e => { const t = e.target.closest?.('.vc-dm, .vc-ch, .vc-home-link, .vc-rail-item'); if (!t || !drawer) return; const h = location.hash; setTimeout(() => { if (location.hash === h) closeDrawer(); }, 60); }}>
-        <Rail onDiscover={() => setDialog({ kind: 'discover' })} onAddInstance={() => setDialog({ kind: 'add-instance' })} onCreate={() => setDialog({ kind: 'create-server' })} />
+        <Rail discoverOn={discover} onDiscover={() => { setDiscover(true); closeDrawer(); }} onAddInstance={() => setDialog({ kind: 'add-instance' })} onCreate={() => setDialog({ kind: 'create-server' })} />
         <div className="vc-side-col">
           <div className="vc-side-swap" key={sideKey}>
             {view.kind === 'channel'
@@ -545,7 +540,7 @@ function ChatPage() {
         <RestrictedBar />
         <ReadOnlyBar />
         <LegacyReadOnlyBar />
-        {view.kind === 'home' || view.kind === 'instance' ? (
+        {discover ? <DiscoverPage onClose={() => setDiscover(false)} /> : view.kind === 'home' || view.kind === 'instance' ? (
           <>
             <button type="button" className="vc-ico-btn vc-burger floating" onClick={openDrawer} title="Menu"><Menu size={19} /></button>
             {view.kind === 'instance' ? <InstanceGate origin={view.inst} /> : signedIn ? <Home onUser={openMini} /> : <SignInPrompt />}
@@ -569,20 +564,10 @@ function ChatPage() {
               )}
               {view.kind === 'group' && <><UsersRound size={20} className="vc-head-ico" /><b className="vc-head-name">{group?.name || 'Group chat'}</b><span className="vc-head-topic">{group ? `${group.members.length} members` : ''}</span></>}
               <span className="grow" />
-              {isServer && (
-                <form className="vc-head-search" onSubmit={e => { e.preventDefault(); runSearch(new FormData(e.currentTarget).get('q')); }}>
-                  <button type="button" className="vc-search-scope" title="Search the whole server or just this channel" onClick={() => setScope(s => (s === 'server' ? 'channel' : 'server'))}>{scope === 'server' ? 'Server' : `#${channel?.name || ''}`}</button>
-                  <input name="q" placeholder={scope === 'server' ? `Search ${detail?.server.name || 'server'}` : `Search #${channel?.name || ''}`} key={view.sid} title="Filters: from:name  in:channel  has:image / video / file / link / embed" />
-                  <Search size={14} />
-                </form>
-              )}
-              {isServer && channel && (['text', 'logs', 'welcome', undefined].includes(channel.type) || (channel.type === 'game' && channel.config?.purpose === 'chat')) && <PinsButton channel={channel} sid={view.sid} />}
-              {isServer && <button type="button" className={`vc-ico-btn${showMembers ? ' on' : ''}`} title={showMembers ? 'Hide members' : 'Show members'} onClick={() => setShowMembers(x => !x)}><Users size={19} /></button>}
-              {((view.kind === 'dm' && !sysDM) || view.kind === 'group') && <PinsButton view={view} />}
               {view.kind === 'dm' && !sysDM && staff && <button type="button" className="vc-ico-btn" title="Message them as Nookara Administrator (Nookara Moderator Chat)" onClick={() => go({ kind: 'modmail', username: view.username })}><ShieldCheck size={19} /></button>}
               {view.kind === 'dm' && !sysDM && <DmCallButton username={view.username} />}
               {view.kind === 'dm' && !sysDM && <button type="button" className="vc-ico-btn" title={`Report @${view.username} to Nookara staff`} aria-label={`Report @${view.username}`} onClick={() => reportDmUser(view.username)}><Flag size={19} /></button>}
-              {view.kind !== 'channel' && <button type="button" className={`vc-ico-btn${showMembers ? ' on' : ''}`} title="Side panel" onClick={() => setShowMembers(x => !x)}><PanelRight size={19} /></button>}
+              {(isServer || (view.kind === 'dm' && !sysDM) || view.kind === 'group') && <PanelToggle on={showMembers} onClick={() => setShowMembers(x => !x)} />}
             </header>
             <div className="vc-body">
               <div className="vc-convo" key={keyOf(view)}>
@@ -602,34 +587,8 @@ function ChatPage() {
  replyTo={replyTo} setReplyTo={setReplyTo}
                   placeholder={modView ? `Message ${view.username} as Nookara Administrator` : isServer ? `Message #${channel?.name || ''}${channel?.type === 'game' ? ' (also shows in Minecraft)' : ''}` : view.kind === 'dm' ? `Message @${view.username}` : `Message ${group?.name || 'the group'}`} /></>}
               </div>
-              {search && (
-                <aside className="vc-results">
-                  <div className="vc-results-head"><b>{search.results ? `${search.total} result${search.total === 1 ? '' : 's'}${search.scope === 'server' ? ' in this server' : ''}` : 'Searching...'}</b><button type="button" className="vc-ico-btn" onClick={() => setSearch(null)}><X size={16} /></button></div>
-                  <div className="vc-results-tip">Filters: <code>from:name</code> <code>in:channel</code> <code>has:image</code> <code>has:file</code> <code>has:link</code></div>
-                  {search.results?.map(m => (
-                    <button type="button" key={m.id} className="vc-result" onClick={() => jumpToMessage({ kind: 'channel', sid: view.sid, cid: m.channel }, m.id)}>
-                      <span>{m.channel_name && <em className="vc-result-ch">#{m.channel_name}</em>}<b>{shownName(m)}</b>{aliasOf(m) && !aliasOf(m).unmarked && <span className="vc-alias-mark" title={`Alias - posted by ${m.author.username}`}><MaskIcon size={12} /></span>} <small>{stampOf(m.created_at)}</small></span>
-                      <span>{m.body || (m.attachments?.length ? `[${m.attachments.length} attachment${m.attachments.length === 1 ? '' : 's'}]` : '')}</span>
-                    </button>
-                  ))}
-                  {search.results && !search.results.length && <div className="vc-empty-note">Nothing found.</div>}
-                </aside>
-              )}
-              {!search && showMembers && isServer && <MemberList sid={view.sid} onUser={openMini} />}
-              {!search && showMembers && view.kind === 'dm' && view.username !== 'System' && (
-                <aside className="vc-dm-side"><ProfileCard username={view.username} onExpand={rect => { const r = rect; window.dispatchEvent(new CustomEvent('vc-open-big', { detail: { username: view.username, rect: r } })); }} /></aside>
-              )}
-              {!search && showMembers && view.kind === 'group' && group && (
-                <aside className="vc-members">
-                  <div className="vc-cat-name static">Members - {group.members.length}</div>
-                  {group.members.map((u, i) => (
-                    <button type="button" key={u} className="vc-member vl-rise" style={{ '--i': i }} onClick={e => openMini(u, e.currentTarget, 'left')}>
-                      <Avatar user={{ username: u, pfp: getState().people[u]?.pfp }} size={34} status={getState().presence[u]?.status || undefined} />
-                      <span className="vc-member-txt"><b>{u}</b>{u === group.owner && <small>Group owner</small>}</span>
-                    </button>
-                  ))}
-                  <button type="button" className="vc-more danger" onClick={leaveGroup}><LogOut size={14} /> Leave group</button>
-                </aside>
+              {showMembers && (isServer || (view.kind === 'dm' && view.username !== 'System') || (view.kind === 'group' && group)) && (
+                <SidePanel view={view} channel={channel} detail={detail} group={group} onUser={openMini} onLeaveGroup={leaveGroup} />
               )}
             </div>
           </>
@@ -655,14 +614,14 @@ function ChatPage() {
       <RadioHost />
       {profileUI}
       <BigFromEvent />
-      {dialog?.kind === 'discover' && <Discover onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'discover' && <DiscoverOpener onOpen={() => { setDialog(null); setDiscover(true); }} />}
       {dialog?.kind === 'app-download' && <AppDownload onClose={() => setDialog(null)} />}
       {dialog?.kind === 'test-bot' && <TestBotDialog key={dialog.id} id={dialog.id} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'import' && <ImportServer onClose={() => setDialog(null)} />}
-      {dialog?.kind === 'add-instance' && <AddInstance url={dialog.url} invite={dialog.invite} onClose={() => setDialog(null)} onSetup={origin => setDialog({ kind: 'setup', origin })} />}
+      {dialog?.kind === 'add-instance' && <AddInstance url={dialog.url} invite={dialog.invite} onClose={() => setDialog(null)} onSetup={origin => setDialog({ kind: 'setup', origin })} onCreate={dialog.fromCreate ? () => setDialog({ kind: 'create-server' }) : undefined} />}
 
       {dialog?.kind === 'setup' && <SetupWizard origin={dialog.origin} name={dialog.name} onClose={() => setDialog(null)} />}
-      {dialog?.kind === 'create-server' && <CreateServer onClose={() => setDialog(null)} onSetup={(origin, name) => setDialog({ kind: 'setup', origin, name })} onAddByAddress={() => setDialog({ kind: 'add-instance' })} />}
+      {dialog?.kind === 'create-server' && <CreateServer onClose={() => setDialog(null)} onSetup={(origin, name) => setDialog({ kind: 'setup', origin, name })} onAddByAddress={() => setDialog({ kind: 'add-instance', fromCreate: true })} />}
 
       {dialog?.kind === 'invite' && <Invite sid={dialog.sid || view.sid} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'invite-join' && <JoinInvite code={dialog.code} inst={dialog.inst} onClose={() => setDialog(null)} />}
@@ -693,4 +652,20 @@ function BigFromEvent() {
     return () => removeEventListener('vc-open-big', on);
   }, []);
   return ui;
+}
+
+// the conversation header's side-panel button (members, pins, inbox, search); the dot = waiting in the Inbox
+function PanelToggle({ on, onClick }) {
+  const n = useInboxCount();
+  return (
+    <button type="button" className={`vc-ico-btn vc-panel-toggle${on ? ' on' : ''}`} title={on ? 'Hide the side panel' : 'Members, pins, inbox and search'} aria-pressed={on} onClick={onClick}>
+      <PanelRight size={19} />{!on && n > 0 && <i className="vc-panel-toggle-dot" />}
+    </button>
+  );
+}
+
+// anything that still asks for the old Discover pop-up (vc-dialog 'discover') opens the page
+function DiscoverOpener({ onOpen }) {
+  useEffect(() => { onOpen(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
 }

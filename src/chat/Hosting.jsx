@@ -4,7 +4,7 @@
 // Plus is prepaid weeks and never renews by itself: when the time is up the server is overdue for 2 days, then read-only,
 // and a week later Velora keeps a backup in your account and shuts it down. Velora's side: /bonfire/hosting/* (PROTOCOL §19).
 import { useEffect, useRef, useState } from 'react';
-import { Check, Globe, Rocket, Sparkles, Users, Volume2, Upload, Smile, Bot, ArrowLeftRight, KeyRound, TriangleAlert, ScrollText, RefreshCw, Trash2, Coins, Server, ShieldCheck, Archive, Download, CalendarClock, X, Lock, HardDrive, Clock, Pencil } from 'lucide-react';
+import { Check, Plus, Globe, Rocket, Sparkles, Users, Volume2, Upload, Smile, Bot, ArrowLeftRight, KeyRound, TriangleAlert, ScrollText, RefreshCw, Trash2, Coins, Server, ShieldCheck, Archive, Download, CalendarClock, X, Lock, HardDrive, Clock, Pencil } from 'lucide-react';
 import { apiFetch, getToken } from '../api.js';
 import { Dialog } from './Dialogs.jsx';
 import { useChat, patchState, toast, errorText, ask, go } from './store.js';
@@ -109,6 +109,16 @@ function WeeksPicker({ plan, weeks, setWeeks }) {
 }
 
 // ── Create a server: plan (or a backup) -> address -> Velora starts it -> sign in -> the normal setup (name, icon, import) ──
+// "Create a server" has two ways in, as tabs at the top: make a new one, or add one that already exists by its address
+export function CreateTabs({ on, onPick }) {
+  return (
+    <div className="vc-tabs bf-create-tabs" role="tablist">
+      <button type="button" role="tab" aria-selected={on === 'new'} className={on === 'new' ? 'on' : ''} onClick={() => on !== 'new' && onPick('new')}><Plus size={14} /> New server</button>
+      <button type="button" role="tab" aria-selected={on === 'address'} className={on === 'address' ? 'on' : ''} onClick={() => on !== 'address' && onPick('address')}><Globe size={14} /> Add one by its address</button>
+    </div>
+  );
+}
+
 export function CreateServer({ onClose, onSetup, onAddByAddress }) {
   const [cfg, setCfg] = useState(null); // { available, domain, url_template, plans, starter_limit_per_account }
   const [backups, setBackups] = useState([]);
@@ -180,6 +190,7 @@ export function CreateServer({ onClose, onSetup, onAddByAddress }) {
     <Dialog title={restore ? 'Restore a server' : 'Create a server'} sub={sub} onClose={onClose} wide className="bf-create">
       {close => (
         <>
+          {!restore && (step === 'plan' || step === 'self') && <CreateTabs on="new" onPick={() => { close(); setTimeout(() => onAddByAddress?.(), 200); }} />}
           {!cfg && <div className="vc-loading"><i /><i /><i /></div>}
           {cfg && step === 'plan' && (
             <>

@@ -79,10 +79,6 @@ function NotifPopup({ anchor, onClose }) {
     return () => { clearTimeout(t); removeEventListener('keydown', onKey); removeEventListener('mousedown', onDown); };
   }, [onClose]);
   const list = data?.list || [];
-  const pick = n => {
-    readNotifs([n.id]);
-    if (n.link) { onClose(); followNotifLink(n.link); }
-  };
   return createPortal(
     <div ref={box} className="vc-notifs" style={pos || { left: -9999, bottom: 0 }} role="dialog" aria-label="Notifications">
       <div className="vc-notifs-head">
@@ -91,7 +87,24 @@ function NotifPopup({ anchor, onClose }) {
         <button type="button" className="vc-notifs-all" disabled={!unread && !list.length} onClick={() => readNotifs('all')}><CheckCheck size={14} /> Mark all read</button>
         <a className="vc-ico-btn" href={siteHref("/me#settings/notifications")} target="_blank" rel="noopener noreferrer" title="Notification settings" onClick={onClose}><Settings size={16} /></a>
       </div>
-      <div className="vc-notifs-list">
+      <NotifList onPicked={onClose} />
+      <a className="vc-notifs-foot" href={siteHref("/me#notifications")} target="_blank" rel="noopener noreferrer" onClick={onClose}>View all</a>
+    </div>,
+    document.body,
+  );
+}
+
+// the unread notifications list (the bell's popup and the side panel's Inbox both use it); loads while it's shown
+export function NotifList({ onPicked, own = false }) {
+  const data = useChat(s => s.notifs);
+  useEffect(() => { if (!own) return undefined; loadNotifs(); return () => closeNotifs(); }, [own]);
+  const list = data?.list || [];
+  const pick = n => {
+    readNotifs([n.id]);
+    if (n.link) { onPicked?.(); followNotifLink(n.link); }
+  };
+  return (
+    <div className="vc-notifs-list">
         {list.map(n => (
           <button type="button" key={n.id} className="vc-notif" onClick={() => pick(n)}>
             <NotifIcon n={n} />
@@ -106,8 +119,5 @@ function NotifPopup({ anchor, onClose }) {
         {data?.loading && <div className="vc-notifs-empty"><span>Loading...</span></div>}
         {!data?.loading && data?.cursor && list.length > 0 && <button type="button" className="vc-notifs-more" onClick={() => loadNotifs({ more: true })}>Load more</button>}
       </div>
-      <a className="vc-notifs-foot" href={siteHref("/me#notifications")} target="_blank" rel="noopener noreferrer" onClick={onClose}>View all</a>
-    </div>,
-    document.body,
   );
 }

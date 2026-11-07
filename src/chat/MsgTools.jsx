@@ -109,7 +109,7 @@ export function PinsButton({ channel, sid, view }) {
   );
 }
 // a channel: Manage messages pins. A DM or group chat (view): anyone in it does.
-function PinsPanel({ channel, sid, view, onClose }) {
+export function PinsPanel({ channel, sid, view, onClose, embedded = false }) {
   const [list, setList] = useState(null);
   const key = view ? pinsKey(view) : channel.cid;
   const ver = useChat(s => s.pinsVersion[key] || 0);
@@ -121,20 +121,21 @@ function PinsPanel({ channel, sid, view, onClose }) {
     else apiFetch(`/chat/channels/${channel.cid}/pins`).then(d => setList(d.messages)).catch(() => setList([]));
   }, [key, ver]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
+    if (embedded) return undefined; // (inside the side panel: it stays until another tab is picked)
     const off = e => { if (box.current && !box.current.contains(e.target) && !e.target.closest('.vc-pins-wrap')) onClose(); };
     const key = e => { if (e.key === 'Escape') onClose(); };
     setTimeout(() => addEventListener('mousedown', off), 0);
     addEventListener('keydown', key);
     return () => { removeEventListener('mousedown', off); removeEventListener('keydown', key); };
-  }, [onClose]);
+  }, [onClose, embedded]);
   const jump = m => {
     const el = document.querySelector(`.vc-msg[data-id="${m.id}"]`);
-    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1600); onClose(); }
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1600); if (!embedded) onClose(); }
     else toast("That message is further up - scroll up to load it.");
   };
   return (
-    <div className="vc-pins" ref={box}>
-      <div className="vc-pins-head"><Pin size={15} /> <b>Pinned messages</b><span className="grow" /><button type="button" className="vc-ico-btn" onClick={onClose} title="Close"><X size={15} /></button></div>
+    <div className={`vc-pins${embedded ? ' embedded' : ''}`} ref={box}>
+      {!embedded && <div className="vc-pins-head"><Pin size={15} /> <b>Pinned messages</b><span className="grow" /><button type="button" className="vc-ico-btn" onClick={onClose} title="Close"><X size={15} /></button></div>}
       <div className="vc-pins-list">
         {list === null && <div className="vc-loading"><i /><i /><i /></div>}
         {list?.length === 0 && <div className="vc-empty-note">Nothing pinned {view ? 'here' : `in #${channel.name}`} yet.{canMod ? ' Right-click a message and pick Pin message.' : ''}</div>}

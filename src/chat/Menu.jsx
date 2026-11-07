@@ -7,7 +7,7 @@
 // Developer mode (Chat settings) adds "Copy ... ID" items at the bottom (dev: true).
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronRight, Check, Hash, Copy, Link2, BellOff, Bell, CheckCheck, UserPlus, Settings, LogOut, Pencil, Trash2, Reply, User, MessageCircle, ExternalLink, Image as ImageIcon, Code2, Forward, Pin, Download, SmilePlus, BookmarkPlus, RefreshCw, LogIn, ShieldCheck, BellRing, Flag, Ban, Info } from 'lucide-react';
+import { ChevronRight, Check, Hash, Copy, Link2, BellOff, Bell, CheckCheck, UserPlus, Settings, LogOut, Pencil, Trash2, Reply, User, MessageCircle, ExternalLink, Image as ImageIcon, Code2, Forward, Pin, Download, SmilePlus, BookmarkPlus, Bookmark, BookmarkCheck, Languages, Ellipsis, RefreshCw, LogIn, ShieldCheck, BellRing, Flag, Ban, Info } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { useChat, getState, setMenu, toggleBlock, toast, setNotify, notifyOf, go, markServerRead, markChannelRead, linkFor } from './store.js';
 import { bare, instOpt, isInst } from './ids.js';
@@ -70,9 +70,10 @@ function Panel({ items, x, y, onDone, nested, reaction }) {
           <div key={it.label + i} className="vc-ctx-row" onMouseEnter={() => setOpen(it.sub ? i : -1)}>
             <button type="button" disabled={it.disabled} className={`${it.danger ? 'danger' : ''}${it.dev ? ' dev' : ''}`}
               onClick={() => { if (it.sub) { setOpen(i); return; } onDone(); it.onClick?.(); }}>
+              {Icon && it.checked === undefined && <span className="vc-ctx-ico"><Icon size={16} /></span>}
               <span className="vc-ctx-label">{it.label}{it.hint && <small>{it.hint}</small>}</span>
               {it.checked !== undefined ? <span className={`vc-ctx-check${it.radio ? ' radio' : ''}${it.checked ? ' on' : ''}`}>{it.checked && (it.radio ? <i /> : <Check size={12} />)}</span>
-                : it.sub ? <ChevronRight size={14} /> : Icon ? <Icon size={15} /> : null}
+                : it.sub ? <ChevronRight size={14} className="vc-ctx-more" /> : null}
             </button>
             {it.sub && open === i && <SubPanel items={it.sub} onDone={onDone} />}
           </div>
@@ -221,7 +222,9 @@ export function channelMenu(e, c, sid, { admin, onEdit, onDelete } = {}) {
     { label: 'Copy channel ID', icon: Code2, dev: true, onClick: () => copy(bare(c.cid), 'Channel ID copied') },
   ]);
 }
-export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, canReply, canEdit, canCopyLink, onForward, canPin, onPin, onReact, onInfo, me } = {}) {
+// a message: the main things up top (reply, forward, react), then save / translate, then Copy and More actions as submenus,
+// and Delete on its own at the bottom
+export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, canReply, canEdit, canCopyLink, onForward, canPin, onPin, onReact, onInfo, onSave, saved, onTranslate, translated, me } = {}) {
   const sel = String(getSelection?.() || '').trim();
   const link = e.target.closest?.('a[href]');
   const img = e.target.closest?.('img');
@@ -231,31 +234,41 @@ export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, 
   const mediaName = mediaEl?.dataset.mediaName || '';
   const pic = img && !/vc-(c|t)emoji|vc-av|vc-srv-ico/.test(`${img.className} ${img.parentElement?.className || ''}`) ? img : null; // a real picture, not an emoji or avatar
   const authorId = m.author?.id || getState().people[m.author?.username]?.id; // (DM and group messages only carry the name)
-  openMenu(e, [
-    sel && { label: 'Copy', icon: Copy, onClick: () => copy(sel, 'Text copied') },
-    link && { label: 'Open link', icon: ExternalLink, onClick: () => window.open(link.href, '_blank', 'noopener') },
-    link && { label: 'Copy link', icon: Link2, onClick: () => copy(link.href, 'Link copied') },
-    pic && { label: 'Open picture', icon: ImageIcon, onClick: () => viewPicture(pic.src) },
-    pic && { label: 'Copy image', icon: Copy, onClick: () => copyImage(pic.src) },
-    pic && { label: 'Download image', icon: Download, onClick: () => downloadImage(pic.src) },
-    mediaUrl && { label: 'Save to Saved Media', icon: BookmarkPlus, onClick: () => saveToMedia(mediaUrl, mediaName) },
-    (sel || link || img || mediaUrl) && 'sep',
-    canReply && { label: 'Reply', icon: Reply, onClick: onReply },
-    view.kind === 'channel' && !m.system && !m.ephemeral && /^\d+$/.test(String(m.id)) && appsItems({ sid: view.sid, cid: view.cid, type: 3, target: m.id }),
-    onReact && { label: 'Add reaction', icon: SmilePlus, onClick: onReact },
-    onForward && { label: 'Forward', icon: Forward, onClick: onForward },
-    canPin && { label: m.pinned ? 'Unpin message' : 'Pin message', icon: Pin, onClick: onPin },
-    canEdit && { label: 'Edit message', icon: Pencil, onClick: onEdit },
+  const dev = !!getState().settings?.developer_mode;
+  const copyItems = [
+    sel && { label: 'Copy selection', icon: Copy, onClick: () => copy(sel, 'Text copied') },
     m.body && { label: 'Copy text', icon: Copy, onClick: () => copy(m.body, 'Text copied') },
     canCopyLink && { label: 'Copy message link', icon: Link2, onClick: () => copy(linkFor(view), 'Link copied') },
-    canDelete && { label: 'Delete message', icon: Trash2, danger: true, onClick: onDelete },
+    link && { label: 'Copy link', icon: Link2, onClick: () => copy(link.href, 'Link copied') },
+    pic && { label: 'Copy image', icon: ImageIcon, onClick: () => copyImage(pic.src) },
+    dev && { label: 'Copy message ID', icon: Code2, onClick: () => copy(m.imId || m.gid || m.id, 'Message ID copied') },
+    dev && authorId && { label: 'Copy author ID', icon: Code2, onClick: () => copy(authorId, 'Account ID copied') },
+  ].filter(Boolean);
+  const moreItems = [
+    canPin && { label: m.pinned ? 'Unpin message' : 'Pin message', icon: Pin, onClick: onPin },
+    view.kind === 'channel' && !m.system && !m.ephemeral && /^\d+$/.test(String(m.id)) && appsItems({ sid: view.sid, cid: view.cid, type: 3, target: m.id }),
+    link && { label: 'Open link', icon: ExternalLink, onClick: () => window.open(link.href, '_blank', 'noopener') },
+    pic && { label: 'Open picture', icon: ImageIcon, onClick: () => viewPicture(pic.src) },
+    pic && { label: 'Download image', icon: Download, onClick: () => downloadImage(pic.src) },
+    mediaUrl && { label: 'Save to Saved Media', icon: BookmarkPlus, onClick: () => saveToMedia(mediaUrl, mediaName) },
+    onInfo && { label: 'Message info', icon: Info, onClick: onInfo }, // Manage messages: the real sender (aliases included)
     view.kind === 'channel' && isInst(view.sid) && !canEdit && !m.system && /^\d+$/.test(String(m.id)) && { label: 'Report message', icon: Flag, danger: true, onClick: () => reportTo(view.sid, { message_id: m.id }, 'this message', { target: m.author, message: m }) },
     canReportDm(view, m, getState().me?.username) && { label: 'Report message', icon: Flag, danger: true, onClick: () => reportDmMessage(view, m) },
+  ].flat().filter(Boolean);
+  openMenu(e, [
+    canReply && { label: 'Reply', icon: Reply, onClick: onReply },
+    canEdit && { label: 'Edit message', icon: Pencil, onClick: onEdit },
+    onForward && { label: 'Forward', icon: Forward, onClick: onForward },
+    onReact && { label: 'React', icon: SmilePlus, onClick: onReact },
     'sep',
-    onInfo && { label: 'Message info', icon: Info, onClick: onInfo }, // Manage messages: the real sender (aliases included)
-    { label: 'Copy message ID', icon: Code2, dev: true, onClick: () => copy(m.imId || m.gid || m.id, 'Message ID copied') },
-    authorId && { label: 'Copy author ID', icon: Code2, dev: true, onClick: () => copy(authorId, 'Account ID copied') },
-  ], { reaction: onReact ? { id: reactionId(m), inst: instOpt(m.channel), selected: myReactions(m, me) } : null });
+    onSave && { label: saved ? 'Remove from saved' : 'Save message', icon: saved ? BookmarkCheck : Bookmark, onClick: onSave },
+    onTranslate && m.body && { label: translated ? 'Show original' : 'Translate', icon: Languages, onClick: onTranslate },
+    'sep',
+    copyItems.length > 0 && { label: 'Copy', icon: Copy, sub: copyItems },
+    moreItems.length > 0 && { label: 'More actions', icon: Ellipsis, sub: moreItems },
+    'sep',
+    canDelete && { label: 'Delete message', icon: Trash2, danger: true, onClick: onDelete },
+  ]);
 }
 export function userMenu(e, username, { onProfile, sid, extra = [] } = {}) {
   const st = getState();

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { MessageCircle, UserPlus, Check, X, House } from 'lucide-react';
 import { apiFetch } from '../api.js';
-import { useChat, go, loadFriends, toast, errorText } from './store.js';
+import { useChat, go, loadFriends, toast, errorText, ask } from './store.js';
 import { Avatar, subtitle, ActivityCard } from './Profile.jsx';
 import { VeloraConnNote } from './Parts.jsx';
 import Dashboard from './Dashboard.jsx';
@@ -48,6 +48,11 @@ export default function Home({ onUser }) {
       setMsg({ ok: false, text: { already_friends: "You're already friends.", user_not_found: "Couldn't find that person.", invalid_target: "That's you!", already_requested: 'You already sent them a request.' }[er.message] || errorText(er.message) });
     }
   }
+  async function cancel(r) {
+    if (!(await ask({ title: `Cancel your request to ${r.to_username}?`, text: "They won't be told. You can send another one later.", confirm: 'Cancel request', cancel: 'Keep it', danger: true }))) return;
+    try { await apiFetch(`/friends/request/${r.id}`, { method: 'DELETE' }); loadReqs(); toast('Request cancelled.', true); }
+    catch (e) { toast(e.message === 'request_not_found' ? 'They already answered it.' : errorText(e.message)); loadReqs(); }
+  }
   async function answer(id, yes) {
     try { await apiFetch(`/friends/request/${id}/${yes ? 'accept' : 'decline'}`, { method: 'PATCH' }); loadReqs(); loadFriends(); }
     catch (e) { toast(errorText(e.message)); }
@@ -87,6 +92,7 @@ export default function Home({ onUser }) {
                 <div key={r.id} className="vc-friend vl-rise" style={{ '--i': i }}>
                   <Avatar user={{ username: r.to_username }} size={36} />
                   <span className="vc-friend-txt"><b>{r.to_username}</b><small>Waiting for them to answer</small></span>
+                  <button type="button" className="vc-round no" title="Cancel request" aria-label={`Cancel the request to ${r.to_username}`} onClick={() => cancel(r)}><X size={17} /></button>
                 </div>
               ))}
               <div className="vc-cat-name static">Message requests - {dmIn.length}</div>
