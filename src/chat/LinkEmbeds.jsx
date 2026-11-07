@@ -9,7 +9,7 @@ import { Play, Download, ShieldCheck, Eye, Loader2, Users, ExternalLink, Bookmar
 import { apiFetch } from '../api.js';
 import { useChat, getState, toast, errorText, openLink, saveSettings, loadMedia, hashFor, ask } from './store.js';
 import { K } from './ids.js';
-import { inviteRef, paymentRef, glintRef, driveRef, forumRef, siteRef } from './inviteLink.js';
+import { inviteRef, paymentRef, glintRef, driveRef, forumRef, siteRef, loadSiteHosts, onSiteHosts } from './inviteLink.js';
 import { GlintMark, GLINT_DOWNLOAD, clipLikes, setClipLike, openOutside } from './glint.jsx';
 import { fmtSize, RISKY, KIND_OF } from './fileKinds.js';
 
@@ -41,7 +41,14 @@ function useUnfurl(url, inst, maxAge = 0, priv = false) {
 }
 
 // inst: the instance a message is on (its previews come from there), undefined for Velora's own. priv: from a DM or group chat, so Velora doesn't store the link
+// custom site addresses: Nookara's list, asked for the first time a link preview is drawn (and now and then after)
+const askSiteHosts = () => loadSiteHosts(() => apiFetch('/sites/api/hosts'));
+function useSiteHosts() {
+  const [, bump] = useState(0);
+  useEffect(() => { askSiteHosts(); return onSiteHosts(() => bump(n => n + 1)); }, []);
+}
 export function LinkEmbeds({ urls, inst, priv }) {
+  useSiteHosts();
   if (!urls?.length) return null;
   return urls.slice(0, 3).map(u => <OneEmbed key={u} url={u} inst={inst} priv={priv} />);
 }

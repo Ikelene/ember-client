@@ -77,12 +77,30 @@ export function forumRef(href) {
   const path = u.pathname.replace(/\/+$/, '');
   return /^\/(t\/[1-9][0-9]{0,18}|c\/[^/]+|u\/[^/]+)$/.test(path) ? { service: 'forum', sure: true } : null;
 }
-//   https://s-<name>.nookara.cc/<any page>  a Nookara Site (custom addresses are only known to Nookara: their card is trusted when Nookara made it, see LinkEmbeds.jsx)
+//   https://s-<name>.nookara.cc/<any page>  a Nookara Site
+//   https://<a custom address>/<any page>      one of the addresses staff attached to a site (Nookara's list: GET /sites/api/hosts, kept here and refreshed)
 // -> { service: 'site', sure: false } or null (not sure: a site can have its own preview turned on, then the link is a plain one)
+let customSiteHosts = new Set();
+const siteHostListeners = new Set();
+let siteHostsAt = 0;
+// fetch(url) -> the list; asked at most every 30 minutes, listeners hear when it changes (LinkEmbeds re-asks for those links' cards)
+export function loadSiteHosts(fetchList) {
+  if (Date.now() - siteHostsAt < 30 * 60 * 1000) return;
+  siteHostsAt = Date.now();
+  fetchList().then(d => {
+    const next = new Set((Array.isArray(d?.hosts) ? d.hosts : []).map(h => String(h).toLowerCase()).filter(h => /^[a-z0-9.-]{4,253}$/.test(h)));
+    if (next.size === customSiteHosts.size && [...next].every(h => customSiteHosts.has(h))) return;
+    customSiteHosts = next;
+    siteHostListeners.forEach(f => f());
+  }).catch(() => { siteHostsAt = 0; });
+}
+export function onSiteHosts(f) { siteHostListeners.add(f); return () => siteHostListeners.delete(f); }
 export function siteRef(href) {
   let u;
   try { u = new URL(href); } catch { return null; }
-  return u.protocol === 'https:' && !u.port && !u.username && !u.password && /^s-[a-z0-9](?:[a-z0-9-]{0,59}[a-z0-9])?\.nookara\.cc$/i.test(u.hostname) && !/--/.test(u.hostname) ? { service: 'site', sure: false } : null;
+  if (u.protocol !== 'https:' || u.port || u.username || u.password) return null;
+  const h = u.hostname.toLowerCase();
+  return (/^s-[a-z0-9](?:[a-z0-9-]{0,59}[a-z0-9])?\.nookara\.cc$/.test(h) && !/--/.test(h)) || customSiteHosts.has(h) ? { service: 'site', sure: false } : null;
 }
 // what a link to a card is called where the card itself isn't shown (a reply preview)
 export function embedLabel(href) {
