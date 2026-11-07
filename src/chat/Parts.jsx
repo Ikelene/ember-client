@@ -4,7 +4,7 @@ import { isDesktopApp } from './BonfireLogo.jsx';
 import { VoiceChannelUsers, QuickVoiceBtns } from './VoiceParts.jsx';
 import { joinVoice } from './voice.js';
 import { openLinkChannel } from './ChannelTypes.jsx';
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Hash, Lock, Plus, Compass, ChevronDown, Settings, UserPlus, LogOut, House, MessageCircle, Home,
@@ -18,6 +18,7 @@ import { serverMenu, instanceMenu, channelMenu, userMenu, openMenu, copy } from 
 import { apiFetch, getToken } from '../api.js';
 import { VELORA, instOf, isInst } from './ids.js';
 import { loudUnread } from './unread.js';
+import { getLook, subscribeLook } from './look.js';
 import { removeInstance, reorderInstances, reconnect as reconnectInstance } from './instances.js';
 import { startSignIn } from './session.js';
 import { Avatar, subtitle, RoleChip, STATUS_LABEL, BlockedMark } from './Profile.jsx';
@@ -430,6 +431,7 @@ export function ServerSidebar({ sid, onInvite, onSettings, onChannel, onLeave, o
                       <ChannelIcon c={c} /> <span>{c.name}</span>{c.type === 'game' && !c.config?.setup && <i className="vc-game-setup-dot" title="Needs setup (only admins see it)" />}
                     </button>
                     {!on && <TypingMark names={typersOf(typing, `c:${c.cid}`)} people={people} sid={sid} />}
+                    {c.type !== 'voice' && <RecentPosters cid={c.cid} base={c.recent} />}
                     {pings > 0 && !muted && <span className="vc-ping" key={pings}>{pings > 99 ? '99+' : pings}</span>}
                     {canChannels && <button type="button" className="vc-ch-gear" title="Edit channel" onClick={() => onChannel(c)}><Settings size={13} /></button>}
                   </div>
@@ -761,4 +763,25 @@ function MemberName({ sid, m: raw }) {
   const m = useFace(raw);
   const key = useNameStyle(sid, m);
   return <b style={colorFrom(key) ? { color: colorFrom(key) } : undefined}>{m.username} <NameDecor sid={sid} user={m} />{m.bot && <BotTag small verified={!!m.verified} />}{m.role === 'owner' && <RoleChip role="owner" />}</b>;
+}
+
+// "who posted recently" (Modern, Settings > Text & layout): up to 3 faces of people who posted in the channel in the last
+// 10 minutes (the server's list with the channels + live messages). Rechecked every minute so old ones drop off.
+const RECENT_MS = 10 * 60 * 1000;
+function RecentPosters({ cid, base }) {
+  const live = useChat(s => s.recentPosts?.[cid]);
+  const people = useChat(s => s.people);
+  const [, tick] = useState(0);
+  const on = useSyncExternalStore(subscribeLook, () => getLook().recentPosters);
+  useEffect(() => { const t = setInterval(() => tick(n => n + 1), 60000); return () => clearInterval(t); }, []);
+  if (!on || !document.documentElement.classList.contains('vc-rounded')) return null;
+  const now = Date.now();
+  const seen = new Set();
+  const list = [...(live || []), ...(base || [])].filter(p => p && now - (p.at || 0) < RECENT_MS && !seen.has(p.username) && seen.add(p.username)).slice(0, 3);
+  if (!list.length) return null;
+  return (
+    <span className="vc-recent" title={`Posted recently: ${list.map(p => p.username).join(', ')}`}>
+      {list.map(p => <Avatar key={p.username} user={{ username: p.username, pfp: p.pfp || people[p.username]?.pfp }} size={18} />)}
+    </span>
+  );
 }

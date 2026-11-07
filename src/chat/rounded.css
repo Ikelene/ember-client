@@ -21,8 +21,8 @@ html.vc-rounded .vc-rail-item > button { border-radius: var(--r-lg); background:
 html.vc-rounded .vc-rail-item > button:hover { border-radius: var(--r-lg); }
 html.vc-rounded .vc-rail-item.active > button { border-radius: var(--r-lg); box-shadow: none; }
 html.vc-rounded .vc-rail-item > button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-html.vc-rounded .vc-pill { border-radius: 0 4px 4px 0; width: 4px; }
-html.vc-rounded .vc-rail-sep { border-radius: 2px; height: 2px; }
+html.vc-rounded .vc-pill { border-radius: 0 calc(4px * var(--rk, 1)) calc(4px * var(--rk, 1)) 0; width: 4px; }
+html.vc-rounded .vc-rail-sep { border-radius: calc(2px * var(--rk, 1)); height: 2px; }
 html.vc-rounded .vc-rail-badge { border-radius: 99px; }
 html.vc-rounded .vc-rail-ghost { border-radius: var(--r-lg); }
 html.vc-rounded .vc-srv-ico.lg { border-radius: var(--r-lg); }
@@ -34,7 +34,7 @@ html.vc-rounded .vc-ch, html.vc-rounded .vc-dm, html.vc-rounded .vc-home-link, h
 html.vc-rounded .vc-ch-btn { border-radius: var(--r-sm); }
 html.vc-rounded .vc-ch.on, html.vc-rounded .vc-dm.on, html.vc-rounded .vc-me-who.on { background: var(--flat-on); }
 html.vc-rounded .vc-member:hover { border-left-color: transparent; }
-html.vc-rounded .vc-ch.unread::before { border-radius: 0 4px 4px 0; left: -8px; }
+html.vc-rounded .vc-ch.unread::before { border-radius: 0 calc(4px * var(--rk, 1)) calc(4px * var(--rk, 1)) 0; left: -8px; }
 html.vc-rounded .vc-ch-gear, html.vc-rounded .vc-cat-add { border-radius: var(--r-xs); }
 html.vc-rounded .vc-ch-gear:hover { background: rgba(255, 255, 255, .06); }
 html.vc-rounded .vc-count { border-radius: 99px; }
@@ -57,8 +57,8 @@ html.vc-rounded .vc-att { overflow: hidden; }
 html.vc-rounded .vc-embed { overflow: hidden; }
 html.vc-rounded .vc-embed .vc-embed-media, html.vc-rounded .vc-embed img { border-radius: var(--r-sm); }
 html.vc-rounded .vc-code { border-radius: var(--r-xs); }
-html.vc-rounded .vc-spoiler, html.vc-rounded .vc-mention, html.vc-rounded .vc-stamp { border-radius: 5px; }
-html.vc-rounded .vc-quote { border-radius: 2px; border-left-width: 4px; }
+html.vc-rounded .vc-spoiler, html.vc-rounded .vc-mention, html.vc-rounded .vc-stamp { border-radius: calc(5px * var(--rk, 1)); }
+html.vc-rounded .vc-quote { border-radius: calc(2px * var(--rk, 1)); border-left-width: 4px; }
 html.vc-rounded .vc-react { border-radius: var(--r-sm); }
 html.vc-rounded .vc-skel { border-radius: var(--r-sm); }
 
@@ -88,7 +88,7 @@ html.vc-rounded .vc-menu { padding: 6px; border-radius: var(--r-md); box-shadow:
 html.vc-rounded .vc-menu > button, html.vc-rounded .vc-menu > a { border-left-width: 0; border-radius: var(--r-sm); }
 html.vc-rounded .vc-ctx { border-radius: var(--r-md); box-shadow: var(--sh-3); }
 html.vc-rounded .vc-ctx-row > button { border-left-width: 0; border-radius: var(--r-sm); }
-html.vc-rounded .vc-ctx-check { border-radius: 5px; }
+html.vc-rounded .vc-ctx-check { border-radius: calc(5px * var(--rk, 1)); }
 html.vc-rounded .vc-pop, html.vc-rounded .bf-pp-pop { border-radius: var(--r-lg); box-shadow: var(--sh-3); }
 html.vc-rounded .vc-pop > *, html.vc-rounded .bf-pp-pop > .bf-pp-card { border-radius: inherit; }
 html.vc-rounded .bf-pp-card { border-radius: var(--r-lg); overflow: hidden; }

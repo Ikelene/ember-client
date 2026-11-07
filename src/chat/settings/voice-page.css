@@ -1,0 +1,48 @@
+/* Settings > Voice & video (VoicePage.jsx). Square by default; soft only under html.vc-rounded. */
+.vp-select { width: 260px; max-width: 100%; }
+.vp-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 4px 0 8px; padding: 10px 12px; background: #111113; border: 1px solid var(--border); font-size: 13px; color: var(--dim); }
+.vp-ask > span { flex: 1; min-width: 180px; }
+
+.vp-err { display: block; width: 100%; margin-top: 6px; color: #f07178; font-size: 12.5px; }
+.vp-slider { display: flex; flex-direction: column; gap: 7px; padding: 12px 0; border-top: 1px solid var(--border); }
+.sx-card-head + .vp-slider { border-top: 0; padding-top: 0; }
+.vp-slider-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.vp-slider-head b { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--text); }
+.vp-slider-head span { font-size: 13px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.vp-slider > small { font-size: 12.5px; color: var(--muted); }
+.vp-slider input[type="range"] { width: 100%; margin: 0; accent-color: var(--accent); cursor: pointer; }
+/* sensitivity: the live level bar sits behind the slider, the marker shows the cut-off */
+.vp-sens { position: relative; height: 28px; display: flex; align-items: center; }
+.vp-sens .vp-meter { position: absolute; left: 0; right: 0; top: 50%; height: 14px; transform: translateY(-50%); pointer-events: none; }
+.vp-sens .vp-meter > i { width: 0; background: var(--muted); opacity: .55; transition: width .06s linear, background .12s; }
+.vp-sens.above .vp-meter > i { background: #6fcf8f; opacity: 1; }
+.vp-sens input[type="range"] { position: relative; z-index: 1; background: transparent; -webkit-appearance: none; appearance: none; height: 28px; }
+.vp-sens input[type="range"]::-webkit-slider-runnable-track { height: 14px; background: transparent; }
+.vp-sens input[type="range"]::-moz-range-track { height: 14px; background: transparent; }
+.vp-sens input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 24px; margin-top: -5px; background: #fff; border: 2px solid var(--accent); cursor: pointer; }
+.vp-sens input[type="range"]::-moz-range-thumb { width: 10px; height: 20px; background: #fff; border: 2px solid var(--accent); border-radius: 0; cursor: pointer; }
+.vp-note { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13.5px; color: var(--dim); }
+.vp-dot { flex: none; width: 8px; height: 8px; background: #6fcf8f; animation: vp-pulse 1.2s ease-in-out infinite; }
+@keyframes vp-pulse { 50% { opacity: .35; } }
+.vp-btn { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.vp-cam { position: relative; width: 320px; max-width: 100%; aspect-ratio: 16 / 9; margin-top: 10px; background: #0a0a0c; border: 1px solid var(--border); overflow: hidden; display: grid; place-items: center; }
+.vp-cam video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.vp-cam-wait { font-size: 13px; color: var(--muted); }
+
+@media (max-width: 700px) {
+  .vp-select { width: 100%; }
+  .sx-row:has(.vp-select) .sx-row-ctl { flex: 1 1 100%; }
+  .vp-cam { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vp-sens .vp-meter > i { transition: none; }
+  .vp-dot { animation: none; }
+}
+
+html.vc-rounded .vp-ask { border: 0; border-radius: calc(10px * var(--rk, 1)); background: var(--m-main); }
+html.vc-rounded .vp-slider { border-top-color: var(--m-line); }
+html.vc-rounded .vp-sens .vp-meter { border-radius: 99px; }
+html.vc-rounded .vp-sens input[type="range"]::-webkit-slider-thumb { border-radius: calc(6px * var(--rk, 1)); }
+html.vc-rounded .vp-sens input[type="range"]::-moz-range-thumb { border-radius: calc(6px * var(--rk, 1)); }
+html.vc-rounded .vp-dot { border-radius: 50%; }
+html.vc-rounded .vp-cam { border: 0; border-radius: calc(12px * var(--rk, 1)); background: var(--m-app); }

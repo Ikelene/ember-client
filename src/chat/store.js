@@ -363,6 +363,17 @@ setInterval(() => send({ type: 'ping' }), 25000);
 const INSTANCE_EVENTS = new Set(['chat_message', 'chat_message_update', 'chat_message_delete', 'chat_reactions', 'chat_typing', 'chat_pins_update', 'chat_server_update', 'chat_server_removed', 'chat_roles_update', 'chat_perms_changed', 'chat_channels_update', 'chat_member_update', 'chat_presence', 'chat_members_stale', 'chat_emojis_update', 'chat_identity_update', 'chat_ack', 'chat_error', 'chat_ephemeral', 'chat_join_request', 'chat_join_result', 'chat_report', 'chat_timeout', 'chat_server_added', 'chat_starboard', 'chat_shop_update', 'chat_commands_update', 'chat_interaction_message', 'chat_interaction_modal', 'game_status', 'game_console', 'game_linked', 'game_unlinked', 'voice_sound', 'voice_sound_failed']);
 const INSTANCE_VOICE = /^(chat_rtc_|chat_voice_state$)/;
 const LOCKED_EVENTS = new Set(['auth_success', 'auth_error', 'restrictions', 'error', 'kicked', 'bonfire_update', 'web_build']); // (what still matters while locked)
+// "who posted recently" (channel list, Modern): people who posted in a channel lately, newest first. The server's list comes
+// with the channels (recent); this adds what arrives live.
+function notePoster(msg) {
+  const a = msg?.author;
+  if (!a?.username || msg.system || a.webhook || a.bot) return;
+  set(s => {
+    const prev = s.recentPosts?.[msg.channel] || [];
+    const next = [{ username: a.username, pfp: a.pfp || null, at: Date.now() }, ...prev.filter(x => x.username !== a.username)].slice(0, 5);
+    return { recentPosts: { ...(s.recentPosts || {}), [msg.channel]: next } };
+  });
+}
 export function handleEvent(m, inst = VELORA) {
   if (inst !== VELORA && !INSTANCE_EVENTS.has(m?.type) && !INSTANCE_VOICE.test(String(m?.type))) return;
   if (inst !== VELORA && m.type === 'chat_error' && String(m.request || '').startsWith('chat_rtc')) { voiceHook?.({ ...m, inst }); return; }
@@ -412,7 +423,7 @@ function onEvent(m, inst = VELORA) {
       catchUp();
       loadNotifCount(); // (anything that happened while the socket was down)
       break;
-    case 'chat_message': addMessage(`c:${m.message.channel}`, m.message); break;
+    case 'chat_message': addMessage(`c:${m.message.channel}`, m.message); notePoster(m.message); break;
     // Velora: somebody I can see changed their profile (picture, colour, name, bio ...): patch every cache that holds them, refresh any open
     // profile card, and ask the instances they are on to re-read it too (instances otherwise pick it up on their own 10-15 min schedule)
     case 'user_update':

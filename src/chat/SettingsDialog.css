@@ -260,3 +260,7 @@ button.bf-sr-tile:hover { border-color: var(--border-2); }
 .bf-la-form .form-input { flex: 1 1 160px; }
 /* the Help links (Report a bug / Get support): open outside, so a small arrow instead of the chevron */
 .bf-sd-group > button .bf-sd-ext { margin-left: auto; color: var(--muted); }
+.bf-sd-extra { max-width: 820px; margin: 16px auto 0; }
+.bf-sd-crumbs { gap: 8px !important; font-size: 13.5px !important; font-weight: 500; color: var(--muted) !important; }
+.bf-sd-crumbs b { color: var(--text); font-weight: 600; }
+.bf-sd-crumbs svg { color: var(--muted); }

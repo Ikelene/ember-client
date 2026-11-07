@@ -1,0 +1,40 @@
+/* Settings > Signed-in accounts and Server hosting (AccountsPages.jsx). Square by default; Modern softens under html.vc-rounded. */
+.ac-hero { padding: 20px 22px; }
+.ac-hero-in { display: flex; align-items: center; gap: 16px; }
+.ac-hero-blank { flex: none; width: 64px; height: 64px; display: grid; place-items: center; background: var(--surface-3, #1c1c20); color: var(--dim); }
+.ac-hero-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ac-hero-txt b { font-size: 18px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-kicker { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.ac-btns { flex: none; display: flex; flex-wrap: wrap; gap: 8px; }
+.ac-btns.end { justify-content: flex-end; }
+.ac-btns .btn, .ac-acts .btn { display: inline-flex; align-items: center; gap: 6px; }
+
+.ac-inst { align-items: flex-start; }
+.ac-ico { flex: none; width: 40px !important; height: 40px !important; background: var(--surface-3, #1c1c20); font-size: 13px; }
+.ac-host, .ac-who, .ac-bill { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.ac-who .vc-av { flex: none; }
+.ac-state { font-size: 12px; color: var(--muted); }
+.ac-state::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 6px; vertical-align: 1px; background: var(--muted); }
+.ac-state.ok::before { background: #6fcf8f; }
+.ac-state.warn::before { background: #e8a84a; }
+.ac-hero .ac-state::before { display: none; }
+.ac-hero .ac-state.ok { color: #6fcf8f; }
+.ac-bill { font-size: 12px; color: var(--dim); }
+.ac-bill.warn, .ac-bill.full { color: #e8a84a; }
+.ac-acts { flex-wrap: wrap; justify-content: flex-end; max-width: 50%; }
+.ac-danger:hover:not(:disabled) { color: var(--red, #f06a6a); border-color: var(--red, #f06a6a); }
+
+@media (max-width: 700px) {
+  .ac-hero-in { flex-wrap: wrap; }
+  .ac-hero-txt { flex-basis: calc(100% - 80px); }
+  .ac-btns { width: 100%; }
+  .ac-btns .btn { flex: 1 1 auto; justify-content: center; }
+  .ac-inst { flex-wrap: wrap; }
+  .ac-inst .sx-row-txt { flex-basis: calc(100% - 52px); }
+  .ac-acts { max-width: none; width: 100%; justify-content: flex-start; }
+}
+
+html.vc-rounded .ac-hero { padding: 22px 24px; }
+html.vc-rounded .ac-hero-blank { border-radius: 50%; background: var(--m-on); }
+html.vc-rounded .ac-ico { border-radius: calc(10px * var(--rk, 1)); background: var(--m-on); }
+html.vc-rounded .ac-state::before { border-radius: 50%; }

@@ -39,6 +39,7 @@ import { shortDays, daysText } from './temp-pick.js';
 import { viaProxy } from './mediaProxy.js';
 import { Ellipsis, Languages } from 'lucide-react';
 import { saveRef, savedIdOf, saveMessage, unsaveMessage, translate, langName } from './inbox.js';
+import { getLook, subscribeLook } from './look.js';
 import { BookmarkPlus, Smile, File as FileIcon, FileArchive, FileCode, FileText, Download, Coins, MessageSquareQuote, Forward } from 'lucide-react';
 import { messageCaps, reactionId, pinPath } from './msg-actions.js';
 
@@ -439,7 +440,8 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
   const blockedAuthor = useBlocked(view.kind === 'channel' && !hook && !m.system ? m.author : null, m.inst);
   const replyBlocked = useBlocked(view.kind === 'channel' ? m.reply?.author : null, m.inst);
   const [unmasked, setUnmasked] = useState(false);
-  const masked = blockedAuthor && !unmasked;
+  const blockMode = useSyncExternalStore(subscribeLook, () => getLook().blocked); // Settings > Blocking: hide / button / show
+  const masked = blockedAuthor && !unmasked && blockMode !== 'show';
   const mine = !hook && isMineMsg(m);
   // what this message can do here (menu + hover toolbar): msg-actions.js
   const caps = messageCaps(view, m, { mine, canMod, canPost: ctx.canPost });
@@ -517,6 +519,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
           onSave: sref ? toggleSave : null, saved: !!savedIdOf(sref), onTranslate: m.body ? toggleTranslate : null, translated: !!tr,
         });
   };
+  if (blockedAuthor && blockMode === 'hide') return null;
   const name = m.author?.username || 'Unknown';
   return (
     <div className={`vc-msg${head ? ' head' : ''}${m.pending ? ' pending' : ''}${m.failed ? ' failed' : ''}${mentionsMe ? ' mention' : ''}${editing ? ' editing' : ''} ${hovered ? ' hov' : ''} ${fresh === 'live' ? (isMineMsg(m) ? 'vc-in-mine' : 'vc-in-live') : fresh === 'done' ? '' : 'vl-in'}`} data-id={m.id}

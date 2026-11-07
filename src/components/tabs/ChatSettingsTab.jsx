@@ -189,9 +189,9 @@ function DesignSettings() {
       <div className="card-header"><span className="card-title">Design</span></div>
       <div className="card-body cs-rows">
         <div className="cs-row">
-          <div className="cs-text"><b>Look</b><span>Square: the original sharp-cornered look. Rounded: flat dark greys with softly rounded corners. Saved on this device.</span></div>
+          <div className="cs-text"><b>Look</b><span>Classic: the original sharp-cornered Ember. Modern (BETA): bigger, softer and roomier, with themes, fonts and more under Look &amp; feel. Saved on this device.</span></div>
           <div className="cs-seg">
-            {[['square', 'Square'], ['rounded', 'Rounded']].map(([v, l]) => <button type="button" key={v} className={d === v ? 'on' : ''} aria-pressed={d === v} onClick={() => setDesign(v)}>{l}</button>)}
+            {[['square', 'Classic'], ['rounded', 'Modern (BETA)']].map(([v, l]) => <button type="button" key={v} className={d === v ? 'on' : ''} aria-pressed={d === v} onClick={() => setDesign(v)}>{l}</button>)}
           </div>
         </div>
       </div>

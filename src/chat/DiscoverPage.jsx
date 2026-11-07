@@ -14,7 +14,7 @@ export default function DiscoverPage({ onClose }) {
   return (
     <div className="vc-disc-page">
       <header className="vc-disc-hero">
-        <div className="vc-disc-bg" aria-hidden="true"><i className="b1" /><i className="b2" /><i className="b3" /><i className="grid" /></div>
+        <HeroTiles />
         <button type="button" className="vc-ico-btn vc-disc-back" onClick={onClose} title="Back" aria-label="Back"><ArrowLeft size={20} /></button>
         <div className="vc-disc-hero-in">
           <span className="vc-disc-kicker"><Compass size={15} /> Explore Ember</span>
@@ -81,5 +81,38 @@ function ServerResults({ q, onClose }) {
       </div>
       {d?.has_more && <div className="vc-disc-more"><button type="button" className="btn btn-surface" onClick={() => load((d.page || 1) + 1)}>Load more</button></div>}
     </>
+  );
+}
+
+// the hero's background, like Nookara's homepage: a tilted wall of server banners with their icons, drifting slowly.
+// Tiles come from the directory (its first page) and the servers you're in; a server with no banner gets a tinted card.
+const hueOf = name => (Array.from(String(name || '')).reduce((h, c) => h + c.charCodeAt(0), 0) * 37) % 360;
+function HeroTiles() {
+  const mine = useChat(s => s.servers);
+  const [dir, setDir] = useState([]);
+  useEffect(() => { fetch('/bonfire/directory?q=&page=1').then(r => (r.ok ? r.json() : null)).then(d => setDir(d?.results || [])).catch(() => {}); }, []);
+  const safe = u => (/^https:\/\//i.test(u || '') || /^\/(uploads|assets)\//.test(u || '') ? u : null);
+  const items = [
+    ...dir.map(r => ({ k: `d${r.id || r.url}`, name: r.name, icon: safe(r.icon_url), banner: safe(r.banner_url) })),
+    ...mine.map(s => ({ k: `m${s.sid}`, name: s.name, icon: safe(s.icon), banner: safe(s.banner) })),
+  ];
+  const base = items.length ? items : Array.from({ length: 8 }, (_, i) => ({ k: `x${i}`, name: ['Pixel', 'Night', 'Den', 'Arcade', 'Studio', 'Lounge', 'Garden', 'Lab'][i] }));
+  const row = n => { const out = []; for (let i = 0; out.length < 12; i++) out.push(base[(i * 3 + n * 5) % base.length]); return [...out, ...out]; }; // doubled for a seamless loop
+  return (
+    <div className="vc-disc-bg" aria-hidden="true">
+      <div className="vc-disc-wall">
+        {[0, 1, 2, 3].map(n => (
+          <div key={n} className={`vc-disc-wall-row${n % 2 ? ' rev' : ''}`}>
+            {row(n).map((t, i) => (
+              <span key={`${t.k}-${i}`} className="vc-disc-tile" style={{ '--hue': hueOf(t.name) }}>
+                {t.banner && <img className="vc-disc-tile-bg" src={t.banner} alt="" loading="lazy" />}
+                <span className="vc-disc-tile-ico">{t.icon ? <img src={t.icon} alt="" loading="lazy" /> : initials(t.name)}</span>
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
+      <i className="vc-disc-shade" />
+    </div>
   );
 }

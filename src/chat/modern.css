@@ -13,7 +13,8 @@
 @font-face { font-family: 'Ember Roboto'; font-style: italic; font-display: swap; font-weight: 100 900; src: url('./fonts/roboto-latin-wght-italic.woff2') format('woff2-variations'), url('./fonts/roboto-latin-wght-italic.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 
-html.vc-rounded, html.vc-rounded .vc {
+/* the Modern tokens live on <html> only, so look.js (Theme / Text & layout settings) can override them inline there */
+html.vc-rounded {
   --m-font: 'Ember Roboto', Roboto, system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
   /* surfaces, darkest to lightest */
   --m-app: #0b0b0d;      /* behind everything (rail) */
@@ -25,13 +26,20 @@ html.vc-rounded, html.vc-rounded .vc {
   --m-line: rgba(255, 255, 255, .06);
   --m-line-2: rgba(255, 255, 255, .1);
   --m-gap: 8px;
-  --m-card: 12px;
-  --bg: var(--m-main); --surface: var(--m-side); --surface-2: var(--m-raised); --surface-3: #26262b; --border: var(--m-line); --border-2: var(--m-line-2);
+  --rk: 1;               /* corner roundness: 0 none, .5 small, 1 medium, 1.6 large */
+  --m-card: calc(12px * var(--rk));
+  --m-text: 15.5px;
+  --m-emoji: 22px;
+  --m-mention: #e0b25a;
+}
+html.vc-rounded, html.vc-rounded .vc {
+  --bg: var(--m-main); --surface: var(--m-side); --surface-2: var(--m-raised); --surface-3: color-mix(in srgb, var(--m-raised) 80%, #fff 6%); --border: var(--m-line); --border-2: var(--m-line-2);
   --flat-panel: var(--m-side); --flat-box: var(--m-raised); --flat-hover: var(--m-hover); --flat-on: var(--m-on);
   --box: var(--m-raised); --panel: var(--m-side);
-  --r-xs: 4px; --r-sm: 6px; --r-md: 8px; --r-lg: 10px; --r-xl: 12px;
+  --r-xs: calc(4px * var(--rk)); --r-sm: calc(6px * var(--rk)); --r-md: calc(8px * var(--rk)); --r-lg: calc(10px * var(--rk)); --r-xl: calc(12px * var(--rk));
   --sh-2: 0 8px 24px rgba(0, 0, 0, .4);
   --sh-3: 0 20px 50px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .06);
+  --radius: var(--r-md); --radius-sm: var(--r-sm);
 }
 html.vc-rounded body, html.vc-rounded .vc, html.vc-rounded .vc-dialog, html.vc-rounded .bf-sd, html.vc-rounded .vc-ctx, html.vc-rounded .vc-pop, html.vc-rounded .vc-tooltip { font-family: var(--m-font); }
 html.vc-rounded .vc :is(button, input, textarea, select), html.vc-rounded :is(.vc-dialog, .bf-sd, .vc-ctx, .vc-pop) :is(button, input, textarea, select) { font-family: inherit; }
@@ -40,18 +48,18 @@ html.vc-rounded .vc { -webkit-font-smoothing: antialiased; letter-spacing: .005e
 /* ── the frame: rail on the app background, sidebar + conversation as floating cards ── */
 html.vc-rounded .vc { background: var(--m-app); padding: var(--m-gap) var(--m-gap) var(--m-gap) 0; gap: var(--m-gap); }
 html.vc-rounded .vc-left { gap: 0; }
-html.vc-rounded .vc-rail { width: 80px; padding: 6px 0 12px; gap: 10px; background: transparent; border-right: 0; }
+html.vc-rounded .vc-rail { width: 72px; padding: 6px 0 12px; gap: 10px; background: transparent; border-right: 0; }
 html.vc-rounded .vc-side-col { width: 340px; background: var(--m-side); border: 0; border-radius: var(--m-card); overflow: hidden; }
 html.vc-rounded .vc-main { background: var(--m-main); border-radius: var(--m-card); overflow: hidden; box-shadow: 0 0 0 1px var(--m-line); }
 html.vc-rounded .vc-side-col { box-shadow: 0 0 0 1px var(--m-line); }
 
 /* ── server rail ── */
-html.vc-rounded .vc-rail-item { width: 80px; }
-html.vc-rounded .vc-rail-item > button { width: 52px; height: 52px; border-radius: 12px; border: 0; background: var(--m-raised); color: var(--dim); transition: border-radius .2s cubic-bezier(.2, .8, .2, 1), background .15s, color .15s, transform .18s cubic-bezier(.2, .8, .2, 1); }
-html.vc-rounded .vc-rail-item > button:hover { border-radius: 10px; background: var(--m-on); transform: none; color: #fff; }
-html.vc-rounded .vc-rail-item.active > button { border-radius: 10px; box-shadow: 0 0 0 2px var(--accent); background: var(--m-raised); }
+html.vc-rounded .vc-rail-item { width: 72px; }
+html.vc-rounded .vc-rail-item > button { width: 48px; height: 48px; border-radius: calc(12px * var(--rk, 1)); border: 0; background: var(--m-raised); color: var(--dim); transition: border-radius .2s cubic-bezier(.2, .8, .2, 1), background .15s, color .15s, transform .18s cubic-bezier(.2, .8, .2, 1); }
+html.vc-rounded .vc-rail-item > button:hover { border-radius: calc(10px * var(--rk, 1)); background: var(--m-on); transform: none; color: #fff; }
+html.vc-rounded .vc-rail-item.active > button { border-radius: calc(10px * var(--rk, 1)); box-shadow: 0 0 0 2px var(--accent); background: var(--m-raised); }
 html.vc-rounded .vc-srv-ico { font-size: 16px; font-weight: 600; }
-html.vc-rounded .vc-pill { width: 5px; left: 0; border-radius: 0 5px 5px 0; }
+html.vc-rounded .vc-pill { width: 5px; left: 0; border-radius: 0 calc(5px * var(--rk, 1)) calc(5px * var(--rk, 1)) 0; }
 html.vc-rounded .vc-rail-item:hover .vc-pill { height: 22px; }
 html.vc-rounded .vc-rail-item.unread .vc-pill { height: 10px; }
 html.vc-rounded .vc-rail-item.active .vc-pill { height: 36px; }
@@ -59,41 +67,41 @@ html.vc-rounded .vc-rail-sep { width: 36px; height: 2px; background: var(--m-lin
 html.vc-rounded .vc-rail-badge { left: calc(50% + 12px); bottom: -4px; min-width: 20px; height: 20px; font-size: 12px; border-color: var(--m-app); }
 
 /* ── sidebar ── */
-html.vc-rounded .vc-side-head { height: 60px; border-bottom: 1px solid var(--m-line); }
+html.vc-rounded .vc-side-head { height: 54px; border-bottom: 1px solid var(--m-line); }
 html.vc-rounded .vc-side-head.banner { height: 132px; }
-html.vc-rounded .vc-side-title { height: 60px; padding: 0 16px; font-size: 16.5px; font-weight: 600; }
+html.vc-rounded .vc-side-title { height: 54px; padding: 0 16px; font-size: 16.5px; font-weight: 600; }
 html.vc-rounded .vc-side-list { padding: 8px 10px 16px; }
-html.vc-rounded .vc-side-list, html.vc-rounded .vc-members, html.vc-rounded .vc-me { --av-k: 1.125; }
+html.vc-rounded .vc-side-list, html.vc-rounded .vc-members, html.vc-rounded .vc-me { --av-k: 1.06; }
 html.vc-rounded .vc-cat-name { padding: 20px 8px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; }
-html.vc-rounded .vc-cat-add { border-radius: 6px; padding: 3px; }
+html.vc-rounded .vc-cat-add { border-radius: calc(6px * var(--rk, 1)); padding: 3px; }
 html.vc-rounded .vc-cat-add:hover { background: var(--m-hover); }
-html.vc-rounded .vc-ch { margin: 2px 0; border-radius: 8px; }
-html.vc-rounded .vc-ch-btn { padding: 9px 10px; gap: 10px; font-size: 16px; border-radius: 8px; }
-html.vc-rounded .vc-ch-btn svg { width: 20px; height: 20px; }
+html.vc-rounded .vc-ch { margin: 2px 0; border-radius: calc(8px * var(--rk, 1)); }
+html.vc-rounded .vc-ch-btn { padding: 7px 10px; gap: 9px; font-size: 15px; border-radius: calc(8px * var(--rk, 1)); }
+html.vc-rounded .vc-ch-btn svg { width: 19px; height: 19px; }
 html.vc-rounded .vc-ch:hover { background: var(--m-hover); }
 html.vc-rounded .vc-ch.on { background: var(--m-on); }
-html.vc-rounded .vc-ch.unread::before { left: -10px; width: 5px; height: 10px; border-radius: 0 5px 5px 0; }
-html.vc-rounded .vc-ch-gear { width: 30px; height: 30px; border-radius: 6px; }
-html.vc-rounded .vc-home-link { padding: 11px 10px; gap: 12px; font-size: 16px; font-weight: 500; border-radius: 8px; }
+html.vc-rounded .vc-ch.unread::before { left: -10px; width: 5px; height: 10px; border-radius: 0 calc(5px * var(--rk, 1)) calc(5px * var(--rk, 1)) 0; }
+html.vc-rounded .vc-ch-gear { width: 30px; height: 30px; border-radius: calc(6px * var(--rk, 1)); }
+html.vc-rounded .vc-home-link { padding: 9px 10px; gap: 11px; font-size: 15px; font-weight: 500; border-radius: calc(8px * var(--rk, 1)); }
 html.vc-rounded .vc-home-link.on { background: var(--m-on); }
-html.vc-rounded .vc-dm { padding: 8px 10px; gap: 12px; margin: 2px 0; border-radius: 8px; }
+html.vc-rounded .vc-dm { padding: 6px 10px; gap: 11px; margin: 2px 0; border-radius: calc(8px * var(--rk, 1)); }
 html.vc-rounded .vc-dm.on { background: var(--m-on); }
-html.vc-rounded .vc-dm-txt b { font-size: 15.5px; font-weight: 500; }
-html.vc-rounded .vc-dm-txt small { font-size: 13px; }
+html.vc-rounded .vc-dm-txt b { font-size: 14.5px; font-weight: 500; }
+html.vc-rounded .vc-dm-txt small { font-size: 12.5px; }
 html.vc-rounded .vc-dm.unread b { font-weight: 700; }
 html.vc-rounded .vc-count { min-width: 20px; padding: 2px 7px; font-size: 12px; text-align: center; }
-html.vc-rounded .vc-quick { height: 42px; width: calc(100% - 20px); margin: 10px; padding: 0 10px 0 14px; font-size: 14.5px; font-weight: 500; border: 0; background: var(--m-app); border-radius: 9px; }
+html.vc-rounded .vc-quick { height: 38px; width: calc(100% - 20px); margin: 10px; padding: 0 10px 0 14px; font-size: 14.5px; font-weight: 500; border: 0; background: var(--m-app); border-radius: calc(9px * var(--rk, 1)); }
 html.vc-rounded .vc-quick:hover { box-shadow: 0 0 0 1px var(--m-line-2); }
-html.vc-rounded .vc-quick kbd { border-radius: 6px; padding: 4px 6px; font-size: 11px; }
+html.vc-rounded .vc-quick kbd { border-radius: calc(6px * var(--rk, 1)); padding: 4px 6px; font-size: 11px; }
 
 /* ── you (bottom left) ── */
-html.vc-rounded .vc-me { padding: 0 8px; gap: 4px; margin: 8px; height: 64px; border-top: 0; border-radius: 10px; background: var(--m-raised); }
+html.vc-rounded .vc-me { padding: 0 8px; gap: 2px; margin: 8px; height: 58px; border-top: 0; border-radius: calc(10px * var(--rk, 1)); background: var(--m-raised); }
 html.vc-rounded .vc-me .vc-st { border-color: var(--m-raised); --st-cut: var(--m-raised); }
-html.vc-rounded .vc-me-who { padding: 6px; gap: 11px; border-radius: 8px; }
+html.vc-rounded .vc-me-who { padding: 6px; gap: 11px; border-radius: calc(8px * var(--rk, 1)); }
 html.vc-rounded .vc-me-who:hover { background: var(--m-on); }
 html.vc-rounded .vc-me-txt b { font-size: 15px; font-weight: 600; }
 html.vc-rounded .vc-me-txt small { font-size: 12.5px; }
-html.vc-rounded .vc-me .vc-ico-btn { width: 36px; height: 36px; border-radius: 8px; }
+html.vc-rounded .vc-me .vc-ico-btn { width: 36px; height: 36px; border-radius: calc(8px * var(--rk, 1)); }
 html.vc-rounded .vc-me .vc-ico-btn svg { width: 19px; height: 19px; }
 
 /* ── avatars + status cut-outs follow the surface they sit on ── */
@@ -104,18 +112,18 @@ html.vc-rounded .vc-ch.on .vc-st, html.vc-rounded .vc-dm.on .vc-st { border-colo
 html.vc-rounded .vc-dm:hover .vc-st, html.vc-rounded .vc-member:hover .vc-st { border-color: var(--m-hover); --st-cut: var(--m-hover); }
 
 /* ── header ── */
-html.vc-rounded .vc-head { height: 60px; padding: 0 14px 0 20px; gap: 10px; background: var(--m-main); border-bottom: 1px solid var(--m-line); }
+html.vc-rounded .vc-head { height: 54px; padding: 0 14px 0 20px; gap: 10px; background: var(--m-main); border-bottom: 1px solid var(--m-line); }
 html.vc-rounded .vc-head-ico { width: 22px; height: 22px; }
-html.vc-rounded .vc-head-name { font-size: 17.5px; font-weight: 600; }
+html.vc-rounded .vc-head-name { font-size: 16.5px; font-weight: 600; }
 html.vc-rounded .vc-head-topic { font-size: 14px; border-left-color: var(--m-line-2); padding-left: 12px; }
-html.vc-rounded .vc-ico-btn { width: 38px; height: 38px; border-radius: 8px; }
+html.vc-rounded .vc-ico-btn { width: 38px; height: 38px; border-radius: calc(8px * var(--rk, 1)); }
 html.vc-rounded .vc-ico-btn:hover:not(:disabled) { background: var(--m-hover); }
 html.vc-rounded .vc-head .vc-ico-btn svg { width: 21px; height: 21px; }
-html.vc-rounded .vc-head-search input { height: 38px; width: 220px; padding: 0 32px 0 14px; font-size: 14.5px; background: var(--m-app); border: 1px solid transparent; border-radius: 8px; }
+html.vc-rounded .vc-head-search input { height: 38px; width: 220px; padding: 0 32px 0 14px; font-size: 14.5px; background: var(--m-app); border: 1px solid transparent; border-radius: calc(8px * var(--rk, 1)); }
 html.vc-rounded .vc-head-search input:focus { width: 290px; border-color: var(--accent); }
 html.vc-rounded .vc-head-search svg { top: 11px; right: 11px; }
 html.vc-rounded .vc-tabs.inline { gap: 6px; margin-left: 16px; }
-html.vc-rounded .vc-tabs.inline button { padding: 7px 14px; font-size: 14.5px; font-weight: 500; border-radius: 8px; color: var(--dim); }
+html.vc-rounded .vc-tabs.inline button { padding: 7px 14px; font-size: 14.5px; font-weight: 500; border-radius: calc(8px * var(--rk, 1)); color: var(--dim); }
 html.vc-rounded .vc-tabs.inline button:hover { background: var(--m-hover); color: #fff; }
 html.vc-rounded .vc-tabs.inline button.on { background: var(--m-on); color: #fff; }
 html.vc-rounded .vc-tabs.inline button.add { background: color-mix(in srgb, #3f9e62 85%, black); color: #fff; }
@@ -124,86 +132,86 @@ html.vc-rounded .vc-tabs button { font-size: 14.5px; font-weight: 500; padding: 
 
 /* ── message list ── */
 html.vc-rounded .vc-msgs { padding: 18px 0 12px; }
-html.vc-rounded .vc-msgs, html.vc-rounded .vc-pins, html.vc-rounded .vc-results { --av-k: 1.1; }
-html.vc-rounded .vc-msg { grid-template-columns: 62px minmax(0, 1fr); margin: 0 10px; padding: 3px 52px 3px 10px; border-radius: 9px; }
-html.vc-rounded .vc-msg.head { margin-top: 18px; padding-top: 6px; }
+html.vc-rounded .vc-msgs, html.vc-rounded .vc-pins, html.vc-rounded .vc-results { --av-k: 1; }
+html.vc-rounded .vc-msg { grid-template-columns: 58px minmax(0, 1fr); margin: 0 10px; padding: 3px 52px 3px 10px; border-radius: calc(9px * var(--rk, 1)); }
+html.vc-rounded .vc-msg.head { margin-top: var(--m-gap-msg, 14px); padding-top: 5px; }
 html.vc-rounded .vc-msg:hover { background: rgba(255, 255, 255, .03); }
 html.vc-rounded .vc-msg.mention { background: rgba(214, 166, 76, .09); box-shadow: inset 3px 0 0 #e0b25a; }
-html.vc-rounded .vc-msg-av { width: 44px; height: 44px; }
+html.vc-rounded .vc-msg-av { width: 40px; height: 40px; }
 html.vc-rounded .vc-msg-gut { font-size: 11.5px; padding-top: 5px; }
 html.vc-rounded .vc-msg-head { gap: 10px; }
-html.vc-rounded .vc-msg-name { font-size: 16.5px; font-weight: 600; }
-html.vc-rounded .vc-time { font-size: 12.5px; }
-html.vc-rounded .vc-text { font-size: 16.5px; line-height: 1.55; color: #e2e2e6; }
-html.vc-rounded .vc-sys-body { font-size: 15.5px; }
-html.vc-rounded .vc-sys-ico { width: 44px; }
-html.vc-rounded .vc-reply-to { padding-left: 62px; font-size: 13.5px; }
+html.vc-rounded .vc-msg-name { font-size: calc(var(--m-text, 15.5px) - .5px); font-weight: 600; }
+html.vc-rounded .vc-time { font-size: 12px; }
+html.vc-rounded .vc-text { font-size: var(--m-text, 15.5px); line-height: 1.5; color: #e2e2e6; }
+html.vc-rounded .vc-sys-body { font-size: calc(var(--m-text, 15.5px) - 1px); }
+html.vc-rounded .vc-sys-ico { width: 40px; }
+html.vc-rounded .vc-reply-to { padding-left: 58px; font-size: 13.5px; }
 html.vc-rounded .vc-reply-line { left: 21px; width: 34px; }
 html.vc-rounded .vc-day { margin: 22px 22px 6px; font-size: 13px; }
 html.vc-rounded .vc-day span { padding: 3px 12px; border-radius: 99px; background: var(--m-raised); color: var(--dim); }
 html.vc-rounded .vc-day::before, html.vc-rounded .vc-day::after { background: var(--m-line); }
 html.vc-rounded .vc-code { font-size: 14px; padding: 1px 5px; background: var(--m-app); border-color: var(--m-line); }
 html.vc-rounded .vc-pre { font-size: 14px; padding: 12px 14px; background: var(--m-app); border-color: var(--m-line); }
-html.vc-rounded .vc-tools { top: -18px; right: 18px; padding: 3px; border: 0; border-radius: 9px; background: var(--m-raised); box-shadow: var(--sh-3); }
-html.vc-rounded .vc-tools button { width: 36px; height: 34px; border-radius: 6px; }
+html.vc-rounded .vc-tools { top: -18px; right: 18px; padding: 3px; border: 0; border-radius: calc(9px * var(--rk, 1)); background: var(--m-raised); box-shadow: var(--sh-3); }
+html.vc-rounded .vc-tools button { width: 32px; height: 30px; border-radius: calc(6px * var(--rk, 1)); }
 html.vc-rounded .vc-tools button:hover { background: var(--m-on); }
 html.vc-rounded .vc-start { padding: 34px 30px 14px; }
-html.vc-rounded .vc-start-ico { width: 76px; height: 76px; border-radius: 16px; background: var(--m-raised); border: 0; }
+html.vc-rounded .vc-start-ico { width: 76px; height: 76px; border-radius: calc(16px * var(--rk, 1)); background: var(--m-raised); border: 0; }
 html.vc-rounded .vc-start h2 { font-size: 30px; font-weight: 700; }
 html.vc-rounded .vc-start p { font-size: 15.5px; }
 html.vc-rounded .vc-atts { max-width: 520px; gap: 6px; }
 html.vc-rounded .vc-att { border: 0; }
-html.vc-rounded .vc-embed { border-radius: 9px; }
+html.vc-rounded .vc-embed { border-radius: calc(9px * var(--rk, 1)); }
 
 /* ── composer ── */
 html.vc-rounded .vc-composer-wrap { padding: 0 20px; }
-html.vc-rounded .vc-composer { gap: 6px; padding: 7px 8px; min-height: 56px; align-items: center; border: 1px solid transparent; border-radius: 12px; background: var(--m-raised); }
+html.vc-rounded .vc-composer { gap: 4px; padding: 5px 6px; min-height: 50px; align-items: center; border: 1px solid transparent; border-radius: calc(12px * var(--rk, 1)); background: var(--m-raised); }
 html.vc-rounded .vc-composer:focus-within { border-color: var(--m-line-2); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
-html.vc-rounded .vc-composer .vc-input, html.vc-rounded .vc-composer textarea { font-size: 16.5px; line-height: 1.5; }
-html.vc-rounded .vc-composer .vc-ico-btn { width: 40px; height: 40px; border-radius: 9px; }
-html.vc-rounded .vc-composer .vc-ico-btn svg { width: 22px; height: 22px; }
+html.vc-rounded .vc-composer .vc-input, html.vc-rounded .vc-composer textarea { font-size: var(--m-text, 15.5px); line-height: 1.5; }
+html.vc-rounded .vc-composer .vc-ico-btn { width: 36px; height: 36px; border-radius: calc(9px * var(--rk, 1)); }
+html.vc-rounded .vc-composer .vc-ico-btn svg { width: 20px; height: 20px; }
 html.vc-rounded .vc-composer .vc-ico-btn.send:not(:disabled) { background: var(--accent); color: #16141c; }
 html.vc-rounded .vc-composer.locked { margin: 0 20px 24px; padding: 16px; font-size: 14.5px; }
-html.vc-rounded .vc-replybar { padding: 9px 14px; font-size: 13.5px; border-radius: 12px 12px 0 0; border: 0; background: color-mix(in srgb, var(--m-raised) 70%, var(--m-app)); }
-html.vc-rounded .vc-pending-atts { border: 0; border-radius: 12px 12px 0 0; background: color-mix(in srgb, var(--m-raised) 70%, var(--m-app)); padding: 10px; }
+html.vc-rounded .vc-replybar { padding: 9px 14px; font-size: 13.5px; border-radius: calc(12px * var(--rk, 1)) calc(12px * var(--rk, 1)) 0 0; border: 0; background: color-mix(in srgb, var(--m-raised) 70%, var(--m-app)); }
+html.vc-rounded .vc-pending-atts { border: 0; border-radius: calc(12px * var(--rk, 1)) calc(12px * var(--rk, 1)) 0 0; background: color-mix(in srgb, var(--m-raised) 70%, var(--m-app)); padding: 10px; }
 html.vc-rounded .vc-replybar + .vc-composer, html.vc-rounded .vc-pending-atts + .vc-composer { border-top-left-radius: 0; border-top-right-radius: 0; }
 html.vc-rounded .vc-typing { height: 28px; font-size: 13px; padding: 0 6px; }
-html.vc-rounded .vc-edit .vc-edit-input { font-size: 16.5px; border-radius: 9px; padding: 10px 12px; background: var(--m-app); }
+html.vc-rounded .vc-edit .vc-edit-input { font-size: var(--m-text, 15.5px); border-radius: calc(9px * var(--rk, 1)); padding: 10px 12px; background: var(--m-app); }
 
 /* ── member list + side panels ── */
 html.vc-rounded .vc-members { width: 280px; padding: 6px 10px 18px; background: var(--m-side); border-left: 0; }
-html.vc-rounded .vc-member { padding: 7px 10px; gap: 12px; margin: 1px 0; border-left: 0; border-radius: 8px; }
+html.vc-rounded .vc-member { padding: 5px 10px; gap: 11px; margin: 1px 0; border-left: 0; border-radius: calc(8px * var(--rk, 1)); }
 html.vc-rounded .vc-member:hover { background: var(--m-hover); }
-html.vc-rounded .vc-member-txt b { font-size: 15.5px; font-weight: 500; }
-html.vc-rounded .vc-member-txt small { font-size: 13px; }
+html.vc-rounded .vc-member-txt b { font-size: 14.5px; font-weight: 500; }
+html.vc-rounded .vc-member-txt small { font-size: 12.5px; }
 html.vc-rounded .vc-member.off { opacity: .5; }
 html.vc-rounded .vc-dm-side, html.vc-rounded .vc-results { width: 340px; border-left: 0; background: var(--m-side); }
 html.vc-rounded .vc-results-head { background: var(--m-side); border-bottom-color: var(--m-line); padding: 12px 10px 12px 16px; }
 html.vc-rounded .vc-result { padding: 12px 16px; border-bottom-color: var(--m-line); }
 
 /* ── menus (dropdowns + right-click), pickers, tooltips ── */
-html.vc-rounded .vc-menu { padding: 6px; min-width: 240px; border: 0; border-radius: 10px; background: var(--m-raised); box-shadow: var(--sh-3); }
-html.vc-rounded .vc-menu > button, html.vc-rounded .vc-menu > a { padding: 10px 12px; gap: 12px; font-size: 15px; border-radius: 6px; }
+html.vc-rounded .vc-menu { padding: 5px; min-width: 210px; border: 0; border-radius: calc(10px * var(--rk, 1)); background: var(--m-raised); box-shadow: var(--sh-3); }
+html.vc-rounded .vc-menu > button, html.vc-rounded .vc-menu > a { padding: 7px 10px; gap: 10px; font-size: 14px; border-radius: calc(6px * var(--rk, 1)); }
 html.vc-rounded .vc-menu > button:hover, html.vc-rounded .vc-menu > a:hover { background: var(--m-on); }
-html.vc-rounded .vc-ctx { padding: 6px; min-width: 230px; max-width: 320px; border: 0; border-radius: 10px; background: var(--m-raised); box-shadow: var(--sh-3); }
-html.vc-rounded .vc-ctx-row > button { padding: 9px 11px; font-size: 15px; border-radius: 6px; }
+html.vc-rounded .vc-ctx { padding: 5px; min-width: 200px; max-width: 290px; border: 0; border-radius: calc(10px * var(--rk, 1)); background: var(--m-raised); box-shadow: var(--sh-3); }
+html.vc-rounded .vc-ctx-row > button { padding: 7px 9px; font-size: 14px; border-radius: calc(6px * var(--rk, 1)); }
 html.vc-rounded .vc-ctx-row > button:hover:not(:disabled) { background: var(--m-on); color: #fff; }
 html.vc-rounded .vc-ctx-row > button.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--red) 85%, black); color: #fff; }
 html.vc-rounded .vc-ctx-row > button.dev:hover:not(:disabled) { color: #fff; }
 html.vc-rounded .vc-ctx-label small { font-size: 12px; }
-html.vc-rounded .vc-ctx-check { width: 18px; height: 18px; border-radius: 6px; }
+html.vc-rounded .vc-ctx-check { width: 18px; height: 18px; border-radius: calc(6px * var(--rk, 1)); }
 html.vc-rounded .vc-ctx-check.on { color: #16141c; }
 html.vc-rounded .vc-menu-sep { background: var(--m-line); margin: 6px 4px; }
-html.vc-rounded .vc-tooltip { padding: 8px 11px; font-size: 13.5px; font-weight: 500; border: 0; border-radius: 8px; background: #050506; box-shadow: var(--sh-3); }
-html.vc-rounded .vc-mentions { padding: 8px; border: 0; border-radius: 10px; background: var(--m-raised); box-shadow: var(--sh-3); }
-html.vc-rounded .vc-mention-row { padding: 9px 10px; border-left: 0; border-radius: 6px; font-size: 15px; }
+html.vc-rounded .vc-tooltip { padding: 8px 11px; font-size: 13.5px; font-weight: 500; border: 0; border-radius: calc(8px * var(--rk, 1)); background: #050506; box-shadow: var(--sh-3); }
+html.vc-rounded .vc-mentions { padding: 8px; border: 0; border-radius: calc(10px * var(--rk, 1)); background: var(--m-raised); box-shadow: var(--sh-3); }
+html.vc-rounded .vc-mention-row { padding: 9px 10px; border-left: 0; border-radius: calc(6px * var(--rk, 1)); font-size: 15px; }
 html.vc-rounded .vc-mention-row.on { background: var(--m-on); }
 html.vc-rounded .vc-picker, html.vc-rounded .vc-sb { border: 0; box-shadow: var(--sh-3); }
-html.vc-rounded .vc-toast { padding: 12px 18px; font-size: 14.5px; border-radius: 10px; }
+html.vc-rounded .vc-toast { padding: 12px 18px; font-size: 14.5px; border-radius: calc(10px * var(--rk, 1)); }
 
 /* ── dialogs ── */
 html.vc-rounded .vc-modal-back { background: rgba(4, 4, 6, .6); backdrop-filter: blur(8px); }
-html.vc-rounded .vc-dialog { width: min(500px, 100%); padding: 28px; border: 0; border-radius: 14px; background: var(--m-main); box-shadow: var(--sh-3); }
+html.vc-rounded .vc-dialog { width: min(500px, 100%); padding: 28px; border: 0; border-radius: calc(14px * var(--rk, 1)); background: var(--m-main); box-shadow: var(--sh-3); }
 html.vc-rounded .vc-dialog.wide { width: min(840px, 100%); }
 html.vc-rounded .vc-dialog h3 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
 html.vc-rounded .vc-dialog-sub { font-size: 15px; margin-bottom: 18px; line-height: 1.5; }
@@ -211,39 +219,39 @@ html.vc-rounded .vc-dialog-btns { gap: 10px; margin-top: 22px; }
 html.vc-rounded .vc-field { gap: 8px; margin-bottom: 16px; }
 html.vc-rounded .vc-field > span { font-size: 12.5px; font-weight: 600; letter-spacing: .05em; }
 html.vc-rounded .vc-hint { font-size: 13px; }
-html.vc-rounded .vc-check, html.vc-rounded .vc-seg button, html.vc-rounded .vc-toggle-row { padding: 13px 14px; border: 0; background: var(--m-raised); font-size: 15px; border-radius: 9px; }
+html.vc-rounded .vc-check, html.vc-rounded .vc-seg button, html.vc-rounded .vc-toggle-row { padding: 13px 14px; border: 0; background: var(--m-raised); font-size: 15px; border-radius: calc(9px * var(--rk, 1)); }
 html.vc-rounded .vc-seg button.on { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-dim); }
-html.vc-rounded .vc-search { margin: 12px 0; padding: 0 14px; border: 0; background: var(--m-app); border-radius: 9px; }
+html.vc-rounded .vc-search { margin: 12px 0; padding: 0 14px; border: 0; background: var(--m-app); border-radius: calc(9px * var(--rk, 1)); }
 html.vc-rounded .vc-search:focus-within { box-shadow: 0 0 0 2px var(--accent); }
 html.vc-rounded .vc-search input { height: 44px; font-size: 15px; }
-html.vc-rounded .vc-pick { padding: 10px 10px; border-left: 0; border-radius: 8px; font-size: 15px; }
+html.vc-rounded .vc-pick { padding: 10px 10px; border-left: 0; border-radius: calc(8px * var(--rk, 1)); font-size: 15px; }
 html.vc-rounded .vc-pick:hover, html.vc-rounded .vc-pick.on { background: var(--m-on); }
 html.vc-rounded .vc-disc-card { border: 0; background: var(--m-raised); }
 html.vc-rounded .vc-disc-card:hover { box-shadow: 0 0 0 2px var(--accent); }
-html.vc-rounded .vc-disc-card .vc-srv-ico.lg { border-color: var(--m-raised); border-radius: 12px; }
+html.vc-rounded .vc-disc-card .vc-srv-ico.lg { border-color: var(--m-raised); border-radius: calc(12px * var(--rk, 1)); }
 html.vc-rounded .vc-disc-body b { font-size: 16.5px; }
 html.vc-rounded .vc-disc-body p { font-size: 14px; }
 
 /* shared form controls inside the chat */
-html.vc-rounded.vc-page .btn { padding: 11px 18px; font-size: 15px; font-weight: 600; border-radius: 8px; }
+html.vc-rounded.vc-page .btn { padding: 11px 18px; font-size: 15px; font-weight: 600; border-radius: calc(8px * var(--rk, 1)); }
 html.vc-rounded.vc-page .btn-sm { padding: 7px 12px; font-size: 13.5px; }
 html.vc-rounded.vc-page .btn-surface { background: var(--m-on); border-color: transparent; }
 html.vc-rounded.vc-page .btn-surface:not(:disabled):hover { background: #36363d; }
-html.vc-rounded.vc-page .form-input, html.vc-rounded.vc-page .form-textarea, html.vc-rounded.vc-page .form-select { padding: 11px 14px; font-size: 15px; background: var(--m-app); border-color: var(--m-line-2); border-radius: 8px; }
+html.vc-rounded.vc-page .form-input, html.vc-rounded.vc-page .form-textarea, html.vc-rounded.vc-page .form-select { padding: 11px 14px; font-size: 15px; background: var(--m-app); border-color: var(--m-line-2); border-radius: calc(8px * var(--rk, 1)); }
 html.vc-rounded.vc-page .form-input:focus, html.vc-rounded.vc-page .form-textarea:focus, html.vc-rounded.vc-page .form-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
 html.vc-rounded .vc .cs-switch, html.vc-rounded .vc-dialog .cs-switch { width: 46px; height: 26px; }
 html.vc-rounded .vc-dialog .cs-switch i { width: 20px; height: 20px; }
 
 /* ── settings (SettingsDialog.css) ── */
-html.vc-rounded .bf-sd { border: 0; background: var(--m-main); border-radius: 16px; }
+html.vc-rounded .bf-sd { border: 0; background: var(--m-main); border-radius: calc(16px * var(--rk, 1)); }
 html.vc-rounded .bf-sd-side { padding: 18px 14px; background: var(--m-side); border-right: 0; }
-html.vc-rounded .bf-sd-search { height: 42px; border: 0; background: var(--m-app); border-radius: 9px; }
+html.vc-rounded .bf-sd-search { height: 42px; border: 0; background: var(--m-app); border-radius: calc(9px * var(--rk, 1)); }
 html.vc-rounded .bf-sd-search input { font-size: 15px; }
-html.vc-rounded .bf-sd-me { padding: 12px; border: 0; background: var(--m-raised); border-radius: 10px; }
+html.vc-rounded .bf-sd-me { padding: 12px; border: 0; background: var(--m-raised); border-radius: calc(10px * var(--rk, 1)); }
 html.vc-rounded .bf-sd-me b { font-size: 15.5px; }
 html.vc-rounded .bf-sd-me small { font-size: 13px; }
 html.vc-rounded .bf-sd-group-t { font-size: 12px; font-weight: 600; padding: 8px 12px; }
-html.vc-rounded .bf-sd-group > button { padding: 10px 12px; font-size: 15.5px; gap: 12px; border-radius: 8px; }
+html.vc-rounded .bf-sd-group > button { padding: 10px 12px; font-size: 15.5px; gap: 12px; border-radius: calc(8px * var(--rk, 1)); }
 html.vc-rounded .bf-sd-group > button:hover { background: var(--m-hover); }
 html.vc-rounded .bf-sd-group > button.on { background: var(--m-on); }
 html.vc-rounded .bf-sd-head { padding: 22px 24px 18px 32px; border-bottom-color: var(--m-line); }
@@ -253,18 +261,18 @@ html.vc-rounded .cs-text b { font-size: 15.5px; }
 html.vc-rounded .cs-text span { font-size: 13.5px; }
 
 /* ── voice ── */
-html.vc-rounded .vc-vuser { padding: 5px 8px; font-size: 14.5px; gap: 9px; border-radius: 6px; }
+html.vc-rounded .vc-vuser { padding: 5px 8px; font-size: 14.5px; gap: 9px; border-radius: calc(6px * var(--rk, 1)); }
 html.vc-rounded .vc-vusers { margin-left: 30px; --av-k: 1.15; }
-html.vc-rounded .vc-vpanel { margin: 8px 8px 0; padding: 12px; border: 0; border-radius: 10px; background: var(--m-raised); }
+html.vc-rounded .vc-vpanel { margin: 8px 8px 0; padding: 12px; border: 0; border-radius: calc(10px * var(--rk, 1)); background: var(--m-raised); }
 html.vc-rounded .vc-vpanel-where b { font-size: 14.5px; }
 html.vc-rounded .vc-vpanel-where small { font-size: 13px; }
 html.vc-rounded .vc-vpanel-btns { gap: 8px; margin-top: 12px; }
-html.vc-rounded .vc-vbtn { min-height: 42px; border: 0; border-radius: 8px; background: var(--m-on); }
+html.vc-rounded .vc-vbtn { min-height: 42px; border: 0; border-radius: calc(8px * var(--rk, 1)); background: var(--m-on); }
 html.vc-rounded .vc-vbtn:hover { background: #36363d; }
 html.vc-rounded .vc-vbtn.off { background: rgba(224, 122, 122, .14); }
 html.vc-rounded .vc-voiceview { background: radial-gradient(ellipse at top, #1d1d22, var(--m-main) 70%); }
 html.vc-rounded .vc-vtiles { gap: 16px; padding: 28px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-html.vc-rounded .vc-vtile { border: 0; border-radius: 12px; background: var(--m-raised); box-shadow: 0 0 0 1px var(--m-line); --av-k: 1.2; }
+html.vc-rounded .vc-vtile { border: 0; border-radius: calc(12px * var(--rk, 1)); background: var(--m-raised); box-shadow: 0 0 0 1px var(--m-line); --av-k: 1.2; }
 html.vc-rounded .vc-vtile.speaking { box-shadow: 0 0 0 3px #6fcf8f, 0 0 30px rgba(111, 207, 143, .2); }
 html.vc-rounded .vc-vtile b { font-size: 15.5px; }
 html.vc-rounded .vc-vview-foot { gap: 12px; padding: 18px; border-top: 0; }
@@ -272,15 +280,15 @@ html.vc-rounded .vc-vbig { width: 56px; height: 56px; border: 0; border-radius: 
 html.vc-rounded .vc-vbig:hover { background: #36363d; }
 html.vc-rounded .vc-vbig.off { background: rgba(224, 122, 122, .18); }
 html.vc-rounded .vc-vbig.on { background: color-mix(in srgb, var(--accent) 22%, var(--m-raised)); }
-html.vc-rounded .vc-vbig.hang { width: 76px; border-radius: 28px; background: #d14b4b; }
+html.vc-rounded .vc-vbig.hang { width: 76px; border-radius: calc(28px * var(--rk, 1)); background: #d14b4b; }
 html.vc-rounded .vc-dmcall { padding: 18px 22px; border-bottom: 0; background: color-mix(in srgb, var(--m-raised) 60%, var(--m-main)); --av-k: 1.2; }
-html.vc-rounded .vc-incoming { padding: 14px 16px; border: 0; border-radius: 12px; box-shadow: var(--sh-3), inset 0 2px 0 #6fcf8f; }
+html.vc-rounded .vc-incoming { padding: 14px 16px; border: 0; border-radius: calc(12px * var(--rk, 1)); box-shadow: var(--sh-3), inset 0 2px 0 #6fcf8f; }
 html.vc-rounded .vc-incoming-btn { width: 46px; height: 46px; border-radius: 50%; }
 
 /* ── home (friends list, Active now) ── */
 html.vc-rounded .vc-home-body { padding: 8px 24px 24px; }
 html.vc-rounded .vc-home-body, html.vc-rounded .vc-active { --av-k: 1.12; }
-html.vc-rounded .vc-friend { padding: 11px 12px; gap: 12px; border-top: 0; border-radius: 9px; margin: 2px 0; }
+html.vc-rounded .vc-friend { padding: 11px 12px; gap: 12px; border-top: 0; border-radius: calc(9px * var(--rk, 1)); margin: 2px 0; }
 html.vc-rounded .vc-friend:hover { background: var(--m-hover); }
 html.vc-rounded .vc-friend-txt b { font-size: 16px; font-weight: 500; }
 html.vc-rounded .vc-friend-txt small { font-size: 13.5px; }
@@ -288,7 +296,7 @@ html.vc-rounded .vc-round { width: 40px; height: 40px; border: 0; background: va
 html.vc-rounded .vc-round:hover { background: var(--m-on); }
 html.vc-rounded .vc-active { width: 350px; padding: 20px; background: var(--m-side); border-left: 0; }
 html.vc-rounded .vc-active h3 { font-size: 20px; font-weight: 700; }
-html.vc-rounded .vc-active-card { padding: 14px; border: 0; background: var(--m-raised); border-radius: 10px; }
+html.vc-rounded .vc-active-card { padding: 14px; border: 0; background: var(--m-raised); border-radius: calc(10px * var(--rk, 1)); }
 html.vc-rounded .vc-active-card:hover { box-shadow: 0 0 0 2px var(--accent); transform: none; }
 
 /* ── tablets: side panels slide over the conversation, inside its card ── */
@@ -301,11 +309,11 @@ html.vc-rounded .vc-active-card:hover { box-shadow: 0 0 0 2px var(--accent); tra
   html.vc-rounded .vc-main { border-radius: 0; box-shadow: none; }
   html.vc-rounded .vc-left { background: var(--m-app); padding: 0 8px 0 0; }
   html.vc-rounded .vc-rail { padding-top: 10px; }
-  html.vc-rounded .vc-side-col { width: min(300px, calc(100vw - 96px)); margin: 8px 0; border-radius: 12px; }
+  html.vc-rounded .vc-side-col { width: min(300px, calc(100vw - 96px)); margin: 8px 0; border-radius: calc(12px * var(--rk, 1)); }
   html.vc-rounded .vc-head { height: 58px; padding: 0 10px 0 14px; }
   html.vc-rounded .vc-msg { margin: 0 4px; padding: 3px 10px 3px 6px; grid-template-columns: 56px minmax(0, 1fr); }
   html.vc-rounded .vc-reply-to { padding-left: 56px; }
-  html.vc-rounded .vc-text { font-size: 16px; }
+  html.vc-rounded .vc-text { font-size: var(--m-text, 15.5px); }
   html.vc-rounded .vc-composer-wrap { padding: 0 10px; }
   html.vc-rounded .vc-composer { min-height: 52px; }
   html.vc-rounded .vc-home .vc-head { padding-left: 58px; }
@@ -318,9 +326,24 @@ html.vc-rounded .vc-active-card:hover { box-shadow: 0 0 0 2px var(--accent); tra
 
 /* ── odds and ends that still had square corners or old surfaces ── */
 html.vc-rounded .vc-bell-n { min-width: 18px; height: 18px; border-radius: 99px; font-size: 11px; top: 0; right: -2px; box-shadow: 0 0 0 2px var(--m-raised); }
-html.vc-rounded .e2-panel { margin: 0 20px 20px; border: 0; border-radius: 12px; background: var(--m-raised); padding: 16px 18px; }
-html.vc-rounded .e2-panel .btn { border-radius: 8px; }
-html.vc-rounded .e2-row, html.vc-rounded .e2-warn, html.vc-rounded .e2-keychange, html.vc-rounded .e2-code, html.vc-rounded .e2-file { border-radius: 9px; }
+html.vc-rounded .e2-panel { margin: 0 20px 20px; border: 0; border-radius: calc(12px * var(--rk, 1)); background: var(--m-raised); padding: 16px 18px; }
+html.vc-rounded .e2-panel .btn { border-radius: calc(8px * var(--rk, 1)); }
+html.vc-rounded .e2-row, html.vc-rounded .e2-warn, html.vc-rounded .e2-keychange, html.vc-rounded .e2-code, html.vc-rounded .e2-file { border-radius: calc(9px * var(--rk, 1)); }
 html.vc-rounded .vc-dm-side .pe-card { background: var(--m-side); border-top-width: 4px; }
-html.vc-rounded .vc-dm-side .pe-card :is(.btn, button.pe-msg, .pe-msg) { border-radius: 8px; }
-html.vc-rounded .vc-dm-side .pe-card :is(.vc-act, .vc-activity, .pe-fact) { border-radius: 9px; }
+html.vc-rounded .vc-dm-side .pe-card :is(.btn, button.pe-msg, .pe-msg) { border-radius: calc(8px * var(--rk, 1)); }
+html.vc-rounded .vc-dm-side .pe-card :is(.vc-act, .vc-activity, .pe-fact) { border-radius: calc(9px * var(--rk, 1)); }
+
+/* ── look.js: the Theme / Text & layout settings ── */
+html.vc-rounded .vc, html.vc-rounded .vc-dialog, html.vc-rounded .bf-sd { color: var(--m-text-color, var(--text)); }
+html.vc-rounded .vc-text { color: color-mix(in srgb, var(--m-text-color, #e2e2e6) 92%, transparent); }
+html.vc-rounded.vc-has-bgimg .vc { background: var(--m-app) var(--m-bgimg) center / cover no-repeat; }
+html.vc-rounded.vc-has-bgimg .vc-rail { background: color-mix(in srgb, var(--m-app) 55%, transparent); backdrop-filter: blur(8px); }
+html.vc-rounded.vc-hide-scroll .vc *, html.vc-rounded.vc-hide-scroll .vc { scrollbar-width: none; }
+html.vc-rounded.vc-hide-scroll .vc ::-webkit-scrollbar { display: none; }
+html.vc-rounded .vc-msg.mention { background: color-mix(in srgb, var(--m-mention) 10%, transparent); box-shadow: inset 3px 0 0 var(--m-mention); }
+html.vc-rounded .vc-mention.me { background: color-mix(in srgb, var(--m-mention) 22%, transparent); color: color-mix(in srgb, var(--m-mention) 70%, #fff); }
+html.vc-rounded .vc-text:not(.jumbo) :is(.vc-cemoji, .vc-temoji) { width: var(--m-emoji); height: var(--m-emoji); vertical-align: calc(var(--m-emoji) * -.25); }
+/* status dots are diamonds in Modern (the phone / console marks keep their shape) */
+html.vc-rounded .vc-st:not(.mobile):not(.console), html.vc-rounded .vc-st-sq:not(.mobile):not(.console) { border-radius: calc(2px * var(--rk, 1)); transform: rotate(45deg) scale(.82); }
+/* client icons off (both looks) */
+html.vc-no-client-icons .vc-msg-head .vc-via { display: none; }

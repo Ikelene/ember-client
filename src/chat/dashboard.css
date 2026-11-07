@@ -93,39 +93,39 @@
 
 /* ── Rounded: soft cards on the layered surfaces (modern.css) ── */
 html.vc-rounded .vc-dash { gap: 20px; }
-html.vc-rounded .vc-dash-hero { padding: 26px; gap: 20px; border: 0; border-radius: 16px; background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--accent) 24%, var(--m-raised)) 0%, var(--m-raised) 55%); }
+html.vc-rounded .vc-dash-hero { padding: 26px; gap: 20px; border: 0; border-radius: calc(16px * var(--rk, 1)); background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--accent) 24%, var(--m-raised)) 0%, var(--m-raised) 55%); }
 html.vc-rounded .vc-dash-hello { gap: 18px; }
 html.vc-rounded .vc-dash-hello .vc-av, html.vc-rounded .vc-dash-hello .vc-av img { border-radius: 50%; }
 html.vc-rounded .vc-dash-hello small { font-size: 13px; font-weight: 500; }
 html.vc-rounded .vc-dash-hello h2 { font-size: 32px; font-weight: 700; }
 html.vc-rounded .vc-dash-hello p { font-size: 16px; }
 html.vc-rounded .vc-dash-stats { gap: 12px; }
-html.vc-rounded .vc-dash-stat { padding: 14px 16px; border: 0; border-radius: 12px; background: rgba(0, 0, 0, .25); }
+html.vc-rounded .vc-dash-stat { padding: 14px 16px; border: 0; border-radius: calc(12px * var(--rk, 1)); background: rgba(0, 0, 0, .25); }
 html.vc-rounded .vc-dash-stat:hover { background: rgba(0, 0, 0, .38); box-shadow: inset 0 0 0 1px var(--m-line-2); }
-html.vc-rounded .vc-dash-stat-ico { width: 40px; height: 40px; border-radius: 9px; background: rgba(255, 255, 255, .06); }
+html.vc-rounded .vc-dash-stat-ico { width: 40px; height: 40px; border-radius: calc(9px * var(--rk, 1)); background: rgba(255, 255, 255, .06); }
 html.vc-rounded .vc-dash-stat b { font-size: 26px; font-weight: 700; }
 html.vc-rounded .vc-dash-stat small { font-size: 13.5px; }
 html.vc-rounded .vc-dash-grid, html.vc-rounded .vc-dash-col { gap: 20px; }
 html.vc-rounded .vc-dash-col > div[id] { margin-bottom: -20px; }
-html.vc-rounded .vc-dash-card { border: 0; border-radius: 14px; background: var(--m-raised); --dash-ring: var(--m-raised); }
+html.vc-rounded .vc-dash-card { border: 0; border-radius: calc(14px * var(--rk, 1)); background: var(--m-raised); --dash-ring: var(--m-raised); }
 html.vc-rounded .vc-dash-card-head { padding: 16px 18px 8px; border-bottom: 0; gap: 10px; }
 html.vc-rounded .vc-dash-card-head b { font-size: 16.5px; font-weight: 600; }
-html.vc-rounded .vc-dash-card-ico { width: 32px; height: 32px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 16%, transparent); }
+html.vc-rounded .vc-dash-card-ico { width: 32px; height: 32px; border-radius: calc(8px * var(--rk, 1)); background: color-mix(in srgb, var(--accent) 16%, transparent); }
 html.vc-rounded .vc-dash-pill { border-radius: 99px; padding: 2px 8px; font-size: 12px; }
-html.vc-rounded .vc-dash-link { border-radius: 6px; padding: 6px 10px; font-size: 13.5px; font-weight: 500; }
+html.vc-rounded .vc-dash-link { border-radius: calc(6px * var(--rk, 1)); padding: 6px 10px; font-size: 13.5px; font-weight: 500; }
 html.vc-rounded .vc-dash-link:hover { background: var(--m-on); }
 html.vc-rounded .vc-dash-card-body { padding: 4px 10px 12px; }
 html.vc-rounded .vc-dash-sub { padding: 12px 10px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; }
-html.vc-rounded .vc-dash-row { padding: 10px; gap: 14px; border-left: 0; border-radius: 9px; --av-k: 1.12; }
+html.vc-rounded .vc-dash-row { padding: 10px; gap: 14px; border-left: 0; border-radius: calc(9px * var(--rk, 1)); --av-k: 1.12; }
 html.vc-rounded .vc-dash-row:hover:not(.static) { background: var(--m-on); }
 html.vc-rounded .vc-dash-row-txt b { font-size: 16px; font-weight: 500; }
 html.vc-rounded .vc-dash-row-txt small { font-size: 14px; }
 html.vc-rounded .vc-dash-row time, html.vc-rounded .vc-dash-meta time { font-size: 12.5px; }
 html.vc-rounded .vc-dash-row .vc-st { border-color: var(--m-raised); --st-cut: var(--m-raised); }
 html.vc-rounded .vc-dash-row:hover .vc-st { border-color: var(--m-on); --st-cut: var(--m-on); }
-html.vc-rounded .vc-dash-srv-ico { width: 44px; height: 44px; border-radius: 10px; }
+html.vc-rounded .vc-dash-srv-ico { width: 44px; height: 44px; border-radius: calc(10px * var(--rk, 1)); }
 html.vc-rounded .vc-dash-at, html.vc-rounded .vc-dash-new { border-radius: 99px; padding: 3px 9px; font-size: 12.5px; }
-html.vc-rounded .vc-dash-voice { padding: 12px 14px; border: 0; border-radius: 10px; background: rgba(111, 207, 143, .08); box-shadow: inset 0 0 0 1px rgba(111, 207, 143, .2); }
+html.vc-rounded .vc-dash-voice { padding: 12px 14px; border: 0; border-radius: calc(10px * var(--rk, 1)); background: rgba(111, 207, 143, .08); box-shadow: inset 0 0 0 1px rgba(111, 207, 143, .2); }
 html.vc-rounded .vc-dash-voice:hover { box-shadow: inset 0 0 0 2px #6fcf8f; }
 html.vc-rounded .vc-dash-voice-top b { font-size: 15px; }
 html.vc-rounded .vc-dash-faces .vc-av, html.vc-rounded .vc-dash-faces .vc-av img { border-radius: 50%; }
@@ -136,14 +136,14 @@ html.vc-rounded .vc-dash-foot { padding: 10px 10px 4px; font-size: 13.5px; }
 html.vc-rounded .vc-dash-notif .vc-notif-av, html.vc-rounded .vc-dash-notif .vc-notif-av img { border-radius: 50%; }
 @media (max-width: 1100px) { html.vc-rounded .vc-home .vc-tabs.inline { margin-left: 0; } }
 @media (max-width: 760px) {
-  html.vc-rounded .vc-dash-hero { padding: 18px; border-radius: 12px; }
+  html.vc-rounded .vc-dash-hero { padding: 18px; border-radius: calc(12px * var(--rk, 1)); }
   html.vc-rounded .vc-dash-hello h2 { font-size: 24px; }
   html.vc-rounded .vc-dash-hello p { font-size: 14.5px; }
   html.vc-rounded .vc-dash-stat { padding: 12px; }
-  html.vc-rounded .vc-dash-stat-ico { width: 32px; height: 32px; border-radius: 8px; }
+  html.vc-rounded .vc-dash-stat-ico { width: 32px; height: 32px; border-radius: calc(8px * var(--rk, 1)); }
   html.vc-rounded .vc-home .vc-tabs.inline { gap: 4px; }
   html.vc-rounded .vc-dash-stat b { font-size: 22px; }
-  html.vc-rounded .vc-dash-card { border-radius: 12px; }
+  html.vc-rounded .vc-dash-card { border-radius: calc(12px * var(--rk, 1)); }
   html.vc-rounded .vc-dash-grid, html.vc-rounded .vc-dash-col { gap: 14px; }
   html.vc-rounded .vc-dash-col > div[id] { margin-bottom: -14px; }
 }

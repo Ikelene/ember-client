@@ -4,7 +4,11 @@
 // the profile editor.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronLeft, ChevronRight, Search, UserRound, CircleUser, Shield, Bell, MessageSquare, Monitor, Sparkles, SlidersHorizontal, Bot, Info, Bug, LifeBuoy, ExternalLink } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Search, UserRound, CircleUser, Shield, Bell, MessageSquare, Monitor, Sparkles, SlidersHorizontal, Bot, Info, Bug, LifeBuoy, ExternalLink, Users, Cloud, ShieldOff, Palette, Type, Mic } from 'lucide-react';
+import { AccountsPage, HostingPage } from './settings/AccountsPages.jsx';
+import VoicePage from './settings/VoicePage.jsx';
+import { ThemePage, TextLayoutPage, BlockingPage, NotifLevels } from './settings/LookPages.jsx';
+import { getDesign, subscribeDesign } from './design.js';
 import ChatSettingsTab, { GROUPS, matches, useDesktopMac, desktopAppTitle } from '../components/tabs/ChatSettingsTab.jsx';
 import ProfileEditor from './ProfileEditor.jsx';
 import { useChat, ask, getState } from './store.js';
@@ -15,15 +19,28 @@ import './SettingsDialog.css';
 
 const rowText = title => (GROUPS.find(([t]) => t === title)?.[1] || []).flatMap(([, label, hint, choices]) => [label, hint, ...(choices || []).map(c => c[1])]);
 // what each page answers to in the search box (its title, its rows, and a few words for the pages that aren't simple rows)
+// (a 5th field: 'desktop' = only in the desktop app, 'modern' = only in the Modern look; 'signed' pages need a Nookara sign-in)
 const PAGES = [
-  ['Your account', [
-    ['profile', 'Profile', UserRound, ['Edit profile', 'Profile customization', 'Username', 'Change username', 'Avatar', 'Profile picture', 'Banner', 'Accent colour', 'Accent color', 'About me', 'Bio', 'Website', 'Country', 'Local time', 'Time zone', 'Profile visibility', 'Friends only', 'Badges']],
-    ['Account', 'Account', CircleUser, ['Log out', 'Sign out', 'Account management', 'Email', 'Password', 'Security', 'Signing key', 'Message signing', 'Signed messages', 'Sign messages as you', 'Ed25519']],
+  ['Account', [
+    ['accounts', 'Signed-in accounts', Users, ['Accounts', 'Sign out', 'Log out', 'Switch accounts', 'Server accounts', 'Instances', 'Signed in']],
+    ['Account', 'Nookara account', CircleUser, ['Log out', 'Sign out', 'Account management', 'Email', 'Password', 'Security', 'Signing key', 'Message signing', 'Signed messages', 'Sign messages as you', 'Ed25519']],
+    ['profile', 'My profile', UserRound, ['Edit profile', 'Profile customization', 'Username', 'Change username', 'Avatar', 'Profile picture', 'Banner', 'Accent colour', 'Accent color', 'About me', 'Bio', 'Website', 'Country', 'Local time', 'Time zone', 'Profile visibility', 'Friends only', 'Badges']],
+    ['hosting', 'Server hosting', Cloud, ['Hosting', 'Hosted servers', 'Plan', 'Billing', 'Backups', 'Ember server']],
+  ]],
+  ['Privacy & safety', [
     ['Privacy', 'Privacy', Shield, rowText('Privacy')],
+    ['blocking', 'Blocking', ShieldOff, ['Blocked', 'Block', 'Unblock', 'Blocked users', 'Hide messages']],
+    ['Notifications', 'Notifications', Bell, [...rowText('Notifications'), 'Push notifications', 'Windows notifications', 'macOS notifications', 'Browser notifications', 'Server notifications', 'Mute server']],
+  ]],
+  ['Look & feel', [
+    ['theme', 'Theme', Palette, ['Theme', 'Colours', 'Colors', 'Accent', 'Background', 'Background image', 'Corners', 'Roundness', 'Mention highlight', 'Dark', 'Midnight', 'AMOLED', 'Nord', 'Dracula'], 'modern'],
+    ['text', 'Text & layout', Type, ['Font', 'Text size', 'Density', 'Compact', 'Emoji size', 'Scrollbars', 'Who posted recently', 'Client icons', 'Roboto'], 'modern'],
+  ]],
+  ['Chat & calls', [
+    ['Messages', 'Messages', MessageSquare, [...rowText('Messages'), 'Design', 'Look', 'Classic', 'Modern', 'Rounded', 'Square', 'Corners', 'Theme']],
+    ['voice', 'Voice & video', Mic, ['Microphone', 'Mic', 'Input', 'Output', 'Speakers', 'Headphones', 'Camera', 'Video', 'Sensitivity', 'Noise suppression', 'Mic test', 'Volume', 'Soundboard']],
   ]],
   ['App settings', [
-    ['Notifications', 'Notifications', Bell, [...rowText('Notifications'), 'Push notifications', 'Windows notifications', 'macOS notifications', 'Browser notifications']],
-    ['Messages', 'Messages', MessageSquare, [...rowText('Messages'), 'Design', 'Look', 'Rounded', 'Square', 'Corners', 'Theme']],
     ['Windows app', 'Windows app', Monitor, ['Desktop app', 'Start with Windows', 'Start minimized', 'Minimize to tray', 'Discord game status', 'RPC', 'Detect games I play'], 'desktop'],
     ['Extras', 'Extras', Sparkles, [...rowText('Extras'), 'Radio', 'Stream address', 'Volume']],
     ['Advanced', 'Advanced', SlidersHorizontal, rowText('Advanced')],
@@ -80,8 +97,10 @@ export default function SettingsDialog({ page: startPage, onClose }) {
 
   // pages that exist here, and the ones that match the search
   // signed out of Velora (web Ember): only the pages that don't need an account
-  const groups = useMemo(() => PAGES.map(([g, items]) => [g, items.filter(it => (it[4] !== 'desktop' || desktop) && (signedIn || ['Account', 'About'].includes(it[0])))
-    .map(it => (it[4] === 'desktop' && mac ? [it[0], desktopAppTitle(true), it[2], MAC_APP_WORDS, it[4]] : it))]).filter(([, items]) => items.length), [desktop, signedIn, mac]);
+  const [design, setDesignState] = useState(getDesign);
+  useEffect(() => subscribeDesign(setDesignState), []);
+  const groups = useMemo(() => PAGES.map(([g, items]) => [g, items.filter(it => (it[4] !== 'desktop' || desktop) && (it[4] !== 'modern' || design === 'rounded') && (signedIn || ['Account', 'About', 'theme', 'text', 'voice', 'accounts'].includes(it[0])))
+    .map(it => (it[4] === 'desktop' && mac ? [it[0], desktopAppTitle(true), it[2], MAC_APP_WORDS, it[4]] : it))]).filter(([, items]) => items.length), [desktop, signedIn, mac, design]);
   const shown = useMemo(() => groups.map(([g, items]) => [g, items.filter(([, label, , words]) => matches(q, label, ...words))]).filter(([, items]) => items.length), [groups, q]);
   const help = useMemo(() => HELP.filter(([label, , , words]) => matches(q, label, ...words)), [q]);
   const all = shown.flatMap(([, items]) => items);
@@ -151,6 +170,7 @@ export default function SettingsDialog({ page: startPage, onClose }) {
     else location.assign('/login');
   };
   const current = groups.flatMap(([, items]) => items).find(it => it[0] === page);
+  useEffect(() => { if (!current && groups.length) setPage(groups[0][1][0][0]); }, [current, groups]); // (a Modern-only page while switching to Classic)
   const Icon = current?.[2];
 
   return createPortal(
@@ -195,13 +215,23 @@ export default function SettingsDialog({ page: startPage, onClose }) {
         <div className="bf-sd-main">
           <header className="bf-sd-head">
             <button type="button" className="bf-sd-backbtn" aria-label="Back to settings" onClick={backToList}><ChevronLeft size={22} /></button>
-            <h2>{Icon && <Icon size={19} />} {current?.[1] || 'Settings'}</h2>
+            {['accounts', 'hosting', 'voice', 'theme', 'text', 'blocking'].includes(page)
+              ? <h2 className="bf-sd-crumbs"><span>Settings</span><ChevronRight size={14} /><span>{groups.find(([, items]) => items.some(it => it[0] === page))?.[0]}</span><ChevronRight size={14} /><b>{current?.[1]}</b></h2>
+              : <h2>{Icon && <Icon size={19} />} {current?.[1] || 'Settings'}</h2>}
             <button type="button" className="bf-sd-x" aria-label="Close settings" data-tip="Close (Esc)" onClick={() => close()}><X size={18} /></button>
           </header>
           <div className="bf-sd-content" ref={content} key={page}>
-            {page === 'profile'
-              ? <ProfileEditor onDirty={(on, nudge) => { dirty.current = { on, nudge }; }} />
-              : <ChatSettingsTab embedded bare page={page} query={matches(q, current?.[1] || '') ? '' : q} web={isWebBonfire()} onLogout={signedIn ? logout : undefined} onLogin={signedIn ? undefined : () => startSignIn()} />}
+            {page === 'profile' ? <ProfileEditor onDirty={(on, nudge) => { dirty.current = { on, nudge }; }} />
+              : page === 'accounts' ? <AccountsPage onClose={() => close()} />
+                : page === 'hosting' ? <HostingPage onClose={() => close()} />
+                  : page === 'voice' ? <VoicePage />
+                    : page === 'theme' ? <ThemePage />
+                      : page === 'text' ? <TextLayoutPage />
+                        : page === 'blocking' ? <BlockingPage />
+                          : <>
+                            <ChatSettingsTab embedded bare page={page} query={matches(q, current?.[1] || '') ? '' : q} web={isWebBonfire()} onLogout={signedIn ? logout : undefined} onLogin={signedIn ? undefined : () => startSignIn()} />
+                            {page === 'Notifications' && signedIn && <div className="bf-sd-extra"><NotifLevels /></div>}
+                          </>}
           </div>
         </div>
       </section>
