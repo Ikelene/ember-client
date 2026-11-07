@@ -28,7 +28,7 @@ export function useInboxCount() {
   return notif + pings;
 }
 
-export function SidePanel({ view, channel, detail, group, onUser, onLeaveGroup }) {
+export function SidePanel({ view, channel, detail, group, onUser, onLeaveGroup, onClose }) {
   const [tab, setTabRaw] = useState(savedTab);
   const setTab = t => { setTabRaw(t); try { localStorage.setItem(TAB_KEY, t); } catch { /* fine */ } };
   const isServer = view.kind === 'channel';
@@ -53,6 +53,7 @@ export function SidePanel({ view, channel, detail, group, onUser, onLeaveGroup }
             {k === 'inbox' && inboxN > 0 && <span className="vc-panel-dot">{inboxN > 99 ? '99+' : inboxN}</span>}
           </button>
         ))}
+        {onClose && <button type="button" className="vc-panel-close" aria-label="Close the side panel" onClick={onClose}><X size={18} /></button>}
       </div>
       <div className="vc-panel-body" key={`${cur}-${view.sid || view.username || view.room}`}>
         {cur === 'people' && isServer && <MemberList sid={view.sid} onUser={onUser} embedded />}

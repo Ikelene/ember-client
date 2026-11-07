@@ -270,3 +270,44 @@ html.vc-rounded .vc-tooltip:has(.vc-tip-via) { padding: 12px 14px; border-radius
 .vc-tip-card.vc-tip-via { flex-direction: row; align-items: flex-start; gap: 10px; }
 .vc-tip-card.vc-tip-via > svg { color: var(--accent); }
 html.vc-rounded .bf-ss-hero-id .vc-srv-ico.lg { border-radius: 50%; overflow: hidden; }
+
+/* ── phones and narrow windows ── */
+/* the side panel's member list never uses the old "slide over" rule meant for the standalone list */
+.vc-panel .vc-members.embedded { position: static; width: auto; box-shadow: none; animation: none; }
+.vc-panel-close { display: none; }
+.vc-panel-scrim { display: none; }
+@media (max-width: 1100px) {
+  .vc-panel-close { flex: none; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; background: none; border: 0; color: var(--dim); cursor: pointer; }
+  .vc-panel-tabs > button:not(.vc-panel-close) { flex: 1; }
+  .vc-panel-scrim { display: block; position: absolute; inset: 0; z-index: 29; background: rgba(0, 0, 0, .45); animation: vc-fade .2s; }
+}
+@media (max-width: 760px) {
+  .vc-mainrow > .vc-panel, html.vc-rounded .vc-mainrow > .vc-panel { left: auto; right: 0; width: calc(100% - 44px); max-width: 380px; border-radius: 0 !important; box-shadow: -18px 0 40px rgba(0, 0, 0, .5); animation: vc-slide-l .25s cubic-bezier(.2, .8, .2, 1); }
+  .vc-panel-tabs { height: 58px; }
+  /* bigger touch targets in Modern */
+  html.vc-rounded .vc-panel-tabs > button { height: 42px; }
+  html.vc-rounded .vc-ch-btn { padding: 10px 10px; }
+  html.vc-rounded .vc-dm { padding: 9px 10px; }
+  html.vc-rounded .vc-member { padding: 8px 10px; }
+  html.vc-rounded .vc-me .vc-ico-btn { width: 40px; height: 40px; }
+  html.vc-rounded .vc-composer .vc-ico-btn { width: 40px; height: 40px; }
+  /* server settings: the server card stays under the search on phones (the list has its own header) */
+  html.vc-rounded .bf-sd.m.bf-ss .bf-ss-srv { order: 0; margin: 0 0 10px; }
+  html.vc-rounded .bf-ss-hero-banner { height: 110px; }
+  html.vc-rounded .bf-ss-hero-id .vc-srv-ico.lg { width: 64px; height: 64px; }
+  html.vc-rounded .bf-ss-qr { width: 150px; height: 150px; }
+  /* home: smaller greeting, the tabs scroll sideways */
+  .hm-hello > .vc-av { display: none; }
+  html.vc-rounded .hm-hello h2 { font-size: 22px; }
+  html.vc-rounded .hm-tip { padding: 14px; }
+  html.vc-rounded .vc-home .vc-head { padding-left: 58px; }
+  /* discovery: tighter hero */
+  .vc-disc-hero h1 { font-size: 40px; }
+  .vc-disc-hero p { font-size: 13.5px; }
+  .vc-disc-tabs button { padding: 10px 14px; }
+}
+
+/* the server card at the top of server settings: icon + name side by side, at every width */
+html.vc-rounded .bf-ss .bf-ss-srv { display: flex; align-items: center; gap: 12px; padding: 10px 12px; }
+html.vc-rounded .bf-ss .bf-ss-srv .vc-srv-ico { flex: none; width: 40px; height: 40px; overflow: hidden; border-radius: calc(12px * var(--rk, 1)); background: var(--m-on); font-size: 13px; }
+html.vc-rounded .bf-ss .bf-ss-srv > span:last-child { min-width: 0; display: flex; flex-direction: column; text-align: left; }

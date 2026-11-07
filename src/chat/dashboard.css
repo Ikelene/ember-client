@@ -74,8 +74,6 @@
 @media (max-width: 1100px) {
   .vc-dash-grid { grid-template-columns: minmax(0, 1fr); }
   .vc-dash-hello > .vc-av { display: none; }
-  .vc-home .vc-head-name, .vc-home .vc-head-ico { display: none; }
-  .vc-home .vc-tabs.inline { margin-left: 0; }
 }
 @media (max-width: 760px) {
   .vc-home-body.dash { padding: 10px 10px 20px; }

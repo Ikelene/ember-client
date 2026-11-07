@@ -521,7 +521,7 @@ function ChatPage() {
       {signedIn && <NotificationBanner />}
       <GifPauseGate />
       <div className="vc-left" onClick={e => { const t = e.target.closest?.('.vc-dm, .vc-ch, .vc-home-link, .vc-rail-item'); if (!t || !drawer) return; const h = location.hash; setTimeout(() => { if (location.hash === h) closeDrawer(); }, 60); }}>
-        <Rail discoverOn={discover} onDiscover={() => { setDiscover(true); closeDrawer(); }} onAddInstance={() => setDialog({ kind: 'add-instance' })} onCreate={() => setDialog({ kind: 'create-server' })} />
+        <Rail discoverOn={discover} onDiscover={() => { if (drawer) { closeDrawer(); setTimeout(() => setDiscover(true), 320); } else setDiscover(true); }} onAddInstance={() => setDialog({ kind: 'add-instance' })} onCreate={() => setDialog({ kind: 'create-server' })} />
         <div className="vc-side-col">
           <div className="vc-side-swap" key={sideKey}>
             {view.kind === 'channel'
@@ -597,7 +597,7 @@ function ChatPage() {
             </div>
             </div>
               {showMembers && (isServer || (view.kind === 'dm' && view.username !== 'System') || (view.kind === 'group' && group)) && (
-                <SidePanel view={view} channel={channel} detail={detail} group={group} onUser={openMini} onLeaveGroup={leaveGroup} />
+                <><div className="vc-panel-scrim" onClick={() => setShowMembers(false)} /><SidePanel view={view} channel={channel} detail={detail} group={group} onUser={openMini} onLeaveGroup={leaveGroup} onClose={() => setShowMembers(false)} /></>
               )}
             </div>
           </>
