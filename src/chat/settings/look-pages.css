@@ -6,7 +6,7 @@
 .lp-mini-main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--m-main, #18181b); }
 .lp-msgs { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; gap: var(--m-gap-msg, 14px); padding: 10px 12px; overflow: hidden; }
 .lp-msg { display: flex; gap: 10px; align-items: flex-start; padding: 2px 4px; }
-.lp-msg.mention { background: color-mix(in srgb, var(--m-mention, #e0b25a) 12%, transparent); box-shadow: inset 3px 0 0 var(--m-mention, #e0b25a); }
+.lp-msg.mention { background: color-mix(in srgb, var(--m-mention, var(--accent)) 12%, transparent); box-shadow: inset 3px 0 0 var(--m-mention, var(--accent)); }
 .lp-av { flex: none; width: 30px; height: 30px; }
 .lp-msg b { font-size: 13px; }
 .lp-msg small { color: var(--muted); font-size: 10.5px; }

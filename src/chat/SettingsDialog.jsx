@@ -34,8 +34,8 @@ const PAGES = [
   ]],
   ['Look & feel', [
     ['design', 'Design', LayoutTemplate, ['Design', 'Look', 'Classic', 'Modern', 'Rounded', 'Square', 'Layout']],
-    ['theme', 'Theme', Palette, ['Theme', 'Colours', 'Colors', 'Accent', 'Background', 'Background image', 'Corners', 'Roundness', 'Mention highlight', 'Dark', 'Midnight', 'AMOLED', 'Nord', 'Dracula'], 'modern'],
-    ['text', 'Text & layout', Type, ['Font', 'Text size', 'Density', 'Compact', 'Emoji size', 'Scrollbars', 'Who posted recently', 'Client icons', 'Roboto'], 'modern'],
+    ['theme', 'Theme', Palette, ['Theme', 'Colours', 'Colors', 'Custom colours', 'Accent', 'Background', 'Corners', 'Roundness', 'Mention highlight', 'Dark', 'Midnight', 'AMOLED', 'Nord', 'Dracula'], 'modern'],
+    ['text', 'Text & layout', Type, ['Font', 'Text size', 'Density', 'Compact', 'Emoji size', 'Scrollbars', 'Who posted recently', 'Client icons', 'Roboto']],
   ]],
   ['Chat & calls', [
     ['Messages', 'Messages', MessageSquare, rowText('Messages')],

@@ -30,7 +30,7 @@ html.vc-rounded {
   --m-card: calc(12px * var(--rk));
   --m-text: 15.5px;
   --m-emoji: 22px;
-  --m-mention: #e0b25a;
+  --m-mention: var(--accent);
 }
 html.vc-rounded, html.vc-rounded .vc {
   --bg: var(--m-main); --surface: var(--m-side); --surface-2: var(--m-raised); --surface-3: color-mix(in srgb, var(--m-raised) 80%, #fff 6%); --border: var(--m-line); --border-2: var(--m-line-2);

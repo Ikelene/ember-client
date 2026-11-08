@@ -6,7 +6,7 @@
 //   <PreviewArea> + usePv('name')      a live preview; elements marked with usePv(name) get outlined while a card with
 //                                       that target is hovered, so you can see what the setting changes
 // Square by default; Modern (html.vc-rounded) softens them (settings-ui.css).
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import './settings-ui.css';
 
 const HoverCtx = createContext({ target: null, set: () => {} });
@@ -19,8 +19,23 @@ export function usePv(name) {
   const { target } = useContext(HoverCtx);
   return target && (Array.isArray(name) ? name.includes(target) : target === name) ? ' pv-hl' : '';
 }
+// it sticks to the top of the settings while you scroll, a bit smaller, so it stays in view as you change things further down
 export function PreviewArea({ children, label = 'Preview' }) {
-  return <div className="sx-preview" aria-hidden="true"><span className="sx-preview-tag">{label}</span>{children}</div>;
+  const mark = useRef(null);
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    const el = mark.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    const io = new IntersectionObserver(([e]) => setStuck(!e.isIntersecting), { root: el.closest('.bf-sd-content') || null, threshold: 0 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <>
+      <div ref={mark} className="sx-preview-mark" aria-hidden="true" />
+      <div className={`sx-preview${stuck ? ' stuck' : ''}`} aria-hidden="true"><span className="sx-preview-tag">{label}</span>{children}</div>
+    </>
+  );
 }
 
 export function SettingsPage({ icon: Icon, title, sub, children }) {

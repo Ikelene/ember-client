@@ -1,10 +1,10 @@
 // Settings pages for how Ember looks (Modern only: Theme, Text & layout) and two that work in both looks (Blocking, and the
 // per-server notification levels shown on the Notifications page). Appearance lives in look.js (per device).
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Palette, Type, ShieldOff, Bell, ImagePlus, Trash2, Upload, MessageCircle, Server, Check, RotateCcw, UserX } from 'lucide-react';
+import { Palette, Type, ShieldOff, Bell, Trash2, Upload, MessageCircle, Server, Check, RotateCcw, UserX } from 'lucide-react';
 import { SettingsPage, SCard, SRow, OptionCards, Switch, ResetButton, PreviewArea, usePv } from './ui.jsx';
-import { getLook, setLook, subscribeLook, resetLook, THEMES, FONTS, getBgImage, setBgImage, setCustomFont, hasCustomFont, DEFAULT_LOOK } from '../look.js';
-import { useChat, setNotify, notifyOf, toggleBlock, toast, ask } from '../store.js';
+import { getLook, setLook, subscribeLook, resetLook, THEMES, FONTS, setCustomFont, hasCustomFont, DEFAULT_LOOK } from '../look.js';
+import { useChat, setNotify, notifyOf, toggleBlock, toast, ask, saveSettings } from '../store.js';
 import { ServerIcon } from '../ServerIcon.jsx';
 import { Avatar } from '../Profile.jsx';
 import './look-pages.css';
@@ -51,20 +51,8 @@ function ColorField({ label, value, fallback, onChange }) {
 export function ThemePage() {
   const L = useLook();
   const t = THEMES[L.theme] || THEMES.dark;
-  const [bg, setBgState] = useState(getBgImage);
-  const file = useRef(null);
-  function pickBg(e) {
-    const f = e.target.files?.[0];
-    e.target.value = '';
-    if (!f) return;
-    if (!/^image\//.test(f.type)) { toast('That has to be a picture.'); return; }
-    if (f.size > 3 * 1024 * 1024) { toast('Pick a picture under 3 MB.'); return; }
-    const r = new FileReader();
-    r.onload = () => { try { setBgImage(r.result); setBgState(r.result); } catch { toast("That picture is too big to keep on this device."); } };
-    r.readAsDataURL(f);
-  }
   return (
-    <SettingsPage icon={Palette} title="Theme" sub="Colours, background picture and corners. Saved on this device, Modern look only.">
+    <SettingsPage icon={Palette} title="Theme" sub="Colours and corners. Saved on this device, Modern look only.">
       <MiniChat />
       <SCard title="Choose a theme" target="theme">
         <div className="lp-themes">
@@ -78,7 +66,7 @@ export function ThemePage() {
           ))}
         </div>
       </SCard>
-      <SCard title="Your own colours" sub="Start from a theme, then change the background, panels or text." target="theme">
+      <SCard title="Custom colours" target="theme">
         <div className="lp-colors">
           <ColorField label="Background" value={L.bg} fallback={t.app} onChange={v => setLook({ bg: v })} />
           <ColorField label="Panels and menus" value={L.panel} fallback={t.raised} onChange={v => setLook({ panel: v })} />
@@ -92,14 +80,6 @@ export function ThemePage() {
         </div>
         <ColorField label="Custom" value={L.accent} fallback={t.accent || '#e88fb4'} onChange={v => setLook({ accent: v })} />
       </SCard>
-      <SCard title="Background picture" sub="Shows behind the server list and around the panels. Only on this device." target="bg">
-        <div className="lp-bgpick">
-          <span className="lp-bgthumb" style={bg ? { backgroundImage: `url("${bg}")` } : undefined}>{!bg && <ImagePlus size={22} />}</span>
-          <button type="button" className="btn btn-surface" onClick={() => file.current?.click()}><Upload size={15} /> {bg ? 'Change picture' : 'Upload picture'}</button>
-          {bg && <button type="button" className="btn btn-danger" onClick={() => { setBgImage(''); setBgState(''); }}><Trash2 size={15} /> Remove</button>}
-          <input ref={file} type="file" accept="image/*" hidden onChange={pickBg} />
-        </div>
-      </SCard>
       <SCard title="Corner roundness" target="radius">
         <OptionCards cols={4} value={L.radius} onPick={v => setLook({ radius: v })} options={[
           { v: 'none', label: 'None', sub: 'Sharp corners', art: <span className="lp-corner" style={{ '--r': '0px' }} /> },
@@ -109,9 +89,9 @@ export function ThemePage() {
         ]} />
       </SCard>
       <SCard title="Mention highlight colour" sub="The colour of messages that mention you. Leave it empty to use your accent colour." target="mention">
-        <ColorField label="Highlight" value={L.mention} fallback="#e0b25a" onChange={v => setLook({ mention: v })} />
+        <ColorField label="Highlight" value={L.mention} fallback={L.accent || t.accent || '#e88fb4'} onChange={v => setLook({ mention: v })} />
       </SCard>
-      <ResetButton onClick={() => { resetLook(['theme', 'bg', 'panel', 'text', 'accent', 'radius', 'mention']); setBgImage(''); setBgState(''); }} />
+      <ResetButton onClick={() => { resetLook(['theme', 'bg', 'panel', 'text', 'accent', 'radius', 'mention']); }} />
     </SettingsPage>
   );
 }
@@ -119,6 +99,7 @@ export function ThemePage() {
 // ── Text & layout ──
 export function TextLayoutPage() {
   const L = useLook();
+  const compact = useChat(s => !!s.settings?.compact);
   const file = useRef(null);
   const [custom, setCustom] = useState(hasCustomFont);
   function pickFont(e) {
@@ -133,7 +114,7 @@ export function TextLayoutPage() {
   }
   const size = Number(L.textSize) || 15.5;
   return (
-    <SettingsPage icon={Type} title="Text & layout" sub="Font, text size, how tightly messages sit, emoji size and scrollbars. Modern look only.">
+    <SettingsPage icon={Type} title="Text & layout" sub="Font, text size, how tightly messages sit, emoji size and scrollbars. Compact layout works in both looks; the rest is for Modern.">
       <MiniChat />
       <SCard title="Message text size" sub="Ctrl + and Ctrl - still zoom everything." target="text-size">
         <div className="lp-slider">
@@ -166,6 +147,9 @@ export function TextLayoutPage() {
         ]} />
       </SCard>
       <SCard>
+        <SRow title="Compact message layout" sub="Smaller pictures and tighter spacing, so more messages fit.">
+          <Switch on={compact} onChange={v => saveSettings({ compact: v })} label="Compact message layout" />
+        </SRow>
         <SRow title="Hide scrollbars" sub="Lists still scroll; the bars just stay out of sight.">
           <Switch on={L.hideScroll} onChange={v => setLook({ hideScroll: v })} label="Hide scrollbars" />
         </SRow>

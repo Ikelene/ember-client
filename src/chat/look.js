@@ -117,9 +117,10 @@ export function applyLook() {
     body.style.setProperty('--accent', accent);
     body.style.setProperty('--accent-dim', `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, .14)`);
   } else { body?.style.removeProperty('--accent'); body?.style.removeProperty('--accent-dim'); }
-  const img = getBgImage();
-  if (img) set('--m-bgimg', `url("${img}")`); else root.style.removeProperty('--m-bgimg');
-  root.classList.toggle('vc-has-bgimg', !!img);
+  // (the background picture setting is gone: an old one is dropped)
+  if (getBgImage()) setBgImage('');
+  root.style.removeProperty('--m-bgimg');
+  root.classList.remove('vc-has-bgimg');
   root.classList.toggle('vc-hide-scroll', !!L.hideScroll);
   root.classList.toggle('vc-recent-off', !L.recentPosters);
   root.classList.toggle('vc-light', !!t.light);

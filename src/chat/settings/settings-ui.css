@@ -76,3 +76,10 @@ html.vc-rounded .sx-seg button.on { background: var(--m-on); }
 html.vc-rounded .sx-list-row { border: 0; border-radius: calc(10px * var(--rk, 1)); background: var(--m-main); }
 html.vc-rounded .sx-meter { border: 0; border-radius: 99px; background: var(--m-app); }
 html.vc-rounded .sx-meter > i { border-radius: 99px; }
+
+/* the preview stays on screen while you scroll the page (PreviewArea), smaller once it's stuck */
+.sx-preview-mark { height: 1px; margin-bottom: -1px; }
+.sx-preview { position: sticky; top: 0; z-index: 5; transition: width .2s ease, padding .2s ease, box-shadow .2s ease; }
+.sx-preview.stuck { width: min(340px, 60%); margin-left: auto; padding: 8px; box-shadow: 0 10px 30px rgba(0, 0, 0, .45); }
+.sx-preview.stuck .lp-mini { min-height: 110px; font-size: 12px; }
+.sx-preview.stuck .sx-preview-tag { display: none; }
