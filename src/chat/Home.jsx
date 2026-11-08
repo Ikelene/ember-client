@@ -18,7 +18,13 @@ const statusText = p => subtitle(p) || (!p || p.status === 'offline' ? 'Offline'
 export default function Home({ onUser }) {
   const me = useChat(s => s.me);
   const friends = useChat(s => s.friends);
+  const friendsLoaded = useChat(s => s.friendsLoaded);
   const presence = useChat(s => s.presence);
+  // friends wait for the first presence answer (or 1.5s), so nobody lands in Offline and then jumps to Online
+  const presenceReady = useChat(s => s.presenceReady);
+  const [waited, setWaited] = useState(false);
+  useEffect(() => { if (presenceReady) return undefined; const t = setTimeout(() => setWaited(true), 1500); return () => clearTimeout(t); }, [presenceReady]);
+  const friendsReady = presenceReady || waited;
   const dms = useChat(s => s.dms);
   const groups = useChat(s => s.groups);
   const servers = useChat(s => s.servers);
@@ -93,10 +99,12 @@ export default function Home({ onUser }) {
     ['saved', Bookmark, 'Saved', 0, false],
   ];
   const now = new Date();
-  const Friend = ({ f, i }) => {
+  // a plain function, not a component: a component made inside render is a new type every render, so every presence update
+  // remounted (and re-animated) every friend. Rows animate once when they appear, all together.
+  const friendRow = f => {
     const p = presence[f.friend_username];
     return (
-      <div className="hm-friend vl-rise" style={{ '--i': Math.min(i, 14) }}>
+      <div key={f.friend_username} className="hm-friend vl-rise">
         <button type="button" className="hm-friend-who" onClick={e => onUser(f.friend_username, e.currentTarget)}>
           <Avatar user={{ username: f.friend_username, pfp: f.pfp_url }} size={34} status={p?.status || 'offline'} />
           <span><b style={f.color ? { color: f.color } : undefined}>{f.friend_username}</b><small>{statusText(p)}</small></span>
@@ -145,8 +153,8 @@ export default function Home({ onUser }) {
                   <>
                     <div className="hm-sub">Recent chats</div>
                     <div className="hm-recent">
-                      {recent.map((c, i) => (
-                        <button type="button" key={c.username} className="hm-tile vl-rise" style={{ '--i': i }} onClick={() => go({ kind: 'dm', username: c.username })}>
+                      {recent.map(c => (
+                        <button type="button" key={c.username} className="hm-tile vl-rise" onClick={() => go({ kind: 'dm', username: c.username })}>
                           <Avatar user={{ username: c.username, pfp: c.pfp || people[c.username]?.pfp }} size={44} status={presence[c.username]?.status || 'offline'} />
                           <b>{c.username}</b>
                           {c.unread > 0 && <i>{c.unread > 99 ? '99+' : c.unread}</i>}
@@ -155,10 +163,11 @@ export default function Home({ onUser }) {
                     </div>
                   </>
                 )}
-                {!friends.length && <div className="hm-empty"><UserPlus size={28} /><b>No friends yet</b><span>Type someone's username above to send them a request.</span></div>}
+                {friendsLoaded && !friends.length && <div className="hm-empty"><UserPlus size={28} /><b>No friends yet</b><span>Type someone's username above to send them a request.</span></div>}
                 {friends.length > 0 && needle && !shown.length && <div className="hm-empty"><Search size={24} /><b>None of your friends match "{q.trim()}"</b><button type="button" className="btn btn-primary" onClick={() => addFriend(q)}><UserPlus size={15} /> Add {q.trim()}</button></div>}
-                {online.length > 0 && <><div className="hm-sub">Online - {online.length}</div><div className="hm-grid">{online.map((f, i) => <Friend key={f.friend_username} f={f} i={i} />)}</div></>}
-                {offline.length > 0 && <><div className="hm-sub">Offline - {offline.length}</div><div className="hm-grid off">{offline.map((f, i) => <Friend key={f.friend_username} f={f} i={i} />)}</div></>}
+                {(!friendsLoaded || (!friendsReady && friends.length > 0)) && <div className="vc-loading"><i /><i /><i /></div>}
+                {friendsReady && online.length > 0 && <><div className="hm-sub">Online - {online.length}</div><div className="hm-grid">{online.map(friendRow)}</div></>}
+                {friendsReady && offline.length > 0 && <><div className="hm-sub">Offline - {offline.length}</div><div className="hm-grid off">{offline.map(friendRow)}</div></>}
               </div>
             )}
 

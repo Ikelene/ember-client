@@ -189,9 +189,12 @@ export function styleMarkdown(root, view) {
   const start = inBox ? selectionOffset(root, range) : null;
   const end = inBox ? selectionOffset(root, range, true) : null;
   const value = serialize(root);
-  fill(root, value, view);
+  // build the styled version off to the side and only swap it in when it differs: rebuilding the box on every key press
+  // threw away the text the browser had spell-checked, so misspelt words often never got their red underline
+  const out = document.createElement('div');
+  fill(out, value, view);
   const textNodes = [];
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const walker = document.createTreeWalker(out, NodeFilter.SHOW_TEXT);
   let node;
   while ((node = walker.nextNode())) textNodes.push(node);
   const linkify = text => {
@@ -249,6 +252,8 @@ export function styleMarkdown(root, view) {
     } else fragment.append(inline(text));
     textNode.replaceWith(fragment);
   }
+  if (out.innerHTML === root.innerHTML) return;
+  root.replaceChildren(...out.childNodes);
   if (start !== null) setSelectionOffset(root, start, end);
 }
 

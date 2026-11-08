@@ -39,6 +39,7 @@ let state = {
   members: {},             // sid -> [member]
   membersMore: {},         // sid -> next offset, for a big Velora-hosted server whose member list comes in pages (absent: all loaded)
   presence: {},            // username -> { status, custom, activities }
+  presenceReady: false,    // the first presence_bulk came in
   people: {},              // username -> { username, pfp, color, rank }
   msgs: {},                // key -> { list, hasMore, loading, loaded }
   typing: {},              // key -> { username: until }
@@ -46,6 +47,7 @@ let state = {
   dms: [],                 // IM conversations
   groups: [],              // group chats
   friends: [],
+  friendsLoaded: false,     // /friends answered once (Home shows "No friends yet" only after)
   blocks: null, // people I blocked ({username, ...}); null until loaded
   unread: {},              // key -> true
   modmail: { messages: [], unread: 0 }, // Velora Moderator Chat (to me)
@@ -636,7 +638,8 @@ function onEvent(m, inst = VELORA) {
       set(s => ({ presence: { ...s.presence, [m.username]: localizePresence(m.presence) } }));
       break;
     case 'presence_bulk': // the answer to chat_presence_watch
-      if (Array.isArray(m.presences) && m.presences.length) set(s => ({ presence: { ...s.presence, ...Object.fromEntries(m.presences.map(x => [x.username, localizePresence(x.presence)])) } }));
+      if (Array.isArray(m.presences) && m.presences.length) set(s => ({ presenceReady: true, presence: { ...s.presence, ...Object.fromEntries(m.presences.map(x => [x.username, localizePresence(x.presence)])) } }));
+      else if (!state.presenceReady) set({ presenceReady: true }); // (Home waits for this so friends don't jump from Offline to Online)
       break;
     case 'im_received':
     case 'im_sent': {
@@ -1595,7 +1598,7 @@ export async function loadFriends() {
   const d = await apiFetch('/friends').catch(() => null);
   if (!d) return;
   remember(d.friends.map(f => ({ username: f.friend_username, pfp: f.pfp_url, color: f.color, rank: f.rank })));
-  set({ friends: d.friends });
+  set({ friends: d.friends, friendsLoaded: true });
   watchPresence(d.friends.map(f => f.friend_username));
 }
 export async function loadBlocks() {

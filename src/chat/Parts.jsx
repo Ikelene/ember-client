@@ -624,7 +624,7 @@ export function MemberList({ sid, cid, onUser, embedded = false }) {
             const blocked = !!blocks?.length && isBlockedPerson(m, isInst(sid) ? instOf(sid) : VELORA); // somebody I blocked: no name, picture or status line
             const sub = blocked ? null : subtitle(p);
             return (
-              <button type="button" key={m.username} className={`vc-member vl-rise${p?.status === 'offline' ? ' off' : ''}`} style={{ '--i': Math.min(n, 14) }} onClick={e => onUser(m.username, e.currentTarget, 'left', isInst(sid) ? m : undefined)}
+              <button type="button" key={m.username} className={`vc-member vl-rise${p?.status === 'offline' ? ' off' : ''}`} onClick={e => onUser(m.username, e.currentTarget, 'left', isInst(sid) ? m : undefined)}
                 onContextMenu={e => { const el = e.currentTarget; userMenu(e, m.username, { sid, onProfile: () => onUser(m.username, el, 'left', isInst(sid) ? m : undefined) }); }}>
                 <MemberAvatar m={m} status={statusOf(sid, m) || undefined} ghost={!!p?.invisible} blocked={blocked} />
                 <span className="vc-member-txt">
