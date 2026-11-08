@@ -234,6 +234,10 @@ export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, 
   const mediaUrl = mediaEl?.dataset.mediaUrl || null;
   const mediaName = mediaEl?.dataset.mediaName || '';
   const pic = img && !/vc-(c|t)emoji|vc-av|vc-srv-ico/.test(`${img.className} ${img.parentElement?.className || ''}`) ? img : null; // a real picture, not an emoji or avatar
+  // a picture or video someone posted (not an emoji or avatar): open it in a new tab / download it, right at the top of the menu
+  const videoEl = e.target.closest?.('video');
+  const mediaSrc = mediaUrl || pic?.src || videoEl?.currentSrc || videoEl?.src || null;
+  const mediaFile = mediaName || undefined;
   const cemoji = e.target.closest?.('img.vc-cemoji[data-eid]'); // right-clicked a custom emoji: Clone emoji
   const authorId = m.author?.id || getState().people[m.author?.username]?.id; // (DM and group messages only carry the name)
   const dev = !!getState().settings?.developer_mode;
@@ -251,13 +255,15 @@ export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, 
     view.kind === 'channel' && !m.system && !m.ephemeral && /^\d+$/.test(String(m.id)) && appsItems({ sid: view.sid, cid: view.cid, type: 3, target: m.id }),
     link && { label: 'Open link', icon: ExternalLink, onClick: () => window.open(link.href, '_blank', 'noopener') },
     pic && { label: 'Open picture', icon: ImageIcon, onClick: () => viewPicture(pic.src) },
-    pic && { label: 'Download image', icon: Download, onClick: () => downloadImage(pic.src) },
     mediaUrl && { label: 'Save to Saved Media', icon: BookmarkPlus, onClick: () => saveToMedia(mediaUrl, mediaName) },
     onInfo && { label: 'Message info', icon: Info, onClick: onInfo }, // Manage messages: the real sender (aliases included)
     view.kind === 'channel' && isInst(view.sid) && !canEdit && !m.system && /^\d+$/.test(String(m.id)) && { label: 'Report message', icon: Flag, danger: true, onClick: () => reportTo(view.sid, { message_id: m.id }, 'this message', { target: m.author, message: m }) },
     canReportDm(view, m, getState().me?.username) && { label: 'Report message', icon: Flag, danger: true, onClick: () => reportDmMessage(view, m) },
   ].flat().filter(Boolean);
   openMenu(e, [
+    mediaSrc && { label: 'Open in new tab', icon: ExternalLink, onClick: () => window.open(mediaSrc, '_blank', 'noopener,noreferrer') },
+    mediaSrc && { label: 'Download', icon: Download, onClick: () => downloadImage(mediaSrc, mediaFile) },
+    mediaSrc && 'sep',
     canReply && { label: 'Reply', icon: Reply, onClick: onReply },
     canEdit && { label: 'Edit message', icon: Pencil, onClick: onEdit },
     onForward && { label: 'Forward', icon: Forward, onClick: onForward },
