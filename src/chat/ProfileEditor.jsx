@@ -21,6 +21,27 @@ const UPLOAD_ERRORS = {
 const RENAME_ERRORS = { invalid_username: 'Usernames are 2-32 letters, numbers, _ - or .', username_taken: 'That username is taken - pick another.', same_username: 'That is already your username.', no_free_rename: 'Your free username change has expired.' };
 
 // onDirty(bool) lets the dialog ask before leaving with unsaved changes
+// the cropped picture as it will look once saved (a still frame for GIFs; the server keeps them animated)
+function cropPreview(file, crop) {
+  return new Promise((resolve, reject) => {
+    const src = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const c = crop || { x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight };
+        const k = Math.min(1, 1024 / Math.max(c.w, c.h));
+        const cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(c.w * k)); cv.height = Math.max(1, Math.round(c.h * k));
+        cv.getContext('2d').drawImage(img, c.x, c.y, c.w, c.h, 0, 0, cv.width, cv.height);
+        URL.revokeObjectURL(src);
+        cv.toBlob(b => (b ? resolve(URL.createObjectURL(b)) : reject(new Error('no_blob'))), 'image/png');
+      } catch (e) { URL.revokeObjectURL(src); reject(e); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(src); reject(new Error('bad_image')); };
+    img.src = src;
+  });
+}
+
 export default function ProfileEditor({ onDirty }) {
   const [user, setUser] = useState(null);
   const [loadErr, setLoadErr] = useState('');
@@ -56,7 +77,10 @@ function Editor({ user, reload, presence, onDirty }) {
   const [f, setF] = useState(initial);
   const [base, setBase] = useState(initial);
   const set = (k, v) => setF(x => ({ ...x, [k]: v }));
-  const dirty = Object.keys(f).some(k => (k === 'website' || k === 'pronouns' ? f[k].trim() : f[k]) !== base[k]);
+  const fieldsDirty = Object.keys(f).some(k => (k === 'website' || k === 'pronouns' ? f[k].trim() : f[k]) !== base[k]);
+  // avatar / banner wait for Save changes too: { file, crop, url } (url = a cropped preview) or 'remove'
+  const [media, setMedia] = useState({});
+  const dirty = fieldsDirty || !!media.pfp || !!media.banner;
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
   const [justSaved, setJustSaved] = useState(false);
@@ -75,11 +99,28 @@ function Editor({ user, reload, presence, onDirty }) {
     if (f.color && !isHex(f.color)) { setMsg({ type: 'error', text: 'Accent colours look like #9d8ad1.' }); setShake(n => n + 1); return; }
     setSaving(true); setMsg(null);
     try {
-      await api.updateMe({ bio: f.bio, pronouns: f.pronouns.trim(), timezone: f.timezone || undefined, country_code: f.country || undefined, website: f.website.trim(), color: f.color || null });
-      setBase({ ...f, website: f.website.trim(), pronouns: f.pronouns.trim() });
+      if (fieldsDirty) {
+        await api.updateMe({ bio: f.bio, pronouns: f.pronouns.trim(), timezone: f.timezone || undefined, country_code: f.country || undefined, website: f.website.trim(), color: f.color || null });
+        setBase({ ...f, website: f.website.trim(), pronouns: f.pronouns.trim() });
+      }
+      for (const type of ['pfp', 'banner']) {
+        const m = media[type];
+        if (!m) continue;
+        try {
+          if (m === 'remove') await (type === 'banner' ? api.clearBanner() : api.clearPfp());
+          else await uploadMedia(`/media/${type}`, m.file, m.crop);
+        } catch (err) { throw Object.assign(err, { media: type, removing: m === 'remove' }); }
+        dropMedia(type);
+      }
       setJustSaved(true); setTimeout(() => setJustSaved(false), 1400);
       reload().catch(() => {});
     } catch (e) {
+      if (e.media) {
+        const what = e.media === 'banner' ? 'banner' : 'avatar';
+        setMsg({ type: 'error', text: e.removing ? `Couldn't remove your ${what}.` : (UPLOAD_ERRORS[e.message] || (() => 'Upload failed. Try a smaller image.'))(e.media) });
+        setShake(n => n + 1); setSaving(false); reload().catch(() => {});
+        return;
+      }
       const m = { bio_too_long: `Bio too long (max ${bioLimit} characters).`, invalid_website: "That website link doesn't look right - use something like https://your-site.com" };
       setMsg({ type: 'error', text: m[e.message] || "Couldn't save - try again." });
       setShake(n => n + 1);
@@ -108,22 +149,18 @@ function Editor({ user, reload, presence, onDirty }) {
   const pfpInput = useRef(null);
   const bannerInput = useRef(null);
   const [cropping, setCropping] = useState(null);
-  const [uploading, setUploading] = useState(null);
   const [mediaMsg, setMediaMsg] = useState(null);
   const pick = (e, type) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) { setMediaMsg(null); setCropping({ type, file }); } };
-  async function upload(type, file, crop) {
-    setCropping(null); setUploading(type); setMediaMsg(null);
-    try { await uploadMedia(`/media/${type}`, file, crop); await reload(); }
-    catch (err) { setMediaMsg({ type: 'error', text: (UPLOAD_ERRORS[err.message] || (() => 'Upload failed. Try a smaller image.'))(type) }); }
-    setUploading(null);
+  const dropMedia = type => setMedia(x => { if (x[type]?.url) URL.revokeObjectURL(x[type].url); const n = { ...x }; delete n[type]; return n; });
+  async function stage(type, file, crop) {
+    setCropping(null); setMediaMsg(null);
+    const url = await cropPreview(file, crop).catch(() => URL.createObjectURL(file));
+    setMedia(x => { if (x[type]?.url) URL.revokeObjectURL(x[type].url); return { ...x, [type]: { file, crop, url } }; });
   }
-  async function remove(type) {
-    if (!(await ask({ title: type === 'banner' ? 'Remove your banner?' : 'Remove your avatar?', confirm: 'Remove', danger: true }))) return;
-    setUploading(type); setMediaMsg(null);
-    try { await (type === 'banner' ? api.clearBanner() : api.clearPfp()); await reload(); }
-    catch { setMediaMsg({ type: 'error', text: `Couldn't remove your ${type === 'banner' ? 'banner' : 'avatar'}.` }); }
-    setUploading(null);
-  }
+  const remove = type => setMedia(x => { if (x[type]?.url) URL.revokeObjectURL(x[type].url); return { ...x, [type]: 'remove' }; });
+  const mediaRef = useRef(media); mediaRef.current = media;
+  useEffect(() => () => Object.values(mediaRef.current).forEach(m => m?.url && URL.revokeObjectURL(m.url)), []);
+  const shown = type => (media[type] === 'remove' ? null : media[type]?.url || profile[type] || null);
 
   const [visibility, setVisibility] = useState(profile.visibility || 'public');
   const [visMsg, setVisMsg] = useState(null);
@@ -136,8 +173,8 @@ function Editor({ user, reload, presence, onDirty }) {
 
   const card = {
     username,
-    pfp: profile.pfp || null,
-    banner: profile.banner || null,
+    pfp: shown('pfp'),
+    banner: shown('banner'),
     color: f.color,
     bio: f.bio,
     pronouns: f.pronouns.trim(),
@@ -186,8 +223,9 @@ function Editor({ user, reload, presence, onDirty }) {
           <div className="bf-pe-sec">
             <div className="bf-pe-label">Avatar</div>
             <div className="bf-pe-row">
-              <button type="button" className="btn btn-primary btn-sm" disabled={!!uploading} onClick={() => pfpInput.current?.click()}>{uploading === 'pfp' ? 'Uploading...' : 'Change avatar'}</button>
-              {profile.pfp && <button type="button" className="btn btn-surface btn-sm" disabled={!!uploading} onClick={() => remove('pfp')}>Remove avatar</button>}
+              <button type="button" className="btn btn-primary btn-sm" disabled={saving} onClick={() => pfpInput.current?.click()}>Change avatar</button>
+              {shown('pfp') && <button type="button" className="btn btn-surface btn-sm" disabled={saving} onClick={() => remove('pfp')}>Remove avatar</button>}
+              {media.pfp && <button type="button" className="btn btn-surface btn-sm" disabled={saving} onClick={() => dropMedia('pfp')}>Undo</button>}
             </div>
             <input ref={pfpInput} type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden onChange={e => pick(e, 'pfp')} />
           </div>
@@ -195,8 +233,9 @@ function Editor({ user, reload, presence, onDirty }) {
           <div className="bf-pe-sec">
             <div className="bf-pe-label">Banner</div>
             <div className="bf-pe-row">
-              <button type="button" className="btn btn-primary btn-sm" disabled={!!uploading} onClick={() => bannerInput.current?.click()}>{uploading === 'banner' ? 'Uploading...' : 'Change banner'}</button>
-              {profile.banner && <button type="button" className="btn btn-surface btn-sm" disabled={!!uploading} onClick={() => remove('banner')}>Remove banner</button>}
+              <button type="button" className="btn btn-primary btn-sm" disabled={saving} onClick={() => bannerInput.current?.click()}>Change banner</button>
+              {shown('banner') && <button type="button" className="btn btn-surface btn-sm" disabled={saving} onClick={() => remove('banner')}>Remove banner</button>}
+              {media.banner && <button type="button" className="btn btn-surface btn-sm" disabled={saving} onClick={() => dropMedia('banner')}>Undo</button>}
             </div>
             <input ref={bannerInput} type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden onChange={e => pick(e, 'banner')} />
             {mediaMsg && <div className={`inline-msg ${mediaMsg.type}`}>{mediaMsg.text}</div>}
@@ -270,7 +309,7 @@ function Editor({ user, reload, presence, onDirty }) {
 
       <div className={`bf-pe-bar${dirty || justSaved ? ' on' : ''}${shake ? ' shake' : ''}${justSaved && !dirty ? ' saved' : ''}`} key={shake ? `s${shake}` : 'bar'} role="status" aria-hidden={!(dirty || justSaved)}>
         <span className="bf-pe-bar-text">{justSaved && !dirty ? 'Saved!' : msg?.type === 'error' ? msg.text : 'Careful - you have unsaved changes!'}</span>
-        {dirty && <button type="button" className="bf-pe-bar-reset" onClick={() => { setF(base); setMsg(null); }} disabled={saving}>Reset</button>}
+        {dirty && <button type="button" className="bf-pe-bar-reset" onClick={() => { setF(base); setMsg(null); dropMedia('pfp'); dropMedia('banner'); }} disabled={saving}>Reset</button>}
         {dirty && <button type="button" className="btn btn-primary btn-sm" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save changes'}</button>}
       </div>
 
@@ -282,7 +321,7 @@ function Editor({ user, reload, presence, onDirty }) {
             round={cropping.type === 'pfp'}
             title={cropping.type === 'banner' ? 'Crop your banner' : 'Crop your avatar'}
             onCancel={() => setCropping(null)}
-            onDone={crop => upload(cropping.type, cropping.file, crop)}
+            onDone={crop => stage(cropping.type, cropping.file, crop)}
           />
         </div>,
         document.body,
