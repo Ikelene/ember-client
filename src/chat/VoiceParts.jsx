@@ -2,7 +2,7 @@
 // view, the DM call bar and incoming call popups. Voice settings live in right-click / long-press menus on
 // the mic (input), deafen (output + soundboard) and camera buttons. Speaking rings: data-vlevel (levels.js).
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Mic, MicOff, Headphones, HeadphoneOff, PhoneOff, Phone, PhoneIncoming, UserPlus, Volume2, Search, AudioLines, Video, VideoOff, MonitorUp, MonitorOff, MonitorPlay, Eye, Maximize2, X } from 'lucide-react';
+import { Mic, MicOff, Headphones, HeadphoneOff, PhoneOff, Phone, PhoneIncoming, UserPlus, Volume2, Search, AudioLines, Video, VideoOff, MonitorUp, MonitorOff, MonitorPlay, Eye, Maximize2, Minimize2, X } from 'lucide-react';
 import { useChat, getState, go, syncRing, isBlockedName, BLOCKED_NAME } from './store.js';
 import { Avatar, BlockedMark } from './Profile.jsx';
 import { joinVoice, leaveVoice, setMute, setDeafen, answer, callDm, callInto, cancelCall, prefs, setPrefs, toggleCamera, toggleScreen, desktopScreenSources, canSelectOutput, watchStream, unwatchStream, refreshDevices, knownDevices, micMeter, micProcessing, sensLabel } from './voice.js';
@@ -278,7 +278,14 @@ function CallStage({ v, tiles, compact, sid }) {
   useEffect(() => { if (!v?.screen) setPreview(false); }, [v?.screen]);
 
   const stop = e => { if (e.mine) setPreview(false); else unwatchStream(e.userId); if (focused === e.userId) setFocused(null); };
-  const fullscreen = () => { const el = stageRef.current?.querySelector('.vc-stage-focus'); if (el?.requestFullscreen) el.requestFullscreen().catch(() => {}); };
+  // the same button leaves fullscreen again (it used to only go in, so Esc was the only way out)
+  const [isFull, setIsFull] = useState(() => !!document.fullscreenElement);
+  useEffect(() => { const f = () => setIsFull(!!document.fullscreenElement); document.addEventListener('fullscreenchange', f); return () => document.removeEventListener('fullscreenchange', f); }, []);
+  const fullscreen = () => {
+    if (document.fullscreenElement) { document.exitFullscreen?.().catch(() => {}); return; }
+    const el = stageRef.current?.querySelector('.vc-stage-focus');
+    if (el?.requestFullscreen) el.requestFullscreen().catch(() => {});
+  };
 
   const streamCard = e => {
     if (e.active) { // thumbnail of a stream you are already watching (not the one in focus)
@@ -341,7 +348,7 @@ function CallStage({ v, tiles, compact, sid }) {
             <span className="vc-stage-title"><MonitorPlay size={15} /> <b>{focus.mine ? 'Your stream' : `${focus.name}'s stream`}</b></span>
             <StreamViewers watchers={focus.watchers} mine={focus.mine} names={focus.mine} />
             <span className="grow" />
-            <button type="button" className="vc-stage-btn" title="Fullscreen" onClick={fullscreen}><Maximize2 size={16} /></button>
+            <button type="button" className="vc-stage-btn" title={isFull ? 'Exit fullscreen' : 'Fullscreen'} onClick={fullscreen}>{isFull ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>
             <button type="button" className="vc-stage-btn stop" title={focus.mine ? 'Hide preview' : 'Stop watching'} onClick={() => stop(focus)}><X size={16} /> {focus.mine ? 'Hide preview' : 'Stop watching'}</button>
           </div>
         </div>
