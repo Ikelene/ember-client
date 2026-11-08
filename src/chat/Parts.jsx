@@ -572,7 +572,7 @@ export function MemberList({ sid, cid, onUser, embedded = false }) {
   const permKey = ch ? JSON.stringify([ch.private, ch.overwrites, ch.type, ch.config?.purpose, ch.config?.instance]) : '';
   const [viewers, setViewers] = useState(null);
   useEffect(() => {
-    if (!cid || isInst(sid)) { setViewers(null); return undefined; }
+    if (!cid) { setViewers(null); return undefined; } // instances without /viewers (older ember-server) answer 404: then everyone shows
     let live = true;
     apiFetch(`/chat/channels/${cid}/viewers`).then(d => { if (live) setViewers(d.all ? null : new Set((d.ids || []).map(String))); }).catch(() => { if (live) setViewers(null); });
     return () => { live = false; };

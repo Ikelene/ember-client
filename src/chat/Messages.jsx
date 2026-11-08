@@ -642,10 +642,11 @@ export function MessageList({ view, onUser, onReply, canPost, canMod, channels, 
   const hideTimer = useRef(null);
   const onHoverMove = e => {
     if (e.pointerType !== 'mouse' || !toolsEl) return;
-    if (toolsEl.contains(e.target)) { clearTimeout(hideTimer.current); return; }
+    if (toolsEl.contains(e.target)) { clearTimeout(hideTimer.current); hideTimer.current = null; return; }
     const el = e.target.closest?.('.vc-msg[data-id]');
-    if (!el || el.classList.contains('vc-sys') || el.classList.contains('editing')) return;
-    clearTimeout(hideTimer.current);
+    // off every message (the empty space above them, the channel intro, a date line...): let go like leaving the list
+    if (!el || el.classList.contains('vc-sys') || el.classList.contains('editing')) { if (hovId != null && !hideTimer.current) onHoverLeave(); return; }
+    clearTimeout(hideTimer.current); hideTimer.current = null;
     const top = el.offsetTop;
     const first = !toolsEl.classList.contains('on');
     if (first) toolsEl.style.transition = 'none';
@@ -656,7 +657,7 @@ export function MessageList({ view, onUser, onReply, canPost, canMod, channels, 
   };
   const onHoverLeave = () => {
     clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => { toolsEl?.classList.remove('on'); hideTimer.current = setTimeout(() => { if (!toolsEl?.classList.contains('on')) setHovered(null); }, 180); }, 120);
+    hideTimer.current = setTimeout(() => { toolsEl?.classList.remove('on'); hideTimer.current = setTimeout(() => { hideTimer.current = null; if (!toolsEl?.classList.contains('on')) setHovered(null); }, 180); }, 120);
   };
   useEffect(() => () => { clearTimeout(hideTimer.current); setHovered(null); }, [key]);
   // a message that is still sending stays out of sight until the server has it (then it appears and animates in once); failed ones and uploads with progress show
