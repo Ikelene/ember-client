@@ -564,8 +564,20 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
 }
 
 // ── member list (grouped: owner / admins / online / offline) ────────────────
-export function MemberList({ sid, onUser, embedded = false }) {
-  const members = useChat(s => s.members[sid]);
+export function MemberList({ sid, cid, onUser, embedded = false }) {
+  const allMembers = useChat(s => s.members[sid]);
+  // only the people who can see the channel you're in (GET /chat/channels/:cid/viewers; null = everyone). Self-hosted
+  // servers don't answer that yet, so they list everyone as before.
+  const ch = useChat(s => (cid ? s.detail[sid]?.channels?.find(c => c.cid === cid) : null));
+  const permKey = ch ? JSON.stringify([ch.private, ch.overwrites, ch.type, ch.config?.purpose, ch.config?.instance]) : '';
+  const [viewers, setViewers] = useState(null);
+  useEffect(() => {
+    if (!cid || isInst(sid)) { setViewers(null); return undefined; }
+    let live = true;
+    apiFetch(`/chat/channels/${cid}/viewers`).then(d => { if (live) setViewers(d.all ? null : new Set((d.ids || []).map(String))); }).catch(() => { if (live) setViewers(null); });
+    return () => { live = false; };
+  }, [cid, sid, permKey, allMembers?.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  const members = useMemo(() => (viewers && allMembers ? allMembers.filter(m => viewers.has(String(m.id))) : allMembers), [allMembers, viewers]);
   const more = useChat(s => s.membersMore[sid]); // a big Velora-hosted server: more pages to load (as you scroll)
   const presence = useChat(s => s.presence);
   const names = useChat(s => s.veloraNames);

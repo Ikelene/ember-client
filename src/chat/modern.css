@@ -77,7 +77,10 @@ html.vc-rounded .vc-cat-add { border-radius: calc(6px * var(--rk, 1)); padding: 
 html.vc-rounded .vc-cat-add:hover { background: var(--m-hover); }
 html.vc-rounded .vc-ch { margin: 2px 0; border-radius: calc(8px * var(--rk, 1)); }
 html.vc-rounded .vc-ch-btn { padding: 7px 10px; gap: 9px; font-size: 15px; border-radius: calc(8px * var(--rk, 1)); }
-html.vc-rounded .vc-ch-btn svg { width: 19px; height: 19px; }
+html.vc-rounded .vc-ch-btn > svg, html.vc-rounded .vc-ch-btn .vc-ch-priv > svg:first-child { width: 19px; height: 19px; }
+html.vc-rounded .vc-ch-priv > svg:last-child { width: 12px; height: 12px; right: -5px; bottom: -4px; background: var(--m-side); border-radius: 50%; }
+html.vc-rounded .vc-ch.on .vc-ch-priv > svg:last-child { background: var(--m-on); }
+html.vc-rounded .vc-ch:hover:not(.on) .vc-ch-priv > svg:last-child { background: var(--m-hover); }
 html.vc-rounded .vc-ch:hover { background: var(--m-hover); }
 html.vc-rounded .vc-ch.on { background: var(--m-on); }
 html.vc-rounded .vc-ch.unread::before { left: -10px; width: 5px; height: 10px; border-radius: 0 calc(5px * var(--rk, 1)) calc(5px * var(--rk, 1)) 0; }

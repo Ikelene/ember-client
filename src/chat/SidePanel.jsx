@@ -56,7 +56,7 @@ export function SidePanel({ view, channel, detail, group, onUser, onLeaveGroup, 
         {onClose && <button type="button" className="vc-panel-close" aria-label="Close the side panel" onClick={onClose}><X size={18} /></button>}
       </div>
       <div className="vc-panel-body" key={`${cur}-${view.sid || view.username || view.room}`}>
-        {cur === 'people' && isServer && <MemberList sid={view.sid} onUser={onUser} embedded />}
+        {cur === 'people' && isServer && <MemberList sid={view.sid} cid={view.cid} onUser={onUser} embedded />}
         {cur === 'people' && view.kind === 'dm' && <div className="vc-panel-profile"><ProfileCard username={view.username} onExpand={rect => dispatchEvent(new CustomEvent('vc-open-big', { detail: { username: view.username, rect } }))} /></div>}
         {cur === 'people' && view.kind === 'group' && group && (
           <div className="vc-panel-scroll">
