@@ -25,6 +25,7 @@ export async function cloneEmoji(emoji, sid) {
     const srv = getState().servers.find(x => x.sid === sid);
     toast(`Added :${name}: to ${srv?.name || 'your server'}.`, true);
   } catch (e) {
+    console.error('clone emoji failed', e?.message, e?.status);
     toast({ emoji_unavailable: "Couldn't get that emoji's picture.", too_many_emojis: 'That server is out of emoji slots.', file_too_large: 'That emoji is too big to copy (2 MB max).', not_allowed: "You can't add emojis to that server." }[e.message] || errorText(e.message));
   }
 }
