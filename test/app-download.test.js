@@ -14,7 +14,7 @@ test('devices with no app start with nothing picked', () => {
   assert.equal(detectAppTarget(''), null);
 });
 test('each app has its own download link', () => {
-  assert.equal(APP_TARGETS.mac.path, '/bonfire/download?os=mac');
-  assert.equal(APP_TARGETS.windows.path, '/bonfire/download?os=windows');
-  assert.equal(APP_TARGETS.android.path, '/bonfire/android/');
+  assert.equal(APP_TARGETS.mac.path, '/ember/download?os=mac');
+  assert.equal(APP_TARGETS.windows.path, '/ember/download?os=windows');
+  assert.equal(APP_TARGETS.android.path, '/ember/android/');
 });

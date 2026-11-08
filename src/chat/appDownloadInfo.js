@@ -1,9 +1,9 @@
 // The Ember apps people can download, and which one this device most likely wants (no React, so it can be tested).
-// /bonfire/download sends ?os=mac to the Mac dmg and anything else to the Windows installer; Android has its own page.
+// /ember/download sends ?os=mac to the Mac dmg and anything else to the Windows installer; Android has its own page.
 export const APP_TARGETS = {
-  windows: { name: 'Windows', path: '/bonfire/download?os=windows', about: 'Desktop notifications, game status and more.' },
-  mac: { name: 'macOS', path: '/bonfire/download?os=mac', about: 'Desktop notifications, game status and more.' },
-  android: { name: 'Android', path: '/bonfire/android/', about: 'Notifications, swipe gestures and a smoother phone experience.' },
+  windows: { name: 'Windows', path: '/ember/download?os=windows', about: 'Desktop notifications, game status and more.' },
+  mac: { name: 'macOS', path: '/ember/download?os=mac', about: 'Desktop notifications, game status and more.' },
+  android: { name: 'Android', path: '/ember/android/', about: 'Notifications, swipe gestures and a smoother phone experience.' },
 };
 
 // 'windows', 'mac', 'android', or null when there is no app for this device (iPhone, iPad, Linux): the person picks one
