@@ -2501,3 +2501,13 @@ a.vc-glint-site:hover { color: var(--text); text-decoration: none; }
 @media (max-width: 600px) { .vc-svc-main { flex-wrap: wrap; } .vc-svc-actions { flex-direction: row; width: 100%; } .vc-svc-actions .vc-svc-btn { flex: 1; } }
 @media (prefers-reduced-motion: reduce) { .vc-svc { transition: none; } }
 .vc-eminfo-clone { width: 100%; justify-content: center; margin-top: 10px; display: inline-flex; align-items: center; gap: 6px; }
+
+/* Modern is the new default (ModernNotice.jsx) */
+.vc-modern-notice { width: min(440px, 100%); padding: 26px 24px 20px; background: var(--box); border: 1px solid var(--border); text-align: center; display: grid; justify-items: center; gap: 10px; }
+.vc-modern-notice-ico { width: 54px; height: 54px; display: grid; place-items: center; background: var(--accent-dim); color: var(--accent); }
+.vc-modern-notice h2 { margin: 4px 0 0; font-size: 20px; }
+.vc-modern-notice p { margin: 0; color: var(--dim); font-size: 14px; line-height: 1.5; }
+.vc-modern-notice-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
+html.vc-rounded .vc-modern-notice { border-radius: calc(16px * var(--rk, 1)); background: var(--m-raised, var(--box)); }
+html.vc-rounded .vc-modern-notice-ico { border-radius: 50%; }
+.vc-modal-back.vc-modern-notice-back { z-index: 2300; } /* first thing you answer, above any other first-run dialog */

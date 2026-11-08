@@ -7,7 +7,6 @@ import serverCreationPolicy from '../server-creation-policy.json';
 import { apiFetch, getToken, onScopeError, onAuthLost, isWebBonfire, uploadFetch } from '../api.js';
 import { endSession, startSignIn } from './session.js';
 import * as E2EE from './e2ee/session.js';
-import { loadBeta } from './beta.js';
 import { fileKindOfMime } from './e2ee/files.js';
 import { rememberedDest, TEMP_LINK, tempId } from './upload-dest.js';
 import { callLinePlain } from './callText.js';
@@ -2016,7 +2015,7 @@ export function authLost() {
 }
 onAuthLost(authLost);
 // what the signed-in account holds (on start, and again when a lockout is lifted)
-function loadAccount() { loadServers(); loadDMs(); loadGroups(); loadFriends(); loadBlocks(); loadModmail(); loadMedia(); loadNotifCount(); loadBeta(); }
+function loadAccount() { loadServers(); loadDMs(); loadGroups(); loadFriends(); loadBlocks(); loadModmail(); loadMedia(); loadNotifCount(); }
 
 // ── lockout: staff switched Ember and DMs off for the account (users.disabled_scopes), or Nookara's birthday gate did ──
 // (no birthday set yet, or under the minimum age for their region: the same bits, told apart by restriction_reason, so the

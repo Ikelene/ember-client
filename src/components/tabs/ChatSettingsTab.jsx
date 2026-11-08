@@ -5,7 +5,6 @@ import { useEffect, useState, useRef } from 'react';
 import { Bell, Gamepad2, LogOut, ShieldCheck, MessagesSquare, Volume2, Pause, Play, Radio, Power, PanelBottomClose, Minimize2 } from 'lucide-react';
 import { SOUND_PACKS, getMessageSounds, setMessageSounds, subscribeMessageSounds, playPackSound } from '../../chat/messageSounds.js';
 import { getDesign, setDesign, subscribeDesign , effectiveDesign } from '../../chat/design.js';
-import { isBeta } from '../../chat/beta.js';
 import { useRadio, setRadioVolume, toggleRadioPause } from '../../chat/Radio.jsx';
 // settings preview of the new-message sound (same files as chat/store.js)
 function previewNotifySound(kind) {
@@ -182,20 +181,18 @@ function DesktopSettings() {
 
 // Internet Radio: the stream address + volume / pause for the player on /chat (chat/Radio.jsx)
 const RADIO_DEFAULT = 'https://www.clubfmserver.be/pink.mp3';
-function DesignSettings() {
+export function DesignSettings() {
   const [d, setD] = useState(() => effectiveDesign());
   useEffect(() => subscribeDesign(() => setD(effectiveDesign())), []);
-  const beta = isBeta(); // Modern is Ember Beta only for now (chat/beta.js)
   return (
     <div className="card vl-rise" style={{ '--i': 0 }}>
       <div className="card-header"><span className="card-title">Design</span></div>
       <div className="card-body cs-rows">
         <div className="cs-row">
-          <div className="cs-text"><b>Look</b><span>Classic: the original sharp-cornered Ember. Modern (BETA): bigger, softer and roomier, with themes, fonts and more under Look &amp; feel. Saved on this device.</span></div>
+          <div className="cs-text"><b>Look</b><span>Modern: bigger, softer and roomier, with themes, fonts and more under Look &amp; feel. Classic: the original sharp-cornered Ember. Saved on this device.</span></div>
           <div className="cs-seg">
-            {[['square', 'Classic'], ['rounded', 'Modern (BETA)']].map(([v, l]) => <button type="button" key={v} className={d === v ? 'on' : ''} aria-pressed={d === v} disabled={v === 'rounded' && !beta} title={v === 'rounded' && !beta ? 'Ember Beta members only - see Settings > Beta' : undefined} onClick={() => setDesign(v)}>{l}</button>)}
+            {[['rounded', 'Modern'], ['square', 'Classic']].map(([v, l]) => <button type="button" key={v} className={d === v ? 'on' : ''} aria-pressed={d === v} onClick={() => setDesign(v)}>{l}</button>)}
           </div>
-          {!beta && <small className="cs-beta-note">Modern is in Ember Beta for now. Join it under <b>Beta</b> in these settings.</small>}
         </div>
       </div>
     </div>
@@ -354,7 +351,6 @@ export default function ChatSettingsTab({ embedded = false, onLogout, onLogin, w
       ))}
       {s && category === 'Notifications' && (desktop ? <DesktopNotifications /> : inAndroidApp() ? <AndroidNotifications /> : <><PushPrompt /><NotificationsTab /></>)}
       {category === 'Privacy' && <><h4 className="bf-settings-title">Encrypted DMs</h4><E2eeSettings /></>}
-      {category === 'Messages' && <DesignSettings />}
       {s && category === 'Extras' && <MessageSoundsSettings />}
       {s && category === 'Extras' && <RadioSettings s={s} change={change} saving={saving} />}
       {s && category === 'Bots' && <BotsManager />}

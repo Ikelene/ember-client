@@ -3,7 +3,7 @@ import { clientUrl } from '../chat/hosts.js';
 import { ForwardDialog } from '../chat/MsgTools.jsx';
 import { SidePanel, useInboxCount } from '../chat/SidePanel.jsx';
 import DiscoverPage from '../chat/DiscoverPage.jsx';
-import { loadBeta } from '../chat/beta.js';
+import ModernNotice from '../chat/ModernNotice.jsx';
 import { TooltipHost } from '../chat/Tooltip.jsx';
 import { MediaViewerHost, viewPicture, copyImage, downloadImage } from '../chat/MediaViewer.jsx';
 import { VoicePanel, VoiceView, DmCallBar, DmCallButton, IncomingCalls } from '../chat/VoiceParts.jsx';
@@ -465,9 +465,6 @@ function ChatPage() {
   const gateName = useChat(s => (view.kind === 'instance' ? s.instances.find(i => i.origin === view.inst)?.name : null));
   useEffect(() => { document.title = `${unreadCount ? `(${unreadCount > 999 ? '999+' : unreadCount}) ` : ''}${channel ? `#${channel.name} - ${detail.server.name}` : view.kind === 'instance' ? gateName || 'Server' : view.kind === 'dm' ? `@${view.username}` : group ? group.name : 'Home'} | Ember`; }, [unreadCount, channel, detail, view, group, gateName]);
   const signedIn = useChat(s => s.signedIn);
-  // Ember Beta (chat/beta.js): signed out = not in; signed in = asked with the account, and again when Ember comes back into focus
-  useEffect(() => { if (ready && !signedIn) loadBeta({ signedIn: false }); }, [ready, signedIn]);
-  useEffect(() => { if (!signedIn) return undefined; const f = () => loadBeta(); addEventListener('focus', f); return () => removeEventListener('focus', f); }, [signedIn]);
   const locked = useChat(s => s.locked); // staff switched Ember and DMs off for the account (store.js lockAccount)
 
   if (!ready) return <BootScreen />;
@@ -610,6 +607,7 @@ function ChatPage() {
       <TooltipHost />
       <MediaViewerHost />
       <EmojiInfoHost />
+      <ModernNotice />
       <ReactionPickerHost />
       <RpcWarning />
       <UpdatePopup />

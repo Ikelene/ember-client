@@ -23,7 +23,10 @@
       // loaded). --boot-t puts both on the same point of one clock so the animation doesn't restart at the hand-over.
       (function () {
         var t = -(Math.round(performance.now()) % 2600);
-        try { if (localStorage.getItem('bf_design') === 'rounded' && localStorage.getItem('bf_beta') === '1') document.documentElement.classList.add('vc-rounded'); /* Modern is Ember Beta only (chat/beta.js) */ } catch (e) { /* square */ }
+        try { /* Modern is the default (chat/design.js): Classic users are moved over once and shown a notice (bf_modern_default) */
+          if (!localStorage.getItem('bf_modern_default')) { localStorage.setItem('bf_modern_default', localStorage.getItem('bf_design') === 'rounded' ? 'seen' : 'notice'); localStorage.setItem('bf_design', 'rounded'); }
+          if (localStorage.getItem('bf_design') !== 'square') document.documentElement.classList.add('vc-rounded');
+        } catch (e) { document.documentElement.classList.add('vc-rounded'); }
         document.getElementById('root').innerHTML = '<div class="vc-boot" role="status" aria-label="Loading Ember"><div class="vc-boot-in"><img class="vc-boot-logo" src="/assets/bonfire/logo-photo-256.jpg?v=2" alt="" width="112" height="112" draggable="false" style="--boot-t:' + t + 'ms"><span class="vc-boot-name">Ember</span></div></div>';
       })();
     </script>
