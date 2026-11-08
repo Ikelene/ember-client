@@ -2500,3 +2500,4 @@ a.vc-glint-site:hover { color: var(--text); text-decoration: none; }
 .vc-svc-gone-row small { font-size: 12.5px; }
 @media (max-width: 600px) { .vc-svc-main { flex-wrap: wrap; } .vc-svc-actions { flex-direction: row; width: 100%; } .vc-svc-actions .vc-svc-btn { flex: 1; } }
 @media (prefers-reduced-motion: reduce) { .vc-svc { transition: none; } }
+.vc-eminfo-clone { width: 100%; justify-content: center; margin-top: 10px; display: inline-flex; align-items: center; gap: 6px; }

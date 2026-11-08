@@ -22,6 +22,7 @@ import { saveToMedia } from './store.js';
 import { QuickReactions } from './Reactions.jsx';
 import { userScrolled } from './userscroll.js';
 import { appsItems } from './commands.js';
+import { cloneMenuItem } from './cloneEmoji.js';
 
 // Track the full press, rather than timing out while the finger is still down.
 let menuTouch = null;
@@ -233,6 +234,7 @@ export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, 
   const mediaUrl = mediaEl?.dataset.mediaUrl || null;
   const mediaName = mediaEl?.dataset.mediaName || '';
   const pic = img && !/vc-(c|t)emoji|vc-av|vc-srv-ico/.test(`${img.className} ${img.parentElement?.className || ''}`) ? img : null; // a real picture, not an emoji or avatar
+  const cemoji = e.target.closest?.('img.vc-cemoji[data-eid]'); // right-clicked a custom emoji: Clone emoji
   const authorId = m.author?.id || getState().people[m.author?.username]?.id; // (DM and group messages only carry the name)
   const dev = !!getState().settings?.developer_mode;
   const copyItems = [
@@ -263,6 +265,7 @@ export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, 
     'sep',
     onSave && { label: saved ? 'Remove from saved' : 'Save message', icon: saved ? BookmarkCheck : Bookmark, onClick: onSave },
     onTranslate && m.body && { label: translated ? 'Show original' : 'Translate', icon: Languages, onClick: onTranslate },
+    cemoji && cloneMenuItem({ eid: cemoji.dataset.eid, name: cemoji.dataset.name, animated: cemoji.dataset.animated === '1' }),
     'sep',
     copyItems.length > 0 && { label: 'Copy', icon: Copy, sub: copyItems },
     moreItems.length > 0 && { label: 'More actions', icon: Ellipsis, sub: moreItems },

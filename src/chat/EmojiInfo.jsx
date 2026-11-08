@@ -1,12 +1,14 @@
 // Click an emoji in a message: its name, and for a custom one the server it's from (join it if it's in Discover).
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Users, Lock } from 'lucide-react';
+import { Users, Lock, Copy, Server } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { go, loadServersOf, toast, errorText, customEmoji, getState } from './store.js';
 import { instOpt } from './ids.js';
 import { Twemoji, nameOfChar } from './emoji.jsx';
 import { emojiDataSync, loadEmojiData } from './EmojiPicker.jsx';
+import { cloneTargets, cloneEmoji } from './cloneEmoji.js';
+import { openMenu } from './Menu.jsx';
 
 export function EmojiInfoHost() {
   const [info, setInfo] = useState(null); // { char } | { eid, name, animated, server? } + rect
@@ -61,6 +63,11 @@ export function EmojiInfoHost() {
           {srv.joined ? <button type="button" className="btn btn-surface btn-sm" onClick={() => { setInfo(null); go({ kind: 'server', sid: srv.sid }); }}>Open</button>
             : srv.discoverable ? <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={join}>Join</button> : null}
         </div>
+      )}
+      {info.eid && cloneTargets().length > 0 && (
+        <button type="button" className="btn btn-surface btn-sm vc-eminfo-clone" onClick={e => { const emoji = { eid: info.eid, name: info.name, animated: info.animated }; openMenu(e, cloneTargets().map(x => ({ label: x.name, icon: Server, onClick: () => { setInfo(null); cloneEmoji(emoji, x.sid); } }))); }}>
+          <Copy size={14} /> Clone emoji
+        </button>
       )}
     </div>,
     document.body,

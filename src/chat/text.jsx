@@ -96,7 +96,7 @@ function CustomEmojiImg({ eid, animated, name }) {
     setTimeout(() => setTries(t => t + 1), 1500 * (tries + 1));
   };
   return <img className="vc-cemoji" src={tries ? `${src}${src.includes('?') ? '&' : '?'}r=${tries}` : src} onError={retry} alt={`:${name}:`} title={`:${name}:`} draggable={false}
-    onClick={e => emojiInfo(e, { eid, name, animated: !!animated })} />;
+    data-eid={eid} data-name={name} data-animated={animated ? '1' : '0'} onClick={e => emojiInfo(e, { eid, name, animated: !!animated })} />;
 }
 const RULES = [
   [/<t:(-?\d{1,13})(?::([tTdDfFR]))?>/, (m, ctx, k) => {

@@ -6,6 +6,8 @@ import { apiFetch, uploadFetch } from '../api.js';
 import { useChat, getState, loadEmojis, toast, errorText, customEmoji } from './store.js';
 import { Twemoji, shortName, allNames } from './emoji.jsx';
 import { usePlan, PlanGate, PlanNotice, PlanUsage } from './PlanGate.jsx';
+import { cloneMenuItem } from './cloneEmoji.js';
+import { openMenu } from './Menu.jsx';
 
 const GROUPS = [
   [0, 'Smileys', Smile], [1, 'People', Users], [3, 'Animals and nature', Cat], [4, 'Food and drink', Apple],
@@ -70,7 +72,7 @@ export default function EmojiPicker({ onPick, onClose, reactionSid }) {
   const jump = id => scroller.current?.querySelector(`[data-sec="${id}"]`)?.scrollIntoView({ block: 'start' });
   const rec = recents().filter(r => !r.c || reactionSid === undefined || (custom || []).some(s => s.emojis.some(e => e.eid === r.c.eid)));
   const cell = (e, c) => (c
-    ? <button type="button" key={e.eid} className="vc-em" onClick={() => pickCustom(e)} onMouseEnter={() => setHover({ name: `:${e.name}:`, img: e.url, sub: e.server })}><img src={e.url} alt={e.name} loading="lazy" /></button>
+    ? <button type="button" key={e.eid} className="vc-em" onClick={() => pickCustom(e)} onContextMenu={ev => { const it = cloneMenuItem(e); if (it) openMenu(ev, [it]); else ev.preventDefault(); }} onMouseEnter={() => setHover({ name: `:${e.name}:`, img: e.url, sub: e.server })}><img src={e.url} alt={e.name} loading="lazy" /></button>
     : <button type="button" key={e[0]} className="vc-em" onClick={() => pickUni(e)} onMouseEnter={() => setHover({ name: `:${shortName(e)}:`, char: e[0] })}><Twemoji char={e[0]} className="vc-em-tw" lazy /></button>);
   return (
     <div className="vc-picker vc-emoji-picker" ref={box}>
