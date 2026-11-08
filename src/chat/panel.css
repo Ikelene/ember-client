@@ -320,3 +320,21 @@ html.vc-rounded .bf-ss .bf-ss-srv > span:last-child { min-width: 0; display: fle
 html.vc-rounded .vc-tools.vc-tools-quick button, .vc .vc-tools.vc-tools-quick button { width: auto; min-width: 0; height: 32px; padding: 0 12px; }
 .vc-panel-tabs > .vc-panel-close { display: none; }
 @media (max-width: 1100px) { .vc-panel-tabs > .vc-panel-close { display: grid; flex: none; } }
+
+/* ── the little icons beside a name in a message: role icon, verified mark, signature mark, client icon ── */
+.vc-msg-head { flex-wrap: wrap; row-gap: 2px; }
+.vc-msg-head .vc-role-ico { width: 18px; height: 18px; margin: 0 0 0 4px; vertical-align: -4px; }
+.vc-msg-head .vc-sig { margin-left: 2px; }
+.vc-msg-head .vc-sig svg { width: 16px; height: 16px; }
+.vc-msg-head .vc-via.icon-only { width: 22px; height: 22px; margin-left: 2px; border-radius: 0; color: var(--dim); opacity: .9; transition: opacity .12s, background .12s; }
+.vc-msg-head .vc-via.icon-only:hover { opacity: 1; background: rgba(255, 255, 255, .06); }
+.vc-msg-head .vc-via.icon-only .vc-via-icon { width: 18px; height: 18px; }
+.vc-msg-head .vc-via.icon-only > svg { width: 16px; height: 16px; }
+.vc-msg-head .vc-pronouns { margin-left: 2px; }
+html.vc-rounded .vc-msg-head { gap: 6px; }
+html.vc-rounded .vc-msg-head .vc-role-ico { width: 19px; height: 19px; }
+html.vc-rounded .vc-msg-head .vc-via.icon-only { border-radius: calc(6px * var(--rk, 1)); }
+html.vc-rounded .vc-msg-head .vc-via.icon-only .vc-via-icon { width: 19px; height: 19px; border-radius: calc(5px * var(--rk, 1)); }
+html.vc-rounded .vc-msg-head .vc-time { margin-left: 2px; }
+.vc-msg-head .vc-via.icon-only, .vc-msg-head .vc-sig, .vc-msg-head .vc-role-ico, .vc-msg-head .vc-rank-badge, .vc-msg-head .vc-bot-tag { align-self: center; }
+html.vc-rounded .vc-msg-head { align-items: center; }
