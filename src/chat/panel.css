@@ -338,3 +338,10 @@ html.vc-rounded .vc-msg-head .vc-via.icon-only .vc-via-icon { width: 19px; heigh
 html.vc-rounded .vc-msg-head .vc-time { margin-left: 2px; }
 .vc-msg-head .vc-via.icon-only, .vc-msg-head .vc-sig, .vc-msg-head .vc-role-ico, .vc-msg-head .vc-rank-badge, .vc-msg-head .vc-bot-tag { align-self: center; }
 html.vc-rounded .vc-msg-head { align-items: center; }
+
+/* one merged Inbox feed: notification icons sit at the row's avatar size, read mentions under a small divider */
+.vc-inbox-top .vc-notif-av { width: 22px; height: 22px; }
+.vc-inbox-top .vc-notif-av.ico svg { width: 13px; height: 13px; }
+.vc-inbox-sep { padding: 12px 4px 6px; color: var(--muted); font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+html.vc-rounded .vc-inbox-top .vc-notif-av, html.vc-rounded .vc-inbox-top .vc-notif-av img { border-radius: 50%; }
+html.vc-rounded .vc-inbox-sep { text-transform: none; letter-spacing: 0; font-size: 12.5px; }

@@ -1,14 +1,14 @@
 // The right-hand side panel: one place for the people here, pinned messages, your Inbox and search, switched by the icon
 // tabs along its top. Server channel: Members / Pins / Inbox / Search. DM: Profile / Pins / Inbox. Group chat: Members / Pins / Inbox.
-// The Inbox (Mentions / Unread / Saved / Notifications) took over the bell's notifications.
+// The Inbox is one feed (unread mentions, chats, channels and notifications together) plus Saved; it took over the bell.
 import { useEffect, useMemo, useState } from 'react';
-import { AtSign, Bell, Bookmark, CheckCheck, Inbox as InboxIco, MessageCircle, Pin, Search, Settings, UserRound, Users, UsersRound, X, Hash, ShieldCheck } from 'lucide-react';
+import { Bell, Bookmark, CheckCheck, Inbox as InboxIco, Pin, Search, Settings, UserRound, Users, UsersRound, X, Hash, ShieldCheck } from 'lucide-react';
 import { apiFetch } from '../api.js';
-import { useChat, getState, go, jumpToMessage, toast, errorText, isMuted, readNotifs, loadNotifs, closeNotifs } from './store.js';
+import { useChat, getState, go, jumpToMessage, toast, errorText, isMuted, readNotifs, loadNotifs, closeNotifs, followNotifLink, markChannelRead, markServerRead } from './store.js';
 import { MemberList } from './Parts.jsx';
 import { PinsPanel } from './MsgTools.jsx';
 import { ProfileCard, Avatar } from './Profile.jsx';
-import { NotifList, ago } from './Notifications.jsx';
+import { NotifIcon, NotifText, ago } from './Notifications.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
 import { snippet } from './Dashboard.jsx';
 import { loadMentions, loadSaved, unsaveMessage } from './inbox.js';
@@ -83,29 +83,19 @@ function PanelHead({ title, count, children }) {
 }
 
 // ── Inbox ──
+// One feed, no sub-tabs: unread mentions, unread chats/channels and unread notifications together, newest first, then
+// mentions you've already read under "Earlier mentions". Saved messages are a separate list behind the bookmark toggle.
 function Inbox() {
-  const [sub, setSub] = useState(() => { try { return localStorage.getItem('bf_inbox_tab') || 'mentions'; } catch { return 'mentions'; } });
-  const pick = k => { setSub(k); try { localStorage.setItem('bf_inbox_tab', k); } catch { /* fine */ } };
-  const notifN = useChat(s => s.notifUnread);
-  const unreadRows = useUnreadRows();
-  const mentionsN = useChat(s => (s.inboxMentions?.list || []).filter(m => m.unread).length);
-  const subs = [['mentions', AtSign, 'Mentions', mentionsN], ['unread', MessageCircle, 'Unread', unreadRows.length], ['saved', Bookmark, 'Saved', 0], ['notifs', Bell, 'Notifications', notifN]];
+  const [saved, setSavedRaw] = useState(() => { try { return localStorage.getItem('bf_inbox_tab') === 'saved'; } catch { return false; } });
+  const setSaved = v => { setSavedRaw(v); try { localStorage.setItem('bf_inbox_tab', v ? 'saved' : 'all'); } catch { /* fine */ } };
   return (
     <div className="vc-inbox">
-      <PanelHead title="Inbox" />
+      <PanelHead title={saved ? 'Saved' : 'Inbox'} />
       <div className="vc-inbox-subs" role="tablist">
-        {subs.map(([k, Icon, label, n]) => (
-          <button type="button" key={k} role="tab" aria-selected={sub === k} className={sub === k ? 'on' : ''} onClick={() => pick(k)} title={label}>
-            <Icon size={14} /><span>{label}</span>{n > 0 && <i>{n > 99 ? '99+' : n}</i>}
-          </button>
-        ))}
+        <button type="button" role="tab" aria-selected={!saved} className={!saved ? 'on' : ''} onClick={() => setSaved(false)} title="Inbox"><InboxIco size={14} /><span>Inbox</span></button>
+        <button type="button" role="tab" aria-selected={saved} className={saved ? 'on' : ''} onClick={() => setSaved(true)} title="Saved"><Bookmark size={14} /><span>Saved</span></button>
       </div>
-      <div className="vc-panel-scroll">
-        {sub === 'mentions' && <MentionsList />}
-        {sub === 'unread' && <UnreadList rows={unreadRows} />}
-        {sub === 'saved' && <SavedList />}
-        {sub === 'notifs' && <InboxNotifs />}
-      </div>
+      <div className="vc-panel-scroll">{saved ? <SavedList /> : <InboxFeed />}</div>
     </div>
   );
 }
@@ -128,21 +118,49 @@ function InboxRow({ face, icon, title, where, time, text, unread, onClick, onRem
   );
 }
 const Note = ({ icon: Icon, children }) => <div className="vc-inbox-empty"><Icon size={22} /><span>{children}</span></div>;
+const msOf = t => { const n = typeof t === 'number' ? t : Date.parse(t || ''); return Number.isFinite(n) ? (n < 1e12 ? n * 1000 : n) : 0; };
 
-function MentionsList() {
+function InboxFeed() {
   const box = useChat(s => s.inboxMentions);
+  const notifs = useChat(s => s.notifs);
+  const unreadRows = useUnreadRows();
   useEffect(() => { if (!box || Date.now() - (box.at || 0) > 15000) loadMentions(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const list = box?.list || [];
+  useEffect(() => { loadNotifs(); return () => closeNotifs(); }, []);
+  const mentions = box?.list;
+  const nlist = notifs?.list;
+  const rows = useMemo(() => {
+    const fresh = [];
+    const earlier = [];
+    (mentions || []).forEach(m => (m.unread ? fresh : earlier).push({ k: `m:${m.id}`, at: msOf(m.created_at), unread: m.unread, face: m.author, title: shownName(m), where: `#${m.channel_name} · ${m.server_name}`, time: ago(m.created_at), text: snippet(m.body) || (m.attachments?.length ? 'Sent an attachment' : ''), open: () => jumpToMessage({ kind: 'channel', sid: m.server, cid: m.channel }, m.id) }));
+    (nlist || []).forEach(n => fresh.push({ k: `n:${n.id}`, at: msOf(n.created_at), unread: true, icon: <NotifIcon n={n} />, title: <NotifText text={n.title} />, where: 'Notification', time: ago(n.created_at), text: n.body ? <NotifText text={n.body} /> : '', open: () => { readNotifs([n.id]); if (n.link) followNotifLink(n.link); } }));
+    unreadRows.forEach(r => fresh.push({ ...r, k: `u:${r.k}`, at: r.at || 0, unread: true, open: () => go(r.go) }));
+    // newest first; chats/channels with no time go after the dated ones, the ones with pings first
+    fresh.sort((a, b) => (b.at - a.at) || ((b.ping || 0) - (a.ping || 0)));
+    earlier.sort((a, b) => b.at - a.at);
+    return { fresh, earlier };
+  }, [mentions, nlist, unreadRows]);
+  const loading = box?.loading || notifs?.loading;
+  const anyUnread = rows.fresh.length > 0;
+  const markAll = () => {
+    readNotifs('all');
+    unreadRows.forEach(r => { if (r.go.kind === 'channel') markChannelRead(r.go.cid, r.go.sid); else if (r.go.kind === 'server') markServerRead(r.go.sid); });
+  };
+  const row = r => <InboxRow key={r.k} unread={r.unread} face={r.face} icon={r.icon} title={r.title} where={r.where} time={r.time} text={r.text} onClick={r.open} />;
   return (
     <>
-      {list.map(m => (
-        <InboxRow key={m.id} unread={m.unread} face={m.author} title={shownName(m)} where={`#${m.channel_name} · ${m.server_name}`} time={ago(m.created_at)} text={snippet(m.body) || (m.attachments?.length ? 'Sent an attachment' : '')}
-          onClick={() => jumpToMessage({ kind: 'channel', sid: m.server, cid: m.channel }, m.id)} />
-      ))}
-      {box?.loading && <div className="vc-loading"><i /><i /><i /></div>}
-      {box?.error && <Note icon={AtSign}>Couldn't load your mentions. <button type="button" className="vc-link-btn" onClick={() => loadMentions()}>Try again</button></Note>}
-      {box && !box.loading && !box.error && !list.length && <Note icon={CheckCheck}>No mentions in the last 30 days.</Note>}
-      {box?.has_more && !box.loading && <button type="button" className="vc-more" onClick={() => loadMentions({ more: true })}>Load more</button>}
+      <div className="vc-inbox-bar">
+        <button type="button" className="vc-link-btn" disabled={!anyUnread} onClick={markAll}><CheckCheck size={14} /> Mark all read</button>
+        <span className="grow" />
+        <a className="vc-link-btn" href={siteHref('/me#notifications')} target="_blank" rel="noopener noreferrer">All notifications</a>
+        <a className="vc-ico-btn" href={siteHref('/me#settings/notifications')} target="_blank" rel="noopener noreferrer" title="Notification settings"><Settings size={15} /></a>
+      </div>
+      {rows.fresh.map(row)}
+      {!loading && !anyUnread && <Note icon={CheckCheck}>You're all caught up.</Note>}
+      {rows.earlier.length > 0 && <div className="vc-inbox-sep">Earlier mentions</div>}
+      {rows.earlier.map(row)}
+      {loading && <div className="vc-loading"><i /><i /><i /></div>}
+      {(box?.error || notifs?.error) && <Note icon={InboxIco}>Part of your inbox couldn't load. <button type="button" className="vc-link-btn" onClick={() => { if (box?.error) loadMentions(); if (notifs?.error) loadNotifs(); }}>Try again</button></Note>}
+      {!loading && (box?.has_more || notifs?.cursor) && <button type="button" className="vc-more" onClick={() => { if (box?.has_more) loadMentions({ more: true }); if (notifs?.cursor) loadNotifs({ more: true }); }}>Load more</button>}
     </>
   );
 }
@@ -162,7 +180,7 @@ function useUnreadRows() {
   return useMemo(() => {
     const rows = [];
     if (modmail?.unread) rows.push({ k: 'mm', icon: <span className="vc-inbox-ico"><ShieldCheck size={14} /></span>, title: 'Nookara Moderator Chat', text: `${modmail.unread} new`, n: modmail.unread, go: { kind: 'modmail' } });
-    dms.forEach(c => { if (c.unread || unread[`d:${c.username.toLowerCase()}`]) rows.push({ k: `d:${c.username}`, face: c.username === 'System' ? null : { username: c.username, pfp: c.pfp || people[c.username]?.pfp }, icon: <span className="vc-inbox-ico"><Bell size={14} /></span>, title: c.username === 'System' ? 'Nookara' : c.username, where: 'Direct message', time: c.last_message?.sent_at ? ago(c.last_message.sent_at) : '', text: snippet(c.last_message?.body), n: c.unread || 1, go: { kind: 'dm', username: c.username } }); });
+    dms.forEach(c => { if (c.unread || unread[`d:${c.username.toLowerCase()}`]) rows.push({ k: `d:${c.username}`, face: c.username === 'System' ? null : { username: c.username, pfp: c.pfp || people[c.username]?.pfp }, icon: <span className="vc-inbox-ico"><Bell size={14} /></span>, title: c.username === 'System' ? 'Nookara' : c.username, where: 'Direct message', at: msOf(c.last_message?.sent_at), time: c.last_message?.sent_at ? ago(c.last_message.sent_at) : '', text: snippet(c.last_message?.body), n: c.unread || 1, go: { kind: 'dm', username: c.username } }); });
     groups.forEach(g => { if (unread[`g:${g.room}`]) rows.push({ k: `g:${g.room}`, icon: <span className="vc-inbox-ico"><UsersRound size={14} /></span>, title: g.name, where: 'Group chat', n: 1, go: { kind: 'group', room: g.room } }); });
     servers.forEach(s => {
       if (isMuted(s.sid)) return;
@@ -180,11 +198,6 @@ function useUnreadRows() {
     return rows.sort((a, b) => (b.ping || 0) - (a.ping || 0));
   }, [dms, groups, unread, modmail, servers, detail, unreadN, mentions, people]);
 }
-function UnreadList({ rows }) {
-  if (!rows.length) return <Note icon={CheckCheck}>You're all caught up.</Note>;
-  return rows.map(r => <InboxRow key={r.k} unread face={r.face} icon={r.icon} title={r.title} where={r.where} time={r.time} text={r.text} onClick={() => go(r.go)} />);
-}
-
 export function SavedList() {
   const box = useChat(s => s.savedMsgs);
   useEffect(() => { loadSaved(); }, []);
@@ -209,23 +222,6 @@ export function SavedList() {
       {box?.error && <Note icon={Bookmark}>Couldn't load your saved messages.</Note>}
       {box?.has_more && !box.loading && <button type="button" className="vc-more" onClick={() => loadSaved({ more: true })}>Load more</button>}
     </>
-  );
-}
-
-function InboxNotifs() {
-  const unread = useChat(s => s.notifUnread);
-  const n = useChat(s => s.notifs?.list?.length || 0);
-  useEffect(() => { loadNotifs(); return () => closeNotifs(); }, []);
-  return (
-    <div className="vc-inbox-notifs">
-      <div className="vc-inbox-bar">
-        <button type="button" className="vc-link-btn" disabled={!unread && !n} onClick={() => readNotifs('all')}><CheckCheck size={14} /> Mark all read</button>
-        <span className="grow" />
-        <a className="vc-link-btn" href={siteHref('/me#notifications')} target="_blank" rel="noopener noreferrer">View all</a>
-        <a className="vc-ico-btn" href={siteHref('/me#settings/notifications')} target="_blank" rel="noopener noreferrer" title="Notification settings"><Settings size={15} /></a>
-      </div>
-      <NotifList />
-    </div>
   );
 }
 
