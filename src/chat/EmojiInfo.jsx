@@ -1,27 +1,30 @@
 // Click an emoji in a message: its name, and for a custom one the server it's from (join it if it's in Discover).
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Users, Lock, Copy, Server } from 'lucide-react';
+import { Users, Lock, Copy, Server, SmilePlus } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { go, loadServersOf, toast, errorText, customEmoji, getState } from './store.js';
 import { instOpt } from './ids.js';
 import { Twemoji, nameOfChar } from './emoji.jsx';
 import { emojiDataSync, loadEmojiData } from './EmojiPicker.jsx';
 import { cloneTargets, cloneEmoji } from './cloneEmoji.js';
+import { addPersonalFromEmoji, isPersonalEmoji } from './personal.js';
+import { Avatar } from './Profile.jsx';
 import { openMenu } from './Menu.jsx';
 
 export function EmojiInfoHost() {
   const [info, setInfo] = useState(null); // { char } | { eid, name, animated, server? } + rect
   const [srv, setSrv] = useState(null);
+  const [owner, setOwner] = useState(null); // a personal emoji's owner { username, pfp }
   const [busy, setBusy] = useState(false);
   const box = useRef(null);
   useEffect(() => {
     const on = e => {
       const d = e.detail;
-      setInfo(d); setSrv(null);
-      // an instance's emoji is asked about on that instance (the one whose emoji list has it), the rest on Velora
+      setInfo(d); setSrv(null); setOwner(null);
+      // an instance's emoji is asked about on that instance (the one whose emoji list has it), the rest (personal emojis) on Nookara
       const from = getState().emojis?.find(sv => sv.emojis?.some(x => x.eid === d.eid))?.sid;
-      if (d.eid) apiFetch(`/chat/emojis/${encodeURIComponent(d.eid)}/info`, { inst: instOpt(from) }).then(x => setSrv(x.server || false)).catch(() => setSrv(false));
+      if (d.eid) apiFetch(`/chat/emojis/${encodeURIComponent(d.eid)}/info`, { inst: instOpt(from) }).then(x => { setSrv(x.server || false); setOwner(x.personal?.owner || null); }).catch(() => setSrv(false));
       else if (!emojiDataSync()) loadEmojiData().then(() => setInfo(x => (x ? { ...x } : x)));
     };
     addEventListener('vc-emoji-info', on);
@@ -53,7 +56,7 @@ export function EmojiInfoHost() {
         {info.eid ? <img className="vc-eminfo-big" src={customEmoji(info.eid, info.animated)} alt="" /> : <Twemoji char={info.char} className="vc-eminfo-big" />}
         <div className="vc-eminfo-txt">
           <b>{name ? `:${name}:` : info.char}</b>
-          <small>{info.eid ? 'Custom server emoji' : 'A standard emoji'}</small>
+          <small>{!info.eid ? 'A standard emoji' : owner || isPersonalEmoji(info.eid) ? 'Personal emoji' : 'Custom server emoji'}</small>
         </div>
       </div>
       {info.eid && srv && (
@@ -64,10 +67,17 @@ export function EmojiInfoHost() {
             : srv.discoverable ? <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={join}>Join</button> : null}
         </div>
       )}
-      {info.eid && cloneTargets().length > 0 && (
-        <button type="button" className="btn btn-surface btn-sm vc-eminfo-clone" onClick={e => { const emoji = { eid: info.eid, name: info.name, animated: info.animated }; openMenu(e, cloneTargets().map(x => ({ label: x.name, icon: Server, onClick: () => { setInfo(null); cloneEmoji(emoji, x.sid); } }))); }}>
-          <Copy size={14} /> Clone emoji
-        </button>
+      {info.eid && owner && (
+        <div className="vc-eminfo-srv vc-eminfo-owner">
+          <Avatar user={{ username: owner.username, pfp: owner.pfp }} size={28} />
+          <div className="grow"><b>{owner.username}</b><small>Their personal emoji</small></div>
+        </div>
+      )}
+      {info.eid && (cloneTargets().length > 0 || (getState().signedIn && !isPersonalEmoji(info.eid))) && (
+        <div className="vc-eminfo-acts">
+          {cloneTargets().length > 0 && <button type="button" className="btn btn-surface btn-sm" onClick={e => { const emoji = { eid: info.eid, name: info.name, animated: info.animated }; openMenu(e, cloneTargets().map(x => ({ label: x.name, icon: Server, onClick: () => { setInfo(null); cloneEmoji(emoji, x.sid); } }))); }}><Copy size={14} /> Clone emoji</button>}
+          {getState().signedIn && !isPersonalEmoji(info.eid) && <button type="button" className="btn btn-surface btn-sm" onClick={() => { const emoji = { eid: info.eid, name: info.name, animated: info.animated }; setInfo(null); addPersonalFromEmoji(emoji); }}><SmilePlus size={14} /> Add to personal</button>}
+        </div>
       )}
     </div>,
     document.body,

@@ -1,12 +1,13 @@
 // The emoji picker (smiley button by Send): recent, custom emojis from every server you're in
 // (usable anywhere), then all the standard emoji by group. Custom emojis go into text as <:name:eid>.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, Clock, Smile, Users, Cat, Apple, Plane, Trophy, Lightbulb, Heart, Flag, Upload, Trash2 } from 'lucide-react';
+import { Search, Clock, Smile, Users, Cat, Apple, Plane, Trophy, Lightbulb, Heart, Flag, Upload, Trash2, UserRound, Sticker } from 'lucide-react';
 import { apiFetch, uploadFetch } from '../api.js';
 import { useChat, getState, loadEmojis, toast, errorText, customEmoji } from './store.js';
 import { Twemoji, shortName, allNames } from './emoji.jsx';
 import { usePlan, PlanGate, PlanNotice, PlanUsage } from './PlanGate.jsx';
-import { cloneMenuItem } from './cloneEmoji.js';
+import { emojiMenuItems } from './cloneEmoji.js';
+import { loadPersonalEmojis, loadStickers } from './personal.js';
 import { openMenu } from './Menu.jsx';
 
 const GROUPS = [
@@ -42,9 +43,17 @@ function LazyGrid({ items, render, root }) {
   return <div ref={ref} className="vc-em-grid" style={on ? undefined : { height: rows * 38 }}>{on && items.map(render)}</div>;
 }
 
-export default function EmojiPicker({ onPick, onClose, reactionSid }) {
+// stickerSid + onSticker: on an Ember server's channel, a Stickers tab with that server's stickers (onSticker(tid))
+export default function EmojiPicker({ onPick, onClose, reactionSid, stickerSid, onSticker }) {
   const [data, setData] = useState(dataSync);
   const [q, setQ] = useState('');
+  const [tab, setTab] = useState('emoji');
+  // your personal emojis (personal.js): in the composer's picker only (an Ember server only takes its own emojis as reactions)
+  const personalAll = useChat(s => s.personalEmojis?.list);
+  const personal = reactionSid === undefined ? personalAll || [] : [];
+  const stickers = useChat(s => (stickerSid ? s.stickers?.[stickerSid]?.list : null));
+  useEffect(() => { if (!getState().personalEmojis) loadPersonalEmojis(); }, []);
+  useEffect(() => { if (stickerSid) loadStickers(stickerSid); }, [stickerSid]);
   const [hover, setHover] = useState(null);
   const allCustom = useChat(s => s.emojis);
   const custom = useMemo(() => reactionSid === undefined ? allCustom : (allCustom || []).filter(s => s.sid === reactionSid), [allCustom, reactionSid]);
@@ -61,26 +70,44 @@ export default function EmojiPicker({ onPick, onClose, reactionSid }) {
   const t = q.trim().toLowerCase().replace(/^:|:$/g, '');
   const found = useMemo(() => {
     if (!t || !data) return null;
-    const cus = (custom || []).flatMap(s => s.emojis.map(e => ({ ...e, server: s.name }))).filter(e => e.name.toLowerCase().includes(t)).slice(0, 40);
+    const cus = [...personal.map(e => ({ ...e, server: 'your personal emojis' })), ...(custom || []).flatMap(s => s.emojis.map(e => ({ ...e, server: s.name })))].filter(e => e.name.toLowerCase().includes(t)).slice(0, 40);
     const words = t.replace(/_/g, ' ');
     const uni = data.filter(e => allNames(e).some(n => n.includes(t)) || e[1].includes(words) || String(e[3] || '').includes(words)).slice(0, 120);
     return { cus, uni };
-  }, [t, data, custom]);
+  }, [t, data, custom, personal]);
   const groups = useMemo(() => (data ? GROUPS.map(([g, label, Icon]) => [g, label, Icon, data.filter(e => e[2] === g)]) : []), [data]);
   function pickUni(e) { addRecent({ k: e[0], u: e[0], label: e[1], n: shortName(e) }); onPick(e[0]); }
   function pickCustom(e) { addRecent({ k: e.eid, c: e }); onPick(emojiToken(e)); }
   const jump = id => scroller.current?.querySelector(`[data-sec="${id}"]`)?.scrollIntoView({ block: 'start' });
   const rec = recents().filter(r => !r.c || reactionSid === undefined || (custom || []).some(s => s.emojis.some(e => e.eid === r.c.eid)));
   const cell = (e, c) => (c
-    ? <button type="button" key={e.eid} className="vc-em" onClick={() => pickCustom(e)} onContextMenu={ev => { const it = cloneMenuItem(e); if (it) openMenu(ev, [it]); else ev.preventDefault(); }} onMouseEnter={() => setHover({ name: `:${e.name}:`, img: e.url, sub: e.server })}><img src={e.url} alt={e.name} loading="lazy" /></button>
+    ? <button type="button" key={e.eid} className="vc-em" onClick={() => pickCustom(e)} onContextMenu={ev => { const items = emojiMenuItems(e); if (items.length) openMenu(ev, items); else ev.preventDefault(); }} onMouseEnter={() => setHover({ name: `:${e.name}:`, img: e.url, sub: e.server })}><img src={e.url} alt={e.name} loading="lazy" /></button>
     : <button type="button" key={e[0]} className="vc-em" onClick={() => pickUni(e)} onMouseEnter={() => setHover({ name: `:${shortName(e)}:`, char: e[0] })}><Twemoji char={e[0]} className="vc-em-tw" lazy /></button>);
   return (
     <div className="vc-picker vc-emoji-picker" ref={box}>
+      {stickerSid && (
+        <div className="vc-em-tabs" role="tablist">
+          <button type="button" role="tab" aria-selected={tab === 'emoji'} className={tab === 'emoji' ? 'on' : ''} onClick={() => setTab('emoji')}><Smile size={15} /> Emoji</button>
+          <button type="button" role="tab" aria-selected={tab === 'stickers'} className={tab === 'stickers' ? 'on' : ''} onClick={() => setTab('stickers')}><Sticker size={15} /> Stickers</button>
+        </div>
+      )}
+      {tab === 'stickers' && stickerSid ? (
+        <div className="vc-stk-body">
+          {!stickers && <div className="vc-loading"><i /><i /><i /></div>}
+          {stickers && !stickers.length && <div className="vc-empty-note">This server has no stickers yet. People with Manage server can add them in Server settings &gt; Stickers.</div>}
+          {stickers && stickers.length > 0 && (
+            <div className="vc-stk-grid">
+              {stickers.map(s => <button type="button" key={s.tid} className="vc-stk" title={s.name} onClick={() => { onSticker?.(s.tid); onClose(); }}><img src={s.url} alt={s.name} loading="lazy" /><span>{s.name}</span></button>)}
+            </div>
+          )}
+        </div>
+      ) : <>
       <label className="vc-search vc-picker-search"><Search size={15} /><input autoFocus placeholder="Find an emoji" value={q} onChange={e => setQ(e.target.value)} /></label>
       <div className="vc-em-body">
         {!t && (
           <nav className="vc-em-nav">
             {rec.length > 0 && <button type="button" title="Recent" onClick={() => jump('recent')}><Clock size={16} /></button>}
+            {personal.length > 0 && <button type="button" title="Your personal emojis" onClick={() => jump('personal')}><UserRound size={16} /></button>}
             {(custom || []).map(s => <button type="button" key={s.sid} title={s.name} onClick={() => jump(s.sid)}>{s.icon ? <img src={s.icon} alt="" /> : <span>{s.name.slice(0, 2)}</span>}</button>)}
             {GROUPS.map(([g, label, Icon]) => <button type="button" key={g} title={label} onClick={() => jump(`g${g}`)}><Icon size={16} /></button>)}
           </nav>
@@ -99,6 +126,8 @@ export default function EmojiPicker({ onPick, onClose, reactionSid }) {
             <>
               {rec.length > 0 && <><div className="vc-em-sec" data-sec="recent">Recent</div>
                 <div className="vc-em-grid">{rec.map(r => (r.c ? cell(r.c, true) : cell([r.u, r.label, 0, '', r.n ? [r.n] : undefined])))}</div></>}
+              {personal.length > 0 && <div><div className="vc-em-sec" data-sec="personal">Personal</div>
+                <LazyGrid root={scroller} items={personal.map(e => ({ ...e, server: 'your personal emojis' }))} render={e => cell(e, true)} /></div>}
               {(custom || []).map(s => (
                 <div key={s.sid}><div className="vc-em-sec" data-sec={s.sid}>{s.name}</div>
                   <LazyGrid root={scroller} items={s.emojis.map(e => ({ ...e, server: s.name }))} render={e => cell(e, true)} /></div>
@@ -112,8 +141,9 @@ export default function EmojiPicker({ onPick, onClose, reactionSid }) {
         </div>
       </div>
       <div className="vc-em-foot">
-        {hover ? <>{hover.img ? <img src={hover.img} alt="" /> : <Twemoji char={hover.char} className="vc-em-big" />}<b>{hover.name}</b>{hover.sub && <small>from {hover.sub}</small>}</> : <small>{reactionSid === undefined ? 'Custom emojis from your servers work everywhere.' : 'React with this community’s custom emojis.'}</small>}
+        {hover ? <>{hover.img ? <img src={hover.img} alt="" /> : <Twemoji char={hover.char} className="vc-em-big" />}<b>{hover.name}</b>{hover.sub && <small>from {hover.sub}</small>}</> : <small>{reactionSid === undefined ? 'Custom emojis from your servers and your personal emojis work everywhere.' : 'React with this community’s custom emojis.'}</small>}
       </div>
+      </>}
     </div>
   );
 }

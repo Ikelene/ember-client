@@ -22,7 +22,7 @@ import { saveToMedia } from './store.js';
 import { QuickReactions } from './Reactions.jsx';
 import { userScrolled } from './userscroll.js';
 import { appsItems } from './commands.js';
-import { cloneMenuItem } from './cloneEmoji.js';
+import { emojiMenuItems } from './cloneEmoji.js';
 
 // Track the full press, rather than timing out while the finger is still down.
 let menuTouch = null;
@@ -271,7 +271,7 @@ export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, 
     'sep',
     onSave && { label: saved ? 'Remove from saved' : 'Save message', icon: saved ? BookmarkCheck : Bookmark, onClick: onSave },
     onTranslate && m.body && { label: translated ? 'Show original' : 'Translate', icon: Languages, onClick: onTranslate },
-    cemoji && cloneMenuItem({ eid: cemoji.dataset.eid, name: cemoji.dataset.name, animated: cemoji.dataset.animated === '1' }),
+    ...(cemoji ? emojiMenuItems({ eid: cemoji.dataset.eid, name: cemoji.dataset.name, animated: cemoji.dataset.animated === '1' }) : []),
     'sep',
     copyItems.length > 0 && { label: 'Copy', icon: Copy, sub: copyItems },
     moreItems.length > 0 && { label: 'More actions', icon: Ellipsis, sub: moreItems },

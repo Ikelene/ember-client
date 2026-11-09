@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Search, LayoutGrid, Shield, Smile, Volume2, Upload, Users, DoorOpen, Bot, ArrowLeftRight, Gamepad2,
   KeyRound, Mic, Globe, UserCog, TriangleAlert, Trash2, RefreshCw, Check, Ban, UserMinus, Compass, Download, Rocket, Archive, Info, Copy, CircleArrowUp,
-  Gauge, MessageSquare, Flag, ShieldAlert, ScrollText, ChartLine,
+  Gauge, MessageSquare, Flag, ShieldAlert, ScrollText, ChartLine, Sticker,
 
 
 } from 'lucide-react';
@@ -17,6 +17,7 @@ import { Avatar } from './Profile.jsx';
 import { stampOf } from './text.jsx';
 import { RolesEditor, Toggle, P, has, rolesOf, modRights, moderate } from './roles.jsx';
 import { EmojiManager } from './EmojiPicker.jsx';
+import { StickerManager } from './PersonalPages.jsx';
 import { SoundManager } from './Soundboard.jsx';
 import { BridgeSettings } from './Bridge.jsx';
 import { GameServersSettings } from './GameServer.jsx';
@@ -47,6 +48,7 @@ function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, 
       canServer && ['overview', 'Overview', LayoutGrid, ['Name', 'Icon', 'Banner', 'Description', 'Accent colour', 'Invite code', 'Discover', 'Directory', 'Tags', 'List']],
       canRoles && ['roles', 'Roles', Shield, ['Permissions', 'Colour']],
       canServer && ['emojis', 'Emojis', Smile, ['Custom emoji']],
+      onInst && canServer && ['stickers', 'Stickers', Sticker, ['Sticker', 'Big emoji']],
       canServer && ['sounds', 'Soundboard', Volume2, ['Sounds']],
       onInst && canServer && ['messages', 'Message rules', MessageSquare, ['Message length', 'Search results', 'Reactions', 'Link previews', 'Proxy']],
       onInst && canServer && !instAdmin && uploads, // (the instance's admins find it under Instance)
@@ -104,6 +106,7 @@ export function ServerSettings({ sid, onClose, tab: startTab }) {
         {page === 'overview' && <Overview sid={sid} origin={origin} instAdmin={instAdmin} onDirty={onDirty} goTo={goTo} />}
         {page === 'roles' && <RolesEditor sid={sid} />}
         {page === 'emojis' && <EmojiManager sid={sid} />}
+        {page === 'stickers' && <StickerManager sid={sid} />}
         {page === 'sounds' && <SoundManager sid={sid} />}
         {page === 'dashboard' && <div className="bf-ss-dash-top"><ServerCard sid={sid} srv={srv} origin={origin} goTo={goTo} /></div>}
         {page === 'dashboard' && <DashboardPage sid={sid} goTo={goTo} />}

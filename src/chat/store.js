@@ -2,6 +2,7 @@
 // Components read it with useChat(selector) and change it through the actions below.
 import { shareLink, clientUrl, notifLinkUrl, EMBER_ORIGIN } from './hosts.js';
 import { shortLinkFor } from './shortLinks.js';
+import { loadPersonalEmojis, setStickers } from './personal.js';
 import { packActive, playPackSound } from './messageSounds.js';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import serverCreationPolicy from '../server-creation-policy.json';
@@ -86,7 +87,9 @@ let state = {
   reports: {},             // sid -> open reports (live count, moderators of an instance)
   veloraNames: {},         // Velora id -> current username (instance members are v:<id>; their presence comes from the home socket by name)
   veloraFaces: {},         // Velora id -> their live public face on Velora { id, username, pfp, color, rank } (v: people on instances)
-  emojiUrls: {},           // eid -> picture of an instance's custom emoji
+  emojiUrls: {},
+  personalEmojis: null,    // { list, max, pro_max }: my personal emojis (personal.js)
+  stickers: {},            // sid -> { list, max }: an Ember server's stickers (personal.js)           // eid -> picture of an instance's custom emoji
   notifUnread: 0,          // Velora notifications not read yet (the bell's badge)
   notifs: null,            // the bell's popup while it's open: { list (unread only, newest first), cursor, loading, error }
 };
@@ -363,7 +366,7 @@ setInterval(() => send({ type: 'ping' }), 25000);
 
 // one event from the home socket (inst = velora) or from an instance's (already in Ember's shapes, ids namespaced)
 // an instance may only say what PROTOCOL.md §7 lets it: nothing that is Velora's own (DMs, kicks, presence, calls...)
-const INSTANCE_EVENTS = new Set(['chat_message', 'chat_message_update', 'chat_message_delete', 'chat_reactions', 'chat_typing', 'chat_pins_update', 'chat_server_update', 'chat_server_removed', 'chat_roles_update', 'chat_perms_changed', 'chat_channels_update', 'chat_member_update', 'chat_presence', 'chat_members_stale', 'chat_emojis_update', 'chat_identity_update', 'chat_ack', 'chat_error', 'chat_ephemeral', 'chat_join_request', 'chat_join_result', 'chat_report', 'chat_timeout', 'chat_server_added', 'chat_starboard', 'chat_shop_update', 'chat_commands_update', 'chat_interaction_message', 'chat_interaction_modal', 'game_status', 'game_console', 'game_linked', 'game_unlinked', 'voice_sound', 'voice_sound_failed']);
+const INSTANCE_EVENTS = new Set(['chat_message', 'chat_message_update', 'chat_message_delete', 'chat_reactions', 'chat_typing', 'chat_pins_update', 'chat_server_update', 'chat_server_removed', 'chat_roles_update', 'chat_perms_changed', 'chat_channels_update', 'chat_member_update', 'chat_presence', 'chat_members_stale', 'chat_emojis_update', 'chat_stickers_update', 'chat_identity_update', 'chat_ack', 'chat_error', 'chat_ephemeral', 'chat_join_request', 'chat_join_result', 'chat_report', 'chat_timeout', 'chat_server_added', 'chat_starboard', 'chat_shop_update', 'chat_commands_update', 'chat_interaction_message', 'chat_interaction_modal', 'game_status', 'game_console', 'game_linked', 'game_unlinked', 'voice_sound', 'voice_sound_failed']);
 const INSTANCE_VOICE = /^(chat_rtc_|chat_voice_state$)/;
 const LOCKED_EVENTS = new Set(['auth_success', 'auth_error', 'restrictions', 'error', 'kicked', 'bonfire_update', 'web_build']); // (what still matters while locked)
 // "who posted recently" (channel list, Modern): people who posted in a channel lately, newest first. The server's list comes
@@ -572,6 +575,11 @@ function onEvent(m, inst = VELORA) {
     case 'chat_emojis_update':
       loadEmojis();
       break;
+    case 'chat_stickers_update': { // an Ember server's stickers changed (personal.js)
+      const sid = String(m.server || '').includes('|') ? m.server : K(inst, m.server);
+      if (m.server) setStickers(sid, m.stickers);
+      break;
+    }
     // ── instances ──
     case 'chat_join_request': {
       const srv = state.servers.find(x => x.sid === m.sid);
@@ -1461,6 +1469,7 @@ export async function loadEmojis() {
   if (mine !== emojiLoad || (!home && !more.some(Boolean))) return;
   const urls = {};
   for (const sv of lists) for (const e of sv.emojis || []) if (e.url && !urls[e.eid]) urls[e.eid] = e.url;
+  for (const e of state.personalEmojis?.list || []) if (e.url && !urls[e.eid]) urls[e.eid] = e.url; // (personal.js)
   set({ emojis: lists, emojiUrls: urls });
 }
 export async function loadMedia() {
@@ -2072,7 +2081,7 @@ export function init(me) {
   set({ me, signedIn: !!me });
   if (me) { try { const was = localStorage.getItem(LOCK_KEY()); if (was) { if (LOCK_REASONS.includes(was)) set({ lockReason: was }); lockAccount(); } } catch { /* fine */ } } // (locked last time: no flash of the app before /bonfire/session answers)
   window.bonfireDesktop?.onSignIn?.(s => set({ reauth: s.state === 'failed' ? { state: 'failed', error: s.error } : { state: 'working' } }));
-  if (me) { checkPermissions(); loadSettings(); loadNotify(); loadEmojis(); connect(); }
+  if (me) { checkPermissions(); loadSettings(); loadNotify(); loadEmojis(); loadPersonalEmojis(); connect(); }
   window.bonfireDesktop?.isFocused?.().then(v => { desktopFocused = !!v; }).catch(() => {});
   window.bonfireDesktop?.onWindowFocus?.(v => { desktopFocused = v; if (v) markViewRead(); });
   startInstances(); // (held while locked: nothing connects until it's lifted)

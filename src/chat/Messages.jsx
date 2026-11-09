@@ -56,6 +56,7 @@ function GifIcon() {
 }
 import { packActive } from './messageSounds.js';
 import { playSound, loadEmojis, loadMembers, loadCommands, clearStatusReply, useTimedOut, untilText, dismissEphemeral } from './store.js';
+import { sendSticker } from './personal.js';
 import { takeJump, fileKind, uploadMedia, saveToMedia, isMineMsg, loadUploadLimits, getUploadLimits, chooseUploadDest, rememberedUploadDest, tempFileInfo, tempFileInfoNow, onTempInfo, TEMP_LINK } from './store.js';
 import { useStarboardFor, starredByMe, STAR } from './Starboard.jsx';
 import { CALL_LINE, callLineText } from './callText.js';
@@ -615,6 +616,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
         <Embeds list={m.embeds} ctx={ctx} />
         {!m.embeds?.length && !m.pending && (linkPreviews ? <LinkEmbeds urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group'} /> : <PreviewOnAsk urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group'} />)}
         <E2eeMessageNote m={m} view={view} />
+        {m.sticker && <StickerView s={m.sticker} />}
         <OpenedAttachments list={[...(m.attachments || []), ...media]} extra={images} m={m} Attachments={Attachments} />
         {m.uploading && <UploadBar m={m} view={view} />}
         <Reactions m={m} me={ctx.me} canReact={canReact} />
@@ -911,6 +913,12 @@ export function Composer(props) {
   if (dm && status !== 'ready') return <E2eeLockedPanel />;
   return <><E2eeComposerNotes view={view} /><ComposerBox {...props} /></>;
 }
+// a sticker in a message (Ember servers): bigger than an emoji, never stretched; a deleted one says so
+function StickerView({ s }) {
+  if (s.deleted || !s.url) return <div className="vc-sticker gone">Sticker deleted</div>;
+  return <img className="vc-sticker" src={s.url} alt={s.name || 'sticker'} title={s.name ? `:${s.name}:` : undefined} draggable={false} loading="lazy" />;
+}
+
 function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo, setReplyTo }) {
   const timedOut = useTimedOut(view.kind === 'channel' ? view.sid : null); // (on an instance: a timeout hides the box until it ends)
   const locked = lockedBy || !!timedOut;
@@ -1407,7 +1415,8 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
         {voice.active && <VoiceBar voice={voice} mode={voiceHolding ? 'hold' : 'click'} dragX={voiceDrag} onDiscard={voiceDelete} />}
         {!voice.active && <button type="button" className={`vc-ico-btn vc-gif-btn${picker ? ' on' : ''}`} title="Media (GIFs, Saved Media, Game Clips)" onClick={() => { setPicker(p => (p ? false : 'saved')); setEmoji(false); }}><GifIcon /></button>}
         {!voice.active && <button type="button" className={`vc-ico-btn vc-emoji-btn${emoji ? ' on' : ''}`} title="Emoji" onClick={() => { setEmoji(x => !x); setPicker(false); }}><Smile size={19} /></button>}
-        {emoji && !voice.active && <EmojiPicker onClose={() => setEmoji(false)} onPick={t => { insertText(t); setEmoji(false); }} />}
+        {emoji && !voice.active && <EmojiPicker onClose={() => setEmoji(false)} onPick={t => { insertText(t); setEmoji(false); }}
+          stickerSid={view.kind === 'channel' && isInst(view.sid) ? view.sid : undefined} onSticker={tid => { sendSticker(view.cid, tid, replyTo); setReplyTo?.(null); }} />}
         <button type="button" className={`vc-ico-btn send${canVoice || voice.active ? ' voice' : ''}${cmd && cmdMissing ? ' blocked' : ''}`} title={voice.active ? 'Send voice message' : canVoice ? 'Record a voice message' : cmd && cmdMissing ? `Fill in ${cmdMissing} first` : 'Send'} aria-label={voice.active ? 'Send voice message' : canVoice ? 'Record a voice message' : 'Send'} disabled={!voice.active && !canVoice && !cmd && !text.trim() && !atts.length}
           onPointerDown={e => { e.preventDefault(); voicePress(e); }} onPointerMove={voiceMove} onPointerUp={voiceRelease} onPointerCancel={voiceCancel} onContextMenu={e => { if (canVoice || voice.active) e.preventDefault(); }} onMouseDown={e => e.preventDefault()}
           onClick={() => {
