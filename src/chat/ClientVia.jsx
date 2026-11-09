@@ -20,9 +20,9 @@ export function useOfficialClients() {
 
 // the chip: [icon] name [verified badge]. Unknown clients: a globe (or plug for a token) + their domain / token name
 const KIND_ICON = { mobile: Smartphone, desktop: Monitor, browser: Globe };
-function Chip({ via, list, tip, Icon, iconOnly }) {
-  const d = describeVia(via, list);
-  const tipData = tip ? JSON.stringify({ name: d.name, domain: d.domain, verified: d.verified, known: d.known, text: viaTitle(via, list), icon: d.icon || null }) : undefined;
+function Chip({ via, list, tip, Icon, iconOnly, inst }) {
+  const d = describeVia(via, list, !!inst);
+  const tipData = tip ? JSON.stringify({ name: d.name, domain: d.domain, verified: d.verified, known: d.known, registered: !!d.registered, text: viaTitle(via, list), icon: d.icon || null }) : undefined;
   return (
     <span className={`vc-via${d.verified ? ' official' : ''}${iconOnly ? ' icon-only' : ''}`} data-tip-via={tipData} aria-label={viaTitle(via, list)}>
       {d.icon ? <img className="vc-via-icon" src={d.icon} alt="" /> : Icon ? <Icon size={13} aria-hidden="true" /> : iconOnly ? <Globe size={13} /> : !d.verified && (via.token ? <Plug size={12} /> : <Globe size={12} />)}
@@ -33,10 +33,10 @@ function Chip({ via, list, tip, Icon, iconOnly }) {
 }
 
 // the small tag next to a message's author
-export function ViaBadge({ via }) {
+export function ViaBadge({ via, inst }) {
   const list = useOfficialClients();
   if (!via) return null;
-  return <Chip via={via} list={list} tip iconOnly />; // (everyone sees it since 2026-11-07: just the app's icon, or a globe; the name is in the hover card)
+  return <Chip via={via} list={list} tip iconOnly inst={inst} />; // (everyone sees it since 2026-11-07: just the app's icon, or a globe; the name is in the hover card)
 }
 // the hover card (Tooltip.jsx, data-tip-via): "Sent from <name>", the domain in small text
 export function ViaTip({ t }) {
@@ -46,7 +46,7 @@ export function ViaTip({ t }) {
       {t.icon ? <img className="vc-tip-via-ico" src={t.icon} alt="" /> : <Globe size={17} />}
       <div>
         <b>{t.known ? <>Sent from {t.name}</> : t.text}{t.verified && <BadgeCheck size={13} className="vc-via-check" aria-label="Verified client" />}</b>
-        <span>{t.verified ? 'An official Ember app.' : t.known ? 'The app this message was sent with.' : "This client isn't on Nookara's list of known apps."}{t.domain && t.known ? ` ${t.domain}` : ''}</span>
+        <span>{t.verified ? 'An official Ember app.' : t.registered ? 'A Nookara app.' : t.known ? 'The app this message was sent with.' : "This client isn't on Nookara's list of known apps."}{t.domain && t.known ? ` ${t.domain}` : ''}</span>
       </div>
     </div>
   );

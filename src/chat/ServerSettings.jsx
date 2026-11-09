@@ -105,6 +105,7 @@ export function ServerSettings({ sid, onClose, tab: startTab }) {
         {page === 'roles' && <RolesEditor sid={sid} />}
         {page === 'emojis' && <EmojiManager sid={sid} />}
         {page === 'sounds' && <SoundManager sid={sid} />}
+        {page === 'dashboard' && <div className="bf-ss-dash-top"><ServerCard sid={sid} srv={srv} origin={origin} goTo={goTo} /></div>}
         {page === 'dashboard' && <DashboardPage sid={sid} goTo={goTo} />}
         {page === 'insights' && <InsightsPage sid={sid} />}
         {page === 'messages' && <MessageRulesPage sid={sid} onDirty={onDirty} goTo={goTo} />}
@@ -389,7 +390,8 @@ function AdvancedCard({ sid }) {
 // server's address. Classic keeps just the editing cards below (CSS hides this card there).
 function ServerCard({ sid, srv, origin, goTo }) {
   const [qr, setQr] = useState('');
-  const link = srv?.invite ? linkFor({ kind: 'invite', code: srv.invite, inst: instOf(sid) }) : '';
+  // the invite link, or (no invite, e.g. an Ember server reached by its address) a link straight to the server
+  const link = srv?.invite ? linkFor({ kind: 'invite', code: srv.invite, inst: instOf(sid) }) : sid ? linkFor({ kind: 'server', sid }) : '';
   useEffect(() => { if (!link) return; QRCode.toString(link, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#111111', light: '#ffffff' } }).then(setQr).catch(() => setQr('')); }, [link]);
   if (!srv) return null;
   const copy = (t, what) => navigator.clipboard?.writeText(t).then(() => toast(`${what} copied.`, true), () => toast("Couldn't copy that."));
@@ -405,8 +407,8 @@ function ServerCard({ sid, srv, origin, goTo }) {
         <div className="bf-ss-hero-invite">
           {qr && <span className="bf-ss-qr" aria-label="QR code of the invite link" dangerouslySetInnerHTML={{ __html: qr }} />}
           <div className="bf-ss-hero-link">
-            <input className="form-input" readOnly value={link} onFocus={e => e.target.select()} aria-label="Invite link" />
-            <button type="button" className="btn btn-surface" onClick={() => copy(link, 'Invite link')}><Copy size={15} /> Copy link</button>
+            <input className="form-input" readOnly value={link} onFocus={e => e.target.select()} aria-label={srv.invite ? 'Invite link' : 'Server link'} />
+            <button type="button" className="btn btn-surface" onClick={() => copy(link, srv.invite ? 'Invite link' : 'Server link')}><Copy size={15} /> Copy link</button>
             {isInst(sid) && <button type="button" className="vc-link-btn bf-ss-hero-more" onClick={() => goTo('join')}>Change how people join</button>}
           </div>
         </div>

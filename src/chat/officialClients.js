@@ -26,9 +26,11 @@ export function hostMatches(pattern, host) {
 export function hostOfVia(via) {
   try { return via && via.url ? new URL(String(via.url)).host.toLowerCase() : ''; } catch { return ''; }
 }
-export function matchClient(via, list) {
+// fromInstance: the `via` came from an Ember server, which can write any app id it likes, so app ids never match there
+// (no borrowed verified badge); its address still can
+export function matchClient(via, list, fromInstance = false) {
   if (!via || typeof via !== 'object' || !Array.isArray(list)) return null;
-  const app = String(via.app || via.token || '').trim().toLowerCase();
+  const app = fromInstance ? '' : String(via.app || via.token || '').trim().toLowerCase();
   const host = hostOfVia(via);
   const kind = String(via.kind || '');
   let best = null, bestScore = 0;
@@ -36,7 +38,7 @@ export function matchClient(via, list) {
     if (!c) continue;
     let score = 0;
     if (app && (c.app_ids || []).some(a => String(a).trim().toLowerCase() === app)) score = 3;
-    else if (!via.token && host && (c.origins || []).some(o => hostMatches(o, host))) {
+    else if ((!via.token || fromInstance) && host && (c.origins || []).some(o => hostMatches(o, host))) {
       const kinds = c.kinds || [];
       if (!kinds.length) score = 1;
       else if (kind && kinds.includes(kind)) score = 2;
@@ -48,14 +50,16 @@ export function matchClient(via, list) {
 
 // what the chip shows: { name, verified, icon, domain, known }
 //   list = the official clients (null = not loaded yet: Velora's own `official` flag stands in, as before)
-export function describeVia(via, list) {
+export function describeVia(via, list, fromInstance = false) {
   if (!via) return null;
   const domain = via.url ? String(via.url).replace(/^https?:\/\//, '') : '';
-  const hit = matchClient(via, list);
+  const hit = matchClient(via, list, fromInstance);
   if (hit) return { name: hit.name, verified: !!hit.verified, icon: /^(https:\/\/|\/(?!\/))/.test(hit.icon_url || '') ? hit.icon_url : null, domain, known: true };
   if (!list && via.official) return { name: via.name || 'Ember', verified: true, icon: null, domain, known: true };
   // a registered app that isn't verified: its own logo, no badge. Only from Nookara's upload folder: an instance can write any `via` it likes
   const icon = /^https:\/\/(nookara\.cc|velora\.ikelene\.net)\/uploads\/app-logos\/[\w.-]+$/.test(via.icon || '') ? via.icon : null;
+  // a registered Nookara app (via.app + its name): named, with its logo, no badge (Nookara's own messages and Ember servers alike)
+  if (via.app && via.token) return { name: via.token, verified: false, icon, domain, known: true, registered: true };
   return { name: via.token || domain || 'Unknown client', verified: false, icon, domain: via.token ? domain : '', known: false };
 }
 

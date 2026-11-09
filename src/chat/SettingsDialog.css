@@ -264,3 +264,4 @@ button.bf-sr-tile:hover { border-color: var(--border-2); }
 .bf-sd-crumbs { gap: 8px !important; font-size: 13.5px !important; font-weight: 500; color: var(--muted) !important; }
 .bf-sd-crumbs b { color: var(--text); font-weight: 600; }
 .bf-sd-crumbs svg { color: var(--muted); }
+.bf-ss-dash-top { padding: 0 0 4px; } .bf-ss-dash-top .bf-ss-hero { margin-bottom: 14px; }

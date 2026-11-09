@@ -600,7 +600,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
             {blockedAuthor
               ? <><button type="button" className="vc-msg-name vc-blocked-name" onClick={e => onUser(name, e.currentTarget)}>{BLOCKED_NAME}</button><BlockedMark /></>
               : <><button type="button" className="vc-msg-name" style={colorFrom(nameKey) && !distrust ? { color: colorFrom(nameKey) } : undefined} onClick={e => onUser(name, e.currentTarget)}>{alias ? alias.name : name}</button>
-                {alias && !unmarked ? <AliasMark alias={alias} by={author} /> : <NameDecor sid={view.sid} user={aliasMember || author} />}</>}{m.author?.bot && !unmarked && <BotTag verified={!!m.author.verified} />}<SigBadge m={m} />{m.via && <ViaBadge via={m.via} />}</>}
+                {alias && !unmarked ? <AliasMark alias={alias} by={author} /> : <NameDecor sid={view.sid} user={aliasMember || author} />}</>}{m.author?.bot && !unmarked && <BotTag verified={!!m.author.verified} />}<SigBadge m={m} />{m.via && <ViaBadge via={m.via} inst={m.inst} />}</>}
             {pronouns && <span className="vc-pronouns" title="Pronouns">{pronouns}</span>}
             <span className="vc-time" title={new Date(m.created_at).toLocaleString()}>{stampOf(m.created_at)}</span>
             {m.pinned && <span className="vc-pinned-mark" title="Pinned"><Pin size={12} /></span>}
