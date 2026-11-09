@@ -425,6 +425,36 @@ if (typeof window !== 'undefined') {
 const useShift = () => useSyncExternalStore(f => { shiftSubs.add(f); return () => shiftSubs.delete(f); }, () => shiftDown);
 const ToolsHost = createContext(null);
 
+// Swipe a message left on a touch screen to reply to it (phones: web and the apps). The Android app used to do this in its own
+// script by clicking the Reply button inside the message, which the gliding toolbar moved out of the message, so it lives here
+// now. Only horizontal drags count (vertical ones scroll, .vc-msg has touch-action: pan-y); swiping right is left alone for the
+// drawers. Past 72px it snaps "ready" and a release replies.
+const SWIPE_AT = 72;
+function useSwipeReply(rootRef, onReply, enabled) {
+  const g = useRef(null);
+  const reset = () => { const el = rootRef.current; if (el) { el.style.removeProperty('transform'); el.classList.remove('vc-swiping', 'vc-swipe-ready'); } g.current = null; };
+  if (!enabled) return {};
+  const skip = t => !(t instanceof Element) || t.closest('a,button,input,textarea,[contenteditable],video,audio,.vc-att,.vc-reaction,.vc-filecard,.vc-mp,.vc-tools');
+  return {
+    onPointerDown: e => { if (e.pointerType !== 'touch' || !e.isPrimary || skip(e.target)) return; g.current = { id: e.pointerId, x: e.clientX, y: e.clientY, axis: null, ready: false }; },
+    onPointerMove: e => {
+      const s = g.current; const el = rootRef.current;
+      if (!s || s.id !== e.pointerId || !el) return;
+      const dx = e.clientX - s.x, dy = e.clientY - s.y;
+      if (!s.axis && Math.max(Math.abs(dx), Math.abs(dy)) > 12) s.axis = Math.abs(dx) > Math.abs(dy) * 1.35 && dx < 0 ? 'x' : 'y';
+      if (s.axis !== 'x') return;
+      el.classList.add('vc-swiping');
+      el.style.transform = `translateX(${Math.max(-96, Math.min(0, dx * 0.8))}px)`;
+      const ready = dx <= -SWIPE_AT;
+      el.classList.toggle('vc-swipe-ready', ready);
+      if (ready && !s.ready) { try { navigator.vibrate?.(10); } catch { /* no vibration */ } }
+      s.ready = ready;
+    },
+    onPointerUp: e => { const s = g.current; if (!s || s.id !== e.pointerId) return; const go = s.axis === 'x' && e.clientX - s.x <= -SWIPE_AT; reset(); if (go) onReply(); },
+    onPointerCancel: reset,
+  };
+}
+
 function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, setEditing, view, fresh }) {
   const toolsEl = useContext(ToolsHost);
   const hovered = useHovered(String(m.id));
@@ -531,11 +561,12 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
           onSave: sref ? toggleSave : null, saved: !!savedIdOf(sref), onTranslate: m.body ? toggleTranslate : null, translated: !!tr,
         });
   };
+  const swipe = useSwipeReply(rootRef, () => onReply(m), canReplyHere && !editing && !m.pending && !m.failed && !m.system);
   if (blockedAuthor && blockMode === 'hide') return null;
   const name = m.author?.username || 'Unknown';
   return (
     <div className={`vc-msg${head ? ' head' : ''}${m.pending ? ' pending' : ''}${m.failed ? ' failed' : ''}${mentionsMe ? ' mention' : ''}${editing ? ' editing' : ''} ${hovered ? ' hov' : ''} ${fresh === 'live' ? (isMineMsg(m) ? 'vc-in-mine' : 'vc-in-live') : fresh === 'done' ? '' : 'vl-in'}`} data-id={m.id}
-      ref={rootRef} onContextMenu={e => openMsgMenu(e)}>
+      ref={rootRef} onContextMenu={e => openMsgMenu(e)} {...swipe}>
       {m.statusReply && (
         <div className="vc-reply-to vc-status-reply">
           <span className="vc-reply-line" />

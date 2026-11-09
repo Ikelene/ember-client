@@ -2511,3 +2511,10 @@ a.vc-glint-site:hover { color: var(--text); text-decoration: none; }
 html.vc-rounded .vc-modern-notice { border-radius: calc(16px * var(--rk, 1)); background: var(--m-raised, var(--box)); }
 html.vc-rounded .vc-modern-notice-ico { border-radius: 50%; }
 .vc-modal-back.vc-modern-notice-back { z-index: 2300; } /* first thing you answer, above any other first-run dialog */
+
+/* swipe a message left to reply (Messages.jsx useSwipeReply): only on touch screens */
+@media (pointer: coarse) { .vc-msg { touch-action: pan-y; } }
+.vc-msg.vc-swiping { transition: none; }
+.vc-msg:not(.vc-swiping) { transition: background .1s, transform .18s ease; }
+.vc-msg.vc-swiping::after { content: ''; position: absolute; right: -36px; top: 50%; width: 22px; height: 22px; margin-top: -11px; opacity: .35; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='9 17 4 12 9 7'/%3E%3Cpath d='M20 18v-2a4 4 0 0 0-4-4H4'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='9 17 4 12 9 7'/%3E%3Cpath d='M20 18v-2a4 4 0 0 0-4-4H4'/%3E%3C/svg%3E") center / contain no-repeat; transition: opacity .12s; }
+.vc-msg.vc-swipe-ready::after { opacity: 1; color: var(--accent); }
