@@ -44,10 +44,10 @@
 .vc-cmd-name { display: flex; align-items: center; padding: 3px 8px; background: var(--flat-on, #222226); font-size: 12.5px; font-weight: 600; color: var(--dim); }
 .vc-cmd-name em { color: #f87171; font-style: normal; margin-left: 2px; }
 .vc-cmd-field { position: relative; display: flex; }
-.vc-cmd-field input, .vc-cmd-ghost { min-width: 90px; width: 150px; padding: 3px 8px; background: none; border: 0; outline: none; color: var(--text); font: inherit; font-size: 14px; }
+.vc-cmd-field input, .vc-cmd-ghost { min-width: 60px; width: auto; max-width: 280px; padding: 3px 8px; background: none; border: 0; outline: none; color: var(--text); font: inherit; font-size: 14px; }
 .vc-cmd-ghost { width: 1px; min-width: 1px; padding: 0; opacity: 0; position: absolute; }
 .vc-cmd-sug { position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 30; min-width: 200px; max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; padding: 4px; background: var(--flat-box, #151517); border: 1px solid var(--border-2); box-shadow: 0 -12px 30px rgba(0, 0, 0, .5); }
-.vc-cmd-sug button { padding: 5px 8px; background: none; border: 0; color: var(--text); text-align: left; cursor: pointer; white-space: nowrap; }
+.vc-cmd-sug button { display: flex; align-items: center; gap: 8px; padding: 5px 8px; background: none; border: 0; color: var(--text); text-align: left; cursor: pointer; white-space: nowrap; }
 .vc-cmd-sug button.on { background: var(--flat-hover, #222226); }
 .vc-cmd-more { position: relative; display: inline-flex; }
 .vc-cmd-add { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: none; border: 1px dashed var(--border-2); color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
@@ -102,3 +102,37 @@
 .vc-field small { color: var(--muted); font-size: 12px; }
 .vc-field textarea { resize: vertical; }
 .vc-cmd-empty { padding: 12px 14px; color: var(--muted); font-size: 13px; }
+
+/* slash command fields: required marks, missing field, suggestion head, the "+ option" box */
+.vc-cmd-opt.missing, .vc-cmd-opt.missing.on { border-color: #f87171; box-shadow: 0 0 0 1px #f87171; }
+.vc-cmd-sug-head.bad { color: #fca5a5; }
+.vc-cmd-opt.missing .vc-cmd-name { color: #fca5a5; }
+.vc-cmd-hint.bad { color: #fecaca; border-color: color-mix(in srgb, #f87171 60%, transparent); background: color-mix(in srgb, #f87171 14%, var(--flat-box, #151517)); }
+.vc-cmd-hint.bad b { color: #fff; }
+.vc-cmd-hint small { color: var(--muted); }
+.vc-cmd-sug-head { display: flex; gap: 6px; align-items: baseline; padding: 4px 8px 6px; margin-bottom: 2px; border-bottom: 1px solid var(--border-2); font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vc-cmd-sug-head b { color: var(--text); font-weight: 600; }
+.vc-cmd-sug button > span { overflow: hidden; text-overflow: ellipsis; }
+.vc-cmd-more { border: 1px dashed var(--border-2); }
+.vc-cmd-more.on { border-color: var(--accent); border-style: solid; }
+.vc-cmd-tail input { min-width: 70px; font-size: 13px; }
+.vc-cmd-tail input::placeholder { color: var(--muted); }
+.vc-ico-btn.send.blocked { opacity: .45; }
+@media (max-width: 640px) {
+  /* fields share the line and the suggestion list spans the whole bar */
+  .vc-cmdbar, .vc-cmd-field, .vc-cmd-more { position: static; } /* hint + lists anchor to the whole composer box */
+  .vc-cmd-sug { left: 0; right: 0; min-width: 0; max-height: 45vh; }
+  .vc-cmd-hint { left: 0; right: 0; }
+  .vc-cmd-opt { flex: 1 1 150px; }
+  .vc-cmd-opt .vc-cmd-field, .vc-cmd-opt .vc-cmd-field input { flex: 1; min-width: 0; max-width: none; }
+  .vc-cmd-field input { font-size: 16px; padding: 6px 8px; } /* 16px: iOS doesn't zoom into it */
+  .vc-cmd-name { padding: 3px 7px; }
+  .vc-cmd-sug button { padding: 9px 10px; }
+}
+/* Modern look rounds these (Classic stays square) */
+html.vc-rounded .vc-cmd-chip, html.vc-rounded .vc-cmd-opt, html.vc-rounded .vc-cmd-more, html.vc-rounded .vc-cmd-x { border-radius: calc(7px * var(--rk, 1)); overflow: visible; }
+html.vc-rounded .vc-cmd-name { border-radius: calc(6px * var(--rk, 1)) 0 0 calc(6px * var(--rk, 1)); }
+html.vc-rounded .vc-cmd-hint, html.vc-rounded .vc-cmd-sug { border-radius: calc(10px * var(--rk, 1)); }
+html.vc-rounded .vc-cmd-sug button { border-radius: calc(6px * var(--rk, 1)); }
+html.vc-rounded.vc-light .vc-cmd-hint.bad { color: #7f1d1d; background: #fde8e8; }
+html.vc-rounded.vc-light .vc-cmd-hint.bad b { color: #450a0a; }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { X, ExternalLink, Check, ChevronDown, Paperclip, EyeOff, Loader, LayoutGrid, Plus } from 'lucide-react';
+import { flushSync } from 'react-dom';
+import { X, ExternalLink, Check, ChevronDown, Paperclip, EyeOff, Loader, LayoutGrid } from 'lucide-react';
 import { useChat, toast, errorText, sendInteraction, dismissEphemeral, closeInteractionModal, uploadAttachment } from './store.js';
 import { bare } from './ids.js';
 import { Avatar } from './Profile.jsx';
@@ -56,6 +57,21 @@ export function CommandPicker({ items, sel, setSel, onPick, bots = [], bot = nul
   );
 }
 
+const PICK_TYPES = [T.USER, T.ROLE, T.CHANNEL, T.MENTIONABLE];
+const strip = s => String(s || '').trim().toLowerCase().replace(/^[@#]/, '');
+// a typed name that exactly matches someone / a role / a channel counts as picked, so "/gayrate bob" + Enter just works
+function resolveTyped(o, text, members, detail) {
+  const q = strip(text);
+  if (!q) return null;
+  const person = () => (members || []).find(m => String(m.username).toLowerCase() === q);
+  const role = () => (detail?.roles || []).find(r => !r.is_default && String(r.name).toLowerCase() === q);
+  if (o.type === T.USER) return person()?.id ?? null;
+  if (o.type === T.ROLE) return role()?.rid ?? null;
+  if (o.type === T.MENTIONABLE) return person()?.id ?? role()?.rid ?? null;
+  if (o.type === T.CHANNEL) return (detail?.channels || []).find(c => String(c.name).toLowerCase() === q)?.cid ?? null;
+  return null;
+}
+
 function useChoices(o, sid, view, entry, vals, text) {
   const members = useChat(s => s.members[sid]);
   const detail = useChat(s => s.detail[sid]);
@@ -68,14 +84,16 @@ function useChoices(o, sid, view, entry, vals, text) {
       const values = Object.fromEntries(Object.entries(vals).filter(([, v]) => v.value !== '' && v.value != null).map(([k, v]) => [k, v.value]));
       values[o.name] = text;
       sendInteraction(sid, { type: 4, channel: view.cid, command: entry.cmd.id, path: entry.path, values, focused: o.name })
-        .then(d => { if (n === ask.current) setAuto(d.choices.map(c => ({ label: c.name, value: c.value }))); }).catch(() => {});
+        .then(d => { if (n === ask.current) setAuto((d?.choices || []).map(c => ({ label: c.name, value: c.value }))); }).catch(() => {});
     }, 200);
     return () => clearTimeout(t);
   }, [text, o.autocomplete]); // eslint-disable-line react-hooks/exhaustive-deps
   return useMemo(() => {
-    const q = text.toLowerCase().replace(/^[@#]/, '');
+    const q = strip(text);
     const has = s => !q || String(s).toLowerCase().includes(q);
-    const people = () => (members || []).filter(m => has(m.username)).slice(0, 8).map(m => ({ label: `@${m.username}`, text: m.username, value: m.id, bot: m.kind === 'bot' }));
+    const starts = s => String(s).toLowerCase().startsWith(q);
+    const people = () => (members || []).filter(m => has(m.username)).sort((a, b) => starts(b.username) - starts(a.username)).slice(0, 8)
+      .map(m => ({ label: `@${m.username}`, text: m.username, value: m.id, user: m }));
     const roles = () => (detail?.roles || []).filter(r => !r.is_default && has(r.name)).slice(0, 8).map(r => ({ label: `@${r.name}`, text: r.name, value: r.rid }));
     if (o.type === T.USER) return people();
     if (o.type === T.ROLE) return roles();
@@ -87,20 +105,42 @@ function useChoices(o, sid, view, entry, vals, text) {
   }, [text, members, detail, auto, o]);
 }
 
-function OptionField({ o, field, setField, view, entry, vals, innerRef, onEnter, onBack }) {
+// caret helpers for moving between fields with the arrow keys
+const atEnd = el => el?.selectionStart == null || (el.selectionStart === el.selectionEnd && el.selectionEnd === String(el.value ?? '').length);
+const atStart = el => el?.selectionStart == null || (el.selectionStart === 0 && el.selectionEnd === 0);
+
+function OptionField({ o, field, setField, view, entry, vals, innerRef, onSubmit, onBack, onNext, onPrev, onOpen, hasNext, ready, problem }) {
   const [open, setOpen] = useState(false);
   const [sel, setSel] = useState(0);
-  const picks = o.type === T.USER || o.type === T.ROLE || o.type === T.CHANNEL || o.type === T.MENTIONABLE || o.choices?.length || o.autocomplete;
+  const picks = PICK_TYPES.includes(o.type) || o.choices?.length || o.autocomplete;
   const items = useChoices(o, view.sid, view, entry, vals, field.text);
   const file = useRef(null);
   const [up, setUp] = useState(false);
-  const pick = it => { setField({ text: it.text ?? it.label, value: it.value }); setOpen(false); };
-  const type = (text) => setField(picks && !o.autocomplete && !o.choices?.length ? { text, value: '' } : { text, value: o.choices?.length ? '' : text });
   const shown = open && items.length > 0;
+  useEffect(() => { onOpen(shown); }, [shown]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (sel >= items.length) setSel(0); }, [items.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pick = it => { setField({ text: it.text ?? it.label, value: it.value, picked: true }); setOpen(false); onNext(); };
+  const type = text => setField(PICK_TYPES.includes(o.type) || o.choices?.length ? { text, value: '' } : { text, value: text });
+  // Left/Right at the edges, Tab / Shift+Tab: walk the fields (the "+ option" box at the end included)
+  const walk = (e, el) => {
+    if (e.key === 'ArrowRight' && !e.shiftKey && atEnd(el) && hasNext) { e.preventDefault(); onNext(); return true; }
+    if (e.key === 'ArrowLeft' && !e.shiftKey && atStart(el)) { e.preventDefault(); onPrev(); return true; }
+    if (e.key === 'Tab' && e.shiftKey) { e.preventDefault(); onPrev(); return true; }
+    if (e.key === 'Tab' && hasNext) { e.preventDefault(); onNext(); return true; }
+    return false;
+  };
   if (o.type === T.BOOLEAN) {
+    const set = v => setField({ text: '', value: v });
     return (
-      <span className="vc-cmd-bool" ref={innerRef} tabIndex={0} onKeyDown={e => { if (e.key === 'Enter') onEnter(); if (e.key === 'Backspace') { e.preventDefault(); if (field.value == null) onBack(); else setField({ text: '', value: null }); } if (e.key === ' ' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); setField({ text: '', value: !(field.value === true) }); } }}>
-        {[true, false].map(v => <button type="button" key={String(v)} className={field.value === v ? 'on' : ''} onClick={() => setField({ text: '', value: v })}>{v ? 'True' : 'False'}</button>)}
+      <span className="vc-cmd-bool" ref={innerRef} tabIndex={0} role="radiogroup" aria-label={o.name} onKeyDown={e => {
+        if (walk(e, null)) return;
+        if (e.key === 'Enter') { e.preventDefault(); onSubmit(); return; }
+        if (e.key === 'Backspace') { e.preventDefault(); if (field.value == null) onBack(); else set(null); return; }
+        if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); set(!(field.value === true)); return; }
+        if (/^[ty1]$/i.test(e.key)) set(true);
+        if (/^[fn0]$/i.test(e.key)) set(false);
+      }}>
+        {[true, false].map(v => <button type="button" tabIndex={-1} key={String(v)} className={field.value === v ? 'on' : ''} onClick={() => set(v)}>{v ? 'True' : 'False'}</button>)}
       </span>
     );
   }
@@ -114,14 +154,20 @@ function OptionField({ o, field, setField, view, entry, vals, innerRef, onEnter,
           try { const a = await uploadAttachment(view, f); setField({ text: f.name, value: a.url }); } catch (er) { toast(errorText(er.message)); }
           setUp(false);
         }} />
-        <button type="button" ref={innerRef} onKeyDown={e => { if (e.key === 'Backspace') { e.preventDefault(); if (field.text) setField({ text: '', value: '' }); else onBack(); } }} onClick={() => file.current?.click()}>{up ? <Loader size={13} className="spin" /> : <Paperclip size={13} />} {field.text || 'Choose a file'}</button>
+        <button type="button" ref={innerRef} onKeyDown={e => {
+          if (walk(e, null)) return;
+          if (e.key === 'Backspace') { e.preventDefault(); if (field.text) setField({ text: '', value: '' }); else onBack(); }
+        }} onClick={() => file.current?.click()}>{up ? <Loader size={13} className="spin" /> : <Paperclip size={13} />} {field.text || 'Choose a file'}</button>
       </span>
     );
   }
   return (
     <span className="vc-cmd-field">
       <input
-        ref={innerRef} value={field.text} placeholder={o.description} inputMode={o.type === T.INTEGER || o.type === T.NUMBER ? 'decimal' : 'text'} maxLength={o.max_length || 6000} spellCheck={o.type === T.STRING && !picks}
+        ref={innerRef} value={field.text} placeholder={o.description} size={Math.max(6, Math.min(24, (field.text || o.description || '').length + 1))}
+        inputMode={o.type === T.INTEGER || o.type === T.NUMBER ? 'decimal' : 'text'} enterKeyHint={ready ? 'send' : 'next'}
+        maxLength={o.max_length || 6000} spellCheck={o.type === T.STRING && !picks} autoComplete="off" autoCapitalize="off"
+        role={picks ? 'combobox' : undefined} aria-expanded={picks ? shown : undefined} aria-label={o.name}
         onFocus={() => { setOpen(true); setSel(0); }} onBlur={() => setTimeout(() => setOpen(false), 120)}
         onChange={e => { type(e.target.value); setOpen(true); setSel(0); }}
         onKeyDown={e => {
@@ -129,71 +175,160 @@ function OptionField({ o, field, setField, view, entry, vals, innerRef, onEnter,
           if (shown) {
             if (e.key === 'ArrowDown') { e.preventDefault(); setSel(x => (x + 1) % items.length); return; }
             if (e.key === 'ArrowUp') { e.preventDefault(); setSel(x => (x - 1 + items.length) % items.length); return; }
-            if (e.key === 'Tab' || (e.key === 'Enter' && (o.choices?.length || o.type !== T.STRING || sel > 0 || field.text))) {
-              if (e.key === 'Enter' && o.type === T.STRING && !o.choices?.length && !items[sel]) { e.preventDefault(); onEnter(); return; }
-              if (items[sel] && (e.key === 'Tab' || field.value === '' || o.autocomplete)) { e.preventDefault(); pick(items[sel]); return; }
-            }
             if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpen(false); return; }
+            // Enter / Tab put the highlighted suggestion in and move on (a pick already made stays: Enter then runs the command)
+            if ((e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) && items[sel] && !field.picked) { e.preventDefault(); pick(items[sel]); return; }
           }
-          if (e.key === 'Enter') { e.preventDefault(); onEnter(); }
+          if (walk(e, e.target)) return;
+          if (e.key === 'Enter') { e.preventDefault(); onSubmit(); }
         }} />
       {shown && (
-        <span className="vc-cmd-sug" onMouseDown={e => e.preventDefault()}>
-          {items.map((it, i) => <button type="button" key={`${it.label}${i}`} className={i === sel ? 'on' : ''} onMouseEnter={() => setSel(i)} onClick={() => pick(it)}>{it.label}</button>)}
+        <span className="vc-cmd-sug" role="listbox" onMouseDown={e => e.preventDefault()}>
+          <span className={`vc-cmd-sug-head${problem ? ' bad' : ''}`}><b>{o.name}</b>{problem || o.description}</span>
+          {items.map((it, i) => (
+            <button type="button" role="option" aria-selected={i === sel} key={`${it.label}${i}`} className={i === sel ? 'on' : ''} onMouseEnter={() => setSel(i)} onClick={() => pick(it)}>
+              {it.user && <Avatar user={it.user} size={18} />}<span>{it.label}</span>
+            </button>
+          ))}
         </span>
       )}
     </span>
   );
 }
 
-export function CommandBar({ view, entry, onCancel, onSent, submitRef }) {
+// the box after the fields: type part of an optional field's name, Enter / Tab puts that field in and the cursor in it
+function OptionTail({ spare, innerRef, onAdd, onPrev, onSubmit, onOpen, ready }) {
+  const [text, setText] = useState('');
+  const [open, setOpen] = useState(false);
+  const [sel, setSel] = useState(0);
+  const [moved, setMoved] = useState(false);
+  const q = text.trim().toLowerCase().replace(/[:=]$/, '');
+  const list = useMemo(() => spare.filter(o => !q || o.name.toLowerCase().includes(q))
+    .sort((a, b) => b.name.toLowerCase().startsWith(q) - a.name.toLowerCase().startsWith(q)), [spare, q]);
+  const shown = open && list.length > 0;
+  useEffect(() => { onOpen(shown); }, [shown]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (sel >= list.length) setSel(0); }, [list.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  const add = o => { setText(''); setMoved(false); setOpen(false); onAdd(o); };
+  return (
+    <span className="vc-cmd-field vc-cmd-tail">
+      <input
+        ref={innerRef} value={text} placeholder="+ option" aria-label="Add an optional field" size={Math.max(8, text.length + 1)}
+        role="combobox" aria-expanded={shown} autoComplete="off" autoCapitalize="off" spellCheck={false} enterKeyHint={ready ? 'send' : 'next'}
+        onFocus={() => { setOpen(true); setSel(0); }} onBlur={() => setTimeout(() => { setOpen(false); setText(''); setMoved(false); }, 120)}
+        onChange={e => {
+          const v = e.target.value;
+          // "name:" or "name " with an exact name puts the field in straight away
+          const exact = /[:= ]$/.test(v) && spare.find(o => o.name.toLowerCase() === v.slice(0, -1).trim().toLowerCase());
+          if (exact) { add(exact); return; }
+          setText(v); setOpen(true); setSel(0);
+        }}
+        onKeyDown={e => {
+          if (e.key === 'Backspace' && !text) { e.preventDefault(); onPrev(); return; }
+          if ((e.key === 'ArrowLeft' && atStart(e.target)) || (e.key === 'Tab' && e.shiftKey)) { e.preventDefault(); onPrev(); return; }
+          if (shown && e.key === 'ArrowDown') { e.preventDefault(); setMoved(true); setSel(x => (x + 1) % list.length); return; }
+          if (shown && e.key === 'ArrowUp') { e.preventDefault(); setMoved(true); setSel(x => (x - 1 + list.length) % list.length); return; }
+          if (e.key === 'Escape' && shown) { e.preventDefault(); e.stopPropagation(); setOpen(false); return; }
+          if (e.key === 'Tab' && list[sel]) { e.preventDefault(); add(list[sel]); return; }
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            // nothing typed and no arrowing: Enter still runs the command
+            if ((text.trim() || moved) && list[sel]) add(list[sel]); else onSubmit();
+          }
+        }} />
+      {shown && (
+        <span className="vc-cmd-sug vc-cmd-more-list" role="listbox" onMouseDown={e => e.preventDefault()}>
+          <span className="vc-cmd-sug-head"><b>Optional</b>type to filter, Enter adds it</span>
+          {list.map((o, i) => <button type="button" role="option" aria-selected={i === sel} key={o.name} className={i === sel ? 'on' : ''} onMouseEnter={() => setSel(i)} onClick={() => add(o)}><b>{o.name}</b>{o.description && <small>{o.description}</small>}</button>)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+const TAIL = '\u0000tail';
+
+export function CommandBar({ view, entry, onCancel, onSent, submitRef, onReady }) {
   const [vals, setVals] = useState({});
   const [busy, setBusy] = useState(false);
   const [active, setActive] = useState(null);
+  const [missing, setMissing] = useState(null); // the required field Enter / Send stopped at
+  const [listOpen, setListOpen] = useState(false);
+  const members = useChat(s => s.members[view.sid]);
+  const detail = useChat(s => s.detail[view.sid]);
   const refs = useRef({});
   const ghost = useRef(null);
   const all = entry.options;
   const [extra, setExtra] = useState([]); // optional options the user added
-  const [menu, setMenu] = useState(false);
-  const [msel, setMsel] = useState(0);
   const opts = useMemo(() => all.filter(o => o.required || extra.includes(o.name)), [all, extra]);
   const spare = all.filter(o => !o.required && !extra.includes(o.name));
-  const focusOpt = name => setTimeout(() => (refs.current[name] || ghost.current)?.focus(), 0);
-  const endOf = name => setTimeout(() => { const el = refs.current[name]; if (!el) return; el.focus(); if (el.setSelectionRange && el.value != null) el.setSelectionRange(el.value.length, el.value.length); }, 0);
+  const order = [...opts.map(o => o.name), ...(spare.length ? [TAIL] : [])];
+  // focus right away when the field is already on screen (so fast typing never lands in the old field), else after the render
+  const go = (name, where = 'end') => {
+    const to = () => {
+      const el = refs.current[name] || (name == null ? ghost.current : null);
+      if (!el || !el.isConnected) return false;
+      el.focus();
+      if (el.setSelectionRange && el.value != null) { const n = where === 'start' ? 0 : el.value.length; el.setSelectionRange(n, n); }
+      return true;
+    };
+    if (!to()) setTimeout(to, 0);
+  };
+  const step = (name, d) => { const i = order.indexOf(name); const to = order[i + d]; if (to) go(to, d > 0 ? 'start' : 'end'); };
   const back = o => {
     const i = opts.findIndex(x => x.name === o.name);
     const prev = opts[i - 1];
     if (!o.required) {
       setExtra(x => x.filter(n => n !== o.name));
       setVals(v => { const n = { ...v }; delete n[o.name]; return n; });
-      const to = prev || opts[i + 1];
-      if (to) endOf(to.name); else focusOpt(null);
+      const to = prev?.name || opts[i + 1]?.name || TAIL;
+      go(to);
       return;
     }
-    if (prev) endOf(prev.name); else onCancel();
+    if (prev) go(prev.name); else onCancel();
   };
-  const add = o => {
-    setExtra(x => [...x, o.name]);
-    setMenu(false);
-    focusOpt(o.name);
-  };
+  const add = o => { flushSync(() => setExtra(x => [...x, o.name])); go(o.name); };
   const field = o => vals[o.name] || { text: '', value: o.type === T.BOOLEAN ? null : '' };
-  useEffect(() => { setTimeout(() => (refs.current[opts[0]?.name] || ghost.current)?.focus(), 20); }, [entry.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  // what gets sent for one field: undefined = left empty, false = filled in wrong (with why)
+  const valueOf = o => {
+    const f = field(o);
+    // autocomplete: a picked suggestion sends its value (the text shows its name); anything typed by hand is sent as typed
+    if (o.type === T.STRING && !o.choices?.length) return f.text.trim() ? { v: f.picked && f.value !== '' ? f.value : f.text } : undefined;
+    if (o.type === T.BOOLEAN) return f.value == null ? undefined : { v: f.value };
+    if (PICK_TYPES.includes(o.type)) {
+      if (!f.text.trim() && !f.value) return undefined;
+      const id = f.value || resolveTyped(o, f.text, members, detail);
+      return id ? { v: bare(id) } : { bad: `Pick ${o.name} from the list.` };
+    }
+    if (o.choices?.length) {
+      if (!f.text.trim()) return undefined;
+      const c = f.value !== '' ? { value: f.value } : o.choices.find(x => x.name.toLowerCase() === f.text.trim().toLowerCase());
+      return c ? { v: c.value } : { bad: `Pick ${o.name} from the list.` };
+    }
+    if (o.type === T.INTEGER || o.type === T.NUMBER) {
+      if (!String(f.text).trim()) return undefined;
+      if (f.picked && typeof f.value === 'number') return { v: f.value };
+      const n = Number(String(f.text).trim());
+      if (!Number.isFinite(n) || (o.type === T.INTEGER && !Number.isInteger(n))) return { bad: `${o.name} needs ${o.type === T.INTEGER ? 'a whole number' : 'a number'}.` };
+      return { v: n };
+    }
+    return f.value === '' || f.value == null ? undefined : { v: f.value };
+  };
+  const firstMissing = opts.find(o => { if (!o.required) return false; const r = valueOf(o); return !r || !!r.bad; });
+  const ready = !firstMissing;
+  useEffect(() => { onReady?.(ready ? null : firstMissing.name); }, [ready, firstMissing?.name]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => onReady?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { go(opts[0]?.name || (spare.length ? TAIL : null)); }, [entry.key]); // eslint-disable-line react-hooks/exhaustive-deps
   async function submit() {
     if (busy) return;
     const values = {};
     for (const o of opts) {
-      const f = field(o);
-      let v = f.value;
-      if (o.type === T.STRING && !o.choices?.length) v = f.text;
-      const blank = v === '' || v == null || (o.type === T.USER && !v) ;
-      if (blank) {
-        if (o.required) { toast(`${o.name} is required.`); refs.current[o.name]?.focus(); return; }
+      const r = valueOf(o);
+      if (!r) {
+        if (o.required) { setMissing(o.name); go(o.name); return; }
         continue;
       }
-      if (o.type === T.INTEGER || o.type === T.NUMBER) { v = Number(String(f.text || v).trim()); if (!Number.isFinite(v)) { toast(`${o.name} needs a number.`); refs.current[o.name]?.focus(); return; } }
-      else if ([T.USER, T.ROLE, T.CHANNEL, T.MENTIONABLE].includes(o.type) && !f.value) { toast(`Pick ${o.name} from the list.`); refs.current[o.name]?.focus(); return; }
-      values[o.name] = [T.USER, T.ROLE, T.CHANNEL, T.MENTIONABLE].includes(o.type) ? bare(v) : v;
+      if (r.bad) { toast(r.bad); setMissing(o.name); go(o.name); return; }
+      values[o.name] = r.v;
     }
     setBusy(true);
     try { await sendInteraction(view.sid, { type: 2, channel: view.cid, command: entry.cmd.id, path: entry.path, values }); onSent(); }
@@ -201,41 +336,38 @@ export function CommandBar({ view, entry, onCancel, onSent, submitRef }) {
   }
   if (submitRef) submitRef.current = submit;
   const cur = opts.find(o => o.name === active);
+  const miss = opts.find(o => o.name === missing);
+  const hint = miss
+    ? <div className="vc-cmd-hint bad" role="alert"><b>{miss.name}</b> {valueOf(miss)?.bad || `is required${miss.description ? `: ${miss.description}` : '.'}`}</div>
+    : listOpen ? null
+      : cur ? <div className="vc-cmd-hint"><b>{cur.name}</b> {cur.description}{!cur.required && <small> (optional)</small>}</div>
+        : active === TAIL ? null
+          : !opts.length && !spare.length ? <div className="vc-cmd-hint"><b>/{entry.label}</b> {entry.description} - press Enter to run it.</div> : null;
   return (
     <div className="vc-cmdbar" onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); onCancel(); } }}>
-      {(cur || !opts.length) && <div className="vc-cmd-hint"><b>{cur ? cur.name : `/${entry.label}`}</b> {cur ? cur.description : all.length ? entry.description : `${entry.description} - press Enter to run it.`}</div>}
+      {hint}
       <span className="vc-cmd-chip" title={`${entry.bot.username}: /${entry.label}`}><Avatar user={entry.bot} size={16} />/{entry.label}</span>
       {opts.map(o => (
-        <label key={o.name} className={`vc-cmd-opt${active === o.name ? ' on' : ''}`} onFocus={() => setActive(o.name)} onBlur={() => setActive(a => (a === o.name ? null : a))}>
-          <span className="vc-cmd-name">{o.name}{o.required && <em>*</em>}</span>
-          <OptionField o={o} field={field(o)} setField={f => setVals(v => ({ ...v, [o.name]: f }))} view={view} entry={entry} vals={vals} innerRef={el => { refs.current[o.name] = el; }} onEnter={submit} onBack={() => back(o)} />
+        <label key={o.name} className={`vc-cmd-opt${active === o.name ? ' on' : ''}${missing === o.name ? ' missing' : ''}${o.required ? ' req' : ''}`} onFocus={() => setActive(o.name)} onBlur={() => setActive(a => (a === o.name ? null : a))}>
+          <span className="vc-cmd-name">{o.name}{o.required && <em aria-label="required">*</em>}</span>
+          <OptionField
+            o={o} field={field(o)} view={view} entry={entry} vals={vals} ready={ready}
+            setField={f => { setVals(v => ({ ...v, [o.name]: f })); if (missing === o.name) setMissing(null); }}
+            innerRef={el => { refs.current[o.name] = el; }} onSubmit={submit} onBack={() => back(o)}
+            onNext={() => step(o.name, 1)} onPrev={() => step(o.name, -1)} hasNext={order.indexOf(o.name) < order.length - 1} onOpen={setListOpen}
+            problem={missing === o.name ? valueOf(o)?.bad || 'is required - pick one to run the command' : null} />
         </label>
       ))}
       {spare.length > 0 && (
-        <span className="vc-cmd-more" onBlur={() => setMenu(false)}>
-          <button
-            type="button" className={`vc-cmd-add${menu ? ' on' : ''}`} aria-haspopup="listbox" aria-expanded={menu} title="Add an optional field"
-            onClick={() => { setMenu(m => !m); setMsel(0); }}
-            onKeyDown={e => {
-              if (!menu) { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setMenu(true); setMsel(0); } return; }
-              if (e.key === 'ArrowDown') { e.preventDefault(); setMsel(x => (x + 1) % spare.length); }
-              else if (e.key === 'ArrowUp') { e.preventDefault(); setMsel(x => (x - 1 + spare.length) % spare.length); }
-              else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); add(spare[Math.min(msel, spare.length - 1)]); }
-              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setMenu(false); }
-            }}><Plus size={13} strokeWidth={2.5} />optional</button>
-          {menu && (
-            <span className="vc-cmd-sug vc-cmd-more-list" role="listbox" onMouseDown={e => e.preventDefault()}>
-              {spare.map((o, i) => <button type="button" role="option" aria-selected={i === msel} key={o.name} className={i === msel ? 'on' : ''} onMouseEnter={() => setMsel(i)} onClick={() => add(o)}><b>{o.name}</b>{o.description && <small>{o.description}</small>}</button>)}
-            </span>
-          )}
+        <span className={`vc-cmd-more${active === TAIL ? ' on' : ''}`} onFocus={() => setActive(TAIL)} onBlur={() => setActive(a => (a === TAIL ? null : a))}>
+          <OptionTail spare={spare} ready={ready} innerRef={el => { refs.current[TAIL] = el; }} onAdd={add} onPrev={() => step(TAIL, -1)} onSubmit={submit} onOpen={setListOpen} />
         </span>
       )}
-      {!opts.length && <input ref={ghost} className="vc-cmd-ghost" aria-label={`Run /${entry.label}`} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } if (e.key === 'Backspace') { e.preventDefault(); onCancel(); } }} />}
+      {!opts.length && !spare.length && <input ref={ghost} className="vc-cmd-ghost" aria-label={`Run /${entry.label}`} enterKeyHint="send" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } if (e.key === 'Backspace') { e.preventDefault(); onCancel(); } }} />}
       <button type="button" className="vc-cmd-x" title="Clear this command (Esc)" aria-label="Clear this command" onClick={onCancel}><X size={15} strokeWidth={2.5} /><span>Clear</span></button>
     </div>
   );
 }
-export const canRun = (opts, vals) => opts.every(o => !o.required || vals[o.name]);
 
 const Emoji = ({ e }) => (e?.name && !e.id ? <span className="vc-cbtn-emoji">{e.name}</span> : null);
 function useOptions(def, view) {
