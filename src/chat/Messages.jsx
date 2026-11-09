@@ -907,6 +907,7 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
   const [cmd, setCmd] = useState(null); // the slash command being filled in
   const [csel, setCsel] = useState(0);
   const cmdSubmit = useRef(null);
+  const [cmdMissing, setCmdMissing] = useState(null); // a required command field that is still empty
   const cdata = useChat(s => (sid && isInst(sid) ? s.commands[sid] : null));
   useEffect(() => { if (sid && isInst(sid)) loadCommands(sid, view.cid); }, [sid, view.cid]); // eslint-disable-line react-hooks/exhaustive-deps
   const centries = useMemo(() => slashEntries(cdata), [cdata]);
@@ -1323,7 +1324,7 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
         {mq && <MentionPicker items={mitems} sel={msel} setSel={setMsel} onPick={pickMention} sid={view.sid} />}
         {slashQ === '' && cdata && !centries.length && <div className="vc-mentions vc-cmd-picker vc-cmd-empty">No bot commands in this server yet. Bots can add slash commands, and they will show up here.</div>}
         {cpicker && <CommandPicker items={citems} sel={csel} setSel={setCsel} onPick={startCommand} bots={cbots} bot={cbotOn} onBot={pickBot} />}
-        {cmd && <CommandBar key={cmd.key} view={view} entry={cmd} submitRef={cmdSubmit} onCancel={() => { setCmd(null); ta.current?.focus(); }} onSent={() => { setCmd(null); setReplyTo?.(null); ta.current?.focus(); }} />}
+        {cmd && <CommandBar key={cmd.key} view={view} entry={cmd} submitRef={cmdSubmit} onReady={setCmdMissing} onCancel={() => { setCmd(null); setTimeout(() => ta.current?.focus(), 0); }} onSent={() => { setCmd(null); setReplyTo?.(null); setTimeout(() => ta.current?.focus(), 0); }} />}
         <input ref={file} type="file" multiple hidden onChange={e => { const once = destOnce.current; destOnce.current = null; addFiles(e.target.files, once); e.target.value = ''; }} />
         <input ref={saveFile} type="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm,video/quicktime,audio/*" onChange={e => { addSavedFiles(e.target.files); e.target.value = ''; }} />
         <div
@@ -1376,7 +1377,7 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
         {!voice.active && <button type="button" className={`vc-ico-btn vc-gif-btn${picker ? ' on' : ''}`} title="Media (GIFs, Saved Media, Game Clips)" onClick={() => { setPicker(p => (p ? false : 'saved')); setEmoji(false); }}><GifIcon /></button>}
         {!voice.active && <button type="button" className={`vc-ico-btn vc-emoji-btn${emoji ? ' on' : ''}`} title="Emoji" onClick={() => { setEmoji(x => !x); setPicker(false); }}><Smile size={19} /></button>}
         {emoji && !voice.active && <EmojiPicker onClose={() => setEmoji(false)} onPick={t => { insertText(t); setEmoji(false); }} />}
-        <button type="button" className={`vc-ico-btn send${canVoice || voice.active ? ' voice' : ''}`} title={voice.active ? 'Send voice message' : canVoice ? 'Record a voice message' : 'Send'} aria-label={voice.active ? 'Send voice message' : canVoice ? 'Record a voice message' : 'Send'} disabled={!voice.active && !canVoice && !cmd && !text.trim() && !atts.length}
+        <button type="button" className={`vc-ico-btn send${canVoice || voice.active ? ' voice' : ''}${cmd && cmdMissing ? ' blocked' : ''}`} title={voice.active ? 'Send voice message' : canVoice ? 'Record a voice message' : cmd && cmdMissing ? `Fill in ${cmdMissing} first` : 'Send'} aria-label={voice.active ? 'Send voice message' : canVoice ? 'Record a voice message' : 'Send'} disabled={!voice.active && !canVoice && !cmd && !text.trim() && !atts.length}
           onPointerDown={e => { e.preventDefault(); voicePress(e); }} onPointerMove={voiceMove} onPointerUp={voiceRelease} onPointerCancel={voiceCancel} onContextMenu={e => { if (canVoice || voice.active) e.preventDefault(); }} onMouseDown={e => e.preventDefault()}
           onClick={() => {
             if (voiceTouch.current) { voiceTouch.current = false; return; } // (the click a browser adds after a touch: the press already did it)
