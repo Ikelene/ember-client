@@ -3,7 +3,8 @@
 //   https://ember.nookara.cc/#/i/<instance origin, encoded>/invite/<code>
 //   https://<instance>/invite/<code>                                  (the instance's own invite page)
 // The server (unfurl.js) makes the card data - the instance is asked from Velora, never from the browser.
-const VELORA_HOST = /^(www\.)?((?:ember\.)?nookara\.cc|velora\.ikelene\.net)$/i;
+import { shortLinkHash } from './shortLinks.js';
+const VELORA_HOST =/^(www\.)?((?:ember\.)?nookara\.cc|velora\.ikelene\.net)$/i;
 const CODE = '[A-Za-z0-9]{4,32}';
 const HASH_OWN = new RegExp(`^#/invite/(${CODE})/?$`);
 const HASH_INST = new RegExp(`^#/i/([^/]+)/invite/(${CODE})/?$`);
@@ -16,10 +17,12 @@ export function inviteRef(href) {
   try { u = new URL(href); } catch { return null; }
   if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
   if (VELORA_HOST.test(u.hostname)) {
-    if (!/^\/(chat\/?)?$/.test(u.pathname)) return null;
-    let m = HASH_OWN.exec(u.hash);
+    const short = shortLinkHash(u.pathname); // ember.nookara.cc/invite/<code>, /invite/<instance host>/<code>
+    if (!short && !/^\/(chat\/?)?$/.test(u.pathname)) return null;
+    const hash = short || u.hash;
+    let m = HASH_OWN.exec(hash);
     if (m) return { inst: null, code: m[1], sure: true };
-    m = HASH_INST.exec(u.hash);
+    m = HASH_INST.exec(hash);
     if (!m) return null;
     try { const o = new URL(decodeURIComponent(m[1])); return o.protocol === 'https:' ? { inst: o.origin, code: m[2], sure: true } : null; } catch { return null; }
   }

@@ -1,6 +1,7 @@
 // Ember's state + its connection (one Velora socket when signed in with Velora, the /chat, /im and /groups APIs, and one socket per server instance).
 // Components read it with useChat(selector) and change it through the actions below.
-import { shareLink, clientUrl, notifLinkUrl } from './hosts.js';
+import { shareLink, clientUrl, notifLinkUrl, EMBER_ORIGIN } from './hosts.js';
+import { shortLinkFor } from './shortLinks.js';
 import { packActive, playPackSound } from './messageSounds.js';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import serverCreationPolicy from '../server-creation-policy.json';
@@ -1668,7 +1669,8 @@ export function hashFor(v) {
   if (v.kind === 'modmail') return `#/modmail${v.username ? `/${encodeURIComponent(v.username)}` : ''}`;
   return '#/home';
 }
-export const linkFor = v => shareLink(hashFor(v));
+// invites and Ember servers get the short form (shortLinks.js) on the real Ember host; everything else the #/ link
+export const linkFor = v => { const long = shareLink(hashFor(v)); return (long.startsWith(EMBER_ORIGIN + '/') && shortLinkFor(v)) || long; };
 export function go(v, { replace = false } = {}) {
   const hash = hashFor(v);
   if (location.hash !== hash) history[replace ? 'replaceState' : 'pushState'](null, '', clientUrl(hash));
