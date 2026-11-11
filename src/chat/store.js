@@ -1271,7 +1271,7 @@ export async function editMessage(id, text, m) {
   let signature;
   const info = m?.channel ? signingInfo(m.server) : null;
   if (info?.can) {
-    try { signature = await signMessage({ instance: inst, community: bare(m.server), channel: bare(m.channel), author: connections.get(inst).user.velora_id, body: normBody(text), attachments: attachmentRefs(m.attachments || []), reply_to: m.reply_to ?? m.reply?.id ?? null, edit_of: id }); }
+    try { signature = await signMessage({ instance: inst, community: bare(m.server), channel: bare(m.channel), author: connections.get(inst).user.velora_id, body: normBody(text), attachments: attachmentRefs(m.attachments || []), reply_to: m.reply_to ?? m.reply?.id ?? null, edit_of: id, sticker: m.sticker?.tid ?? null }); }
     catch { if (!(await askSendUnsigned(true))) throw new Error('sign_failed'); }
   }
   const patch = sig => apiFetch(`/chat/messages/${id}`, { method: 'PATCH', body: JSON.stringify({ message: text, signature: sig }), inst: inst === VELORA ? undefined : inst });

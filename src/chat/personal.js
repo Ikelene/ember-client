@@ -3,8 +3,10 @@
 // as server emojis, so every client can already show them; only the owner gets them in their picker.
 // Stickers: an Ember server's /api/v1/servers/:sid/stickers; a message carries one as `sticker: { tid, name, url, animated }`.
 import { apiFetch, uploadFetch } from '../api.js';
-import { getState, patchState, toast, errorText, customEmoji } from './store.js';
-import { isInst } from './ids.js';
+import { getState, patchState, toast, errorText, customEmoji, signingInfo, askSendUnsigned } from './store.js';
+import { isInst, instOf, bare } from './ids.js';
+import { signMessage, refreshSigningKey } from './signing.js';
+import { connections } from './instances.js';
 
 const ERR = {
   too_many_emojis: 'You have as many personal emojis as you can (25, or 100 with Pro).',
@@ -83,8 +85,23 @@ export async function deleteSticker(sid, tid) {
   try { await apiFetch(`/chat/servers/${sid}/stickers/${tid}`, { method: 'DELETE' }); } catch (e) { toast(msg(e)); }
   return loadStickers(sid);
 }
-// send one: a message with only the sticker in it
+// send one: a message with only the sticker in it, signed like any other message (the signature covers the sticker id)
+const SIGN_REFUSED = new Set(['bad_signature', 'signing_unavailable']);
 export async function sendSticker(cid, tid, replyTo) {
-  try { await apiFetch(`/chat/channels/${cid}/messages`, { method: 'POST', body: JSON.stringify({ message: '', sticker: tid, ...(replyTo?.id ? { reply_to: replyTo.id } : {}) }) }); }
-  catch (e) { toast(e.message === 'unknown_sticker' ? 'That sticker is gone.' : errorText(e.message)); }
+  const sid = getState().view?.sid;
+  const post = signature => apiFetch(`/chat/channels/${cid}/messages`, { method: 'POST', body: JSON.stringify({ message: '', sticker: tid, ...(replyTo?.id ? { reply_to: replyTo.id } : {}), ...(signature ? { signature } : {}) }) });
+  try {
+    let signature;
+    if (sid && isInst(sid) && signingInfo(sid).can) {
+      try {
+        signature = await signMessage({ instance: instOf(sid), community: bare(sid), channel: bare(cid), author: connections.get(instOf(sid)).user.velora_id, body: '', attachments: [], reply_to: replyTo?.id ?? null, edit_of: null, sticker: tid });
+      } catch { if (!(await askSendUnsigned())) return; }
+    }
+    try { await post(signature); }
+    catch (e) {
+      if (!signature || !SIGN_REFUSED.has(e.message)) throw e;
+      if (e.message === 'bad_signature') refreshSigningKey(); // (a rotated key)
+      if (await askSendUnsigned()) await post(undefined); // the server turned the signature down: the same choice as for text
+    }
+  } catch (e) { toast(e.message === 'unknown_sticker' ? 'That sticker is gone.' : errorText(e.message)); }
 }

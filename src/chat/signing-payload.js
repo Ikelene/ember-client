@@ -8,9 +8,11 @@ export function canonical(v) {
   if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`;
   return `{${Object.keys(v).filter(k => v[k] !== undefined).sort().map(k => `${JSON.stringify(k)}:${canonical(v[k])}`).join(',')}}`;
 }
-export const payloadOf = ({ iss, instance, community, channel, author, ts, nonce, body, attachments, reply_to, edit_of }) => ({
+// sticker: the sticker id a sticker message carries (PROTOCOL §8.2), left out of the payload when there is none
+export const payloadOf = ({ iss, instance, community, channel, author, ts, nonce, body, attachments, reply_to, edit_of, sticker }) => ({
   v: 1, iss, instance, community, channel, author: String(author), ts: Number(ts), nonce: String(nonce), body: String(body),
   attachments: (attachments || []).map(String), reply_to: reply_to == null ? null : String(reply_to), edit_of: edit_of == null ? null : String(edit_of),
+  ...(sticker == null || sticker === '' ? {} : { sticker: String(sticker) }),
 });
 
 // Upload hashes keep v1 signatures unchanged; link-only GIFs bind their exact URL.
@@ -25,5 +27,5 @@ export function attachmentRefs(attachments = []) {
 export function receivedPayload(m, iss) {
   return payloadOf({ iss, instance: m.inst, community: bare(m.server), channel: bare(m.channel), author: m.author.velora_id,
     ts: m.signature.ts, nonce: m.signature.nonce, body: m.body, attachments: attachmentRefs(m.attachments || []),
-    reply_to: m.reply_to ?? m.reply?.id ?? null, edit_of: m.edited_at ? m.id : null });
+    reply_to: m.reply_to ?? m.reply?.id ?? null, edit_of: m.edited_at ? m.id : null, sticker: m.sticker?.tid ?? null });
 }

@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test test/media-proxy.test.js test/glint-links.test.js test/aliases.test.js test/hosted-alias.test.js test/notif-link.test.js test/attachments.test.js test/insights.test.js test/manage-users.test.js test/app-download.test.js test/temp-expiry.test.js test/server-clock.test.js test/temp-pick.test.js test/unread.test.js test/upload-dest.test.js test/upload-links.test.js test/user-update.test.js test/dm-report.test.js test/dm-double.test.js test/text-images.test.js test/msg-actions.test.js test/forward.test.js test/voice-note.test.js test/service-embeds.test.js test/nke1.test.js test/short-links.test.js test/e2ee-bundles.test.js"
+    "test": "node --test test/media-proxy.test.js test/glint-links.test.js test/aliases.test.js test/hosted-alias.test.js test/notif-link.test.js test/attachments.test.js test/insights.test.js test/manage-users.test.js test/app-download.test.js test/temp-expiry.test.js test/server-clock.test.js test/temp-pick.test.js test/unread.test.js test/upload-dest.test.js test/upload-links.test.js test/user-update.test.js test/dm-report.test.js test/dm-double.test.js test/text-images.test.js test/msg-actions.test.js test/forward.test.js test/voice-note.test.js test/service-embeds.test.js test/nke1.test.js test/short-links.test.js test/e2ee-bundles.test.js test/sticker-signing.test.js"
   },
   "dependencies": {
     "hash-wasm": "^4.12.0",

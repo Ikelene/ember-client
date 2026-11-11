@@ -30,7 +30,7 @@ export function describeVia(via, lookup = () => undefined, fromInstance = false)
       const verified = !!info.verified && (!fromInstance || sameSite(hostOf(via.url), hostOf(info.website)));
       return { name: info.name, verified, icon: info.icon || null, domain, known: true, registered: !verified, app: id };
     }
-    if (info === undefined) return { name: id === EMBER_APP_ID ? 'Ember' : (via.token || domain || 'A Nookara app'), verified: false, icon: null, domain, known: true, registered: true, app: id };
+    if (info === undefined) return { name: id === EMBER_APP_ID ? 'Ember' : (domain || 'A Nookara app'), verified: false, icon: null, domain, known: true, registered: true, app: id };
   }
   return { name: domain || (via.kind === 'bot' ? 'Bot connection' : 'Unknown client'), verified: false, icon: null, domain: '', known: false, registered: false, app: null };
 }
