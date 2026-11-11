@@ -44,6 +44,9 @@ import { CreateServer, HostingNote } from '../chat/Hosting.jsx';
 import { ExportButton } from '../chat/Community.jsx';
 
 import { isInst, instOf } from '../chat/ids.js';
+import { forgetIfEmpty } from '../chat/instances.js';
+// a left Ember server goes off the list (the server list is updated by the leave's own event, or in a moment)
+const forgetLeft = sid => { const o = instOf(sid); setTimeout(() => forgetIfEmpty(o), 400); };
 
 
 import { Discover, Invite, JoinInvite, ChannelEditor, NewDM, NewGroup, QuickSwitcher, AskHost } from '../chat/Dialogs.jsx';
@@ -428,7 +431,7 @@ function ChatPage() {
       if (kind === 'leave') {
         const srv = getState().servers.find(x => x.sid === sid);
         if (!srv || !(await ask({ title: `Leave ${srv.name}?`, text: srv.inst ? (srv.join_policy === 'open' ? 'You can join again whenever you like.' : "You'll need to ask again, or have an invite, to get back in.") : srv.discoverable || srv.is_default ? 'You can join again from Discover.' : "You'll need an invite to get back in.", confirm: 'Leave server', danger: true }))) return;
-        apiFetch(`/chat/servers/${sid}/leave`, { method: 'POST' }).catch(er => toast(errorText(er.message)));
+        apiFetch(`/chat/servers/${sid}/leave`, { method: 'POST' }).then(() => { if (isInst(sid)) forgetLeft(sid); }).catch(er => toast(errorText(er.message)));
         return;
       }
       if (kind === 'leave-group') {
@@ -481,7 +484,7 @@ function ChatPage() {
   async function leaveServer() {
     const srv = detail.server;
     if (!(await ask({ title: `Leave ${srv.name}?`, text: srv.inst ? (srv.join_policy === 'open' ? 'You can join again whenever you like.' : "You'll need to ask again, or have an invite, to get back in.") : srv.discoverable || srv.is_default ? 'You can join again from Discover.' : "You'll need an invite to get back in.", confirm: 'Leave server', danger: true }))) return;
-    try { await apiFetch(`/chat/servers/${view.sid}/leave`, { method: 'POST' }); } catch (e) { toast(errorText(e.message)); }
+    try { await apiFetch(`/chat/servers/${view.sid}/leave`, { method: 'POST' }); if (isInst(view.sid)) forgetLeft(view.sid); } catch (e) { toast(errorText(e.message)); }
   }
   async function leaveGroup() {
     if (!(await ask({ title: `Leave ${group.name}?`, text: "Someone in the group will have to add you back.", confirm: 'Leave group', danger: true }))) return;

@@ -18,7 +18,7 @@ import { applyIdentity } from './identity.js';
 import { applyUserUpdate, instancesWithAccount } from './userUpdate.js';
 import { findPending, dropSettled, wireText, settle } from './pending.js';
 import { VELORA, K, parseK, instOf, bare, isInst, normOrigin, acctKey } from './ids.js';
-import { connections, sendTo, startInstances, loadInstanceData, retryInstances, renewVeloraSession, holdInstances } from './instances.js';
+import { connections, sendTo, startInstances, loadInstanceData, retryInstances, renewVeloraSession, holdInstances, forgetIfEmpty } from './instances.js';
 import { attachmentRefs } from './signing-payload.js';
 import { spoilerName } from './spoiler.js';
 import { prepareInstanceAttachments } from './attachment-preparation.js';
@@ -626,6 +626,7 @@ function onEvent(m, inst = VELORA) {
     case 'chat_server_removed':
       set(s => ({ servers: s.servers.filter(x => x.sid !== m.server), detail: Object.fromEntries(Object.entries(s.detail).filter(([k]) => k !== m.server)) }));
       if (state.view.sid === m.server) { go({ kind: 'home' }); toast(m.reason === 'deleted' ? 'That server was deleted.' : m.reason === 'left' ? 'You left the server.' : `You were ${m.reason === 'banned' ? 'banned' : 'removed'} from that server.`); }
+      if (inst !== VELORA) forgetIfEmpty(inst); // (an Ember server you're no longer in leaves the list, so it doesn't come back on reconnect)
       break;
     case 'chat_member_update':
       if (inst !== VELORA && state.commands[m.server] && String(m.user_id || '').startsWith('b:')) loadCommands(m.server);

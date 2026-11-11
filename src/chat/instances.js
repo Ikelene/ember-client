@@ -277,11 +277,18 @@ export async function loadInstanceData(origin) {
     loadEmojis();
     for (const [key] of Object.entries(getState().detail)) if (parseK(key).inst === origin && !srv.servers.some(x => x.sid === key)) patchState(s => { const detail = { ...s.detail }; delete detail[key]; return { detail }; });
     if (srv.servers.length && c.pending) { c.pending = false; mirror(); }
+    // in nothing there, nothing asked for, anyone could join (so no request is waiting) and not on screen: a server you left. Off the list
+    if (!srv.servers.length && !c.pending && !autoJoin.has(origin) && c.info?.community?.join_policy === 'open' && !onScreen(origin)) { removeInstance(origin); return; }
     resumeInstanceView(origin);
   } catch (e) { if (e.status === 401) hooks.refresh(origin); }
 }
 
 // ── the list ──
+const onScreen = origin => { const v = getState().view; return v.inst === origin || (!!v.sid && instOf(v.sid) === origin); };
+// you're in no server there any more (left, kicked, banned, it was deleted): it leaves the list on every device
+export function forgetIfEmpty(origin) {
+  if (connections.has(origin) && !getState().servers.some(x => x.inst === origin)) removeInstance(origin);
+}
 const newConn = (origin, info) => ({ origin, info: info || null, session: loadSessions()[origin] || null, user: null, ws: null, status: 'connecting', retry: 0, acks: new Map(), isAdmin: false, isOwner: false });
 function addConnection(origin, info) {
   let c = connections.get(origin);
