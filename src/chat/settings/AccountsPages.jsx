@@ -34,6 +34,7 @@ export function AccountsPage({ onClose }) {
   const me = useChat(s => s.me);
   const signedIn = useChat(s => s.signedIn);
   const instances = useChat(s => s.instances || NONE);
+  const localInstances = instances.filter(i => i.mode !== 'velora' && !i.needsVelora); // (Nookara-linked ones are left out, see Server accounts)
   const [busy, setBusy] = useState('');
   const others = signedIn ? savedAccounts().filter(a => a.username.toLowerCase() !== String(me?.username || '').toLowerCase()) : [];
 
@@ -95,9 +96,11 @@ export function AccountsPage({ onClose }) {
         </SCard>
       )}
 
-      <SCard title="Server accounts" sub="Ember servers you've added. Each one has its own sign-in.">
-        {instances.length ? instances.map(i => <InstanceRow key={i.origin} inst={i} onClose={onClose} />) : (
-          <div className="sx-empty"><Server size={28} /><b>No servers yet</b><span>Servers you add show up here with the account you use on each.</span></div>
+      {/* only servers with their own separate sign-in (a local account there): the ones you use with your Nookara account are
+          managed from the server list (Ikelene 2026-11-11) */}
+      <SCard title="Server accounts" sub="Ember servers where you use a separate account instead of Nookara.">
+        {localInstances.length ? localInstances.map(i => <InstanceRow key={i.origin} inst={i} onClose={onClose} />) : (
+          <div className="sx-empty"><Server size={28} /><b>No separate server accounts</b><span>Servers you use with your Nookara account aren't listed here; manage them from your server list.</span></div>
         )}
       </SCard>
 
