@@ -94,11 +94,18 @@ export function Avatar({ user, size = 32, status, className = '', ghost: ghostPr
 export function BlockedMark({ size = 13 }) {
   return <span className="vc-blocked-mark" title="You blocked this person" aria-label="Blocked by you"><Ban size={size} /></span>;
 }
+// who someone's listening to, for "Listening to <artist>" instead of the app's name: Spotify puts the artist in details; music
+// apps like Chime send a song (it has a duration) with "by <artist>" as its state. Radio and the rest keep the app's name.
+function listenArtist(a) {
+  if (a?.type !== 'listening') return '';
+  if (a.app === 'Spotify') return a.details || '';
+  return Number(a.duration) > 0 && a.state ? String(a.state).replace(/^by\s+/i, '') : '';
+}
 // "Playing Hyperfocus", or their custom status
 export function subtitle(p) {
   const a = p?.activities?.[0];
   if (a && onPlatform(a)) return <><Icon3DS /> Playing on <strong className="vc-sub-activity">{onPlatform(a)}</strong></>;
-  if (a?.app === 'Spotify' && a.type === 'listening' && a.details) return <>Listening to <strong className="vc-sub-activity">{a.details}</strong></>; // the artist; the song title stays on the activity card
+  if (listenArtist(a)) return <>Listening to <strong className="vc-sub-activity">{listenArtist(a)}</strong></>; // the artist; the song title stays on the activity card
   if (a) return a.type === 'custom' ? a.name : <>{VERB[a.type] || 'Playing'} <strong className="vc-sub-activity">{a.name}</strong></>;
   return p?.custom || '';
 }
@@ -123,7 +130,7 @@ export function ActivityCard({ a, compact = false }) {
   const progress = duration ? Math.min(duration, Math.max(0, progressBase)) : 0;
   const time = ms => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
   return (
-    <div className={`vc-act${compact ? ' compact' : ''}`}>
+    <div className={`vc-act${compact ? ' compact' : ''}${a.type === 'listening' ? ' listen' : ''}`}>
       <div className="vc-act-head">{plat ? <><Icon3DS /> Playing on {plat}</> : a.type === 'custom' ? 'Activity' : (VERB[a.type] || 'Playing')}{a.app ? <span> via {a.app}</span> : null}</div>
       <div className="vc-act-row">
         <span className="vc-act-art">{a.image || a.icon ? <img src={viaProxy(a.image || a.icon)} alt="" /> : <Icon size={compact ? 20 : 26} className={plat ? 'vc-3ds' : undefined} />}</span>
@@ -131,7 +138,7 @@ export function ActivityCard({ a, compact = false }) {
           <b>{a.url ? <a href={a.url} target="_blank" rel="noopener noreferrer nofollow">{a.name}</a> : a.name}</b>
           {a.details && <span>{a.details}</span>}
           {a.state && <span>{a.state}</span>}
-          {a.since && a.app !== 'Spotify' && <span className="vc-act-time"><Clock size={11} /> {elapsed(a.since)} elapsed</span>}
+          {a.since && a.type !== 'listening' && a.app !== 'Spotify' && <span className="vc-act-time"><Clock size={11} /> {elapsed(a.since)} elapsed</span>}
           {duration > 0 && <span className="vc-song-progress"><span className="vc-song-times"><span>{time(progress)}</span><span>{time(duration)}</span></span><span className="vc-song-track"><i style={{ width: `${(progress / duration) * 100}%` }} /></span></span>}
         </span>
       </div>

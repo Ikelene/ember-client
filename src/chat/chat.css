@@ -391,6 +391,16 @@ body:has(.vc-sign-banner) .vc-notify-banner { top: 52px; } /* (the notifications
 .vc-song-times { display: flex; justify-content: space-between; }
 .vc-song-track { display: block; height: 4px; overflow: hidden; border-radius: 99px; background: #34343a; }
 .vc-song-track i { display: block; height: 100%; border-radius: inherit; background: #1db954; transition: width .9s linear; }
+/* listening (Spotify, Chime...): a smaller card than games get */
+.vc-act.listen { padding: 8px 10px; }
+.vc-act.listen .vc-act-head { margin-bottom: 6px; font-size: 10.5px; }
+.vc-act.listen .vc-act-row { gap: 10px; }
+.vc-act.listen .vc-act-art { width: 48px; height: 48px; }
+.vc-act.listen.compact .vc-act-art { width: 40px; height: 40px; }
+.vc-act.listen .vc-act-txt { font-size: 12px; }
+.vc-act.listen .vc-act-txt b { font-size: 13px; }
+.vc-act.listen .vc-song-progress { gap: 3px; margin-top: 4px; min-width: 140px; font-size: 10.5px; }
+.vc-act.listen .vc-song-track { height: 3px; }
 
 /* the large profile */
 .vc-modal-back { position: fixed; inset: 0; z-index: 2100; display: grid; place-items: center; padding: 20px; background: rgba(5, 5, 7, .72); backdrop-filter: blur(3px); animation: vc-fade .2s ease-out; }
