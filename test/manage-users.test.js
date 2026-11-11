@@ -17,13 +17,18 @@ test('a registered app shows its registry name, not the token name', () => {
 });
 test('no app: only the web address, never a token name', () => {
   assert.equal(viaLabel({ official: false, token: 'My bot', url: 'https://a.example' }, lookup), 'a.example');
-  assert.equal(viaLabel({ url: 'https://nookara.cc', kind: 'desktop' }, lookup), 'nookara.cc'); // no more "Ember Desktop" by origin
+  assert.equal(viaLabel({ url: 'https://a.example', kind: 'desktop' }, lookup), 'a.example');
   assert.equal(viaLabel({ official: false }, lookup), 'Unknown client');
+});
+test('no App id but sent from the Ember site: Ember (old messages, old Ember server sessions)', () => {
+  assert.equal(viaTitle({ url: 'https://ember.nookara.cc', kind: 'desktop' }, lookup, true), 'Sent from Ember (verified)');
+  assert.equal(viaLabel({ url: 'https://nookara.cc' }, lookup), 'Ember');
+  assert.equal(viaLabel({ url: 'https://ember.nookara.cc.evil.example' }, lookup, true), 'ember.nookara.cc.evil.example');
 });
 test('an Ember server cannot borrow a verified mark', () => {
   assert.equal(viaTitle({ app: EMBER, url: 'https://ember.nookara.cc' }, lookup, true), 'Sent from Ember (verified)');
   assert.equal(viaTitle({ app: EMBER, url: 'https://evil.example' }, lookup, true), 'Sent from Ember');
-  assert.equal(viaLabel({ official: true, url: 'https://ember.nookara.cc' }, lookup, true), 'ember.nookara.cc'); // (official from a server means nothing)
+  assert.equal(viaLabel({ official: true, url: 'https://a.example' }, lookup, true), 'a.example'); // (official from a server means nothing)
 });
 test('a session line lists platform, device, browser and version', () => {
   assert.equal(sessionLine({ platform: 'Windows', browser: 'Chrome', version: 'abc1234' }), 'Windows, Chrome, vabc1234');

@@ -9,6 +9,7 @@ import { NOOKARA_ORIGIN } from './hosts.js';
 export const EMBER_APP_ID = 'app_e3be4c1d7a9f02b65c88';
 const APP_ID = /^app_[0-9a-f]{8,40}$/;
 
+const EMBER_SITES = new Set(['ember.nookara.cc', 'nookara.cc', 'velora.ikelene.net']); // where Ember (web, desktop, Android) runs
 const hostOf = u => { try { return new URL(String(u)).host.toLowerCase(); } catch { return ''; } };
 const baseHost = h => String(h || '').replace(/^www\./, '');
 // same site: equal hosts, or one a subdomain of the other's site (ember.nookara.cc and nookara.cc)
@@ -19,7 +20,10 @@ const sameSite = (a, b) => { a = baseHost(a); b = baseHost(b); return !!a && !!b
 export function describeVia(via, lookup = () => undefined, fromInstance = false) {
   if (!via) return null;
   const domain = via.url ? String(via.url).replace(/^https?:\/\//, '') : '';
-  const id = APP_ID.test(String(via.app || '')) ? String(via.app) : (via.official && !fromInstance ? EMBER_APP_ID : null);
+  // no App id: Ember's own sites are the Ember App (messages from before App ids, and Ember server sessions made before the
+  // sign-in token carried one, only have the address). Same rule as the verified check: an address on Ember's own site.
+  const id = APP_ID.test(String(via.app || '')) ? String(via.app)
+    : (via.official && !fromInstance) || EMBER_SITES.has(baseHost(hostOf(via.url))) ? EMBER_APP_ID : null;
   if (id) {
     const info = lookup(id);
     if (info) {
