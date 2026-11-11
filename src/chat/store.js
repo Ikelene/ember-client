@@ -307,7 +307,7 @@ export function sendBinary(buf) {
 // voice.js listens here (voice JSON, calls, who's in which voice channel, and the audio frames)
 let voiceHook = null;
 export const onVoiceEvent = fn => { voiceHook = fn; };
-const VOICE_EVENTS = new Set(['voice', 'voice_open', 'voice_closed', 'voice_call_incoming', 'voice_call_ringing', 'voice_call_answered', 'voice_call_accepted', 'voice_call_failed', 'voice_call_ended', 'chat_voice_state', 'chat_call_state', 'voice_sound', 'voice_sound_failed', 'chat_rtc_joined', 'chat_rtc_published', 'chat_rtc_offer', 'chat_rtc_ready', 'chat_rtc_room']);
+const VOICE_EVENTS = new Set(['voice', 'voice_open', 'voice_closed', 'voice_call_incoming', 'voice_call_ringing', 'voice_call_answered', 'voice_call_accepted', 'voice_call_failed', 'voice_call_ended', 'chat_voice_state', 'chat_call_state', 'voice_sound', 'voice_sound_failed', 'chat_rtc_joined', 'chat_rtc_published', 'chat_rtc_offer', 'chat_rtc_ready', 'chat_rtc_room', 'chat_rtc_resumed']);
 // is this a phone (or tablet)? -> the socket says mobile: true and people see the phone mark next to you.
 // 1. the desktop app is never mobile
 // 2. Chromium's Client Hints say so (navigator.userAgentData.mobile) -> mobile
@@ -346,7 +346,7 @@ export function connect() {
   s.onclose = () => {
     if (sock !== s) return;
     set({ conn: 'closed' });
-    voiceHook?.({ type: 'voice_closed' }); // the voice link went with the socket
+    voiceHook?.({ type: 'voice_closed', dropped: true }); // the voice link went with the socket (voice.js waits for the next one to resume a call)
     const wait = backoff(retry++);
     set({ connRetryAt: Date.now() + wait });
     clearTimeout(sockTimer); sockTimer = setTimeout(connect, wait);
@@ -389,7 +389,10 @@ export function handleEvent(m, inst = VELORA) {
   onEvent(m, inst);
 }
 // an instance's socket closed: a voice channel on it is over
-export function instanceVoiceClosed(origin) { voiceHook?.({ type: 'voice_closed', inst: origin }); }
+// dropped = the socket just went (a call can resume on the next one); otherwise the call is over for good
+export function instanceVoiceClosed(origin, { dropped = false } = {}) { voiceHook?.({ type: 'voice_closed', inst: origin, dropped }); }
+// a socket is (back) up and said chat_ready: a call held over a drop can resume now
+export function voiceSocketReady(inst = VELORA) { voiceHook?.({ type: 'voice_socket_ready', inst }); }
 // me, as that instance knows me
 const meOn = inst => (inst === VELORA || !inst ? state.me : connections.get(inst)?.user) || state.me;
 export const isMineMsg = msg => isMine(msg);
@@ -426,6 +429,7 @@ function onEvent(m, inst = VELORA) {
       else if (inst === VELORA) E2EE.flushOutbox();
       set(s => ({ conn: 'open', connected: true, presence: { ...s.presence, [m.you.username]: localizePresence(m.you.presence) } }));
       rewatchPresence(); // (a new socket: the server forgot what this one was watching)
+      if (inst === VELORA) voiceSocketReady(VELORA);
       catchUp();
       loadNotifCount(); // (anything that happened while the socket was down)
       break;

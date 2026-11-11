@@ -6,7 +6,7 @@
 // with Velora it is merged with (and saved to) /bonfire/instances.
 import { apiFetch, getToken } from '../api.js';
 import { K, acctKey, registry, hooks, normOrigin, instOf, loadSessions, loadSessionTags, tokenTag, saveSession, fromInstance, parseK } from './ids.js';
-import { getState, patchState, toast, handleEvent, RESTRICTED_TEXT, instanceVoiceClosed, loadEmojis, go, catchUp, resumeInstanceView, backoff, instanceRestricted, instanceRestored } from './store.js';
+import { getState, patchState, toast, handleEvent, RESTRICTED_TEXT, instanceVoiceClosed, voiceSocketReady, loadEmojis, go, catchUp, resumeInstanceView, backoff, instanceRestricted, instanceRestored } from './store.js';
 
 export const connections = new Map();
 const LIST_CACHE = () => acctKey('bonfire_instance_list'); // (per account: an alt must not inherit the main's servers)
@@ -179,7 +179,7 @@ function openSocket(c) {
   ws.onclose = ev => {
     if (c.ws !== ws) return;
     c.ws = null;
-    instanceVoiceClosed(c.origin);
+    instanceVoiceClosed(c.origin, { dropped: true }); // (a call waits for the next socket to resume it)
     if (!connections.has(c.origin)) return;
     if (ev.code === 4003) { setStatus(c, 'banned'); return; }
     if (ev.code === 4001) { // the session was rejected: get a fresh one
@@ -247,6 +247,7 @@ function onFrame(c, m) {
       c.restricted = null;
       c.retry = 0; c.failed = false; c.retryAt = 0;
       setStatus(c, 'open');
+      voiceSocketReady(c.origin);
       loadInstanceData(c.origin).then(() => { catchUp(c.origin); if (autoJoin.has(c.origin)) joinOnce(c); });
 
       if (c.isAdmin) loadServerInfo(c);

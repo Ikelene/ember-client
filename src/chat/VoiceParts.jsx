@@ -150,7 +150,7 @@ export function VoicePanel() {
       <div className="vc-vpanel-top">
         <span className="vc-vpanel-sig"><Volume2 size={15} /></span>
         <button type="button" className="vc-vpanel-where" onClick={() => (v.info.kind === 'channel' && v.info.sid ? go({ kind: 'channel', sid: v.info.sid, cid: v.info.cid }) : v.info.with && go({ kind: 'dm', username: v.info.with }))}>
-          <b>{v.status === 'connected' ? 'Voice connected' : 'Connecting...'}</b>
+          <b>{v.status === 'connected' ? 'Voice connected' : v.status === 'reconnecting' ? 'Reconnecting...' : 'Connecting...'}</b>
           <small>{where}</small>
         </button>
         <button type="button" className="vc-ico-btn danger" title="Disconnect" onClick={() => leaveVoice()}><PhoneOff size={17} /></button>
