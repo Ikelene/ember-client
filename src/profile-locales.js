@@ -602,8 +602,9 @@ export const TIMEZONES = [
   "Zulu"
 ];
 
-// All 249 ISO 3166-1 countries and territories, plus Kosovo (XK).
-// Checked against tzdb iso3166.tab.
+// The ISO 3166-1 countries and territories that have a permanent civilian population, plus Kosovo (XK).
+// 249 ISO entries minus 7 with none (AQ, BV, HM, TF, GS, UM, IO): 242, plus XK = 243. Checked against tzdb iso3166.tab.
+// Keep in step with HIDDEN in country-list.js on the server (it rejects the removed codes).
 export const COUNTRIES = [
   ["AF", "Afghanistan"],
   ["AX", "Åland Islands"],
@@ -613,7 +614,6 @@ export const COUNTRIES = [
   ["AD", "Andorra"],
   ["AO", "Angola"],
   ["AI", "Anguilla"],
-  ["AQ", "Antarctica"],
   ["AG", "Antigua and Barbuda"],
   ["AR", "Argentina"],
   ["AM", "Armenia"],
@@ -635,9 +635,7 @@ export const COUNTRIES = [
   ["BQ", "Bonaire, Sint Eustatius and Saba"],
   ["BA", "Bosnia and Herzegovina"],
   ["BW", "Botswana"],
-  ["BV", "Bouvet Island"],
   ["BR", "Brazil"],
-  ["IO", "British Indian Ocean Territory"],
   ["BN", "Brunei"],
   ["BG", "Bulgaria"],
   ["BF", "Burkina Faso"],
@@ -684,7 +682,6 @@ export const COUNTRIES = [
   ["FR", "France"],
   ["GF", "French Guiana"],
   ["PF", "French Polynesia"],
-  ["TF", "French Southern Territories"],
   ["GA", "Gabon"],
   ["GM", "Gambia"],
   ["GE", "Georgia"],
@@ -702,7 +699,6 @@ export const COUNTRIES = [
   ["GW", "Guinea-Bissau"],
   ["GY", "Guyana"],
   ["HT", "Haiti"],
-  ["HM", "Heard Island and McDonald Islands"],
   ["VA", "Holy See"],
   ["HN", "Honduras"],
   ["HK", "Hong Kong"],
@@ -813,7 +809,6 @@ export const COUNTRIES = [
   ["SB", "Solomon Islands"],
   ["SO", "Somalia"],
   ["ZA", "South Africa"],
-  ["GS", "South Georgia and the South Sandwich Islands"],
   ["SS", "South Sudan"],
   ["ES", "Spain"],
   ["LK", "Sri Lanka"],
@@ -842,7 +837,6 @@ export const COUNTRIES = [
   ["AE", "United Arab Emirates"],
   ["GB", "United Kingdom"],
   ["US", "United States"],
-  ["UM", "United States Minor Outlying Islands"],
   ["UY", "Uruguay"],
   ["UZ", "Uzbekistan"],
   ["VU", "Vanuatu"],
