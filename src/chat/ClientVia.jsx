@@ -1,30 +1,28 @@
 // Which client someone is using. `via` on a message goes to everyone (since 2026-11-07);
 // on a presence, and `sessions` / `last_online` / `notifications_only` on a presence (people also get `sessions` for themselves). Ember servers send `via` the same way.
-// The name and verified badge come from Velora's official clients list (officialClients.js); anything not on it shows
+// The name, logo and verified badge are the Nookara App that sent it (appClients.js, from Nookara's App registry); no App shows
 // its domain (or token name) with no badge.
 import { useEffect, useState } from 'react';
 import { BadgeCheck, Plug, Globe, Monitor, Smartphone, Clock } from 'lucide-react';
 import { viaTitle, sessionShort, sessionDetails, sessionKind, sessionIsIdle, STATE_SHORT } from './clientViaText.js';
-import { describeVia, officialClients, loadOfficialClients, onOfficialClients } from './officialClients.js';
+import { describeVia, appInfo, loadApp, onApps } from './appClients.js';
 
 // the official clients list (null until it's known), re-rendering when it arrives
-export function useOfficialClients() {
-  const [list, setList] = useState(officialClients);
-  useEffect(() => {
-    const off = onOfficialClients(setList);
-    loadOfficialClients().then(setList).catch(() => {});
-    return off;
-  }, []);
-  return list;
+// re-render when an App's registry entry arrives; returns the lookup describeVia takes
+export function useApps() {
+  const [, bump] = useState(0);
+  useEffect(() => onApps(() => bump(n => n + 1)), []);
+  return appInfo;
 }
 
 // the chip: [icon] name [verified badge]. Unknown clients: a globe (or plug for a token) + their domain / token name
 const KIND_ICON = { mobile: Smartphone, desktop: Monitor, browser: Globe };
 function Chip({ via, list, tip, Icon, iconOnly, inst }) {
   const d = describeVia(via, list, !!inst);
-  const tipData = tip ? JSON.stringify({ name: d.name, domain: d.domain, verified: d.verified, known: d.known, registered: !!d.registered, text: viaTitle(via, list), icon: d.icon || null }) : undefined;
+  useEffect(() => { if (d.app && list(d.app) === undefined) loadApp(d.app); }, [d.app]); // eslint-disable-line react-hooks/exhaustive-deps
+  const tipData = tip ? JSON.stringify({ name: d.name, domain: d.domain, verified: d.verified, known: d.known, registered: !!d.registered, text: viaTitle(via, list, !!inst), icon: d.icon || null }) : undefined;
   return (
-    <span className={`vc-via${d.verified ? ' official' : ''}${iconOnly ? ' icon-only' : ''}`} data-tip-via={tipData} aria-label={viaTitle(via, list)}>
+    <span className={`vc-via${d.verified ? ' official' : ''}${iconOnly ? ' icon-only' : ''}`} data-tip-via={tipData} aria-label={viaTitle(via, list, !!inst)}>
       {d.icon ? <img className="vc-via-icon" src={d.icon} alt="" /> : Icon ? <Icon size={13} aria-hidden="true" /> : iconOnly ? <Globe size={13} /> : !d.verified && (via.token ? <Plug size={12} /> : <Globe size={12} />)}
       {!iconOnly && <span className="vc-via-name">{d.name}</span>}
       {!iconOnly && d.verified && <BadgeCheck size={12} className="vc-via-check" aria-hidden="true" />}
@@ -34,7 +32,7 @@ function Chip({ via, list, tip, Icon, iconOnly, inst }) {
 
 // the small tag next to a message's author
 export function ViaBadge({ via, inst }) {
-  const list = useOfficialClients();
+  const list = useApps();
   if (!via) return null;
   return <Chip via={via} list={list} tip iconOnly inst={inst} />; // (everyone sees it since 2026-11-07: just the app's icon, or a globe; the name is in the hover card)
 }
@@ -46,7 +44,7 @@ export function ViaTip({ t }) {
       {t.icon ? <img className="vc-tip-via-ico" src={t.icon} alt="" /> : <Globe size={17} />}
       <div>
         <b>{t.known ? <>Sent from {t.name}</> : t.text}{t.verified && <BadgeCheck size={13} className="vc-via-check" aria-label="Verified client" />}</b>
-        <span>{t.verified ? 'An official Ember app.' : t.registered ? 'A Nookara app.' : t.known ? 'The app this message was sent with.' : "This client isn't on Nookara's list of known apps."}{t.domain && t.known ? ` ${t.domain}` : ''}</span>
+        <span>{t.verified ? 'A verified Nookara app.' : t.known ? 'A Nookara app.' : 'Not sent with a Nookara app.'}{t.domain && t.known ? ` ${t.domain}` : ''}</span>
       </div>
     </div>
   );
@@ -79,7 +77,7 @@ export function LastOnlineFact({ member }) {
 }
 // the "Client" and "Last online" rows of a mini profile
 export function ManageFacts({ presence }) {
-  const list = useOfficialClients();
+  const list = useApps();
   if (!presence || (presence.sessions === undefined && presence.last_online === undefined && presence.last_login === undefined)) return null;
   const sessions = presence.sessions || [];
   const online = presence.status !== 'offline';

@@ -1,17 +1,16 @@
 // Plain text for the client info shown to people with Manage users (no React, so it can be tested).
 // via: { official?, kind?, name?, token?, url?, app? } from Velora (client-via.js) or an Ember server ({ url, kind? }).
-// list = Velora's official clients (officialClients.js); null/undefined = not loaded yet.
-import { describeVia } from './officialClients.js';
+// lookup = the App registry lookup (appClients.js appInfo).
+import { describeVia } from './appClients.js';
 
-export function viaLabel(via, list) {
+export function viaLabel(via, list, fromInstance) {
   if (!via) return '';
-  return describeVia(via, list).name;
+  return describeVia(via, list, fromInstance).name;
 }
-export function viaTitle(via, list) {
+export function viaTitle(via, list, fromInstance) {
   if (!via) return 'Sent from an unknown client';
-  const d = describeVia(via, list);
-  if (d.known) return `Sent from ${d.name}${d.verified ? ' (official)' : ''}`;
-  if (via.token) return `Sent with the sign-in token "${via.token}"${via.url ? ` from ${via.url}` : ''}`;
+  const d = describeVia(via, list, fromInstance);
+  if (d.known) return `Sent from ${d.name}${d.verified ? ' (verified)' : ''}`;
   return via.url ? `Sent from ${via.url}` : 'Sent from an unknown client';
 }
 export const STATE_TEXT = { notifications: 'Notifications only, the app is not open', background: 'In the background' };
