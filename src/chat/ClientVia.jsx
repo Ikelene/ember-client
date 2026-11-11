@@ -3,9 +3,12 @@
 // The name, logo and verified badge are the Nookara App that sent it (appClients.js, from Nookara's App registry); no App shows
 // its domain (or token name) with no badge.
 import { useEffect, useState } from 'react';
-import { BadgeCheck, Plug, Globe, Monitor, Smartphone, Clock } from 'lucide-react';
-import { viaTitle, sessionShort, sessionDetails, sessionKind, sessionIsIdle, STATE_SHORT } from './clientViaText.js';
+import { BadgeCheck, Plug, Globe, Monitor, Smartphone, Clock, Bot } from 'lucide-react';
+import { viaTitle, sessionShort, sessionDetails, sessionKind, sessionIsIdle, mergeSessions, STATE_SHORT } from './clientViaText.js';
 import { describeVia, appInfo, loadApp, onApps } from './appClients.js';
+import { useChat } from './store.js';
+import { parseK } from './ids.js';
+import { watchInstClients, instClientsOf, onInstClients } from './instClients.js';
 
 // the official clients list (null until it's known), re-rendering when it arrives
 // re-render when an App's registry entry arrives; returns the lookup describeVia takes
@@ -16,7 +19,7 @@ export function useApps() {
 }
 
 // the chip: [icon] name [verified badge]. Unknown clients: a globe (or plug for a token) + their domain / token name
-const KIND_ICON = { mobile: Smartphone, desktop: Monitor, browser: Globe };
+const KIND_ICON = { mobile: Smartphone, desktop: Monitor, browser: Globe, bot: Bot };
 function Chip({ via, list, tip, Icon, iconOnly, inst }) {
   const d = describeVia(via, list, !!inst);
   useEffect(() => { if (d.app && list(d.app) === undefined) loadApp(d.app); }, [d.app]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -75,13 +78,38 @@ export function LastOnlineFact({ member }) {
   if (!member) return null;
   return <LastOnlineRow online={!!member.online} at={Number(member.last_online) || 0} />;
 }
-// the "Client" and "Last online" rows of a mini profile
-export function ManageFacts({ presence }) {
+// The clients an Ember server says this member is connected with (instClients.js), while the card is open. `who` = the member
+// as that server knows them ({ inst, id }), `sid` = the server the card was opened in. Only asked when the server would answer:
+// it is me there, or I hold Manage users in that server (the server checks again; anyone else gets nothing).
+// -> undefined (nothing / not asked) | null (not allowed) | { online, sessions, last_online }
+const MANAGE_USERS = 2048;
+export function useInstClients(who, sid) {
+  const inst = who?.inst || null, uid = who?.id != null ? String(who.id) : null;
+  const server = useChat(s => {
+    if (!inst || uid == null) return null;
+    const here = sid && parseK(sid).inst === inst ? sid : s.servers.find(x => x.inst === inst)?.sid; // (one community per server, usually)
+    if (!here) return null;
+    const mine = s.instances?.find(i => i?.origin === inst)?.user?.id;
+    const perms = Number(s.detail[here]?.server?.perms ?? s.servers.find(x => x.sid === here)?.perms) || 0;
+    return String(mine) === uid || (perms & MANAGE_USERS) === MANAGE_USERS ? parseK(here).id : null;
+  });
+  const [, bump] = useState(0);
+  useEffect(() => onInstClients(() => bump(n => n + 1)), []);
+  useEffect(() => (server ? watchInstClients(inst, server, uid) : undefined), [inst, server, uid]);
+  return server ? instClientsOf(inst, uid) : undefined;
+}
+
+// the "Client" and "Last online" rows of a mini profile.
+// presence: Nookara's (its `sessions`); inst: what an Ember server reports (useInstClients); member: an Ember server's member row
+// (last_online / online for Manage users) for its own accounts and bots. Ember is connected to both, so the lists are merged.
+export function ManageFacts({ presence, inst, member }) {
   const list = useApps();
-  if (!presence || (presence.sessions === undefined && presence.last_online === undefined && presence.last_login === undefined)) return null;
-  const sessions = presence.sessions || [];
-  const online = presence.status !== 'offline';
-  const at = presence.last_online ? Number(presence.last_online) : 0;
+  const hasP = !!presence && (presence.sessions !== undefined || presence.last_online !== undefined || presence.last_login !== undefined);
+  const hasI = !!inst && Array.isArray(inst.sessions);
+  if (!hasP && !hasI) return member ? <LastOnlineFact member={member} /> : null;
+  const sessions = mergeSessions(hasP ? presence.sessions || [] : [], hasI ? inst.sessions : [], list);
+  const online = (hasP && presence.status !== 'offline') || (hasI && inst.online) || (!hasP && !hasI && !!member?.online);
+  const at = Number((hasP && presence.last_online) || (hasI && inst.last_online) || member?.last_online) || 0;
   return (
     <>
       {sessions.length > 0 && (
@@ -89,13 +117,13 @@ export function ManageFacts({ presence }) {
           <b>{sessions.length > 1 ? 'Clients' : 'Client'}</b>
           {sessions.map((s, i) => (
             <span key={i} className={`vc-via-row${sessionIsIdle(s) ? ' idle' : ''}`} title={sessionDetails(s) || undefined}>
-              {s.via ? <Chip via={s.via} list={list} Icon={KIND_ICON[sessionKind(s)]} /> : <span className="vc-via"><Globe size={13} /><span className="vc-via-name">Unknown client</span></span>}
+              {s.via ? <Chip via={s.via} list={list} Icon={KIND_ICON[sessionKind(s)]} inst={s.inst} /> : <span className="vc-via"><Globe size={13} /><span className="vc-via-name">Unknown client</span></span>}
               {sessionIsIdle(s) ? <small>{STATE_SHORT[s.state]}</small> : sessionShort(s) && <small>{sessionShort(s)}</small>}
             </span>
           ))}
         </div>
       )}
-      {sessions.length === 0 && presence.status === 'offline' && <div className="pe-fact vc-manage-fact"><b>Client</b><span>Not connected</span></div>}
+      {sessions.length === 0 && !online && <div className="pe-fact vc-manage-fact"><b>Client</b><span>Not connected</span></div>}
       <LastOnlineRow online={online} at={at} />
     </>
   );

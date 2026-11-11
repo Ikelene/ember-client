@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { viaLabel, viaTitle, sessionLine, sessionShort, sessionDetails, sessionKind, sessionIsIdle } from '../src/chat/clientViaText.js';
+import { viaLabel, viaTitle, sessionLine, sessionShort, sessionDetails, sessionKind, sessionIsIdle, mergeSessions } from '../src/chat/clientViaText.js';
 
 // the client is the Nookara App that sent it (appClients.js): its registry name, logo and verified mark
 const EMBER = 'app_e3be4c1d7a9f02b65c88', SC = 'app_41afda32aadb66d74415';
@@ -46,4 +46,37 @@ test('a session line lists platform, device, browser and version', () => {
   assert.equal(sessionIsIdle({ state: 'notifications' }), true);
   assert.equal(sessionIsIdle({ state: 'background' }), true);
   assert.equal(sessionIsIdle({ state: 'active' }), false);
+});
+
+test("an Ember server's clients merge with Nookara's: Ember (on both) once, the rest added and marked", () => {
+  const nookara = [
+    { via: { official: true, kind: 'desktop', app: EMBER }, platform: 'Windows', browser: 'Electron' },
+    { via: { app: EMBER, url: 'https://ember.nookara.cc' }, browser: 'Chrome', platform: 'Windows' },
+  ];
+  const inst = [
+    { via: { url: 'https://ember.nookara.cc', kind: 'desktop', app: EMBER }, platform: 'Windows', browser: 'Electron' }, // = the desktop app
+    { via: { url: 'https://ember.nookara.cc', app: EMBER }, browser: 'Chrome' }, // = the Chrome tab
+    { via: { url: 'https://ember.nookara.cc', app: EMBER }, browser: 'Firefox' }, // a second tab, only on the server
+    { via: { url: 'https://ikelene.net', app: SC }, browser: 'Chrome' }, // ScratchCord, only on the server
+    { via: {} }, // a script
+  ];
+  const out = mergeSessions(nookara, inst, lookup);
+  assert.equal(out.length, 5);
+  assert.deepEqual(out.slice(0, 2), nookara);
+  assert.deepEqual(out.slice(2).map(s => s.inst), [true, true, true]);
+  assert.equal(out[2].browser, 'Firefox');
+  assert.equal(viaLabel(out[3].via, lookup, true), 'ScratchCord V2');
+  assert.equal(viaLabel(out[4].via, lookup, true), 'Unknown client');
+  assert.deepEqual(mergeSessions([], inst.slice(0, 1), lookup), [{ ...inst[0], inst: true }]);
+  assert.deepEqual(mergeSessions(nookara, [], lookup), nookara);
+});
+test("an Ember server's session cannot borrow a verified mark either", () => {
+  assert.equal(viaTitle({ app: SC, url: 'https://evil.example' }, lookup, true), 'Sent from ScratchCord V2');
+  assert.equal(viaTitle({ app: EMBER, url: 'https://evil.example', kind: 'desktop' }, lookup, true), 'Sent from Ember');
+});
+test('bot gateway connections: a bot icon, never a token name', () => {
+  assert.equal(sessionKind({ via: { kind: 'bot' } }), 'bot');
+  assert.equal(viaLabel({ kind: 'bot' }, lookup, true), 'Bot connection');
+  assert.equal(viaLabel({ kind: 'bot', token: 'secret name' }, lookup, true), 'Bot connection');
+  assert.equal(viaLabel({ kind: 'bot', url: 'https://bot.example' }, lookup, true), 'bot.example');
 });

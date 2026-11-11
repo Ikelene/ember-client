@@ -32,7 +32,7 @@ export function describeVia(via, lookup = () => undefined, fromInstance = false)
     }
     if (info === undefined) return { name: id === EMBER_APP_ID ? 'Ember' : (via.token || domain || 'A Nookara app'), verified: false, icon: null, domain, known: true, registered: true, app: id };
   }
-  return { name: domain || 'Unknown client', verified: false, icon: null, domain: '', known: false, registered: false, app: null };
+  return { name: domain || (via.kind === 'bot' ? 'Bot connection' : 'Unknown client'), verified: false, icon: null, domain: '', known: false, registered: false, app: null };
 }
 
 // ── the registry cache ──

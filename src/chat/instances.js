@@ -6,6 +6,8 @@
 // with Velora it is merged with (and saved to) /bonfire/instances.
 import { apiFetch, getToken } from '../api.js';
 import { K, acctKey, registry, hooks, normOrigin, instOf, loadSessions, loadSessionTags, tokenTag, saveSession, fromInstance, parseK } from './ids.js';
+import { onInstClientsFrame, rewatchInstClients } from './instClients.js';
+import { SHORT } from '../version.js';
 import { getState, patchState, toast, handleEvent, RESTRICTED_TEXT, instanceVoiceClosed, voiceSocketReady, loadEmojis, go, catchUp, resumeInstanceView, backoff, instanceRestricted, instanceRestored } from './store.js';
 
 export const connections = new Map();
@@ -170,7 +172,7 @@ function openSocket(c) {
   setStatus(c, 'connecting');
   const ws = new WebSocket(`${c.origin.replace(/^http/, 'ws')}/gateway`);
   c.ws = ws;
-  ws.onopen = () => ws.send(JSON.stringify({ type: 'auth', session: c.session }));
+  ws.onopen = () => ws.send(JSON.stringify({ type: 'auth', session: c.session, client: { version: SHORT } })); // (`client`: shown to Manage users holders, PROTOCOL §7.1)
   ws.onmessage = e => {
     if (c.ws !== ws || typeof e.data !== 'string') return;
     let m; try { m = JSON.parse(e.data); } catch { return; }
@@ -241,13 +243,18 @@ function onFrame(c, m) {
       return;
     case 'chat_error':
       if (m.error === 'account_restricted') { restrict(c, m.message); return; } // (any chat_ / voice_ frame after the notice: no toast per request)
+      if (m.request === 'chat_clients_watch') { onInstClientsFrame(c.origin, m); return; } // (not allowed to see them: no row, no toast)
       break;
+    case 'chat_clients': // a watched member's live clients (instClients.js)
+      onInstClientsFrame(c.origin, m);
+      return;
     case 'chat_ready':
       if (held) return; // (the account is locked: holdInstances(false) says hello again)
       c.restricted = null;
       c.retry = 0; c.failed = false; c.retryAt = 0;
       setStatus(c, 'open');
       voiceSocketReady(c.origin);
+      rewatchInstClients(c.origin); // (open profile cards: the new socket doesn't know what the old one watched)
       loadInstanceData(c.origin).then(() => { catchUp(c.origin); if (autoJoin.has(c.origin)) joinOnce(c); });
 
       if (c.isAdmin) loadServerInfo(c);

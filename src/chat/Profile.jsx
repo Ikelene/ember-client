@@ -17,7 +17,7 @@ import { userMenu } from './Menu.jsx';
 import { RoleChips, modRights, moderate } from './roles.jsx';
 import { PlatformIcon, PLATFORM_NAMES } from './platforms.jsx';
 import StatusReply from './StatusReply.jsx';
-import { ManageFacts, LastOnlineFact } from './ClientVia.jsx';
+import { ManageFacts, useInstClients } from './ClientVia.jsx';
 import { MaskIcon } from './Alias.jsx';
 
 export const STATUS_LABEL = { online: 'Online', idle: 'Idle', dnd: 'Do not disturb', invisible: 'Invisible', offline: 'Offline' };
@@ -267,6 +267,7 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
   const instMe = useChat(s => (who?.inst ? s.instances?.find(i => i?.origin === who.inst)?.user?.id : null));
   const presence = useChat(s => (plain ? null : s.presence[vname])) || (plain ? null : extra?.presence);
   const member = useChat(s => (sid ? s.members[sid]?.find(m => m.username === username) : null));
+  const instClients = useInstClients(who, sid); // an Ember server's view of their clients (me / Manage users there only)
   const ref = useRef(null);
   const setRef = el => { ref.current = el; if (outerRef) outerRef.current = el; };
   const [menu, setMenu] = useState(false);
@@ -341,8 +342,7 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
             {plain && who?.bot && extra?.bot?.bot?.description ? <BioText text={extra.bot.bot.description} /> : null}
             {sid && <RoleChips sid={sid} username={username} />}
             {localTime && <div className="pe-fact"><b>Local time</b><span>{localTime}</span></div>}
-            {!plain && <ManageFacts presence={presence} />}
-            {plain && <LastOnlineFact member={member} />}
+            <ManageFacts presence={plain ? null : presence} inst={instClients} member={plain ? member : null} />
             {member?.joined_at && <div className="pe-fact vc-fact-classic"><b>Joined this server</b><span>{new Date(member.joined_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span></div>}
             {!plain && p?.created_at && <div className="pe-fact vc-fact-classic"><b>Nookara member since</b><span>{new Date(p.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span></div>}
             <ProfileDates joined={member?.joined_at} since={!plain ? p?.created_at : null} />
@@ -406,6 +406,7 @@ export function ProfileModal({ username: shown, from, sid, who, onClose }) {
   const me = useChat(s => s.me);
   const presence = useChat(s => s.presence[username]) || extra?.presence;
   const member = useChat(s => (sid ? s.members[sid]?.find(m => m.username === shown) : null));
+  const instClients = useInstClients(who, sid);
   const [tab, setTab] = useState('about');
   const [friend, setFriend] = useState(null);
   const [closing, setClosing] = useState(false);
@@ -520,7 +521,7 @@ export function ProfileModal({ username: shown, from, sid, who, onClose }) {
                   <div className="vc-facts">
                     {p?.country_code && <div className="pe-fact"><b>Country</b><span className="pe-country"><img className="pe-flag" src={`/assets/flags/${p.country_code.toLowerCase()}.png`} alt="" onError={e => { e.currentTarget.style.display = 'none'; }} /> {regionName(p.country_code)}</span></div>}
                     {localTime && <div className="pe-fact"><b>Local time</b><span>{localTime}</span></div>}
-                    <ManageFacts presence={presence} />
+                    <ManageFacts presence={presence} inst={instClients} />
                     {p?.created_at && <div className="pe-fact vc-fact-classic"><b>Nookara member since</b><span>{new Date(p.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</span></div>}
                     <ProfileDates since={p?.created_at} />
                     {p?.website && <div className="pe-fact"><b>Website</b><span><a className="pe-link" href={/^https?:/i.test(p.website) ? p.website : `https://${p.website}`} target="_blank" rel="noopener noreferrer nofollow"><Globe size={13} /> {p.website.replace(/^https?:\/\/(www\.)?/i, '')}</a></span></div>}
