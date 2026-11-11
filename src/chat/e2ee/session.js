@@ -72,7 +72,7 @@ export async function setup(type, passcode, { replace = false } = {}) {
   const recovery = N.newRecoveryCode();
   const b = await buildBackups(secret, type, passcode, recovery);
   await apiFetch('/im/keys', { method: 'POST', body: JSON.stringify({ enc_pub: secret.enc_pub, sig_pub: secret.sig_pub, ...b, replace }) });
-  bundles.clear();
+  forgetAllBundles();
   await holdKeys(secret);
   return recovery;
 }
@@ -147,7 +147,7 @@ async function saveDoc(path, method, doc, extra = {}) {
   const sig = await N.signClients(me.id, keys.kid, doc, keys.sigPriv);
   await apiFetch(path, { method, body: JSON.stringify({ doc, sig, ...extra }) });
   await myBundle();
-  bundles.delete(me.username.toLowerCase());
+  forgetBundle(me.username);
   changed();
 }
 // { history: true } = hand a client the old DMs as well. onProgress(n)
@@ -191,38 +191,64 @@ export async function revokeClient(kid) {
 }
 
 // ── other people's keys ──
-const bundles = new Map(); // username (lower) -> { at, b } or { at, none: true }
-const BUNDLE_MS = 5 * 60 * 1000;
+// Keys hardly ever change, and Nookara says when they do (e2ee_keys_changed -> forgetBundle), so a bundle is kept an hour.
+// Opening a conversation opens every message at once and each checks its sender's signature: they all share ONE request
+// (inflight), and a refusal (blocked, DM privacy, rate limited, offline) is remembered for a while too, so it isn't asked again per message.
+const bundles = new Map(); // username (lower) -> { at, b } | { at, none: true } | { at, err }
+const inflight = new Map(); // username (lower) -> the request on its way
+const gens = new Map(); // username (lower) -> bumped by forgetBundle: a request that started before it never stores what it got
+let epoch = 0; // the same for all of them (forgetAllBundles)
+const BUNDLE_MS = 60 * 60 * 1000; // keys
+const NONE_MS = 5 * 60 * 1000; // "hasn't set up yet" (they get e2ee_keys_changed to people they've talked to, strangers need asking again)
+const ERR_MS = 2 * 60 * 1000; // blocked / DM privacy / not found
+const BUSY_MS = 30 * 1000; // rate limited, offline, server trouble
+const FRESH_MS = 3000; // a "fresh" ask right after a fetch takes that one
 const noticeSubs = new Set();
 export const onKeyChange = fn => { noticeSubs.add(fn); return () => noticeSubs.delete(fn); };
+const ttl = v => (v.b ? BUNDLE_MS : v.none ? NONE_MS : v.err?.status >= 400 && v.err.status < 500 && v.err.status !== 429 ? ERR_MS : BUSY_MS);
 // { b } | { none: true }. Throws what the server said for anything else (blocked, DM privacy)
-export async function bundleFor(username, { fresh = false } = {}) {
+export function bundleFor(username, { fresh = false } = {}) {
   const key = String(username).toLowerCase();
   const hit = bundles.get(key);
-  if (hit && !fresh && Date.now() - hit.at < BUNDLE_MS) return hit;
+  const age = hit ? Date.now() - hit.at : Infinity;
+  if (hit && (fresh ? age < FRESH_MS : age < ttl(hit))) return hit.err ? Promise.reject(hit.err) : Promise.resolve(hit);
+  let p = inflight.get(key);
+  if (!p) {
+    p = fetchBundle(username, key).finally(() => { if (inflight.get(key) === p) inflight.delete(key); });
+    inflight.set(key, p);
+  }
+  return p;
+}
+async function fetchBundle(username, key) {
+  const gen = () => `${epoch}:${gens.get(key) || 0}`;
+  const g = gen();
+  const keep = v => { if (gen() === g) bundles.set(key, v); };
   let b;
   try { b = await apiFetch(`/im/keys/user/${encodeURIComponent(username)}`); }
   catch (e) {
-    if (e.message !== 'no_keys') throw e;
+    if (e.message !== 'no_keys') { keep({ at: Date.now(), err: e }); throw e; }
     const none = { at: Date.now(), none: true };
-    bundles.set(key, none);
+    keep(none);
     return none;
   }
   // the list of linked clients has to be signed by the key itself, or Nookara could add a reader
   const doc = b.clients || { seq: 0, list: [] };
-  if (doc.list?.length && !(await N.verifyClients(b.user_id, b.kid, doc, b.clients_sig, b.sig_pub))) throw new Error('bad_key_list');
+  const bad = () => { const e = new Error('bad_key_list'); keep({ at: Date.now(), err: e }); return e; };
+  if (doc.list?.length && !(await N.verifyClients(b.user_id, b.kid, doc, b.clients_sig, b.sig_pub))) throw bad();
   const fp = await N.fingerprint(b.enc_pub, b.sig_pub);
   if (String(b.user_id) !== me.id) {
     const pin = await KS.getPin(me.id, b.user_id).catch(() => null);
-    if (pin && pin.seq > Number(doc.seq || 0) && pin.fp === fp) throw new Error('bad_key_list'); // an older list than one I already saw
+    if (pin && pin.seq > Number(doc.seq || 0) && pin.fp === fp) throw bad(); // an older list than one I already saw
     if (pin && pin.fp !== fp) noticeSubs.forEach(f => f(b.username));
     await KS.putPin(me.id, b.user_id, { fp, seq: Number(doc.seq || 0), first: pin?.fp === fp ? pin.first : Date.now() }).catch(() => {});
   }
   const v = { at: Date.now(), b: { ...b, fp } };
-  bundles.set(key, v);
+  keep(v);
   return v;
 }
-export const forgetBundle = username => bundles.delete(String(username).toLowerCase());
+// (a request already on its way may carry the old keys: it's let go, the next ask fetches again)
+export const forgetBundle = username => { const k = String(username).toLowerCase(); bundles.delete(k); inflight.delete(k); gens.set(k, (gens.get(k) || 0) + 1); };
+const forgetAllBundles = () => { bundles.clear(); inflight.clear(); epoch++; };
 // the numbers two people compare outside Nookara
 export async function safetyWith(username) {
   const v = await bundleFor(username);
@@ -290,7 +316,20 @@ async function checkSig(m) {
   const sender = String(m.from_id) === me.id ? me.username : m.from;
   const v = await bundleFor(sender).catch(() => null);
   if (!v?.b) return 'unknown';
-  const b = v.b;
+  const r = await sigWith(v.b, m);
+  // signed by a key my copy doesn't have, or it doesn't match: they may have linked a client or set up again since. Ask once more,
+  // at most once a minute per person (every message of a conversation lands here at once, they share the one request)
+  if (r !== 'valid' && Date.now() - v.at > SIG_RETRY_MS) {
+    if (!sigRetry.has(String(sender).toLowerCase())) sigRetry.set(String(sender).toLowerCase(), bundleFor(sender, { fresh: true }).catch(() => null).finally(() => setTimeout(() => sigRetry.delete(String(sender).toLowerCase()), SIG_RETRY_MS)));
+    const again = await sigRetry.get(String(sender).toLowerCase());
+    if (again?.b) return sigWith(again.b, m);
+  }
+  return r;
+}
+const SIG_RETRY_MS = 60 * 1000;
+const sigRetry = new Map(); // username (lower) -> the one fresh ask after a signature didn't check out
+async function sigWith(b, m) {
+  const enc = m.enc;
   const key = b.kid === enc.signer ? b.sig_pub : (b.clients?.list || []).find(c => c.kid === enc.signer)?.sig_pub || (b.past || []).find(p => p.kid === enc.signer)?.sig_pub;
   if (!key) return 'unknown';
   return (await N.verifyMessage(enc, key, { from: m.from_id, to: m.to_id, editOf: m.edited_at ? m.id : 0 })) ? 'valid' : 'invalid';
