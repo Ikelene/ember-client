@@ -83,9 +83,13 @@ function set(next) {
   subs.forEach(fn => fn(list));
 }
 // loads the list if it isn't fresh; resolves to it (or the stale copy / null when Velora can't be reached)
+// The saved copy shows straight away, but it's always refreshed once per page load (so a new icon or name shows after
+// a reload, not up to CACHE_MS later); after that, only every CACHE_MS.
+let refreshedThisLoad = false;
 export function loadOfficialClients({ force = false } = {}) {
   if (!list && !fetchedAt) readStore();
-  if (!force && list && Date.now() - fetchedAt < CACHE_MS) return Promise.resolve(list);
+  if (!force && refreshedThisLoad && list && Date.now() - fetchedAt < CACHE_MS) return Promise.resolve(list);
+  refreshedThisLoad = true;
   if (inflight) return inflight;
   inflight = fetch(ENDPOINT, { cache: 'no-cache' }).then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
     .then(d => { const l = cleanList(d && d.clients); if (l) set(l); return list; })
