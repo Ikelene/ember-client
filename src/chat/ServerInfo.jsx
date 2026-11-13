@@ -4,6 +4,7 @@ import { Info, CircleArrowUp, Check, Copy, Server, Database, RefreshCw } from 'l
 import { useChat } from './store.js';
 import { instanceConn, loadServerInfo } from './instances.js';
 import { Card } from './SettingsShell.jsx';
+import { UpdateServerRow } from './UpdateServer.jsx';
 
 const bytes = n => {
   n = Number(n); if (!Number.isFinite(n) || n < 0) return '-';
@@ -21,13 +22,14 @@ const span = s => {
 
 const Row = ({ label, children }) => <div className="cs-row"><div className="cs-text"><b>{label}</b></div><span className="vc-info-val">{children}</span></div>;
 
-export function ServerInfoPage({ origin }) {
+export function ServerInfoPage({ origin, autoUpdate = false }) {
   const inst = useChat(s => s.instances.find(i => i.origin === origin));
   const info = inst?.serverInfo;
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   useEffect(() => { const c = instanceConn(origin); if (c) loadServerInfo(c); }, [origin]);
-  const refresh = async () => { const c = instanceConn(origin); if (!c) return; setBusy(true); await loadServerInfo(c); setBusy(false); };
+  // Refresh really checks: the server asks Nookara again instead of answering from its cache
+  const refresh = async () => { const c = instanceConn(origin); if (!c) return; setBusy(true); await loadServerInfo(c, { refresh: true }); setBusy(false); };
   if (!inst?.isAdmin) return null;
   if (!info) return <div className="bf-ss-page"><div className="vc-loading"><i /><i /><i /></div></div>;
   const b = info.build || {}, r = info.runtime || {}, st = info.stats || {}, u = info.update;
@@ -46,8 +48,9 @@ export function ServerInfoPage({ origin }) {
       </Card>
       <Card title="Updates" icon={CircleArrowUp}>
         {!u ? <div className="vc-hint">Update status is not available right now.</div> : u.outdated
-          ? <div className="bf-ss-reg warn"><CircleArrowUp size={14} /><span><b>Out of date.</b> Latest is {u.latest?.commit_short || u.latest?.version || 'newer'}{u.latest?.commit_date ? ` (${when(u.latest.commit_date)})` : ''}.{u.latest?.message ? ` ${u.latest.message}` : ''} {inst.managed ? 'Nookara updates this server automatically within about 10 minutes.' : 'Update the server software to get it.'}</span></div>
+          ? <div className="bf-ss-reg warn"><CircleArrowUp size={14} /><span><b>Out of date.</b> Latest is {u.latest?.commit_short || u.latest?.version || 'newer'}{u.latest?.commit_date ? ` (${when(u.latest.commit_date)})` : ''}.{u.latest?.message ? ` ${u.latest.message}` : ''} {inst.managed ? 'Nookara updates this server automatically within about 10 minutes.' : u.one_click ? 'You can update it right here.' : 'Update the server software to get it.'}{u.checked_at ? ` Checked ${when(u.checked_at)}.` : ''}</span></div>
           : <div className="bf-ss-reg ok"><Check size={14} /><span><b>Up to date.</b>{u.checked_at ? ` Checked ${when(u.checked_at)}.` : ''}</span></div>}
+        {u?.outdated && u.one_click && !inst.managed && <UpdateServerRow origin={origin} name={inst.name || inst.host} autoStart={autoUpdate} />}
         <button type="button" className="btn btn-surface btn-sm vc-gap-top" disabled={busy} onClick={refresh}><RefreshCw size={13} /> {busy ? 'Checking...' : 'Refresh'}</button>
       </Card>
       <Card title="Runtime" icon={Server}>

@@ -217,12 +217,13 @@ export const sendTo = (origin, obj) => {
 };
 setInterval(() => connections.forEach(c => { if (c.ws?.readyState === 1) c.ws.send('{"type":"ping"}'); }), 25000);
 
-// the instance's build / stats / update status (admins only: the rest of the call is public build info); on connect and every ~30 min
-export async function loadServerInfo(c) {
+// the instance's build / stats / update status (admins only: the rest of the call is public build info); on connect and every ~10 min
+// (the server's own check is cached 10 min). refresh = Server info > Refresh: the server really asks Nookara again
+export async function loadServerInfo(c, { refresh = false } = {}) {
   if (!c.isAdmin) return;
-  try { const d = await apiFetch('/api/v1/instance/info', { inst: c.origin }); c.serverInfo = d?.admin ? { ...d, fetchedAt: Date.now() } : null; mirror(); } catch { /* fine */ }
+  try { const d = await apiFetch(`/api/v1/instance/info${refresh ? '?refresh=1' : ''}`, { inst: c.origin }); c.serverInfo = d?.admin ? { ...d, fetchedAt: Date.now() } : null; mirror(); } catch { /* fine */ }
 }
-setInterval(() => connections.forEach(c => { if (c.isAdmin && c.status === 'open') loadServerInfo(c); }), 30 * 60 * 1000);
+setInterval(() => connections.forEach(c => { if (c.isAdmin && c.status === 'open') loadServerInfo(c); }), 10 * 60 * 1000);
 
 function onFrame(c, m) {
   switch (m.type) {

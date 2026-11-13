@@ -16,7 +16,7 @@ const WHY = {
   not_configured: 'One-click updates are not set up on this server. Update it where it runs (docker pull / rebuild, then restart).',
 };
 
-export function UpdateServerRow({ origin, name }) {
+export function UpdateServerRow({ origin, name, autoStart = false }) {
   const [info, setInfo] = useState(null); // GET answer
   const [loadErr, setLoadErr] = useState('');
   const [phase, setPhase] = useState('idle'); // idle | updating | done | failed | slow
@@ -53,6 +53,14 @@ export function UpdateServerRow({ origin, name }) {
       watch(Date.now());
     } catch (e) { setPhase('idle'); setNote(''); toast(errorText(e.message)); load(); }
   }
+
+  // "Update now" on the out-of-date note: once the status is in, ask right away (the same confirm as the button)
+  const asked = useRef(false);
+  useEffect(() => {
+    if (!autoStart || asked.current || !info || phase !== 'idle') return;
+    asked.current = true;
+    if (info.supported && info.reachable !== false && info.outdated && info.update?.state !== 'running') update();
+  }, [autoStart, info]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const busy = phase === 'updating';
   const supported = info?.supported;

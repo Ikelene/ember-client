@@ -642,7 +642,7 @@ function ChatPage() {
 
       {dialog?.kind === 'invite' && <Invite sid={dialog.sid || view.sid} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'invite-join' && <JoinInvite code={dialog.code} inst={dialog.inst} onClose={() => setDialog(null)} />}
-      {dialog?.kind === 'settings' && <ServerSettings key={`${dialog.sid || view.sid}-${dialog.tab || ''}`} sid={dialog.sid || view.sid} tab={dialog.tab} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'settings' && <ServerSettings key={`${dialog.sid || view.sid}-${dialog.tab || ''}`} sid={dialog.sid || view.sid} tab={dialog.tab} autoUpdate={!!dialog.autoUpdate} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'channel' && (dialog.channel?.cid
         ? <ChannelSettings key={dialog.channel.cid} sid={dialog.sid || view.sid} channel={dialog.channel} tab={dialog.tab} onClose={() => setDialog(null)} />
         : <ChannelEditor sid={dialog.sid || view.sid} channel={dialog.channel} onClose={() => setDialog(null)} />)}

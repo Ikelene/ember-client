@@ -82,7 +82,7 @@ function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, 
   ].map(([g, items]) => [g, items.filter(Boolean)]).filter(([, items]) => items.length);
 }
 
-export function ServerSettings({ sid, onClose, tab: startTab }) {
+export function ServerSettings({ sid, onClose, tab: startTab, autoUpdate = false }) {
   const d = useChat(s => s.detail[sid]);
   const onInst = isInst(sid);
   const origin = onInst ? instOf(sid) : null;
@@ -123,7 +123,7 @@ export function ServerSettings({ sid, onClose, tab: startTab }) {
         {page === 'game' && <GameServersSettings sid={sid} />}
         {['accounts', 'voice', 'velora', 'admins'].includes(page) && <InstanceTab key={page} origin={origin} tab={page} onDirty={onDirty} />}
         {page === 'hosting' && <HostingPage origin={origin} />}
-        {page === 'serverinfo' && <ServerInfoPage origin={origin} />}
+        {page === 'serverinfo' && <ServerInfoPage origin={origin} autoUpdate={autoUpdate && startTab === 'serverinfo'} />}
         {page === 'backups' && <BackupsPage origin={origin} />}
         {page === 'danger' && <DangerZone sid={sid} origin={origin} instAdmin={instAdmin} onClose={onClose} />}
       </PlanCtx.Provider>}

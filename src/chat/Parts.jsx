@@ -694,13 +694,15 @@ export function OutdatedNote() {
   try { seen = !!sessionStorage.getItem(key); } catch { /* fine */ }
   if (seen) return null;
   const dismiss = () => { try { sessionStorage.setItem(key, '1'); } catch { /* fine */ } redraw(n => n + 1); };
-  const open = () => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'settings', sid: view.sid, tab: 'serverinfo' } }));
+  const open = (autoUpdate = false) => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'settings', sid: view.sid, tab: 'serverinfo', autoUpdate } }));
+  const oneClick = !!u.one_click && !inst.managed; // Ember can run the update itself (the server's host agent is set up)
   return (
     <div className="vc-quota-note near" role="status">
       <button type="button" className="vc-quota-x" aria-label="Dismiss" onClick={dismiss}><X size={14} /></button>
       <b><CircleArrowUp size={14} /> Server update available</b>
-      <span>This server is running an old version ({mine}). Latest is {latest}. {inst.managed ? 'Nookara updates it automatically within about 10 minutes.' : 'Update the server software to get the latest.'}</span>
-      <button type="button" className="btn btn-surface btn-sm" onClick={open}>Server info</button>
+      <span>This server is running an old version ({mine}). Latest is {latest}{u.latest?.message ? `: ${u.latest.message}` : ''}. {inst.managed ? 'Nookara updates it automatically within about 10 minutes.' : oneClick ? 'Update it now? Everyone is disconnected for a minute or two.' : 'Update the server software to get the latest.'}</span>
+      {oneClick && <button type="button" className="btn btn-primary btn-sm" onClick={() => open(true)}><CircleArrowUp size={14} /> Update now</button>}
+      <button type="button" className="btn btn-surface btn-sm" onClick={() => open(false)}>Server info</button>
     </div>
   );
 }
