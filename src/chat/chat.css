@@ -588,8 +588,9 @@ a.vc-chip.vc-conn:hover { border-color: var(--cc, var(--accent)); background: #1
   .vc-scrim { display: block; position: fixed; inset: 0; z-index: 55; background: rgba(0, 0, 0, .55); opacity: 0; pointer-events: none; transition: opacity .25s; }
   .vc.drawer .vc-scrim { opacity: 1; pointer-events: auto; }
   .vc-burger { display: inline-grid; margin-left: -8px; }
-  .vc-head .vc-burger { display: none; }
-  .vc-head .vc-back { display: inline-grid; margin-left: -8px; color: var(--text); }
+  /* the header has only the menu button (Ikelene 2026-11-13: not a back button next to it). The back button stays in the
+     page, hidden: the Android app's Back gesture clicks it to go back to the chat list (mobile.js) */
+  .vc-head .vc-back { display: none; }
   html.vc-page body { position: fixed; inset: 0; width: 100%; }
   .vc-burger.floating { position: absolute; top: 9px; left: 14px; z-index: 5; }
   .vc-home .vc-head { padding-left: 52px; }
