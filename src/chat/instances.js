@@ -396,12 +396,19 @@ export function reconnect(origin) {
   const ws = c.ws; c.ws = null; try { ws?.close(); } catch { /* gone */ }
   connect(origin);
 }
+// Servers added on this device that Nookara's list hasn't got yet (signed out, or the save didn't go through). Only these go back to
+// Nookara when the lists are merged: anything else missing from Nookara's list was removed on another device, so it goes here too.
+// (Before, every device pushed its whole list back, so a server removed on one device came back from another one, flashed on
+// the rail while it reconnected, and vanished again once it saw you weren't in it. Ikelene 2026-11-13.)
+const ADDS = () => `${LIST_CACHE()}:adds`;
+const readAdds = () => { try { const v = JSON.parse(localStorage.getItem(ADDS()) || '[]'); return new Set(Array.isArray(v) ? v.map(normOrigin).filter(Boolean) : []); } catch { return new Set(); } };
+const writeAdds = set => { try { if (set.size) localStorage.setItem(ADDS(), JSON.stringify([...set])); else localStorage.removeItem(ADDS()); } catch { /* fine */ } };
 const readList = () => { try { const v = JSON.parse(localStorage.getItem(LIST_CACHE()) || '[]'); return Array.isArray(v) ? v.map(normOrigin).filter(Boolean) : []; } catch { return []; } };
 // always saved here; signed in with Velora it goes there too (the same list on every device)
 const saveList = () => {
   const urls = [...connections.keys()];
   try { localStorage.setItem(LIST_CACHE(), JSON.stringify(urls)); } catch { /* fine */ }
-  return getToken() ? apiFetch('/bonfire/instances', { method: 'PUT', body: JSON.stringify({ instances: urls.map(url => ({ url })) }) }).then(d => { applyPrefs(d); followMoves(d); }).catch(() => {}) : Promise.resolve();
+  return getToken() ? apiFetch('/bonfire/instances', { method: 'PUT', body: JSON.stringify({ instances: urls.map(url => ({ url })) }) }).then(d => { writeAdds(new Set()); applyPrefs(d); followMoves(d); }).catch(() => {}) : Promise.resolve();
 };
 // Velora saw an old address of a server that moved (PUT /bonfire/instances answers { moved: { old: new } })
 function followMoves(d) {
@@ -416,6 +423,9 @@ async function mergeWithVelora() {
   const d = await apiFetch('/bonfire/instances').catch(() => null);
   if (!d?.instances) return;
   const remote = [...new Set(d.instances.map(i => normOrigin(i.url)).filter(Boolean))];
+  const adds = readAdds();
+  const gone = [...connections.keys()].filter(o => !remote.includes(o) && !adds.has(o)); // removed on another device
+  for (const o of gone) await removeInstance(o, { sync: false });
   const order = [...new Set([...remote, ...connections.keys()])];
   const old = new Map(connections);
   connections.clear();
@@ -438,14 +448,20 @@ async function joinOnce(c) {
 }
 // on start: this device's list connects right away, then (signed in) Velora's list is merged in
 export function startInstances() {
-  readList().forEach(o => addConnection(o));
-  mirror();
-  [...connections.keys()].forEach(o => connect(o));
-  if (getToken()) mergeWithVelora();
+  readList().forEach(o => { if (!connections.has(o)) connections.set(o, newConn(o)); }); // (not on the rail yet: see below)
+  const go_ = () => { mirror(); [...connections.keys()].forEach(o => connect(o)); }; // (connect skips one already connecting / open)
+  if (!getToken()) { go_(); return; }
+  // signed in: Nookara's list first (one quick request), so a server removed on another device isn't shown and dropped again;
+  // after 2.5 s without an answer this device's list connects anyway
+  let started = false;
+  const once = () => { if (!started) { started = true; go_(); } };
+  const t = setTimeout(once, 2500);
+  mergeWithVelora().catch(() => {}).finally(() => { clearTimeout(t); once(); });
 }
 // the dialog finished (it holds a session): the instance goes on the rail and the list is saved
 export async function addInstance(origin, info, got) {
   const c = addConnection(origin, info);
+  { const a = readAdds(); a.add(normOrigin(origin)); writeAdds(a); } // (until Nookara's list has it)
   c.info = info || c.info;
   if (got) adopt(c, got);
   await saveList();
@@ -453,9 +469,11 @@ export async function addInstance(origin, info, got) {
   mirror();
   return c;
 }
-export async function removeInstance(origin) {
+// sync: false = Nookara's list already doesn't have it (removed on another device): just drop it here
+export async function removeInstance(origin, { sync = true } = {}) {
   const c = connections.get(origin);
   if (!c) return;
+  { const a = readAdds(); if (a.delete(origin)) writeAdds(a); }
   if (c.session) await fetch(`${origin}/api/v1/auth/logout`, { method: 'POST', headers: { Authorization: `Bearer ${c.session}` } }).catch(() => {});
   clearTimeout(c.timer);
   connections.delete(origin);
@@ -474,7 +492,8 @@ export async function removeInstance(origin) {
     };
   });
   if ((view.sid && gone(view.sid)) || view.inst === origin) go({ kind: 'home' });
-  await saveList();
+  if (sync) await saveList();
+  else try { localStorage.setItem(LIST_CACHE(), JSON.stringify([...connections.keys()])); } catch { /* fine */ }
   loadEmojis();
 }
 // drag and drop on the rail: `from` goes before / after `to`
