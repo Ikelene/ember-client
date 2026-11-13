@@ -7,7 +7,8 @@
 // Developer mode (Chat settings) adds "Copy ... ID" items at the bottom (dev: true).
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronRight, Check, Hash, Copy, Link2, BellOff, Bell, CheckCheck, UserPlus, Settings, LogOut, Pencil, Trash2, Reply, User, MessageCircle, ExternalLink, Image as ImageIcon, Code2, Forward, Pin, Download, SmilePlus, BookmarkPlus, Bookmark, BookmarkCheck, Languages, Ellipsis, RefreshCw, LogIn, ShieldCheck, BellRing, Flag, Ban, Info } from 'lucide-react';
+import { ChevronRight, Check, Hash, Copy, Link2, BellOff, Bell, CheckCheck, UserPlus, Settings, LogOut, Pencil, Trash2, Reply, User, MessageCircle, ExternalLink, Image as ImageIcon, Code2, Forward, Pin, Download, SmilePlus, BookmarkPlus, Bookmark, BookmarkCheck, Languages, Ellipsis, RefreshCw, LogIn, ShieldCheck, BellRing, Flag, Ban, Info, Users } from 'lucide-react';
+import { openReactionsView } from './ReactionsView.jsx';
 import { apiFetch } from '../api.js';
 import { useChat, getState, setMenu, toggleBlock, toast, setNotify, notifyOf, go, markServerRead, markChannelRead, linkFor } from './store.js';
 import { bare, instOpt, isInst } from './ids.js';
@@ -268,6 +269,7 @@ export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, 
     canEdit && { label: 'Edit message', icon: Pencil, onClick: onEdit },
     onForward && { label: 'Forward', icon: Forward, onClick: onForward },
     onReact && { label: 'React', icon: SmilePlus, onClick: onReact },
+    m.reactions?.length > 0 && { label: 'View Reactions', icon: Users, onClick: () => openReactionsView(m) },
     'sep',
     onSave && { label: saved ? 'Remove from saved' : 'Save message', icon: saved ? BookmarkCheck : Bookmark, onClick: onSave },
     onTranslate && m.body && { label: translated ? 'Show original' : 'Translate', icon: Languages, onClick: onTranslate },

@@ -8,6 +8,9 @@ import { frequentReactions, recordReaction } from './reactionUsage.js';
 import { reactionId, reactionBase } from './msg-actions.js';
 import EmojiPicker, { emojiDataSync } from './EmojiPicker.jsx';
 import { Twemoji, nameOfChar } from './emoji.jsx';
+import { ReactorFaces, openReactionsView } from './ReactionsView.jsx';
+import { openMenu } from './Menu.jsx';
+import { Users } from 'lucide-react';
 import './Reactions.css';
 
 const CUSTOM = /^<(a?):(\w+):(e[0-9a-f]{10})>$/;
@@ -60,6 +63,8 @@ function EmojiNode({ emoji, info, sid }) {
   }
   return <Twemoji char={emoji} className="vc-react-img" />;
 }
+export const ReactionEmoji = EmojiNode;
+export const reactionName = (emoji, info, sid) => nameOf(emoji, info, sid);
 const nameOf = (emoji, info, sid) => { const c = CUSTOM.exec(emoji), meta = info || customInfo(emoji, sid); return customId(emoji) ? `:${meta?.name || c?.[2] || 'deleted_emoji'}:` : `:${nameOfChar(emoji, emojiDataSync()) || emoji}:`; };
 
 export function QuickReactions({ id, inst, selected = [], onDone, limit = 6, className = 'vc-quick-reactions', sid: sidIn }) {
@@ -88,8 +93,9 @@ export function Reactions({ m, me, canReact }) {
         const others = r.count - r.users.length;
         const who = `${r.users.slice(0, 8).join(', ')}${r.users.length > 8 || others > 0 ? ` and ${r.count - Math.min(8, r.users.length)} more` : ''}`;
         return (
-          <button type="button" key={r.emoji} className={`vc-react${mine ? ' on' : ''}`} disabled={!canReact} title={`${who} reacted with ${nameOf(r.emoji, r.emoji_id ? r : null, m.server)}`} onClick={() => setReaction(rid, r.emoji, !mine, instOpt(m.channel))}>
-            <EmojiNode emoji={r.emoji} info={r.emoji_id ? r : null} sid={m.server} /><span>{r.count}</span>
+          <button type="button" key={r.emoji} className={`vc-react${mine ? ' on' : ''}`} disabled={!canReact} title={`${who} reacted with ${nameOf(r.emoji, r.emoji_id ? r : null, m.server)}`} onClick={() => setReaction(rid, r.emoji, !mine, instOpt(m.channel))}
+            onContextMenu={e => { e.preventDefault(); e.stopPropagation(); openMenu(e, [{ label: 'View Reactions', icon: Users, onClick: () => openReactionsView(m, r.emoji) }]); }}>
+            <EmojiNode emoji={r.emoji} info={r.emoji_id ? r : null} sid={m.server} /><span>{r.count}</span><ReactorFaces r={r} sid={m.server} />
           </button>
         );
       })}

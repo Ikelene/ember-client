@@ -28,6 +28,7 @@ import { PlatformIcon } from '../chat/platforms.jsx';
 import { CrashGuard } from '../chat/Crash.jsx';
 import { EmojiInfoHost } from '../chat/EmojiInfo.jsx';
 import { ReactionPickerHost } from '../chat/Reactions.jsx';
+import { ReactionsViewHost } from '../chat/ReactionsView.jsx';
 import { UpdatePopup } from '../chat/UpdatePopup.jsx';
 import { MobileAppPromo } from '../chat/MobileAppPromo.jsx';
 import { AppDownload, AppDownloadTip } from '../chat/AppDownload.jsx';
@@ -614,6 +615,7 @@ function ChatPage() {
       <EmojiInfoHost />
       <ModernNotice />
       <ReactionPickerHost />
+      <ReactionsViewHost />
       <RpcWarning />
       <UpdatePopup />
       <MobileAppPromo />

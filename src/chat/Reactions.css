@@ -5,3 +5,35 @@
 .vc-tools-react .vc-react-img { width: 18px; height: 18px; }
 .vc-tools-react > button[aria-pressed="true"] { background: var(--accent-dim, #ffffff12); }
 .vc-tools-sep { align-self: center; width: 1px; height: 18px; margin: 0 3px; background: var(--border-2); }
+
+/* who reacted: up to 3 small overlapping faces on a chip; with more people the third is "+N" (ReactionsView.jsx) */
+.vc-react-faces { display: inline-flex; align-items: center; margin-left: 1px; }
+.vc-react-faces .vc-av { box-shadow: 0 0 0 2px #17171a; }
+.vc-react-faces > * + * { margin-left: -5px; }
+.vc-react-more { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; padding: 0 3px; font-size: 10px; font-weight: 700; color: var(--text); background: var(--border-2); box-shadow: 0 0 0 2px #17171a; position: relative; }
+.vc-react.on .vc-react-faces .vc-av, .vc-react.on .vc-react-more { box-shadow: 0 0 0 2px var(--accent-dim); }
+
+/* View Reactions: emoji tabs on the left, the people on the right */
+.vc-rv { width: min(560px, calc(100vw - 24px)); padding: 0; display: flex; flex-direction: column; max-height: min(520px, calc(100dvh - 40px)); }
+.vc-rv-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 10px 16px; border-bottom: 1px solid var(--border); }
+.vc-rv-head b { font-size: 16px; }
+.vc-rv-body { display: flex; min-height: 0; flex: 1; }
+.vc-rv-tabs { flex: none; width: 112px; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--border); background: rgba(0, 0, 0, .15); }
+.vc-rv-tabs button { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 0; background: none; color: var(--dim); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; text-align: left; }
+.vc-rv-tabs button:hover { background: rgba(255, 255, 255, .05); color: var(--text); }
+.vc-rv-tabs button.on { background: var(--accent-dim); color: var(--text); }
+.vc-rv-tabs .vc-react-img { width: 20px; height: 20px; }
+.vc-rv-all { min-width: 20px; }
+.vc-rv-list { flex: 1; min-width: 0; overflow-y: auto; padding: 6px; }
+.vc-rv-person { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.vc-rv-person:hover { background: rgba(255, 255, 255, .05); }
+.vc-rv-names { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex: 1; }
+.vc-rv-names b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vc-rv-names small { font-size: 12px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vc-rv-emoji .vc-react-img { width: 18px; height: 18px; }
+.vc-rv-more { padding: 10px 8px; font-size: 13px; color: var(--dim); }
+@media (max-width: 520px) {
+  .vc-rv-body { flex-direction: column; }
+  .vc-rv-tabs { width: auto; flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); }
+  .vc-rv-tabs button { flex: none; }
+}
