@@ -250,6 +250,8 @@ export function RolesEditor({ sid }) {
   const d = useChat(s => s.detail[sid]);
   const perms = d?.server.perms || 0;
   const isOwner = d?.server.role === 'owner';
+  // "Use unmarked aliases" only while the Danger zone switch is on (an older server that doesn't say: shown, like before)
+  const unmarkedOn = d?.server.unmarked_aliases !== false;
   const roles = useMemo(() => [...(d?.roles || [])].sort((a, b) => (a.is_default - b.is_default) || b.position - a.position), [d?.roles]);
   const [sel, setSel] = useState(null);
   const [drag, setDragS] = useState(null);
@@ -354,7 +356,7 @@ export function RolesEditor({ sid }) {
               </>
             )}
           <div className="vc-sec-t" style={{ marginTop: 16 }}>Permissions</div>
-          {PERM_LIST.filter(([k]) => isInst(sid) || !INST_ONLY_PERMS.has(k)).map(([k, label, hint, instHint]) => (
+          {PERM_LIST.filter(([k]) => (isInst(sid) || !INST_ONLY_PERMS.has(k)) && (k !== 'UNMARKED_ALIASES' || unmarkedOn)).map(([k, label, hint, instHint]) => (
             <Toggle key={k} label={label} hint={isInst(sid) && instHint ? instHint : hint} on={has(r.permissions, P[k])}
               disabled={!editable || (!has(perms, P[k]) && !isOwner)}
               onChange={v => save({ permissions: v ? (r.permissions | P[k]) : (r.permissions & ~P[k]) })} />
