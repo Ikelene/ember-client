@@ -157,10 +157,11 @@ export function FileCard({ a, live = true }) {
     : TEMP_LINK.test(a.url) && !cdn ? `${a.url.split(/[?#]/)[0]}?dl=1` : a.url;
   const fetchDl = () => saveMedia(a.url, name).catch(() => { toast("Couldn't save it directly - opening it instead."); window.open(a.url, '_blank', 'noopener,noreferrer'); });
   const open = async e => {
-    if (!risky && !cdn) return; // the link just downloads
+    const inApp = !!window.BonfireDownloads?.postMessage; // the Android app saves it with its real name instead of the link's
+    if (!risky && !cdn && !inApp) return; // the link just downloads
     e.preventDefault();
     if (risky && !(await ask({ title: 'Download this program?', text: `${name} can run code on your computer. Only open files from people you trust.`, confirm: 'Download' }))) return;
-    if (cdn) fetchDl(); else location.href = dl;
+    if (cdn || inApp) fetchDl(); else location.href = dl;
   };
   if (temp === 'gone') return <ExpiredFile name={name} />;
   const Ico = /^(zip|rar|7z|tar|gz|xz|bz2)$/.test(ext) ? FileArchive : /^(js|ts|jsx|tsx|py|json|html|css|c|cpp|cs|java|lua|sb3|pmp|sh|ps1)$/.test(ext) ? FileCode : /^(txt|md|pdf|doc|docx|rtf|odt|log)$/.test(ext) ? FileText : FileIcon;
