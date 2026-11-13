@@ -8,7 +8,7 @@ import { getDesign, setDesign, subscribeDesign , effectiveDesign } from '../../c
 import { useRadio, setRadioVolume, toggleRadioPause } from '../../chat/Radio.jsx';
 // settings preview of the new-message sound (same files as chat/store.js)
 function previewNotifySound(kind) {
-  try { const a = new Audio({ long: '/assets/sounds/chat/notify.mp3?v=20261011', classic: '/assets/sounds/chat/message.mp3' }[kind] || '/assets/sounds/chat/message-new.mp3?v=20261103'); a.volume = 0.6; a.play().catch(() => {}); } catch { /* no audio */ }
+  try { const a = new Audio({ long: '/assets/sounds/chat/notify.mp3?v=20261011', classic: '/assets/sounds/chat/message.mp3', soft: '/assets/sounds/chat/message-new.mp3?v=20261103' }[kind] || '/assets/sounds/chat/message-default.mp3?v=20261113'); a.volume = 0.6; a.play().catch(() => {}); } catch { /* no audio */ }
 }
 import { apiFetch } from '../../api.js';
 import { useChat } from '../../chat/store.js';
@@ -26,7 +26,7 @@ export const GROUPS = [
   ]],
   ['Notifications', [
     ['sounds', 'Sounds', 'A sound for new direct messages and when someone @mentions you.'],
-    ['notify_sound', 'Notification sound', 'The sound for new direct messages and @mentions. Use the speaker to hear it.', [['short', 'Short'], ['long', 'Long'], ['classic', 'Classic']]],
+    ['notify_sound', 'Notification sound', 'The sound for new direct messages and @mentions. Use the speaker to hear it.', [['short', 'Short'], ['soft', 'Soft'], ['long', 'Long'], ['classic', 'Classic']]],
     ['notifications', 'Desktop notifications', 'When Ember is open in the background. Direct messages count as mentions.', [['all', 'Every message'], ['mentions', 'DMs + mentions'], ['none', 'Off']]],
   ]],
   ['Messages', [
