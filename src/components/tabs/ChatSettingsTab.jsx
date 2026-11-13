@@ -27,7 +27,6 @@ export const GROUPS = [
   ['Notifications', [
     ['sounds', 'Sounds', 'A sound for new direct messages and when someone @mentions you.'],
     ['notify_sound', 'Notification sound', 'The sound for new direct messages and @mentions. Use the speaker to hear it.', [['short', 'Short'], ['soft', 'Soft'], ['long', 'Long'], ['classic', 'Classic']]],
-    ['notifications', 'Desktop notifications', 'When Ember is open in the background. Direct messages count as mentions.', [['all', 'Every message'], ['mentions', 'DMs + mentions'], ['none', 'Off']]],
   ]],
   ['Messages', [
     ['show_typing', 'Show typing indicators', 'See who is typing, in the conversation and next to channels in the list.'],

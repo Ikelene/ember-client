@@ -17,7 +17,7 @@ import { Hash, Lock, Users, Menu, ChevronLeft, Search, X, AtSign, UsersRound, Lo
 import { reportDmUser } from '../chat/report.js';
 import { api, getToken, cachedMe, apiFetch, isWebBonfire } from '../api.js';
 import { applyAccentColor } from '../theme.js';
-import { jumpToMessage, loginAgain, retryNow, useBotPeer } from '../chat/store.js';
+import { jumpToMessage, loginAgain, retryNow, useBotPeer, isMobileDevice } from '../chat/store.js';
 import { BotTag } from '../chat/Bots.jsx';
 import { useChat, init, open, go, readHash, keyOf, loadGroups, loadMembers, toast, errorText, getState, ask, unreadTotals } from '../chat/store.js';
 import { Rail, ServerSidebar, HomeSidebar, MemberList, UserPanel, VoiceQuotaNote, OutdatedNote, useConnLost } from '../chat/Parts.jsx';
@@ -123,6 +123,8 @@ function NotificationBanner() {
   const macDesktop = useDesktopMac(); // the Mac app: say macOS, not Windows
   useEffect(() => {
     if (/(?:^|; )bonfire_notifications_dismissed=1(?:;|$)/.test(document.cookie)) return;
+    // no desktop pop-ups (2026-11-13): only a phone's browser is offered push; the desktop app and computers never ask
+    if (window.bonfireDesktop?.isDesktop || !isMobileDevice()) return;
     // Old desktop shells do not have Ember's notification bridge yet. Put
     // the update call-to-action in the chat app itself, not account settings.
     if (window.bonfireDesktop?.isDesktop) {

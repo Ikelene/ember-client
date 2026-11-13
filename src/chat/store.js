@@ -12,8 +12,6 @@ import * as E2EE from './e2ee/session.js';
 import { fileKindOfMime } from './e2ee/files.js';
 import { rememberedDest, TEMP_LINK, tempId } from './upload-dest.js';
 import { callLinePlain } from './callText.js';
-import { inviteSummary } from './gameInvite.js';
-import { isVoiceAtt, voiceSummary } from './voice-note.js';
 import { applyIdentity } from './identity.js';
 import { applyUserUpdate, instancesWithAccount } from './userUpdate.js';
 import { findPending, dropSettled, wireText, settle } from './pending.js';
@@ -24,7 +22,6 @@ import { spoilerName } from './spoiler.js';
 import { prepareInstanceAttachments } from './attachment-preparation.js';
 import { setupSigning, signMessage, canSign, watchSignature, normBody, refreshSigningKey } from './signing.js';
 import { SHORT } from '../version.js';
-import { shownName, shownPfp } from './aliases.js';
 
 let state = {
   me: null,                // { username, pfp, color, rank } - null while signed out of Velora (web Ember works without it)
@@ -881,30 +878,15 @@ function ping(key, msg, everyMessage = false, quiet = false) {
   const hidden = !pageFocused();
   // pings in servers make the same sound as a new DM
   if ((direct || mention) && !quiet) { if (packActive()) playPackSound(msg.author?.bot ? 'bot' : 'receive'); else playSound('message'); }
-  const mode = state.settings.notifications;
-  if (!hidden || mode === 'none' || (mode === 'mentions' && !direct && !mention)) return;
-  if (overlayToastHook?.(key, msg)) return; // Ember desktop: in a game with the overlay up -> a toast there instead
-  try {
-    if (key.startsWith('d:') && desktopNotify({ type: 'dm', from: msg.author?.username || 'Nookara', to: key.slice(2), body: inviteSummary(voiceSummary(String(msg.body || (msg.attachments?.some(isVoiceAtt) ? 'sent a voice message' : 'sent a picture')))).slice(0, 140), icon: msg.author?.pfp || '/assets/icon.png', tag: msg.id })) return;
-    if (Notification.permission === 'granted') {
-      new Notification(shownName(msg), { body: inviteSummary(voiceSummary(String(msg.body || (msg.attachments?.some(isVoiceAtt) ? 'sent a voice message' : 'sent a picture')))).slice(0, 140), icon: shownPfp(msg) || '/assets/icon.png', tag: msg.id });
-    }
-  } catch { /* no notifications */ }
+  // no desktop / browser pop-ups any more (Ikelene 2026-11-13): sounds, unread badges and the bell stay, phones get push.
+  // Only Ember desktop's in-game overlay still shows a toast for DMs and mentions while a game is in front.
+  if (hidden && (direct || mention)) overlayToastHook?.(key, msg);
 }
 
 // Ember desktop in-game overlay (chat/overlay.js): gets first pick of notifications while a game is in front
 let overlayToastHook = null;
 export const onOverlayToast = fn => { overlayToastHook = fn; };
 
-// The browser's Notification API has no reply field. The desktop shell supplies
-// an interactive popup; browsers continue with their normal system notification.
-export function desktopNotify(note) {
-  try {
-    if (!window.bonfireDesktop?.notify) return false;
-    window.bonfireDesktop.notify(note);
-    return true;
-  } catch { return false; }
-}
 const typingTimers = {};
 function typingFrom(key, username, on = true, inst = VELORA) {
   if (!username || username === meOn(inst)?.username) return;
@@ -2026,28 +2008,10 @@ function notificationsUpdated(m) {
   // something became unread again that the open popup doesn't have: fetch the list again
   if (state.notifs && [...stillUnread].some(k => !state.notifs.list.some(n => notifKey(n.id) === k))) { set(s => ({ notifs: s.notifs && { ...s.notifs, list: [], cursor: null } })); loadNotifs(); }
 }
-// a new one: the DM sound, and a system notification while Ember is in the background (same rules as a DM: not in
-// Do Not Disturb, not with Notifications set to "Nothing"). The desktop app's own notify() only knows DMs and calls, so this
-// uses the web Notification API there too, behind the app's "notifications" switch.
-function notifPing(n) {
+// a new one: the DM sound (not in Do Not Disturb). No desktop / browser pop-up: it waits in the bell.
+function notifPing() {
   if (state.presence[state.me?.username]?.status === 'dnd') return;
   if (packActive()) { if (state.settings.sounds) playPackSound('receive'); } else playSound('message');
-  if (pageFocused() || state.settings.notifications === 'none') return;
-  const show = () => {
-    try {
-      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-      const note = new Notification(notifPlain(n.title) || 'Nookara', { body: notifPlain(n.body).slice(0, 140), icon: n.actor?.pfp_url || '/assets/icon.png', tag: `notif${n.id}` });
-      note.onclick = () => {
-        try { window.focus(); } catch { /* fine */ }
-        note.close();
-        readNotifs([n.id]);
-        followNotifLink(n.link);
-      };
-    } catch { /* no notifications */ }
-  };
-  const d = window.bonfireDesktop;
-  if (d?.isDesktop && d.notificationStatus) d.notificationStatus().then(st => { if (st?.enabled) show(); }).catch(() => {});
-  else show();
 }
 
 // Velora's token is no good any more (web Ember): start over signed out, with a note about it
@@ -2119,7 +2083,6 @@ export function init(me) {
   startInstances(); // (held while locked: nothing connects until it's lifted)
   if (me) setupSigning();
   if (me && !state.locked) loadAccount();
-  try { if (me && Notification.permission === 'default') setTimeout(() => Notification.requestPermission().catch(() => {}), 8000); } catch { /* fine */ }
   window.addEventListener('popstate', () => open(readHash()));
   const markFocusedViewRead = () => {
     if (pageFocused()) markViewRead();
