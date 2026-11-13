@@ -6,6 +6,7 @@ import { VideoPlayer, fmtTime } from './MediaPlayer.jsx';
 import { viewPicture } from './MediaViewer.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { Play, Download, ShieldCheck, Eye, Loader2, Users, ExternalLink, BookmarkPlus, BookmarkCheck, Coins, Heart, Clock, HardDrive, Folder, File as FileIcon, FileArchive, FileCode, FileText, Image as ImageIcon, Film, Music, MessagesSquare, MessageSquare, ArrowBigUp, Pin, Lock, Ban, Globe, KeyRound, FileX } from 'lucide-react';
+import { joinAndOpen } from './instances.js';
 import { apiFetch } from '../api.js';
 import { useChat, getState, toast, errorText, openLink, saveSettings, loadMedia, hashFor, ask } from './store.js';
 import { K } from './ids.js';
@@ -318,7 +319,12 @@ function InviteEmbed({ e }) {
           <b>{s.name}</b>
           <span>{s.online != null && <><i className="dot on" /> {s.online} online </>}<i className="dot" /> {s.member_count} member{s.member_count === 1 ? '' : 's'}{e.inst && <small className="vc-invite-host">{e.inst.replace('https://', '')}</small>}</span>
         </div>
-        <button type="button" className="btn btn-primary" disabled={busy} onClick={() => { setBusy(true); openLink(e.inst ? (mine ? hashFor({ kind: 'server', sid: K(e.inst, s.sid) }) : hashFor({ kind: 'invite', code: e.code, inst: e.inst })) : e.joined ? `#/s/${s.sid}` : `#/invite/${e.code}`); setBusy(false); }}>{e.joined || mine ? 'Open' : 'Join'}</button>
+        <button type="button" className="btn btn-primary" disabled={busy} onClick={async () => {
+          setBusy(true);
+          if (e.inst && !mine) await joinAndOpen(e.inst, e.code); // (an Ember server: joined with the invite code and opened, no invite pop-up)
+          else openLink(e.inst ? hashFor({ kind: 'server', sid: K(e.inst, s.sid) }) : e.joined ? `#/s/${s.sid}` : `#/invite/${e.code}`);
+          setBusy(false);
+        }}>{busy ? 'Joining...' : e.joined || mine ? 'Open' : 'Join'}</button>
       </div>
       {line && (
         <div className="vc-invite-people">

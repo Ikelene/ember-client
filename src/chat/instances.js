@@ -537,3 +537,32 @@ export async function refreshInstance(origin) {
   mirror();
 }
 
+
+// ── one-click join (Ikelene 2026-11-13: no "Connect with Nookara" / invite pop-up, just put it on the rail and open it) ──
+// An Ember server that signs you in with your Nookara account: connect with this account, join (with the invite code when
+// there is one) and open it. -> { sid } | { pending: true, name } | null when it needs the full dialog: signed out, a server
+// with its own accounts, one nobody has set up, or one that wants a join password / approval and no invite code was given.
+export async function quickJoin(input, code) {
+  if (!getToken()) return null;
+  const d = await discover(input);
+  const info = d.info || {};
+  if (info.accounts_mode !== 'velora' || info.claimed === false || !info.community) return null;
+  if (!code && info.community.join_policy !== 'open') return null;
+  let c = connections.get(d.origin);
+  if (!c?.session) c = await addInstance(d.origin, info, await veloraSession(d.origin));
+  else if (c.status !== 'open') await connect(d.origin);
+  const already = getState().servers.find(x => x.inst === d.origin);
+  if (already) return { sid: already.sid };
+  const r = await joinCommunity(d.origin, code);
+  return r.pending ? { pending: true, name: info.community.name } : r;
+}
+// Join buttons (invite embeds, the invite pop-up, Discover): straight in when it can, the Add a server dialog when it can't
+export async function joinAndOpen(origin, code) {
+  const dialog = () => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'add-instance', url: origin, ...(code ? { invite: code } : {}) } }));
+  let r = null;
+  try { r = await quickJoin(origin, code); } catch { r = null; } // (anything odd: the dialog shows what went wrong)
+  if (!r) { dialog(); return false; }
+  if (r.pending) { toast(`Asked to join ${r.name || 'the server'}.`, true); return true; }
+  go({ kind: 'server', sid: r.sid });
+  return true;
+}

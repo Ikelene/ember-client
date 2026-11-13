@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import serverCreationPolicy from '../server-creation-policy.json';
 import { Users, Copy, Check, Upload, Trash2, Hash, Search, Globe, ShieldCheck, Bot } from 'lucide-react';
+import { joinAndOpen } from './instances.js';
 import { BotGallery } from './BotGallery.jsx';
 import { apiFetch } from '../api.js';
 import { getState, useChat, go, loadServersOf, refreshServer, loadGroups, toast, errorText, ask, answerAsk, loadFriends, sendMessage, linkFor } from './store.js';
@@ -69,7 +70,7 @@ function Directory({ close }) {
     const url = normOrigin(r.url);
     if (!url) return;
     close();
-    setTimeout(() => (mine.some(i => i.origin === url) ? go({ kind: 'instance', inst: url }) : dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'add-instance', url } }))), 200);
+    setTimeout(() => (mine.some(i => i.origin === url) ? go({ kind: 'instance', inst: url }) : joinAndOpen(url)), 200);
   };
   return (
     <>
@@ -189,13 +190,12 @@ export function JoinInvite({ code, inst, onClose }) {
         <>
           <div className="vc-invite-srv"><span className="vc-srv-ico lg">{s.icon ? <img src={s.icon} alt="" /> : initials(s.name)}</span><div><b>{s.name}</b><small><Users size={13} /> {s.member_count} members{inst ? ` - ${inst.replace(/^https?:\/\//, '')}` : ''}</small></div></div>
           {s.description && <p className="vc-dialog-sub">{s.description}</p>}
-          {inst && !conn && <p className="vc-dialog-sub">This server isn't in your list yet. Add it first, then you're in.</p>}
           <div className="vc-dialog-btns"><span className="grow" /><button type="button" className="btn btn-surface" onClick={close}>Not now</button>
             <button type="button" className="btn btn-primary" disabled={!!conn && !ready} onClick={async () => {
-              if (inst && !conn) { close(); setTimeout(() => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'add-instance', url: inst, invite: code } })), 200); return; }
+              if (inst && !conn) { close(); joinAndOpen(inst, code); return; } // (connects with your account and joins; the Add a server dialog only when it has to ask)
               try { if (!joined) await apiFetch(`/chat/join/${encodeURIComponent(code)}`, { method: 'POST', inst: inst || undefined }); await loadServersOf(s.sid); close(); go({ kind: 'server', sid: s.sid }); }
               catch (e) { toast(errorText(e.message)); }
-            }}>{inst && !conn ? 'Add server' : joined ? 'Open it' : 'Join server'}</button></div>
+            }}>{joined ? 'Open it' : 'Join server'}</button></div>
         </>
       ))}
     </Dialog>

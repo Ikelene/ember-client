@@ -2,6 +2,7 @@
 // the search, then Servers / Bots. The directory listings are untrusted text (shown as text; a card only opens Add a server).
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Bot, Compass, Globe, Search, ShieldCheck, Users, X } from 'lucide-react';
+import { joinAndOpen } from './instances.js';
 import { useChat, go } from './store.js';
 import { normOrigin } from './ids.js';
 import { initials } from './Parts.jsx';
@@ -49,7 +50,7 @@ function ServerResults({ q, onClose }) {
     const url = normOrigin(r.url);
     if (!url) return;
     if (mine.some(i => i.origin === url)) { onClose(); go({ kind: 'instance', inst: url }); return; }
-    dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'add-instance', url } }));
+    joinAndOpen(url).then(ok => { if (ok) onClose(); }); // straight in (the Add a server dialog only when it has to ask)
   };
   return (
     <>

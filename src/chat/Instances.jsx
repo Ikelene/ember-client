@@ -51,19 +51,22 @@ export function AddInstance({ url, invite, onClose, onSetup, onCreate }) {
     try {
       const d = await discover(value);
       setFound(d); setText(d.origin);
-      setStep(instanceConn(d.origin)?.session ? 'join' : 'auth');
+      // a server that uses Nookara accounts, while signed in: no Connect step, it connects with this account right away
+      if (!instanceConn(d.origin)?.session && d.info.accounts_mode === 'velora' && hasVelora() && d.info.claimed !== false && d.info.community) {
+        try { await authed(await veloraSession(d.origin), d); } catch { setStep('auth'); }
+      } else setStep(instanceConn(d.origin)?.session ? 'join' : 'auth');
     } catch (e) { setErr(errorText(e.message)); setStep('url'); }
     setBusy(false);
   }
   useEffect(() => { if (url) look(url); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  // opened from an invite link: join right after logging in
-  useEffect(() => { if (step === 'join' && invite && live?.status === 'open' && !asked && !member) { setAsked(true); join(invite); } }, [step, live?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  // opened from an invite link, or a server anyone can join: join right after connecting (then it opens)
+  useEffect(() => { if (step === 'join' && (invite || info?.community?.join_policy === 'open') && live?.status === 'open' && !asked && !member) { setAsked(true); join(invite); } }, [step, live?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // logged in: it goes on the rail; a server that isn't set up yet is set up now
-  async function authed(got) {
-    const { origin } = found;
-    const c = await addInstance(origin, found.info, got);
-    if (found.info.claimed === false || (!found.info.community && c.isAdmin)) { onSetup?.(origin); return; }
+  async function authed(got, f = found) {
+    const { origin } = f;
+    const c = await addInstance(origin, f.info, got);
+    if (f.info.claimed === false || (!f.info.community && c.isAdmin)) { onSetup?.(origin); return; }
     setStep('join');
   }
   async function viaVelora() {
