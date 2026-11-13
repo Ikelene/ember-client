@@ -27,7 +27,7 @@ import { InsightsPage } from './Insights.jsx';
 import { DashboardPage, JoiningPage, MessageRulesPage, ReportsPage, AutoModPage, AuditLogPage, UploadRulesPage } from './ServerRules.jsx';
 import { InstanceTab, BridgeBots, restartInstance } from './Instances.jsx';
 import { UpdateServerRow } from './UpdateServer.jsx';
-import { HostingPage } from './Hosting.jsx';
+import { HostingPage, useHostedFor, loadHosted, deleteHostedServer } from './Hosting.jsx';
 import { BackupsPage } from './Backups.jsx';
 import { ServerInfoPage } from './ServerInfo.jsx';
 import { PlanCtx, buildPlanCtx, PlanUsage, PlanGate, usePlan } from './PlanGate.jsx';
@@ -308,9 +308,13 @@ function MembersPage({ sid }) {
 function DangerZone({ sid, origin, instAdmin, onClose }) {
   const srv = useChat(s => s.detail[sid]?.server);
   const instName = useChat(s => s.instances.find(i => i.origin === origin)?.name);
+  const hostedRow = useHostedFor(origin); // hosted by Nookara and you own the hosting: deleting goes through Nookara
+  useEffect(() => { if (origin) loadHosted(); }, [origin]);
   if (!srv) return null;
   const owner = srv.role === 'owner' && !srv.is_default;
   const del = async () => {
+    // a hosted server: delete the whole server through Nookara, or it keeps running (empty) and holds the plan slot
+    if (hostedRow) { if (await deleteHostedServer(hostedRow)) onClose(); return; }
     if (!(await ask({ title: `Delete ${srv.name}?`, text: 'This deletes the server, its channels and every message in it, for everyone. It cannot be undone.', match: srv.name, confirm: 'Delete server', danger: true }))) return;
     try { await apiFetch(`/chat/servers/${sid}`, { method: 'DELETE' }); onClose(); go({ kind: 'home' }); loadServersOf(sid); } catch (e) { toast(errorText(e.message)); }
   };
@@ -332,9 +336,9 @@ function DangerZone({ sid, origin, instAdmin, onClose }) {
           <UpdateServerRow origin={origin} name={instName} />
         </Card>
       )}
-      {owner && (
+      {(owner || hostedRow) && (
         <Card title="Delete" icon={Trash2} className="bf-ss-danger">
-          <div className="cs-row"><div className="cs-text"><b>Delete this server</b><span>Its channels and every message go, for everyone. This can't be undone.</span></div>
+          <div className="cs-row"><div className="cs-text"><b>Delete this server</b><span>{hostedRow ? 'Nookara saves a backup to your account, then shuts the server down and deletes it, for everyone. Its plan slot is free right away.' : "Its channels and every message go, for everyone. This can't be undone."}</span></div>
             <button type="button" className="btn btn-danger" onClick={del}><Trash2 size={14} /> Delete server</button></div>
         </Card>
       )}
