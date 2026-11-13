@@ -337,6 +337,16 @@ function useTabBadge() {
   useEffect(() => { drawTabIcon.want = [count, pings]; drawTabIcon(count, pings); }, [count, pings]);
   return count;
 }
+// the phone layout's menu / back button (opens the server rail + channel list): what's waiting behind it. DMs + mentions as a
+// red count (99+ at most), only plain unread channels as a dot; muted servers / channels don't count (unreadTotals). It follows
+// the store, so it changes as messages come in and clears as they're read; the conversation on screen is already marked read.
+function DrawerBadge() {
+  const totals = useChat(s => { const t = unreadTotals(s); return `${t.count}|${t.pings}`; });
+  const [count, pings] = totals.split('|').map(Number);
+  if (pings > 0) return <span className="vc-drawer-badge" aria-label={`${pings} unread mention${pings === 1 ? '' : 's'} or message${pings === 1 ? '' : 's'}`}>{pings > 99 ? '99+' : pings}</span>;
+  if (count > 0) return <span className="vc-drawer-badge dot" aria-label="Unread messages" />;
+  return null;
+}
 function ChatPage() {
   const [ready, setReady] = useState(false);
   const view = useChat(s => s.view);
@@ -551,7 +561,7 @@ function ChatPage() {
         <LegacyReadOnlyBar />
         {discover ? <DiscoverPage onClose={() => setDiscover(false)} /> : view.kind === 'home' || view.kind === 'instance' ? (
           <>
-            <button type="button" className="vc-ico-btn vc-burger floating" onClick={openDrawer} title="Menu"><Menu size={19} /></button>
+            <button type="button" className="vc-ico-btn vc-burger floating" onClick={openDrawer} title="Menu"><Menu size={19} /><DrawerBadge /></button>
             {view.kind === 'instance' ? <InstanceGate origin={view.inst} /> : signedIn ? <Home onUser={openMini} /> : <SignInPrompt />}
           </>
         ) : (
@@ -559,8 +569,8 @@ function ChatPage() {
             <div className="vc-mainrow">
             <div className="vc-maincol">
             <header className="vc-head">
-              <button type="button" className="vc-ico-btn vc-burger" onClick={openDrawer} title="Menu"><Menu size={19} /></button>
-              <button type="button" className="vc-ico-btn vc-back" onClick={openDrawer} title="Back to your chats" aria-label="Back to your chats"><ChevronLeft size={22} /></button>
+              <button type="button" className="vc-ico-btn vc-burger" onClick={openDrawer} title="Menu"><Menu size={19} /><DrawerBadge /></button>
+              <button type="button" className="vc-ico-btn vc-back" onClick={openDrawer} title="Back to your chats" aria-label="Back to your chats"><ChevronLeft size={22} /><DrawerBadge /></button>
               {isServer && <><ChIcon size={20} className="vc-head-ico" /><b className="vc-head-name">{channel?.name || ''}</b>{(channel?.bridges || (channel?.bridged ? [channel.bridged] : [])).map(link => <span key={link.platform} className="vc-bridge-tag" title={`Bridged with #${link.name} in the linked ${link.platform === 'discord' ? 'Discord' : 'Fluxer'} community`}><PlatformIcon p={link.platform} size={14} /> #{link.name}</span>)}{channel?.type === 'logs' && channel.config?.mode === 'cloudlink' && <span className="vc-bridge-tag" title={`Bridged with CloudLink (${channel.config.url}${channel.config.room ? `, room ${channel.config.room}` : ''}) - messages go both ways. Type !online to see who's there.`}><PlatformIcon p="cloudlink" size={14} /> CloudLink</span>}{channel?.topic && <span className="vc-head-topic" title={channel.topic}>{channel.topic}</span>}</>}
               {sysDM && <><b className="vc-head-name">Nookara</b><span className="vc-head-topic">Notices about your account</span></>}
               {modView && <><ShieldCheck size={20} className="vc-head-ico" /><b className="vc-head-name">{view.username ? `Moderator chat: ${view.username}` : 'Nookara Moderator Chat'}</b><span className="vc-head-topic">{view.username ? 'You write as Nookara Administrator' : 'From Nookara\'s admins - read only'}</span></>}

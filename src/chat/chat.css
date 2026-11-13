@@ -2590,3 +2590,9 @@ html.vc-rounded .vc-sticker.gone { border-radius: calc(8px * var(--rk, 1)); }
 .vc-av-side .vc-bubble.mine svg, .bf-pp-side .vc-bubble.mine svg { margin-top: 2px; }
 .vc-av-side .bf-pp-bubble-t, .bf-pp-side .bf-pp-bubble-t { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; }
 .vc-card .pe-avatar-row .pe-avatar { align-self: flex-end; }
+
+/* unread behind the phone layout's menu / back button (Chat.jsx DrawerBadge): a red count for DMs + mentions, a dot otherwise */
+.vc-burger, .vc-back { position: relative; overflow: visible; }
+.vc-drawer-badge { position: absolute; top: 1px; right: -3px; min-width: 17px; height: 17px; padding: 0 4px; display: grid; place-items: center; background: var(--red, #e5484d); color: #fff; font-size: 10.5px; font-weight: 800; line-height: 1; box-shadow: 0 0 0 2px var(--bg, #0e0e10); pointer-events: none; animation: vc-pop .2s cubic-bezier(.2, .8, .2, 1); }
+.vc-drawer-badge.dot { min-width: 0; width: 9px; height: 9px; padding: 0; top: 4px; right: 1px; background: var(--text, #ececf0); }
+html.vc-rounded .vc-drawer-badge { border-radius: 999px; }
