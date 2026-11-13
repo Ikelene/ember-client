@@ -768,7 +768,7 @@ function CustomStatus({ current, onClose }) {
       <form className="vc-dialog" onSubmit={save}>
         <h3>Set a custom status</h3>
         <p className="vc-dialog-sub">Shows under your name in member lists and on your profile.</p>
-        <input className="form-input" autoFocus maxLength={128} placeholder="What are you up to?" value={text} onChange={e => setText(e.target.value)} />
+        <input className="form-input" autoFocus maxLength={128} placeholder="What's on your mind?" value={text} onChange={e => setText(e.target.value)} />
         <div className="vc-dialog-btns">
           {current && <button type="button" className="btn btn-surface" disabled={busy} onClick={async () => { setBusy(true); try { await setCustom(''); onClose(); } catch { setBusy(false); } }}>Clear status</button>}
           <span className="grow" />

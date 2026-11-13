@@ -5,7 +5,7 @@
 // PopoutCard is also the live preview in Settings > Profile (chat/ProfileEditor.jsx).
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Copy, Pencil, ChevronRight, Check, Circle, Moon, MinusCircle, EyeOff, Smile, X, Users, IdCard, UserPlus, Crown, Globe, LogOut } from 'lucide-react';
+import { Copy, Pencil, ChevronRight, Check, Circle, Moon, MinusCircle, EyeOff, Smile, X, Users, IdCard, UserPlus, Crown, Globe, LogOut, Plus } from 'lucide-react';
 import { isWebBonfire, getToken } from '../api.js';
 import { signOutVelora, startSignIn, savedBonfireAccounts, rememberAccount, switchBonfireAccount } from './session.js';
 import { useChat, lookup, wantPresence, setStatus, setCustom, toast, getState, onUserUpdate } from './store.js';
@@ -40,11 +40,13 @@ function Custom({ text }) {
 
 // the card. p = { username, display_name?, pfp, banner, color, bio, pronouns, website, badges: [{name, icon_url, description}], rank, created, localTime }
 // activities: what they're doing right now (games, music...), shown under the custom status like the mini profile
-export function PopoutCard({ p, status = 'online', custom, activities, children, preview = false }) {
+// bubble: what goes beside the avatar (your own card: the custom status, or "What's on your mind?"); without one the custom status
+// shows in the body as before
+export function PopoutCard({ p, status = 'online', custom, activities, bubble, children, preview = false }) {
   const [, tick] = useState(0);
   useEffect(() => { const t = setInterval(() => tick(x => x + 1), 30000); return () => clearInterval(t); }, []);
   const color = isHex(p?.color) ? p.color : '';
-  const badges = (p?.badges || []).filter(b => b.icon_url).slice(0, 5);
+  const badges = (p?.badges || []).filter(b => b.icon_url).slice(0, 6);
   const name = p?.username || '';
   const shown = p?.display_name || name; // (display names: the big name; @username goes beside the pronouns)
   return (
@@ -54,12 +56,15 @@ export function PopoutCard({ p, status = 'online', custom, activities, children,
       </div>
       <div className="bf-pp-head">
         <span className="bf-pp-av"><Avatar user={{ username: name, pfp: p?.pfp }} size={84} status={status} /></span>
+        <span className="bf-pp-side">
+        {bubble}
         {(badges.length > 0 || p?.pro) && (
           <span className="bf-pp-badges">
             {badges.length ? badges.map(b => <img key={b.name} src={b.icon_url} alt={b.name} data-tip-badge={JSON.stringify({ name: b.name, icon: b.icon_url, description: b.description || '' })} />)
               : <Crown size={16} data-tip="Nookara Pro" />}
           </span>
         )}
+        </span>
       </div>
       <div className="bf-pp-body">
         <div className="bf-pp-name-row">
@@ -67,7 +72,7 @@ export function PopoutCard({ p, status = 'online', custom, activities, children,
           {name && <button type="button" className="bf-pp-copy" data-tip="Copy username" aria-label="Copy username" onClick={() => copy(name, 'Username copied')}><Copy size={13} /></button>}
         </div>
         <HandleLine name={shown} handle={name} pronouns={p?.pronouns || ''} cls="bf-pp-pronouns" />
-        <Custom text={custom} />
+        {!bubble && <Custom text={custom} />}
         {activities?.map((a, i) => <ActivityCard key={`${a.name}${i}`} a={a} compact />)}
         <Bio text={p?.bio} />
         {p?.website && <a className="bf-pp-link" href={/^https?:\/\//i.test(p.website) ? p.website : `https://${p.website}`} target="_blank" rel="noopener noreferrer nofollow"><Globe size={13} /> {hostOf(p.website)}</a>}
@@ -147,6 +152,18 @@ export async function signOut() {
   try { localStorage.removeItem('velora_token'); localStorage.removeItem('velora_me_cache'); } catch { /* fine */ }
   if (window.bonfireDesktop?.logout) await window.bonfireDesktop.logout();
   else location.assign('/login');
+}
+
+// your custom status beside the avatar: click to change it, x to clear it; none yet = "What's on your mind?"
+function MeBubble({ custom, onEdit }) {
+  const nodes = useMemo(() => (custom ? renderBody(custom, BODY_CTX).nodes : null), [custom]);
+  if (!custom) return <button type="button" className="vc-bubble empty bf-pp-bubble" onClick={onEdit}><Plus size={12} /> What's on your mind?</button>;
+  return (
+    <span className="vc-bubble-wrap bf-pp-bubble">
+      <button type="button" className="vc-bubble mine" title="Change your custom status" onClick={onEdit}><span className="bf-pp-bubble-t">{nodes}</span><Pencil size={11} /></button>
+      <button type="button" className="vc-bubble-x" title="Clear your custom status" onClick={() => setCustom('').catch(() => toast("Couldn't clear your status."))}><X size={12} /></button>
+    </span>
+  );
 }
 
 export function MePopout({ anchor, onClose, onEditProfile, onCustomStatus }) {
@@ -261,7 +278,7 @@ export function MePopout({ anchor, onClose, onEditProfile, onCustomStatus }) {
 
   return createPortal(
     <div ref={box} className={`bf-pp-pop${closing ? ' out' : ''}`} style={pos ? { left: pos.left, top: pos.top } : { left: -9999, top: 0 }} role="dialog" aria-label="Your profile">
-      <PopoutCard p={card} status={status} custom={presence?.custom} activities={presence?.activities}>
+      <PopoutCard p={card} status={status} custom={presence?.custom} activities={presence?.activities} bubble={<MeBubble custom={presence?.custom} onEdit={onCustomStatus} />}>
         <ManageFacts presence={presence} />
         <div className="bf-pp-rows">
           <div className="bf-pp-rowwrap" {...hp('status')}>

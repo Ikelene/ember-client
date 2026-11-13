@@ -2570,3 +2570,16 @@ html.vc-rounded .vc-sticker.gone { border-radius: calc(8px * var(--rk, 1)); }
 .vc-handle-line .vc-handle { color: var(--dim); font-weight: 500; }
 .bf-pp-pronouns .vc-handle { color: var(--dim); }
 
+
+/* beside the avatar on a profile card: the status bubble on top, the badges under it on the right (Profile.jsx, ProfilePopout.jsx) */
+.vc-av-side, .bf-pp-side { flex: 1; min-width: 0; align-self: stretch; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; gap: 6px; }
+.vc-av-side > .vc-bubble, .vc-av-side > .vc-bubble-wrap, .bf-pp-side > .vc-bubble, .bf-pp-side > .vc-bubble-wrap { margin: 0; max-width: 100%; }
+.vc-av-side > .vc-bubble.empty, .bf-pp-side > .vc-bubble.empty { display: inline-flex; align-items: center; gap: 5px; }
+.vc-av-side .vc-badge-box, .bf-pp-side .bf-pp-badges { align-self: flex-end; margin: 0 0 4px; }
+.vc-badge-box { display: inline-flex; align-items: center; gap: 4px; padding: 5px 7px; background: #151517; border: 1px solid var(--border-2); }
+.vc-badge-box img { width: 18px; height: 18px; object-fit: contain; display: block; }
+.vc-card .pe-avatar-row { align-items: stretch; }
+.bf-pp-head { align-items: stretch; }
+.bf-pp-head .bf-pp-av { align-self: flex-end; }
+.bf-pp-bubble-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bf-pp-bubble-t img { width: 16px; height: 16px; vertical-align: -3px; }
