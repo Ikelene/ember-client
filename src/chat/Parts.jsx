@@ -63,6 +63,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
   const instances = allInstances.filter(i => !(i.loaded && i.status === 'open' && !i.pending && !servers.some(x => x.inst === i.origin) && view.inst !== i.origin && !(view.sid && instOf(view.sid) === i.origin)));
   const unread = useChat(s => s.unread);
   const dms = useChat(s => s.dms);
+  const homeRequests = useChat(s => s.homeRequests || 0); // friend + message requests waiting (a red count, like a mention)
   const homeUnread = dms.some(c => c.unread) || Object.entries(unread).some(([k, v]) => v && (k.startsWith('d:') || k.startsWith('g:')));
   const home = view.kind === 'home' || view.kind === 'dm' || view.kind === 'group' || view.kind === 'modmail';
   const people = useChat(s => s.people);
@@ -237,7 +238,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
   };
   return (
     <nav className="vc-rail" aria-label="Servers">
-      <RailItem active={home && !discoverOn} unread={homeUnread && !home} title="Home - friends and direct messages" onClick={() => go({ kind: 'home' })}>
+      <RailItem active={home && !discoverOn} unread={(homeUnread || homeRequests > 0) && !home} badge={homeRequests} title={homeRequests ? `Home - ${homeRequests} request${homeRequests === 1 ? '' : 's'} waiting` : 'Home - friends and direct messages'} onClick={() => go({ kind: 'home' })}>
         <span className="vc-srv-ico vc-rail-dm"><MessageCircle size={24} /></span>
       </RailItem>
       {newDMs.map(c => (

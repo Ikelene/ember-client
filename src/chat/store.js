@@ -89,6 +89,7 @@ let state = {
   personalEmojis: null,    // { list, max, pro_max }: my personal emojis (personal.js)
   stickers: {},            // sid -> { list, max }: an Ember server's stickers (personal.js)           // eid -> picture of an instance's custom emoji
   notifUnread: 0,          // Velora notifications not read yet (the bell's badge)
+  homeRequests: 0,         // friend requests + message requests waiting for me (the Home button's count)
   notifs: null,            // the bell's popup while it's open: { list (unread only, newest first), cursor, loading, error }
 };
 const subs = new Set();
@@ -710,9 +711,9 @@ function onEvent(m, inst = VELORA) {
       break;
     case 'group_update': case 'group_removed': loadGroups(); break;
     case 'chat_pins_update': bumpPins(m.channel); break;
-    case 'friend_request': case 'friend_request_accepted': loadFriends(); break;
+    case 'friend_request': case 'friend_request_accepted': loadFriends(); loadHomeRequests(); break;
     case 'blocks_changed': loadBlocks(); break; // I blocked / unblocked someone (here or on another device)
-    case 'notification_new': notificationNew(m); break;
+    case 'notification_new': notificationNew(m); if (/request/.test(String(m.notification?.type || m.notification?.kind || ''))) loadHomeRequests(); break; // (a message request comes as a notification)
     case 'notifications_updated': notificationsUpdated(m); break; // read / deleted somewhere else (another tab, the site, a phone)
     case 'kicked': if (isWebBonfire()) authLost(); else location.href = '/login'; break;
     default: break;
@@ -823,6 +824,7 @@ export function unreadTotals(s = state) {
     else if (k.startsWith('d:') && !s.dms.some(c => `d:${c.username.toLowerCase()}` === k && c.unread)) { count += 1; pings += 1; }
   }
   if (s.modmail?.unread) { count += s.modmail.unread; pings += s.modmail.unread; }
+  if (s.homeRequests) { count += s.homeRequests; pings += s.homeRequests; } // friend + message requests waiting
   return { count, pings };
 }
 // is this message for me? @me, a reply to my message, @everyone / @here, or one of my roles
@@ -1617,6 +1619,18 @@ export async function loadGroups() {
   const d = await apiFetch('/groups').catch(() => null);
   if (d) set({ groups: d.groups });
 }
+// friend requests + message requests waiting for me: the count on the Home button in the server rail. Home's own lists
+// report what they load (setHomeRequests) so the count is right the moment you answer one there.
+const homeReq = { friends: 0, dms: 0 };
+export function setHomeRequests(part) {
+  Object.assign(homeReq, part);
+  const n = (homeReq.friends || 0) + (homeReq.dms || 0);
+  if (state.homeRequests !== n) set({ homeRequests: n });
+}
+export async function loadHomeRequests() {
+  const [f, d] = await Promise.all([apiFetch('/friends/requests').catch(() => null), apiFetch('/account/dm-requests').catch(() => null)]);
+  setHomeRequests({ ...(f ? { friends: f.incoming?.length || 0 } : {}), ...(d ? { dms: d.requests?.length || 0 } : {}) });
+}
 export async function loadFriends() {
   const d = await apiFetch('/friends').catch(() => null);
   if (!d) return;
@@ -2022,7 +2036,7 @@ export function authLost() {
 }
 onAuthLost(authLost);
 // what the signed-in account holds (on start, and again when a lockout is lifted)
-function loadAccount() { loadServers(); loadDMs(); loadGroups(); loadFriends(); loadBlocks(); loadModmail(); loadMedia(); loadNotifCount(); }
+function loadAccount() { loadServers(); loadDMs(); loadGroups(); loadFriends(); loadBlocks(); loadModmail(); loadMedia(); loadNotifCount(); loadHomeRequests(); }
 
 // ── lockout: staff switched Ember and DMs off for the account (users.disabled_scopes), or Nookara's birthday gate did ──
 // (no birthday set yet, or under the minimum age for their region: the same bits, told apart by restriction_reason, so the

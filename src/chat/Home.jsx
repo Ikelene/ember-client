@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MessageCircle, UserPlus, Check, X, House, Users, Inbox, ShieldOff, UsersRound, Sparkles, Bookmark, Search, Compass, Plus, ChevronRight } from 'lucide-react';
 import { apiFetch } from '../api.js';
-import { useChat, go, loadFriends, toast, errorText, ask, toggleBlock } from './store.js';
+import { useChat, go, loadFriends, toast, errorText, ask, toggleBlock, setHomeRequests } from './store.js';
 import { NameText, displayNameOf } from './displayNames.js';
 import { Avatar, subtitle } from './Profile.jsx';
 import { VeloraConnNote } from './Parts.jsx';
@@ -35,11 +35,11 @@ export default function Home({ onUser }) {
   const setTab = t => { const k = { online: 'friends', all: 'friends', pending: 'requests', add: 'friends', home: 'catchup' }[t] || t; setTabRaw(k); try { localStorage.setItem('bf_home_tab', k); } catch { /* fine */ } };
   const [reqs, setReqs] = useState({ incoming: [], outgoing: [] });
   const [q, setQ] = useState('');
-  const loadReqs = () => apiFetch('/friends/requests').then(setReqs).catch(() => {});
+  const loadReqs = () => apiFetch('/friends/requests').then(d => { setReqs(d); setHomeRequests({ friends: d?.incoming?.length || 0 }); }).catch(() => {});
   useEffect(() => { loadReqs(); }, []);
   // message requests (dm-privacy.js): someone who isn't a friend asks before they can DM you. Nothing they wrote comes with it
   const [dmReqs, setDmReqs] = useState(null);
-  const loadDmReqs = () => apiFetch('/account/dm-requests').then(setDmReqs).catch(() => {});
+  const loadDmReqs = () => apiFetch('/account/dm-requests').then(d => { setDmReqs(d); setHomeRequests({ dms: d?.requests?.length || 0 }); }).catch(() => {});
   useEffect(() => { loadDmReqs(); }, [tab]);
   const dmIn = dmReqs?.requests || [];
   async function answerDm(id, yes) {
