@@ -53,7 +53,20 @@ export function loadHosted(force) {
   return apiFetch('/bonfire/hosting/servers').then(d => patchState({ hosted: d.servers || [], hostedYou: d.you || null })).catch(() => {}); // you: { pro, pro_until }
 }
 const NONE = []; // (a selector must return the same empty list every time, or the store re-renders forever)
-const useHostedFor = origin => useChat(s => (origin ? (s.hosted || NONE).find(h => normOrigin(h.url) === origin) : null));
+export const useHostedFor = origin => useChat(s => (origin ? (s.hosted || NONE).find(h => normOrigin(h.url) === origin) : null));
+// delete a Nookara-hosted server through Nookara (backup, then the container goes and the plan slot is free).
+// Hosting > Delete and Danger zone > Delete both use this: deleting only the community inside left the server running. -> true when deleted
+export async function deleteHostedServer(h) {
+  const word = h.host_slug || h.slug;
+  if (!(await ask({ title: `Delete ${h.name || word}?`, text: 'Nookara saves a backup to your account first, then shuts the server down and deletes it, for everyone. Its plan slot is free right away. You can restore the backup later from Create a server.', match: word, confirm: 'Delete server', danger: true }))) return false;
+  try {
+    const d = await apiFetch(`/bonfire/hosting/servers/${h.slug}`, { method: 'DELETE', body: JSON.stringify({ confirm: word }) });
+    loadHosted(true);
+    toast(d?.pending ? "Deleted. Nookara's hosting box didn't answer, so it finishes shutting the server down by itself in a few minutes." : 'Deleted. A backup is in your account.', true);
+    go({ kind: 'home' });
+    return true;
+  } catch (e) { toast(hostingError(e)); return false; }
+}
 if (typeof window !== 'undefined') { addEventListener('focus', () => loadHosted()); }
 
 // what a plan gives, as short lines with icons
@@ -432,11 +445,7 @@ export function HostingPage({ origin }) {
     try { await apiFetch(`/bonfire/hosting/servers/${h.slug}/restart`, { method: 'POST' }); toast('Restarting...', true); setTimeout(() => loadHosted(true), 4000); } catch (e) { toast(hostingError(e)); }
     setBusy('');
   }
-  async function del() {
-    const word = h.host_slug || h.slug;
-    if (!(await ask({ title: `Delete ${h.name || word}?`, text: 'Nookara saves a backup to your account first, then shuts the server down and deletes it. You can restore the backup later from Create a server.', match: word, confirm: 'Delete server', danger: true }))) return;
-    try { await apiFetch(`/bonfire/hosting/servers/${h.slug}`, { method: 'DELETE', body: JSON.stringify({ confirm: word }) }); loadHosted(true); toast('Deleted. A backup is in your account.', true); go({ kind: 'home' }); } catch (e) { toast(hostingError(e)); }
-  }
+  const del = () => deleteHostedServer(h);
   async function dropBackup(b) {
     if (!(await ask({ title: 'Delete this backup?', text: "It's gone for good - download it first if you might want it.", confirm: 'Delete backup', danger: true }))) return;
     try { await apiFetch(`/bonfire/hosting/backups/${b.id}`, { method: 'DELETE' }); loadBackups(); } catch (e) { toast(hostingError(e)); }
