@@ -1,11 +1,11 @@
 // Encrypted DMs where they meet the message list and the composer. Separate from Messages.jsx so E2ee.jsx's dialogs stay out of its imports.
-import { useEffect, useState } from 'react';
-import { Lock, LockOpen, AlertTriangle, Clock, File as FileIcon, Download, Link2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Lock, LockOpen, AlertTriangle, Clock, File as FileIcon, Download, Link2, Film, Music, Image as ImageIcon, Play, RefreshCw } from 'lucide-react';
 import { useChat, openE2eeGate, dismissKeyChange, dropFailed, useBotPeer } from './store.js';
 import { LinkEmbeds } from './LinkEmbeds.jsx';
 import { openSafety, E2eeLockedPanel } from './E2ee.jsx';
 import * as E2EE from './e2ee/session.js';
-import { opensByItself } from './e2ee/files.js';
+import { opensByItself, autoMax } from './e2ee/files.js';
 import { shownName } from './spoiler.js';
 import './E2ee.css';
 
@@ -26,15 +26,41 @@ export function E2eeMessageNote({ m, view }) {
 }
 
 // Files in a DM: the encrypted ones are fetched and opened here, and from then on they're ordinary attachments with a local address.
+// Pictures, GIFs, videos and sounds open by themselves once they scroll into view (Ikelene 2026-11-13: "make all files
+// automatically open"), up to autoMax(); a bigger one shows its size and opens on a click. Other files keep a Download button.
 function useOpened(list) {
-  const [got, setGot] = useState({}); // link -> object URL | 'gone' | 'failed' | 'wait'
-  const wanted = list.filter(a => a.sealed && opensByItself(a)).map(a => a.url).join('\n');
-  const open = link => {
-    setGot(g => (g[link] ? g : { ...g, [link]: 'wait' }));
-    E2EE.openFile(link).then(u => setGot(g => ({ ...g, [link]: u }))).catch(e => setGot(g => ({ ...g, [link]: e.message === 'gone' ? 'gone' : 'failed' })));
+  const [got, setGot] = useState({}); // link -> object URL | 'gone' | 'failed' | 'wait' | { big: size }
+  const open = (link, auto = false) => {
+    setGot(g => ({ ...g, [link]: 'wait' }));
+    E2EE.openFile(link, auto ? { max: autoMax() } : {}).then(u => setGot(g => ({ ...g, [link]: u })))
+      .catch(e => setGot(g => ({ ...g, [link]: e.message === 'gone' ? 'gone' : e.message === 'too_big' ? { big: e.size } : 'failed' })));
   };
-  useEffect(() => { if (wanted) wanted.split('\n').forEach(open); }, [wanted]); // eslint-disable-line react-hooks/exhaustive-deps
   return [got, open];
+}
+const sizeText = n => (n >= 1048576 ? `${(n / 1048576).toFixed(n >= 10485760 ? 0 : 1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+// the placeholder of one that isn't open yet: opens itself when it comes into view (media only)
+function Waiting({ a, open }) {
+  const ref = useRef(null);
+  const auto = opensByItself(a) && !a.state;
+  useEffect(() => {
+    if (!auto || !ref.current) return undefined;
+    if (typeof IntersectionObserver === 'undefined') { open(a.url, true); return undefined; }
+    const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); open(a.url, true); } }, { rootMargin: '300px 0px' });
+    io.observe(ref.current);
+    return () => io.disconnect();
+  }, [auto, a.url]); // eslint-disable-line react-hooks/exhaustive-deps
+  const big = a.state && typeof a.state === 'object' ? a.state.big : 0;
+  const media = a.type === 'video' || a.type === 'audio';
+  return (
+    <div ref={ref} className={`e2-file${opensByItself(a) ? ' media' : ''}`}>
+      {a.type === 'video' ? <Film size={18} /> : a.type === 'audio' ? <Music size={18} /> : a.type === 'image' || a.type === 'gif' ? <ImageIcon size={18} /> : <FileIcon size={18} />}
+      <span title={shownName(a.name)}>{shownName(a.name)}</span>
+      {a.state === 'failed' ? <><small>Couldn't open it.</small><button type="button" className="btn btn-surface btn-sm" onClick={() => open(a.url)}><RefreshCw size={14} /> Try again</button></>
+        : a.state === 'wait' ? <small>Opening...</small>
+        : big ? <button type="button" className="btn btn-surface btn-sm" onClick={() => open(a.url)}>{media ? <Play size={14} /> : <Download size={14} />} {media ? 'Play' : 'Open'} ({sizeText(big)})</button>
+        : !opensByItself(a) ? <button type="button" className="btn btn-surface btn-sm" onClick={() => open(a.url)}><Download size={14} /> Download</button> : <small>Loading...</small>}
+    </div>
+  );
 }
 export function OpenedAttachments({ list, extra, m, Attachments }) {
   const [got, open] = useOpened(list);
@@ -48,13 +74,7 @@ export function OpenedAttachments({ list, extra, m, Attachments }) {
   }
   return (
     <>
-      {waiting.map(a => (
-        <div key={a.url} className="e2-file">
-          <FileIcon size={18} />
-          <span title={shownName(a.name)}>{shownName(a.name)}</span>
-          {a.state === 'failed' ? <small>Couldn't open it.</small> : a.state === 'wait' ? <small>Opening...</small> : !opensByItself(a) ? <button type="button" className="btn btn-surface btn-sm" onClick={() => open(a.url)}><Download size={14} /> Open</button> : null}
-        </div>
-      ))}
+      {waiting.map(a => <Waiting key={a.url} a={a} open={open} />)}
       <Attachments list={shown} extra={extra} m={m} />
     </>
   );

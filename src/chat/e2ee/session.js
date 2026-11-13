@@ -2,6 +2,7 @@
 // The format is nke1.js, how it all fits together is docs/E2EE.md in the Nookara repo.
 import { apiFetch } from '../../api.js';
 import * as N from './nke1.js';
+import { mimeOf } from './files.js';
 import * as KS from './keystore.js';
 
 // what stretches a DM passcode. 64 MB makes guessing expensive, on a phone it takes a second or two.
@@ -345,17 +346,21 @@ export const parseFileLink = N.parseFileLink;
 const blobs = new Map(); // link -> promise of an object URL
 const myHost = u => { try { const x = new URL(u); return /^\/(t|uploads)\//.test(x.pathname) && /(^|\.)nookara\.cc$|ikelene\.net$|^127\.0\.0\.1$|^localhost$/.test(x.hostname) && x.hostname !== 'cdn.nookara.cc' ? location.origin + x.pathname : u; } catch { return u; } };
 // a file link -> an object URL of the opened file. Rejects 'gone' when the file isn't there any more.
-export function openFile(link) {
+// max: opening by itself (bytes): a bigger file stops before downloading and rejects with too_big (err.size = its size)
+export function openFile(link, { max = 0 } = {}) {
   let p = blobs.get(link);
   if (p) return p;
   const f = N.parseFileLink(link);
   if (!f) return Promise.reject(new Error('bad_link'));
+  const ctl = new AbortController();
   p = (async () => {
-    const r = await fetch(myHost(f.url), { credentials: 'omit' });
+    const r = await fetch(myHost(f.url), { credentials: 'omit', signal: ctl.signal });
     if (r.status === 404 || r.status === 410) throw new Error('gone');
     if (!r.ok) throw new Error('fetch_failed');
+    const size = Number(r.headers.get('content-length')) || 0;
+    if (max && size > max) { ctl.abort(); throw Object.assign(new Error('too_big'), { size }); }
     const plain = await N.decryptFile(await r.arrayBuffer(), f.key, f.iv);
-    return URL.createObjectURL(new Blob([plain], { type: f.mime }));
+    return URL.createObjectURL(new Blob([plain], { type: mimeOf(f.mime, f.name) }));
   })();
   blobs.set(link, p);
   p.catch(() => blobs.delete(link));

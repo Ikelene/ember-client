@@ -907,7 +907,7 @@ function typingFrom(key, username, on = true, inst = VELORA) {
 }
 // a DM's files, from its opened message (E2EE.openMessage): their links go to Messages.jsx, which opens them on the way to the screen
 function sealedAtts(m) {
-  return (m.sealed?.files || []).map(link => { const f = E2EE.parseFileLink(link); return f ? { url: link, sealed: true, name: f.name, type: fileKindOfMime(f.mime) } : null; }).filter(Boolean);
+  return (m.sealed?.files || []).map(link => { const f = E2EE.parseFileLink(link); return f ? { url: link, sealed: true, name: f.name, type: fileKindOfMime(f.mime, f.name) } : null; }).filter(Boolean);
 }
 export function imToMsg(m) {
   const meName = state.me?.username;

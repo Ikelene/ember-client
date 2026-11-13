@@ -103,7 +103,13 @@ test('files show as what they are', () => {
   assert.equal(fileKindOfMime('audio/webm'), 'audio');
   assert.equal(fileKindOfMime('application/zip'), 'file');
   assert.equal(opensByItself({ type: 'image' }), true);
-  assert.equal(opensByItself({ type: 'video' }), false);
+  assert.equal(opensByItself({ type: 'video' }), true); // (videos open by themselves too now, up to autoMax)
+  assert.equal(opensByItself({ type: 'file' }), false);
+  // a type that says nothing: the name decides
+  assert.equal(fileKindOfMime('application/octet-stream', 'Download.mp4'), 'video');
+  assert.equal(fileKindOfMime('', 'song.MP3'), 'audio');
+  assert.equal(fileKindOfMime('application/octet-stream', 'thing.zip'), 'file');
+  assert.equal(fileKindOfMime('image/png', 'x.mp4'), 'image'); // (a real type wins)
 });
 
 // what the server's test checks its side against (VELORA tests/e2ee.test.js). Written when NKE1_VECTORS says where.
