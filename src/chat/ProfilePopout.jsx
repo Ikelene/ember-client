@@ -5,8 +5,9 @@
 // PopoutCard is also the live preview in Settings > Profile (chat/ProfileEditor.jsx).
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Copy, Pencil, ChevronRight, Check, Circle, Moon, MinusCircle, EyeOff, Smile, X, Users, IdCard, UserPlus, Crown, Globe, LogOut, Plus } from 'lucide-react';
-import { isWebBonfire, getToken } from '../api.js';
+import { Copy, Pencil, ChevronRight, Check, Circle, Moon, MinusCircle, EyeOff, Smile, X, Users, IdCard, UserPlus, Crown, Globe, LogOut, Plus, Coins, ExternalLink } from 'lucide-react';
+import { NOOKARA_ORIGIN } from './hosts.js';
+import { isWebBonfire, getToken, apiFetch } from '../api.js';
 import { signOutVelora, startSignIn, savedBonfireAccounts, rememberAccount, switchBonfireAccount } from './session.js';
 import { useChat, lookup, wantPresence, setStatus, setCustom, toast, getState, onUserUpdate } from './store.js';
 import { copy } from './Menu.jsx';
@@ -166,13 +167,65 @@ function MeBubble({ custom, onEdit }) {
   );
 }
 
+// ── your credits (read-only here: buying and sending stay on the website) ──
+// the balance for the row (fetched with the card, again on Nookara's balance_changed), and the latest transactions once it's open
+function useCredits(open) {
+  const [balance, setBalance] = useState(null);
+  const [list, setList] = useState(null); // latest transactions | 'error'
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    let gone = false;
+    apiFetch('/account/me').then(d => { if (!gone && typeof d?.account?.credits === 'number') setBalance(d.account.credits); }).catch(() => {});
+    return () => { gone = true; };
+  }, [tick]);
+  useEffect(() => {
+    if (!open) return undefined;
+    let gone = false;
+    apiFetch('/currency/transactions').then(d => { if (!gone) setList((d?.transactions || []).slice(0, 6)); }).catch(() => { if (!gone) setList('error'); });
+    return () => { gone = true; };
+  }, [open, tick]);
+  useEffect(() => { const on = () => setTick(t => t + 1); addEventListener('vc-balance', on); return () => removeEventListener('vc-balance', on); }, []);
+  return { balance, list };
+}
+const TX_WHAT = { daily: 'Daily credits', banner_upload: 'Profile banner', credit_sub: 'Nookara Pro', subscription: 'Recurring payment', refund: 'Refund', purchase: 'Purchase', sale: 'Sale', hosting: 'Server hosting', role: 'Server role' };
+function txLine(tx, myId) {
+  const incoming = String(tx.to_user_id) === String(myId);
+  const other = incoming ? tx.from_username : tx.to_username;
+  const what = tx.note || TX_WHAT[tx.type] || (tx.type === 'transfer' ? (incoming ? `From @${other}` : `To @${other}`) : other ? `${incoming ? 'From' : 'To'} @${other}` : String(tx.type || 'Credits').replace(/_/g, ' '));
+  return { incoming, what, amount: Number(tx.amount) || 0, when: tx.created_at ? new Date(tx.created_at) : null };
+}
+const shortDate = d => (d ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) }) : '');
+function CreditsPanel({ c, myId }) {
+  return (
+    <div className="bf-pp-credits">
+      <div className="bf-pp-cr-bal"><Coins size={20} /><b>{c.balance == null ? '...' : c.balance.toLocaleString()}</b><span>credits</span></div>
+      <div className="bf-pp-fl-head">Recent</div>
+      {c.list == null ? <div className="bf-pp-fl-none">Loading...</div>
+        : c.list === 'error' ? <div className="bf-pp-fl-none">Couldn't load your transactions.</div>
+        : !c.list.length ? <div className="bf-pp-fl-none">No transactions yet.</div>
+        : c.list.map(tx => {
+          const t = txLine(tx, myId);
+          return (
+            <div key={tx.id} className="bf-pp-cr-tx">
+              <span className="bf-pp-cr-what" title={t.what}>{t.what}<small>{shortDate(t.when)}</small></span>
+              <b className={t.incoming ? 'in' : 'out'}>{t.incoming ? '+' : '-'}{t.amount.toLocaleString()}</b>
+            </div>
+          );
+        })}
+      <a className="bf-pp-cr-all" href={`${NOOKARA_ORIGIN}/me#credits`} target="_blank" rel="noopener noreferrer">View all <ExternalLink size={13} /></a>
+    </div>
+  );
+}
+
 export function MePopout({ anchor, onClose, onEditProfile, onCustomStatus }) {
   const me = useChat(s => s.me);
   const presence = useChat(s => s.presence[s.me?.username]);
   const box = useRef(null);
   const [p, setP] = useState(null);
-  const [sub, setSub] = useState(''); // 'status' | 'accounts'
+  const [sub, setSub] = useState(''); // 'status' | 'credits' | 'accounts'
   const statusRow = useRef(null);
+  const creditsRow = useRef(null);
+  const credits = useCredits(sub === 'credits');
   const acctRow = useRef(null);
   const [closing, setClosing] = useState(false);
   const [busy, setBusy] = useState('');
@@ -248,7 +301,7 @@ export function MePopout({ anchor, onClose, onEditProfile, onCustomStatus }) {
     else if (viaHover.current) viaHover.current = false; // clicking a hover-opened submenu pins it open
     else setSub('');
   };
-  const rowRefs = { status: statusRow, accounts: acctRow };
+  const rowRefs = { status: statusRow, credits: creditsRow, accounts: acctRow };
   const hp = k => ({
     onPointerEnter: e => {
       if (!hoverOk(e)) return;
@@ -300,6 +353,19 @@ export function MePopout({ anchor, onClose, onEditProfile, onCustomStatus }) {
                 <div className="bf-pp-fl-sep" />
                 <button type="button" onClick={() => { setSub(''); onCustomStatus(); }}><Smile size={15} /><span className="bf-pp-fl-txt"><span>{presence?.custom ? 'Change custom status' : 'Set a custom status'}</span></span></button>
                 {presence?.custom && <button type="button" onClick={() => { setSub(''); setCustom('').catch(() => toast("Couldn't clear your status.")); }}><X size={15} /><span className="bf-pp-fl-txt"><span>Clear custom status</span></span></button>}
+              </Flyout>
+            )}
+          </div>
+          <div className="bf-pp-rowwrap" {...hp('credits')}>
+            <button type="button" ref={creditsRow} className={`bf-pp-row${sub === 'credits' ? ' on' : ''}`} aria-expanded={sub === 'credits'} onClick={() => toggle('credits')}>
+              <Coins size={16} />
+              <span className="bf-pp-row-l">{credits.balance == null ? 'Credits' : `${credits.balance.toLocaleString()} credit${credits.balance === 1 ? '' : 's'}`}</span>
+              <ChevronRight size={15} />
+            </button>
+            {sub === 'credits' && (
+              <Flyout from={creditsRow.current}>
+                {back}
+                <CreditsPanel c={credits} myId={uid} />
               </Flyout>
             )}
           </div>

@@ -712,7 +712,8 @@ function onEvent(m, inst = VELORA) {
     case 'group_update': case 'group_removed': loadGroups(); break;
     case 'chat_pins_update': bumpPins(m.channel); break;
     case 'friend_request': case 'friend_request_accepted': loadFriends(); loadHomeRequests(); break;
-    case 'blocks_changed': loadBlocks(); break; // I blocked / unblocked someone (here or on another device)
+    case 'blocks_changed': loadBlocks(); break;
+    case 'balance_changed': dispatchEvent(new CustomEvent('vc-balance', { detail: m })); break; // (your account card's credits row) // I blocked / unblocked someone (here or on another device)
     case 'notification_new': notificationNew(m); if (/request/.test(String(m.notification?.type || m.notification?.kind || ''))) loadHomeRequests(); break; // (a message request comes as a notification)
     case 'notifications_updated': notificationsUpdated(m); break; // read / deleted somewhere else (another tab, the site, a phone)
     // read on another device (desktop app, phone, another tab): the red counts here go too
