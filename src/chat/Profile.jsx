@@ -324,7 +324,7 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
           )}
           {!plain && presence?.custom && isMe && (
             <span className="vc-bubble-wrap">
-              <button type="button" className="vc-bubble mine" title="Edit your custom status" onClick={() => window.dispatchEvent(new CustomEvent('vc-custom-status'))}>{presence.custom}<Pencil size={11} /></button>
+              <button type="button" className="vc-bubble mine" title="Edit your custom status" onClick={() => window.dispatchEvent(new CustomEvent('vc-custom-status'))}><span className="bf-pp-bubble-t">{presence.custom}</span><Pencil size={11} /></button>
               <button type="button" className="vc-bubble-x" title="Clear your custom status" onClick={() => setCustom('').catch(() => toast(errorText('')))}><X size={12} /></button>
             </span>
           )}

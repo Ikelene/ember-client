@@ -2583,3 +2583,10 @@ html.vc-rounded .vc-sticker.gone { border-radius: calc(8px * var(--rk, 1)); }
 .bf-pp-head .bf-pp-av { align-self: flex-end; }
 .bf-pp-bubble-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bf-pp-bubble-t img { width: 16px; height: 16px; vertical-align: -3px; }
+/* a long status beside the avatar wraps onto up to 3 lines (growing downward) before it's cut off */
+.vc-av-side .vc-bubble, .bf-pp-side .vc-bubble { white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
+.vc-av-side > .vc-bubble:not(.mine):not(.empty) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; }
+.vc-av-side .vc-bubble.mine, .bf-pp-side .vc-bubble.mine { align-items: flex-start; }
+.vc-av-side .vc-bubble.mine svg, .bf-pp-side .vc-bubble.mine svg { margin-top: 2px; }
+.vc-av-side .bf-pp-bubble-t, .bf-pp-side .bf-pp-bubble-t { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; }
+.vc-card .pe-avatar-row .pe-avatar { align-self: flex-end; }
