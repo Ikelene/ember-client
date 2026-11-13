@@ -11,7 +11,8 @@ import { signOutVelora, startSignIn, savedBonfireAccounts, rememberAccount, swit
 import { useChat, lookup, wantPresence, setStatus, setCustom, toast, getState, onUserUpdate } from './store.js';
 import { copy } from './Menu.jsx';
 import { renderBody } from './text.jsx';
-import { Avatar, STATUS_LABEL } from './Profile.jsx';
+import { Avatar, STATUS_LABEL, ActivityCard } from './Profile.jsx';
+import { ManageFacts } from './ClientVia.jsx';
 import './ProfilePopout.css';
 
 const isHex = c => /^#[0-9a-f]{6}$/i.test(c || '');
@@ -38,7 +39,8 @@ function Custom({ text }) {
 }
 
 // the card. p = { username, pfp, banner, color, bio, pronouns, website, badges: [{name, icon_url, description}], rank, created, localTime }
-export function PopoutCard({ p, status = 'online', custom, children, preview = false }) {
+// activities: what they're doing right now (games, music...), shown under the custom status like the mini profile
+export function PopoutCard({ p, status = 'online', custom, activities, children, preview = false }) {
   const [, tick] = useState(0);
   useEffect(() => { const t = setInterval(() => tick(x => x + 1), 30000); return () => clearInterval(t); }, []);
   const color = isHex(p?.color) ? p.color : '';
@@ -65,6 +67,7 @@ export function PopoutCard({ p, status = 'online', custom, children, preview = f
         </div>
         {p?.pronouns && <div className="bf-pp-pronouns">{p.pronouns}</div>}
         <Custom text={custom} />
+        {activities?.map((a, i) => <ActivityCard key={`${a.name}${i}`} a={a} compact />)}
         <Bio text={p?.bio} />
         {p?.website && <a className="bf-pp-link" href={/^https?:\/\//i.test(p.website) ? p.website : `https://${p.website}`} target="_blank" rel="noopener noreferrer nofollow"><Globe size={13} /> {hostOf(p.website)}</a>}
         {p?.localTime && <div className="bf-pp-fact"><b>Local time</b><span>{p.localTime}</span></div>}
@@ -256,7 +259,8 @@ export function MePopout({ anchor, onClose, onEditProfile, onCustomStatus }) {
 
   return createPortal(
     <div ref={box} className={`bf-pp-pop${closing ? ' out' : ''}`} style={pos ? { left: pos.left, top: pos.top } : { left: -9999, top: 0 }} role="dialog" aria-label="Your profile">
-      <PopoutCard p={card} status={status} custom={presence?.custom}>
+      <PopoutCard p={card} status={status} custom={presence?.custom} activities={presence?.activities}>
+        <ManageFacts presence={presence} />
         <div className="bf-pp-rows">
           <div className="bf-pp-rowwrap" {...hp('status')}>
             <button type="button" ref={statusRow} className={`bf-pp-row${sub === 'status' ? ' on' : ''}`} aria-expanded={sub === 'status'} onClick={() => toggle('status')}>
