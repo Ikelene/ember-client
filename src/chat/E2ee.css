@@ -40,3 +40,9 @@ button.e2-label:hover { color: inherit; }
 .e2-err { color: var(--vc-danger, #e5484d); margin: 0; font-size: 13px; }
 .e2-label { border-bottom: 0; border-top: 1px solid var(--vc-border, #3a3a40); }
 .vc-msg.pending:has(.e2-msg-note) { opacity: 1; }
+
+/* the lock beside the name at the top of a DM / group (E2eeHeadLock) */
+.e2-head-lock { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; margin-left: 2px; padding: 0; border: 0; background: none; color: var(--dim, #a3a3ad); cursor: default; }
+button.e2-head-lock { cursor: pointer; }
+button.e2-head-lock:hover, button.e2-head-lock:focus-visible { color: var(--text, #ececf0); }
+.e2-head-lock.off { color: var(--vc-warn, #e0a030); }

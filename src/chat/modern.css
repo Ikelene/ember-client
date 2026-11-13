@@ -167,7 +167,8 @@ html.vc-rounded .vc-att { border: 0; }
 html.vc-rounded .vc-embed { border-radius: calc(9px * var(--rk, 1)); }
 
 /* ── composer ── */
-html.vc-rounded .vc-composer-wrap { padding: 0 20px; }
+html.vc-rounded .vc-composer-wrap { padding: 0 20px 8px; }
+html.vc-rounded .vc-composer-wrap > .vc-typing { position: absolute; left: 22px; right: 22px; bottom: 100%; height: 22px; pointer-events: none; text-shadow: 0 0 6px var(--m-main), 0 0 2px var(--m-main); }
 html.vc-rounded .vc-composer { gap: 4px; padding: 5px 6px; min-height: 50px; align-items: center; border: 1px solid transparent; border-radius: calc(12px * var(--rk, 1)); background: var(--m-raised); }
 html.vc-rounded .vc-composer:focus-within { border-color: var(--m-line-2); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
 html.vc-rounded .vc-composer .vc-input, html.vc-rounded .vc-composer textarea { font-size: var(--m-text, 15.5px); line-height: 1.5; }
@@ -317,7 +318,8 @@ html.vc-rounded .vc-active-card:hover { box-shadow: 0 0 0 2px var(--accent); tra
   html.vc-rounded .vc-msg { margin: 0 4px; padding: 3px 10px 3px 6px; grid-template-columns: 56px minmax(0, 1fr); }
   html.vc-rounded .vc-reply-to { padding-left: 56px; }
   html.vc-rounded .vc-text { font-size: var(--m-text, 15.5px); }
-  html.vc-rounded .vc-composer-wrap { padding: 0 10px; }
+  html.vc-rounded .vc-composer-wrap { padding: 0 10px 6px; }
+  html.vc-rounded .vc-composer-wrap > .vc-typing { left: 12px; right: 12px; }
   html.vc-rounded .vc-composer { min-height: 52px; }
   html.vc-rounded .vc-home .vc-head { padding-left: 58px; }
   html.vc-rounded .vc-burger.floating { top: 11px; left: 12px; }
@@ -347,7 +349,7 @@ html.vc-rounded .vc-msg.mention { background: color-mix(in srgb, var(--m-mention
 html.vc-rounded .vc-mention.me { background: color-mix(in srgb, var(--m-mention) 22%, transparent); color: color-mix(in srgb, var(--m-mention) 70%, #fff); }
 html.vc-rounded .vc-text:not(.jumbo) :is(.vc-cemoji, .vc-temoji) { width: var(--m-emoji); height: var(--m-emoji); vertical-align: calc(var(--m-emoji) * -.25); }
 /* status dots are diamonds in Modern (the phone / console marks keep their shape) */
-html.vc-rounded .vc-st:not(.mobile):not(.console), html.vc-rounded .vc-st-sq:not(.mobile):not(.console) { border-radius: calc(2px * var(--rk, 1)); transform: rotate(45deg) scale(.82); }
+html.vc-rounded .vc-st:not(.mobile):not(.console), html.vc-rounded .vc-st-sq:not(.mobile):not(.console) { border-radius: calc(2px * var(--rk, 1)); transform: rotate(45deg) scale(.9); }
 /* client icons off (both looks) */
 html.vc-no-client-icons .vc-msg-head .vc-via { display: none; }
 

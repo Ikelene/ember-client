@@ -2,7 +2,8 @@
 // instead of the browser's. The title moves into data-tip on first hover, so the browser one never
 // shows. data-tip-side="right" puts it beside the element; data-tip-server="<sid>" shows a server card; data-tip-alias='{json}'
 // shows who really posted an aliased message (Alias.jsx) - that one also shows on keyboard focus; data-tip-via='{json}' is
-// the "sent from" card of a message's client chip (ClientVia.jsx).
+// the "sent from" card of a message's client chip (ClientVia.jsx); data-tip-badge='{json}' is a profile badge's big card
+// ({ name, icon, description }).
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AtSign, Globe, TriangleAlert, Info, ShieldAlert, CircleCheck } from 'lucide-react';
@@ -14,9 +15,10 @@ export function TooltipHost() {
   const [tip, setTip] = useState(null); // { el, text, side, server, rect }
   useEffect(() => {
     let cur = null, timer = null, shownAt = 0;
-    const find = t => (t instanceof Element ? t.closest('[title], [data-tip], [data-tip-server], [data-tip-alias], [data-tip-via]') : null);
+    const find = t => (t instanceof Element ? t.closest('[title], [data-tip], [data-tip-server], [data-tip-alias], [data-tip-via], [data-tip-badge]') : null);
     const aliasOf = el => { try { return JSON.parse(el.getAttribute('data-tip-alias') || 'null'); } catch { return null; } };
     const viaOf = el => { try { return JSON.parse(el.getAttribute('data-tip-via') || 'null'); } catch { return null; } };
+    const badgeOf = el => { try { return JSON.parse(el.getAttribute('data-tip-badge') || 'null'); } catch { return null; } };
     const over = e => {
       const el = find(e.target);
       if (el === cur) return;
@@ -35,13 +37,14 @@ export function TooltipHost() {
       const server = el.getAttribute('data-tip-server');
       const alias = aliasOf(el);
       const via = viaOf(el);
-      if (!text && !server && !alias && !via) { setTip(null); return; }
+      const badge = badgeOf(el);
+      if (!text && !server && !alias && !via && !badge) { setTip(null); return; }
       // moving from one tip straight to the next shows it right away
       const quick = Date.now() - shownAt < 400;
       timer = setTimeout(() => {
         if (cur !== el || !document.contains(el)) return;
         shownAt = Date.now();
-        setTip({ el, text, server, alias, via, title: el.getAttribute('data-tip-title'), kind: el.getAttribute('data-tip-kind'), side: el.getAttribute('data-tip-side') || 'top', rect: el.getBoundingClientRect() });
+        setTip({ el, text, server, alias, via, badge, title: el.getAttribute('data-tip-title'), kind: el.getAttribute('data-tip-kind'), side: el.getAttribute('data-tip-side') || 'top', rect: el.getBoundingClientRect() });
       }, quick ? 40 : 380);
     };
     const hide = () => { cur = null; clearTimeout(timer); setTip(null); };
@@ -104,9 +107,9 @@ function Tip({ tip }) {
     setPos({ left: clampedLeft, top: Math.max(pad, Math.min(innerHeight - h - pad, top)), side, arrow: side === 'right' ? null : r.left + r.width / 2 - clampedLeft });
   }, [tip]);
   return (
-    <div ref={ref} className={`vc-tooltip side-${pos?.side || tip.side}${tip.server ? ' rich' : ''}${tip.alias ? ' alias' : ''}${tip.title ? ` card k-${tip.kind || 'info'}` : ''}`} role="tooltip"
+    <div ref={ref} className={`vc-tooltip side-${pos?.side || tip.side}${tip.server ? ' rich' : ''}${tip.alias ? ' alias' : ''}${tip.badge ? ' badge' : ''}${tip.title ? ` card k-${tip.kind || 'info'}` : ''}`} role="tooltip"
       style={pos ? { left: pos.left, top: pos.top, '--ax': pos.arrow != null ? `${pos.arrow}px` : undefined } : { left: -9999, top: -9999 }}>
-      {tip.server ? <ServerTip sid={tip.server} /> : tip.alias ? <AliasTip a={tip.alias} /> : tip.via ? <ViaTip t={tip.via} /> : tip.title ? <CardTip title={tip.title} text={tip.text} kind={tip.kind} /> : tip.text}
+      {tip.badge ? <BadgeTip b={tip.badge} /> : tip.server ? <ServerTip sid={tip.server} /> : tip.alias ? <AliasTip a={tip.alias} /> : tip.via ? <ViaTip t={tip.via} /> : tip.title ? <CardTip title={tip.title} text={tip.text} kind={tip.kind} /> : tip.text}
     </div>
   );
 }
@@ -128,6 +131,17 @@ function ServerTip({ sid }) {
         <i className="dot" />{s.member_count} member{s.member_count === 1 ? '' : 's'}
       </span>
       {(s.mentions > 0) && <small><AtSign size={11} /> {s.mentions} mention{s.mentions === 1 ? '' : 's'} waiting</small>}
+    </div>
+  );
+}
+
+// a profile badge: the big icon, its name and how it's earned
+function BadgeTip({ b }) {
+  return (
+    <div className="vc-tip-badge">
+      {b.icon && <img src={b.icon} alt="" />}
+      <b>{b.name}</b>
+      {b.description && <span>{b.description}</span>}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Lock, LockOpen, AlertTriangle, Clock, File as FileIcon, Download, Link2 } from 'lucide-react';
 import { useChat, openE2eeGate, dismissKeyChange, dropFailed } from './store.js';
 import { LinkEmbeds } from './LinkEmbeds.jsx';
-import { E2eeLabel, openSafety, E2eeLockedPanel } from './E2ee.jsx';
+import { openSafety, E2eeLockedPanel } from './E2ee.jsx';
 import * as E2EE from './e2ee/session.js';
 import { opensByItself } from './e2ee/files.js';
 import { shownName } from './spoiler.js';
@@ -68,8 +68,8 @@ export function PreviewOnAsk({ urls, inst, priv }) {
   return <div className="e2-msg-note"><Link2 size={13} /> <span><button type="button" onClick={() => setOn(true)}>Show link preview</button>{priv && ' (Nookara fetches it, so Nookara sees the link)'}</span></div>;
 }
 
-export function E2eeComposerNotes({ view }) {
-  // has the other person set up? (they haven't: what's sent now isn't encrypted)
+// has the other person set up encrypted DMs? (they haven't: what's sent now isn't encrypted)
+function useUnset(view) {
   const [unset, setUnset] = useState(false);
   useEffect(() => {
     let live = true;
@@ -79,6 +79,26 @@ export function E2eeComposerNotes({ view }) {
     addEventListener('e2ee-keys-changed', again);
     return () => { live = false; removeEventListener('e2ee-keys-changed', again); };
   }, [view.kind, view.username]);
+  return unset;
+}
+
+// the lock beside the name at the top of a DM / group: hover says how private it is, click (an encrypted DM) compares keys.
+// Not encrypted (they haven't set up, or a group chat): a yellow open lock.
+export function E2eeHeadLock({ view }) {
+  const unset = useUnset(view);
+  if (view.kind !== 'dm' && view.kind !== 'group') return null;
+  if (view.kind === 'dm' && view.username === 'System') return null;
+  if (view.kind === 'group' || unset) {
+    const text = view.kind === 'group' ? 'Nookara can read group chats.' : `@${view.username} hasn't set up encrypted DMs yet. They can read this, and have to set up to reply.`;
+    return <span className="e2-head-lock off" tabIndex={0} role="img" aria-label={`Not end-to-end encrypted. ${text}`} data-tip={text} data-tip-title="Not end-to-end encrypted" data-tip-kind="warn" data-tip-side="bottom"><LockOpen size={16} /></span>;
+  }
+  return (
+    <button type="button" className="e2-head-lock" onClick={() => openSafety(view.username)} aria-label="End-to-end encrypted. Compare keys"
+      data-tip="Only you two can read this. Click to compare keys." data-tip-title="End-to-end encrypted" data-tip-kind="ok" data-tip-side="bottom"><Lock size={16} /></button>
+  );
+}
+
+export function E2eeComposerNotes({ view }) {
   const changed = useChat(s => (view.kind === 'dm' ? s.e2eeKeyChanged[String(view.username).toLowerCase()] : false));
   if (view.kind !== 'dm' && view.kind !== 'group') return null;
   if (view.kind === 'dm' && view.username === 'System') return null;
@@ -89,7 +109,6 @@ export function E2eeComposerNotes({ view }) {
           <span>@{view.username}'s encryption key changed. They may have started over or lost their old one. <button type="button" onClick={() => openSafety(view.username)}>Compare keys</button> <button type="button" onClick={() => dismissKeyChange(view.username)}>Dismiss</button></span>
         </div>
       )}
-      <E2eeLabel kind={view.kind} username={view.username} plain={view.kind === 'dm' && !!unset} />
     </>
   );
 }

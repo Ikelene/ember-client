@@ -53,7 +53,7 @@ export function PopoutCard({ p, status = 'online', custom, children, preview = f
         <span className="bf-pp-av"><Avatar user={{ username: name, pfp: p?.pfp }} size={84} status={status} /></span>
         {(badges.length > 0 || p?.pro) && (
           <span className="bf-pp-badges">
-            {badges.length ? badges.map(b => <img key={b.name} src={b.icon_url} alt={b.name} data-tip={b.description ? `${b.name} - ${b.description}` : b.name} />)
+            {badges.length ? badges.map(b => <img key={b.name} src={b.icon_url} alt={b.name} data-tip-badge={JSON.stringify({ name: b.name, icon: b.icon_url, description: b.description || '' })} />)
               : <Crown size={16} data-tip="Nookara Pro" />}
           </span>
         )}

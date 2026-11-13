@@ -1,6 +1,6 @@
 // The screens of end-to-end encrypted DMs: setting up, unlocking on a new device, linking, the settings page, comparing keys with someone.
 import { useEffect, useState } from 'react';
-import { Lock, LockOpen, KeyRound, ShieldCheck, Smartphone, AppWindow, Trash2, Copy, Check, AlertTriangle } from 'lucide-react';
+import { Lock, KeyRound, ShieldCheck, Smartphone, AppWindow, Trash2, Copy, Check, AlertTriangle } from 'lucide-react';
 import { Dialog } from './Dialogs.jsx';
 import { toast, errorText, ask, useChat, openE2eeGate, closeE2eeGate } from './store.js';
 import * as S from './e2ee/session.js';
@@ -200,12 +200,7 @@ export function E2eeLockedPanel() {
 }
 
 // a line under the conversation's header: what kind of privacy this conversation has
-export function E2eeLabel({ kind, username, plain }) {
-  if (plain) return <div className="e2-label off"><LockOpen size={13} /> Not encrypted: @{username} hasn't set up encrypted DMs yet. They can read this, and have to set up to reply.</div>;
-  if (kind === 'group') return <div className="e2-label off"><LockOpen size={13} /> Not end-to-end encrypted. Nookara can read group chats.</div>;
-  return <button type="button" className="e2-label" onClick={() => openSafety(username)} title="Compare keys with them"><Lock size={13} /> End-to-end encrypted. Only you two can read this.</button>;
-}
-
+// (the old "End-to-end encrypted" line above the composer is now the lock beside the name: E2eeMessage.jsx E2eeHeadLock)
 export async function openSafety(username) {
   let code = null;
   try { code = await S.safetyWith(username); } catch { /* shown below */ }

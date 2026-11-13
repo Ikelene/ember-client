@@ -44,6 +44,7 @@ import { CreateServer, HostingNote } from '../chat/Hosting.jsx';
 import { ExportButton } from '../chat/Community.jsx';
 
 import { isInst, instOf } from '../chat/ids.js';
+import { E2eeHeadLock } from '../chat/E2eeMessage.jsx';
 import { forgetIfEmpty } from '../chat/instances.js';
 // a left Ember server goes off the list (the server list is updated by the leave's own event, or in a moment)
 const forgetLeft = sid => { const o = instOf(sid); setTimeout(() => forgetIfEmpty(o), 400); };
@@ -566,10 +567,11 @@ function ChatPage() {
                     <Avatar user={{ username: view.username, pfp: getState().people[view.username]?.pfp }} size={26} status={dmPresence?.status || 'offline'} />
                     <b className="vc-head-name">{view.username}</b>
                   </button>
+                  <E2eeHeadLock view={view} />
                   {subtitle(dmPresence) && <span className="vc-head-topic">{subtitle(dmPresence)}</span>}
                 </>
               )}
-              {view.kind === 'group' && <><UsersRound size={20} className="vc-head-ico" /><b className="vc-head-name">{group?.name || 'Group chat'}</b><span className="vc-head-topic">{group ? `${group.members.length} members` : ''}</span></>}
+              {view.kind === 'group' && <><UsersRound size={20} className="vc-head-ico" /><b className="vc-head-name">{group?.name || 'Group chat'}</b><E2eeHeadLock view={view} /><span className="vc-head-topic">{group ? `${group.members.length} members` : ''}</span></>}
               <span className="grow" />
               {view.kind === 'dm' && !sysDM && staff && <button type="button" className="vc-ico-btn" title="Message them as Nookara Administrator (Nookara Moderator Chat)" onClick={() => go({ kind: 'modmail', username: view.username })}><ShieldCheck size={19} /></button>}
               {view.kind === 'dm' && !sysDM && <DmCallButton username={view.username} />}

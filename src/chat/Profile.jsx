@@ -277,6 +277,7 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
   const botSt = plain && who?.kind === 'bot' ? botPresenceOf(member) || botPresenceOf(who) : null; // an instance bot: its presence comes with the member row
   const status = botSt || presence?.status || 'offline';
   const sub = subtitle(presence);
+  const subShown = typeof sub === 'string' && !!presence?.custom && sub === presence.custom ? '' : sub; // (the bubble by the avatar already says it)
   const role = member?.role;
   useChat(s => (sid ? s.detail[sid] : null)); useChat(s => (sid ? s.members[sid] : null)); // (redraw when roles / members change)
   const rights = sid ? modRights(sid, username) : null;
@@ -324,12 +325,12 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
         {who?.alias_name && <div className="vc-card-sub vc-card-alias"><MaskIcon size={13} /> Posting as alias: <b>{who.alias_name}</b></div>}
         {extra?.bot?.bot?.owner && <div className="vc-card-sub">Bot made by @{extra.bot.bot.owner}</div>}
         {extra?.bot?.bot && extra.bot.bot.trusted_in != null && <TrustedIn n={extra.bot.bot.trusted_in} verified={!!extra.bot.bot.verified} />}
-        {sub && <div className="vc-card-sub">{sub}</div>}
+        {(plain ? sub : subShown) && <div className="vc-card-sub">{plain ? sub : subShown}</div>}
         <div className="pe-sub">
           <RoleChip role={role} />
           {!plain && p?.badges?.length > 0 && (
             <span className="pe-badges vc-card-badges" data-vpb-protect="">
-              {p.badges.slice(0, 8).map(b => (b.icon_url ? <img key={b.name} src={b.icon_url} alt={b.name} title={b.name} /> : null))}
+              {p.badges.slice(0, 8).map(b => (b.icon_url ? <img key={b.name} src={b.icon_url} alt={b.name} data-tip-badge={JSON.stringify({ name: b.name, icon: b.icon_url, description: b.description || '' })} /> : null))}
             </span>
           )}
         </div>
@@ -495,7 +496,7 @@ export function ProfileModal({ username: shown, from, sid, who, onClose }) {
           </div>
           {p?.badges?.length > 0 && (
             <div className="vc-big-badges">
-              {p.badges.map(b => (b.icon_url ? <span key={b.name} className="vc-big-badge" title={b.description || b.name}><img src={b.icon_url} alt="" /> {b.name}</span> : null))}
+              {p.badges.map(b => (b.icon_url ? <span key={b.name} className="vc-big-badge" data-tip-badge={JSON.stringify({ name: b.name, icon: b.icon_url, description: b.description || '' })}><img src={b.icon_url} alt="" /> {b.name}</span> : null))}
             </div>
           )}
         </div>

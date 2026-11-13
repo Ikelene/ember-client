@@ -3,7 +3,7 @@
 // The name, logo and verified badge are the Nookara App that sent it (appClients.js, from Nookara's App registry); no App shows
 // its domain (or token name) with no badge.
 import { useEffect, useState } from 'react';
-import { BadgeCheck, Plug, Globe, Monitor, Smartphone, Clock, Bot } from 'lucide-react';
+import { BadgeCheck, Plug, Globe, Monitor, Smartphone, Clock, Bot, ChevronDown } from 'lucide-react';
 import { viaTitle, sessionShort, sessionDetails, sessionKind, sessionIsIdle, mergeSessions, STATE_SHORT } from './clientViaText.js';
 import { describeVia, appInfo, loadApp, onApps } from './appClients.js';
 import { useChat } from './store.js';
@@ -104,6 +104,7 @@ export function useInstClients(who, sid) {
 // (last_online / online for Manage users) for its own accounts and bots. Ember is connected to both, so the lists are merged.
 export function ManageFacts({ presence, inst, member }) {
   const list = useApps();
+  const [open, setOpen] = useState(false);
   const hasP = !!presence && (presence.sessions !== undefined || presence.last_online !== undefined || presence.last_login !== undefined);
   const hasI = !!inst && Array.isArray(inst.sessions);
   if (!hasP && !hasI) return member ? <LastOnlineFact member={member} /> : null;
@@ -113,14 +114,17 @@ export function ManageFacts({ presence, inst, member }) {
   return (
     <>
       {sessions.length > 0 && (
-        <div className="pe-fact vc-manage-fact">
-          <b>{sessions.length > 1 ? 'Clients' : 'Client'}</b>
-          {sessions.map((s, i) => (
+        <div className={`pe-fact vc-manage-fact vc-clients${open ? ' open' : ''}`}>
+          {sessions.length > 1
+            ? <button type="button" className="vc-clients-toggle" aria-expanded={open} onClick={() => setOpen(o => !o)}><b>Clients</b><span className="vc-clients-n">{sessions.length}</span><ChevronDown size={14} /></button>
+            : <b>Client</b>}
+          {(open || sessions.length === 1 ? sessions : sessions.slice(0, 1)).map((s, i) => (
             <span key={i} className={`vc-via-row${sessionIsIdle(s) ? ' idle' : ''}`} title={sessionDetails(s) || undefined}>
               {s.via ? <Chip via={s.via} list={list} Icon={KIND_ICON[sessionKind(s)]} inst={s.inst} /> : <span className="vc-via"><Globe size={13} /><span className="vc-via-name">Unknown client</span></span>}
               {sessionIsIdle(s) ? <small>{STATE_SHORT[s.state]}</small> : sessionShort(s) && <small>{sessionShort(s)}</small>}
             </span>
           ))}
+          {!open && sessions.length > 1 && <button type="button" className="vc-clients-more" onClick={() => setOpen(true)}>+{sessions.length - 1} more</button>}
         </div>
       )}
       {sessions.length === 0 && !online && <div className="pe-fact vc-manage-fact"><b>Client</b><span>Not connected</span></div>}
