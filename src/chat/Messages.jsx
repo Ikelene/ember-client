@@ -369,8 +369,8 @@ function authorKey(a) {
 }
 
 // Velora people on an instance server can sign what they send. A message from one that carries no signature can't be tied to
-// their account, so it is shown without their picture or colours. (Local accounts, bots, webhooks, system lines and Velora's own
-// servers - whose messages live on Velora itself - are exempt.)
+// their account: it gets the "Not signed" shield, but keeps their picture and colours (Ikelene 2026-11-13). Only a signature that
+// doesn't match takes those away. (Local accounts, bots, webhooks, system lines and Velora's own servers are exempt.)
 const isUnsigned = m => !!m.inst && m.author?.kind === 'velora' && !m.signature && !m.author.bot && !m.author.webhook && !m.system && (!m.pending || m.unsigned) && !m.ephemeral;
 // 'unsigned' | 'bad' | null: should this message's author picture / colour be withheld?
 function useDistrust(m) {
@@ -593,7 +593,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
       <InteractionLine m={m} sid={view.sid} onUser={onUser} />
       {head ? (
         hook ? <span className="vc-msg-av hook">{m.author.pfp ? <img src={m.author.pfp} alt="" /> : m.author.bridge ? <span className="vc-av-l">{(m.author.username || '?')[0].toUpperCase()}</span> : <Webhook size={20} />}</span>
-          : <button type="button" className="vc-msg-av" onClick={e => onUser(name, e.currentTarget)}><Avatar user={blockedAuthor ? blockedFace(author) : distrust ? { ...author, pfp: null } : aliasFace(alias, author, aliasMember)} size={40} /></button>
+          : <button type="button" className="vc-msg-av" onClick={e => onUser(name, e.currentTarget)}><Avatar user={blockedAuthor ? blockedFace(author) : distrust === 'bad' ? { ...author, pfp: null } : aliasFace(alias, author, aliasMember)} size={40} /></button>
       ) : (
         <span className="vc-msg-gut">{timeOf(m.created_at)}</span>
       )}
@@ -603,7 +603,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
             {hook ? <><span className="vc-msg-name hook">{name}</span>{m.author.staff ? <><span className="vc-app-tag staff">STAFF</span>{m.staffBy && <small className="vc-staff-by">sent by {m.staffBy} (only staff see this)</small>}</> : m.author.bridge === 'cloudlink' ? <><span className="vc-app-tag cl" title="This message came in over the channel's CloudLink bridge.">CLOUDLINK</span>{m.author.bridge_from && <span className="vc-game-tag" title="The chat it came from before CloudLink">{m.author.bridge_from}</span>}</> : m.author.bridge ? <><span className="vc-plat-tag" title={m.author.bridge === 'minecraft' ? 'Sent from the linked Minecraft server.' : `This message was sent from the linked ${PLATFORM_NAMES[m.author.bridge] || m.author.bridge} community.`}><PlatformIcon p={m.author.bridge} size={16} /></span>{m.author.bridge_from && <span className="vc-game-tag" title="The server it was sent from">{m.author.bridge_from}</span>}</> : <span className="vc-app-tag">APP</span>}</> : <>
             {blockedAuthor
               ? <><button type="button" className="vc-msg-name vc-blocked-name" onClick={e => onUser(name, e.currentTarget)}>{BLOCKED_NAME}</button><BlockedMark /></>
-              : <><button type="button" className="vc-msg-name" style={colorFrom(nameKey) && !distrust ? { color: colorFrom(nameKey) } : undefined} onClick={e => onUser(name, e.currentTarget)} title={!alias && shown !== name ? `@${name}` : undefined}>{alias ? alias.name : shown || name}</button>
+              : <><button type="button" className="vc-msg-name" style={colorFrom(nameKey) && distrust !== 'bad' ? { color: colorFrom(nameKey) } : undefined} onClick={e => onUser(name, e.currentTarget)} title={!alias && shown !== name ? `@${name}` : undefined}>{alias ? alias.name : shown || name}</button>
                 {alias && !unmarked ? <AliasMark alias={alias} by={author} /> : <NameDecor sid={view.sid} user={aliasMember || author} />}</>}{m.author?.bot && !unmarked && <BotTag verified={!!m.author.verified} />}<SigBadge m={m} />{m.via && <ViaBadge via={m.via} inst={m.inst} />}</>}
             {pronouns && <span className="vc-pronouns" title="Pronouns">{pronouns}</span>}
             <span className="vc-time" title={new Date(m.created_at).toLocaleString()}>{stampOf(m.created_at)}</span>
