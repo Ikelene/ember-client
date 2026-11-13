@@ -17,7 +17,7 @@ export function E2eeMessageNote({ m, view }) {
   if (m.waiting) return (
     <div className="e2-msg-note"><Clock size={13} /> <span>Waiting for @{view.username} to set up encrypted DMs. It sends by itself once they have, while Ember is open on this device. <button type="button" onClick={() => dropFailed(view, m.nonce)}>Remove</button></span></div>
   );
-  if (m.notEncrypted && !m.pending && view.kind === 'dm') return <div className="e2-msg-note"><LockOpen size={13} /> Not encrypted: sent before you'd both set up encrypted DMs. It's encrypted once you've both set up.</div>;
+  // (no per-message 'Not encrypted' line: the lock beside the name at the top says whether the DM is encrypted)
   if (!s) return null;
   if (s.state === 'locked') return <div className="e2-msg-note"><Lock size={13} /> <span>Encrypted. <button type="button" onClick={() => openE2eeGate()}>Unlock your DMs</button> to read this.</span></div>;
   if (s.state === 'failed') return <div className="e2-msg-note bad"><AlertTriangle size={13} /> This device can't open this message. It was sealed to a key you don't have any more.</div>;
