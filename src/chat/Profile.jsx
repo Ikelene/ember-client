@@ -4,7 +4,7 @@ import { viaProxy } from './mediaProxy.js';
 // profile editor's preview) and the large profile it expands into.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { MessageCircle, Maximize2, X, UserPlus, Check, Clock, ExternalLink, Globe, Gamepad2, Music, Tv, Trophy, Radio, MoreHorizontal, Pencil, CalendarDays, LogIn, ShieldCheck, Crown, UserMinus, Ban, Link as LinkIcon } from 'lucide-react';
+import { MessageCircle, Maximize2, X, UserPlus, Check, Clock, ExternalLink, Globe, Gamepad2, Music, Tv, Trophy, Radio, MoreHorizontal, Pencil, CalendarDays, LogIn, ShieldCheck, Crown, UserMinus, Ban, Link as LinkIcon, Plus } from 'lucide-react';
 import { apiFetch, getToken } from '../api.js';
 import { BotTag, AddBotButton, TrustedIn } from './Bots.jsx';
 import { useChat, lookup, go, wantPresence, toast, errorText, getState, setCustom, ask, loadFriends, toggleBlock, memberRef, faceOf, botPresenceOf, loadMembers, onUserUpdate, markBotPeer } from './store.js';
@@ -338,6 +338,7 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
           <div className="pe-avatar vc-card-av" data-vpb-protect="">
             <Avatar user={{ username, pfp: plain ? (who?.bot ? extra?.bot?.bot?.avatar_url || who.pfp || null : null) : p?.pfp_url }} size={80} status={plain ? botSt || undefined : status} />
           </div>
+          <div className="vc-av-side">
           {!plain && presence?.custom && !isMe && (
             <span className="vc-bubble-wrap">
               <div className="vc-bubble" title={presence.custom}>{presence.custom}</div>
@@ -346,11 +347,17 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
           )}
           {!plain && presence?.custom && isMe && (
             <span className="vc-bubble-wrap">
-              <button type="button" className="vc-bubble mine" title="Edit your custom status" onClick={() => window.dispatchEvent(new CustomEvent('vc-custom-status'))}>{presence.custom}<Pencil size={11} /></button>
+              <button type="button" className="vc-bubble mine" title="Edit your custom status" onClick={() => window.dispatchEvent(new CustomEvent('vc-custom-status'))}><span className="bf-pp-bubble-t">{presence.custom}</span><Pencil size={11} /></button>
               <button type="button" className="vc-bubble-x" title="Clear your custom status" onClick={() => setCustom('').catch(() => toast(errorText('')))}><X size={12} /></button>
             </span>
           )}
-          {!plain && !presence?.custom && isMe && !who?.inst && <button type="button" className="vc-bubble empty" onClick={() => window.dispatchEvent(new CustomEvent('vc-custom-status'))}>What are you up to?</button>}
+          {!plain && !presence?.custom && isMe && !who?.inst && <button type="button" className="vc-bubble empty" onClick={() => window.dispatchEvent(new CustomEvent('vc-custom-status'))}><Plus size={12} /> What's on your mind?</button>}
+          {!plain && p?.badges?.length > 0 && (
+            <span className="pe-badges vc-card-badges vc-badge-box" data-vpb-protect="">
+              {p.badges.filter(b => b.icon_url).slice(0, 6).map(b => <img key={b.name} src={b.icon_url} alt={b.name} data-tip-badge={JSON.stringify({ name: b.name, icon: b.icon_url, description: b.description || '' })} />)}
+            </span>
+          )}
+          </div>
         </div>
         <div className="pe-name" data-vpb-protect="" style={color ? { color } : undefined}>{bigName}{(extra?.bot || (plain && who?.bot)) && <BotTag verified={!!(extra?.bot?.bot?.verified || (plain && who?.verified))} />}</div>
         <HandleLine name={bigName} handle={handle} pronouns={!plain && !p?.private ? p?.pronouns : ''} />
@@ -361,11 +368,6 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
         {(plain ? sub : subShown) && <div className="vc-card-sub">{plain ? sub : subShown}</div>}
         <div className="pe-sub">
           <RoleChip role={role} />
-          {!plain && p?.badges?.length > 0 && (
-            <span className="pe-badges vc-card-badges" data-vpb-protect="">
-              {p.badges.slice(0, 8).map(b => (b.icon_url ? <img key={b.name} src={b.icon_url} alt={b.name} data-tip-badge={JSON.stringify({ name: b.name, icon: b.icon_url, description: b.description || '' })} /> : null))}
-            </span>
-          )}
         </div>
         {p?.private ? (
           <div className="vc-private"><b>This profile is private</b><span>Only their friends can see it.</span></div>

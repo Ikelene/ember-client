@@ -823,3 +823,4 @@ html.vc-rounded.vc-light .vp-err { color: #8b4246; }
 html.vc-rounded.vc-light .vp-sens input[type="range"]::-webkit-slider-thumb { background: #ffffff; }
 html.vc-rounded.vc-light .vp-sens input[type="range"]::-moz-range-thumb { background: #ffffff; }
 html.vc-rounded.vc-light .vp-cam { background: #f9f9fc; }
+html.vc-rounded.vc-light .vc-badge-box { background: #f3f3f6; }
