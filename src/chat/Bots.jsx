@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Bot, Server, Plus, Copy, Check, RefreshCw, Trash2, Upload, ServerCog, ChevronDown, KeyRound, BookOpen, BadgeCheck, Lock, ShieldCheck, Info, FlaskConical } from 'lucide-react';
+import { ServerIcon } from './ServerIcon.jsx';
 import { apiFetch, uploadFetch } from '../api.js';
 import { confirmBox } from '../components/confirmBox.jsx';
 import { useChat } from './store.js';
@@ -136,7 +137,7 @@ export function AddBotButton({ username, info, onDone, className = 'btn btn-prim
           <div className="vc-addbot-head">Add {bot.username} to...</div>
           {list.map(s => (
             <button type="button" key={s.sid} disabled={!!done[s.sid] || !!busy} onClick={() => add(s)}>
-              <span className="vc-srv-ico sm">{s.icon ? <img src={s.icon} alt="" /> : (s.name || '?').slice(0, 2)}</span>
+              <span className="vc-srv-ico sm"><ServerIcon src={s.icon} name={s.name} /></span>
               <span className="grow">{s.name}{s.inst && <small className="vc-addbot-host"> {s.inst.replace(/^https?:\/\//, '')}</small>}</span>
               {busy === s.sid && <RefreshCw size={13} className="vc-spin" />}
               {done[s.sid] && <><Check size={14} />{done[s.sid] === 'test' && <small>test</small>}</>}

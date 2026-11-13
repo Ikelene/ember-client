@@ -3,6 +3,7 @@
 // the "vc-dialog" event { kind: 'test-bot', id }. Contract: BOT-GALLERY.md ("Testing a pending bot before approving").
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, Check, RefreshCw, FlaskConical, Trash2, ExternalLink, Bot, Copy } from 'lucide-react';
+import { ServerIcon } from './ServerIcon.jsx';
 import { Dialog } from './Dialogs.jsx';
 import { apiFetch, getToken } from '../api.js';
 import { useChat, go, loadMembers } from './store.js';
@@ -152,7 +153,7 @@ export function TestBotDialog({ id, onClose }) {
             <div className="vc-addbot-head">Pick a server you manage</div>
             {targets.map(s => (
               <div className="bt-srv" key={s.sid}>
-                <span className="vc-srv-ico sm">{s.icon ? <img src={s.icon} alt="" /> : (s.name || '?').slice(0, 2)}</span>
+                <span className="vc-srv-ico sm"><ServerIcon src={s.icon} name={s.name} /></span>
                 <span className="grow">{s.name}{s.inst && <small className="vc-addbot-host"> {s.inst.replace(/^https?:\/\//, '')}</small>}</span>
                 {isIn(s) ? (
                   <>

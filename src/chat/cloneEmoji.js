@@ -1,6 +1,7 @@
 // Clone emoji: copy someone's custom emoji into a server of yours (one where you have Manage server).
 // The picture is fetched as-is (GIFs stay animated) and uploaded like a new emoji from Server settings > Emojis.
-import { Copy, Server, SmilePlus } from 'lucide-react';
+import { Copy, SmilePlus } from 'lucide-react';
+import { serverMenuIcon } from './ServerIcon.jsx';
 import { addPersonalFromEmoji, isPersonalEmoji } from './personal.js';
 import { uploadFetch } from '../api.js';
 import { getState, customEmoji, loadEmojis, toast, errorText } from './store.js';
@@ -46,5 +47,5 @@ export function cloneMenuItem(emoji) {
   if (!emoji?.eid) return null;
   const targets = cloneTargets();
   if (!targets.length) return { label: 'Clone emoji', icon: Copy, disabled: true, hint: 'Needs Manage server somewhere' };
-  return { label: 'Clone emoji', icon: Copy, sub: targets.map(x => ({ label: x.name, icon: Server, onClick: () => cloneEmoji(emoji, x.sid) })) };
+  return { label: 'Clone emoji', icon: Copy, sub: targets.map(x => ({ label: x.name, icon: serverMenuIcon(x), onClick: () => cloneEmoji(emoji, x.sid) })) };
 }
