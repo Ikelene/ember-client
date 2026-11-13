@@ -714,6 +714,9 @@ function onEvent(m, inst = VELORA) {
     case 'blocks_changed': loadBlocks(); break; // I blocked / unblocked someone (here or on another device)
     case 'notification_new': notificationNew(m); break;
     case 'notifications_updated': notificationsUpdated(m); break; // read / deleted somewhere else (another tab, the site, a phone)
+    // read on another device (desktop app, phone, another tab): the red counts here go too
+    case 'im_read_sync': if (m.with) { const u = String(m.with).toLowerCase(); set(s => ({ dms: s.dms.map(c => (c.username.toLowerCase() === u ? { ...c, unread: 0 } : c)), unread: { ...s.unread, [`d:${u}`]: false } })); } break;
+    case 'chat_read_sync': if (m.cid && m.sid) { clearMentions(m.sid, [m.cid]); channelSeen(m.sid, m.cid, m.id); } break;
     case 'kicked': if (isWebBonfire()) authLost(); else location.href = '/login'; break;
     default: break;
   }
