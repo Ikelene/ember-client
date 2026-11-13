@@ -257,6 +257,12 @@ function localTimeOf(p) {
   const d = new Date(Date.now() + (p.tz_offset_min + new Date().getTimezoneOffset()) * 60000);
   return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
+// under the name on profiles: @username (only when a display name is shown instead) and the pronouns, in one smaller line
+export function HandleLine({ name, handle, pronouns, cls = 'vc-pronouns' }) {
+  const at = !!handle && !!name && name !== handle;
+  if (!at && !pronouns) return null;
+  return <div className={`${cls} vc-handle-line`}>{at && <span className="vc-handle" title="Username">@{handle}</span>}{pronouns && <span title="Pronouns">{pronouns}</span>}</div>;
+}
 export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: outerRef }) {
   const [p, extra, vname] = useProfile(username, who);
   const plain = plainOn(who); // an instance's own account / bot: name, roles, joined - nothing from Velora
@@ -284,6 +290,10 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
   const canKick = !!rights?.kick && rights.below, canBan = !!rights?.ban && rights.below;
   const act = async what => { setMenu(false); if (await moderate(sid, username, what, member)) onClose?.(); };
   const canMod = canKick || canBan;
+  // display name big, @username small beside the pronouns (displayNames.js). An Ember server's own name for them wins there.
+  const handle = plain ? username : p?.username || vname;
+  const serverName = who?.inst && who?.display_name && who.display_name !== who.username ? who.display_name : '';
+  const bigName = (plain ? who?.display_name : serverName || p?.display_name) || handle;
 
   return (
     <div className={`pe-card vc-card${plain ? ' plain' : ''}`} ref={setRef} style={color ? { '--pe-accent': color } : undefined} onContextMenu={e => { if (!e.target.closest('input, textarea')) userMenu(e, username, { sid }); }}>
@@ -319,8 +329,8 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
           )}
           {!plain && !presence?.custom && isMe && !who?.inst && <button type="button" className="vc-bubble empty" onClick={() => window.dispatchEvent(new CustomEvent('vc-custom-status'))}>What are you up to?</button>}
         </div>
-        <div className="pe-name" data-vpb-protect="" style={color ? { color } : undefined}>{plain ? username : p?.username || vname}{(extra?.bot || (plain && who?.bot)) && <BotTag verified={!!(extra?.bot?.bot?.verified || (plain && who?.verified))} />}</div>
-        {!plain && p?.pronouns && !p.private && <div className="vc-pronouns">{p.pronouns}</div>}
+        <div className="pe-name" data-vpb-protect="" style={color ? { color } : undefined}>{bigName}{(extra?.bot || (plain && who?.bot)) && <BotTag verified={!!(extra?.bot?.bot?.verified || (plain && who?.verified))} />}</div>
+        <HandleLine name={bigName} handle={handle} pronouns={!plain && !p?.private ? p?.pronouns : ''} />
         {!plain && vname !== username && <div className="vc-card-sub">{username} on this server</div>}
         {who?.alias_name && <div className="vc-card-sub vc-card-alias"><MaskIcon size={13} /> Posting as alias: <b>{who.alias_name}</b></div>}
         {extra?.bot?.bot?.owner && <div className="vc-card-sub">Bot made by @{extra.bot.bot.owner}</div>}
@@ -404,6 +414,7 @@ export function MiniProfile({ username, anchor, side = 'right', sid, who, onClos
 // the large profile: grows out of the mini card it was opened from
 export function ProfileModal({ username: shown, from, sid, who, onClose }) {
   const [p, extra, username] = useProfile(shown, who); // (username: their Velora name - on an instance it can differ from the one it shows)
+  const bigName = (who?.inst && who?.display_name && who.display_name !== who.username ? who.display_name : p?.display_name) || p?.username || username; // (display names: see ProfileCard)
   const me = useChat(s => s.me);
   const presence = useChat(s => s.presence[username]) || extra?.presence;
   const member = useChat(s => (sid ? s.members[sid]?.find(m => m.username === shown) : null));
@@ -485,8 +496,8 @@ export function ProfileModal({ username: shown, from, sid, who, onClose }) {
           </div>
         </div>
         <div className="vc-big-id">
-          <h2 style={color ? { color } : undefined}>{p?.username || username}{extra?.bot && <BotTag verified={!!extra.bot.bot?.verified} />}</h2>
-          {p?.pronouns && !p.private && <div className="vc-pronouns">{p.pronouns}</div>}
+          <h2 style={color ? { color } : undefined}>{bigName}{extra?.bot && <BotTag verified={!!extra.bot.bot?.verified} />}</h2>
+          <HandleLine name={bigName} handle={p?.username || username} pronouns={!p?.private ? p?.pronouns : ''} />
           {extra?.bot?.bot?.owner && <div className="vc-card-sub">Bot made by @{extra.bot.bot.owner}</div>}
           {extra?.bot?.bot && <TrustedIn n={extra.bot.bot.trusted_in} verified={!!extra.bot.bot.verified} />}
           {sub && <div className="vc-card-sub">{sub}</div>}

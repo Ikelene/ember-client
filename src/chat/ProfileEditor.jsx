@@ -18,6 +18,15 @@ const UPLOAD_ERRORS = {
   file_too_large: () => 'That file is too big.',
   upload_suspended: () => 'Uploads are currently suspended on your account.',
 };
+// display names (Nookara display-names.js): what the server's refusals mean
+const DISPLAY_NAME_ERRORS = {
+  invalid_display_name: "That display name can't be used.",
+  display_name_too_long: 'Display names are at most 32 characters.',
+  display_name_bad_characters: 'Display names can only use letters, numbers, symbols and single spaces (no invisible or control characters).',
+  display_name_at: "Display names can't start with @.",
+  display_name_reserved: 'That name is reserved for Nookara and its staff - pick another.',
+  display_name_impersonation: "That's a Nookara staff member's name - pick another.",
+};
 const RENAME_ERRORS = { invalid_username: 'Usernames are 2-32 letters, numbers, _ - or .', username_taken: 'That username is taken - pick another.', same_username: 'That is already your username.', no_free_rename: 'Your free username change has expired.' };
 
 // onDirty(bool) lets the dialog ask before leaving with unsaved changes
@@ -52,10 +61,10 @@ export default function ProfileEditor({ onDirty }) {
     // the rest of Ember (your panel, member lists, cached profile cards) picks up the new look
     const me = getState().me;
     if (me) {
-      patchState({ me: { ...me, username: d.account.username, pfp: d.profile.pfp || null, color: d.profile.color || null, rank: d.account.rank, pro: !!d.account.pro } });
+      patchState({ me: { ...me, username: d.account.username, display_name: d.account.display_name || null, pfp: d.profile.pfp || null, color: d.profile.color || null, rank: d.account.rank, pro: !!d.account.pro } });
       remember([{ username: d.account.username, pfp: d.profile.pfp || null, color: d.profile.color || null }]);
       forgetProfile(d.account.username);
-      dispatchEvent(new CustomEvent('vc-profile-changed', { detail: { username: d.account.username } })); // message headers refetch your pronouns
+      dispatchEvent(new CustomEvent('vc-profile-changed', { detail: { username: d.account.username, display_name: d.account.display_name || null } })); // message headers refetch your pronouns + show your display name
     }
     applyAccentColor(d.profile.color);
     return d;
@@ -73,11 +82,11 @@ function Editor({ user, reload, presence, onDirty }) {
   const account = user.account || {};
   const username = account.username || '';
   const bioLimit = user.bio_limit ?? 200;
-  const initial = () => ({ bio: profile.bio || '', pronouns: (profile.pronouns || '').trim(), website: (profile.website || '').trim(), country: profile.country || '', timezone: profile.timezone || '', color: profile.color || '' });
+  const initial = () => ({ displayName: (account.display_name || '').trim(), bio: profile.bio || '', pronouns: (profile.pronouns || '').trim(), website: (profile.website || '').trim(), country: profile.country || '', timezone: profile.timezone || '', color: profile.color || '' });
   const [f, setF] = useState(initial);
   const [base, setBase] = useState(initial);
   const set = (k, v) => setF(x => ({ ...x, [k]: v }));
-  const fieldsDirty = Object.keys(f).some(k => (k === 'website' || k === 'pronouns' ? f[k].trim() : f[k]) !== base[k]);
+  const fieldsDirty = Object.keys(f).some(k => (k === 'website' || k === 'pronouns' || k === 'displayName' ? f[k].trim() : f[k]) !== base[k]);
   // avatar / banner wait for Save changes too: { file, crop, url } (url = a cropped preview) or 'remove'
   const [media, setMedia] = useState({});
   const dirty = fieldsDirty || !!media.pfp || !!media.banner;
@@ -100,8 +109,8 @@ function Editor({ user, reload, presence, onDirty }) {
     setSaving(true); setMsg(null);
     try {
       if (fieldsDirty) {
-        await api.updateMe({ bio: f.bio, pronouns: f.pronouns.trim(), timezone: f.timezone || undefined, country_code: f.country || undefined, website: f.website.trim(), color: f.color || null });
-        setBase({ ...f, website: f.website.trim(), pronouns: f.pronouns.trim() });
+        await api.updateMe({ display_name: f.displayName.trim() || null, bio: f.bio, pronouns: f.pronouns.trim(), timezone: f.timezone || undefined, country_code: f.country || undefined, website: f.website.trim(), color: f.color || null });
+        setBase({ ...f, website: f.website.trim(), pronouns: f.pronouns.trim(), displayName: f.displayName.trim() });
       }
       for (const type of ['pfp', 'banner']) {
         const m = media[type];
@@ -122,7 +131,7 @@ function Editor({ user, reload, presence, onDirty }) {
         return;
       }
       const m = { bio_too_long: `Bio too long (max ${bioLimit} characters).`, invalid_website: "That website link doesn't look right - use something like https://your-site.com" };
-      setMsg({ type: 'error', text: m[e.message] || "Couldn't save - try again." });
+      setMsg({ type: 'error', text: m[e.message] || DISPLAY_NAME_ERRORS[e.message] || "Couldn't save - try again." });
       setShake(n => n + 1);
     }
     setSaving(false);
@@ -173,6 +182,7 @@ function Editor({ user, reload, presence, onDirty }) {
 
   const card = {
     username,
+    display_name: f.displayName.trim(),
     pfp: shown('pfp'),
     banner: shown('banner'),
     color: f.color,
@@ -212,6 +222,15 @@ function Editor({ user, reload, presence, onDirty }) {
               </form>
             )}
             {renameMsg && <div className={`inline-msg ${renameMsg.type}`}>{renameMsg.text}</div>}
+          </div>
+
+          <div className="bf-pe-sec">
+            <div className="bf-pe-label">Display name</div>
+            <div className="bf-pe-row">
+              <input id="bf-pe-display-name" className="form-input" type="text" placeholder="Your name, the way you like it" maxLength={40} autoComplete="off" value={f.displayName} onChange={e => set('displayName', e.target.value)} />
+              {f.displayName && <button type="button" className="btn btn-surface btn-sm" onClick={() => set('displayName', '')}>Clear</button>}
+            </div>
+            <div className="bf-pe-hint">Shown instead of your username in Ember and on your profile. People still mention you as @{username}. Leave it empty to use your username.</div>
           </div>
 
           <div className="bf-pe-sec">

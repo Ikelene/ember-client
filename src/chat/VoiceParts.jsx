@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Mic, MicOff, Headphones, HeadphoneOff, PhoneOff, Phone, PhoneIncoming, UserPlus, Volume2, Search, AudioLines, Video, VideoOff, MonitorUp, MonitorOff, MonitorPlay, Eye, Maximize2, Minimize2, X } from 'lucide-react';
 import { useChat, getState, go, syncRing, isBlockedName, BLOCKED_NAME } from './store.js';
+import { NameText, displayNameOf } from './displayNames.js';
 import { Avatar, BlockedMark } from './Profile.jsx';
 import { joinVoice, leaveVoice, setMute, setDeafen, answer, callDm, callInto, cancelCall, prefs, setPrefs, toggleCamera, toggleScreen, desktopScreenSources, canSelectOutput, watchStream, unwatchStream, refreshDevices, knownDevices, micMeter, micProcessing, sensLabel } from './voice.js';
 import { levelKey } from './levels.js';
@@ -17,6 +18,8 @@ const roomOf = cid => `bf_${cid}`;
 // in a server's voice channel, somebody I blocked shows as "Blocked User" with the default picture (sid null = a DM call: as is)
 const maskedIn = (sid, name) => !!sid && isBlockedName(sid, name);
 const faceIn = (sid, name) => (maskedIn(sid, name) ? { username: BLOCKED_NAME, pfp: null } : { username: name, pfp: pfpOf(name) });
+// the person behind a voice name: the server's member (an Ember server's own name wins) or just the username (displayNames.js)
+const personIn = (sid, name) => (sid && getState().members[sid]?.find(m => m.username === name)) || { username: name };
 const pfpOf = name => { const s = getState(); return s.people[name]?.pfp || (s.me?.username === name ? s.me.pfp : null) || null; };
 
 // ── voice control menus ──
@@ -118,7 +121,7 @@ export function VoiceChannelUsers({ cid, sid, onUser }) {
           <div key={u.username} className={`vc-vuser${onUser ? ' clickable' : ''}`} role={onUser ? 'button' : undefined} tabIndex={onUser ? 0 : undefined}
             onClick={onUser ? e => onUser(u.username, e.currentTarget) : undefined} onKeyDown={onUser ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onUser(u.username, e.currentTarget); } } : undefined}>
             <span className="vc-vuser-av vc-vlvl" data-vlevel={levelKey(u.username)}><Avatar user={faceIn(sid, u.username)} size={20} /></span>
-            {maskedIn(sid, u.username) ? <span className="vc-vuser-name vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={11} /></span> : <span className="vc-vuser-name">{u.username}</span>}
+            {maskedIn(sid, u.username) ? <span className="vc-vuser-name vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={11} /></span> : <span className="vc-vuser-name"><NameText u={personIn(sid, u.username)} fallback={u.username} /></span>}
             {u.deafened ? <HeadphoneOff size={13} /> : u.muted ? <MicOff size={13} /> : null}
           </div>
         );
@@ -199,7 +202,7 @@ function CallInDialog({ sid, onClose }) {
             {list.map(m => (
               <div key={m.username} className="vc-callin-row">
                 <Avatar user={m} size={30} status={m.status} />
-                <b>{m.username}</b>
+                <b><NameText u={m} fallback={m.username} /></b>
                 <span className="grow" />
                 <button type="button" className="btn btn-primary btn-sm" onClick={() => { callInto(m.username); close(); }}><Phone size={13} /> Call</button>
               </div>
@@ -327,7 +330,7 @@ function CallStage({ v, tiles, compact, sid }) {
       <div key={t.name} className={`vc-vtile${cam ? ' vc-video vc-vlvl' : ''}${flash && flash.by === t.name ? ' sb-flash' : ''}`} data-vlevel={cam && v ? levelKey(t.name) : undefined}>
         {flash && flash.by === t.name && <span className="vc-vtile-sound" key={flash.at}><AudioLines size={12} /><span>{flash.name}</span></span>}
         {cam ? <Vid stream={cam.stream} muted={!!cam.mine} /> : <span className="vc-vlvl-av vc-vlvl" data-vlevel={v ? levelKey(t.name) : undefined}><Avatar user={t.me ? { username: t.name, pfp: pfpOf(t.name) } : faceIn(sid, t.name)} size={compact ? 48 : 72} /></span>}
-        {!t.me && maskedIn(sid, t.name) ? <b className="vc-vtile-name vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={12} /></b> : <b className="vc-vtile-name">{t.name}{t.me ? ' (you)' : ''}</b>}
+        {!t.me && maskedIn(sid, t.name) ? <b className="vc-vtile-name vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={12} /></b> : <b className="vc-vtile-name"><NameText u={personIn(sid, t.name)} fallback={t.name} />{t.me ? ' (you)' : ''}</b>}
         <span className="vc-vtile-state">{t.deafened ? <HeadphoneOff size={15} /> : t.muted ? <MicOff size={15} /> : null}</span>
         {v && !t.me && (
           <label className="vc-vtile-vol" title={`${maskedIn(sid, t.name) ? BLOCKED_NAME : t.name}'s volume`}>
@@ -407,7 +410,7 @@ export function DmCallBar({ username }) {
       <div className={`vc-dmcall${inIt ? ' in' : ''}`}>
         <div className="vc-dmcall-people">
           {call.users.filter((u, i, a) => a.findIndex(x => String(x.username).toLowerCase() === String(u.username).toLowerCase()) === i).map(u => {
-            return <span key={u.username} className="vc-dmcall-av vc-vlvl" data-vlevel={inIt ? levelKey(u.username) : undefined} title={u.username}><Avatar user={{ username: u.username, pfp: pfpOf(u.username) }} size={44} />{u.muted && <MicOff size={12} />}</span>;
+            return <span key={u.username} className="vc-dmcall-av vc-vlvl" data-vlevel={inIt ? levelKey(u.username) : undefined} title={displayNameOf(u.username) || u.username}><Avatar user={{ username: u.username, pfp: pfpOf(u.username) }} size={44} />{u.muted && <MicOff size={12} />}</span>;
           })}
         </div>
         <span className="vc-dmcall-txt">{inIt ? (call.users.length > 1 ? 'In a call' : `Calling ${username}...`) : `${username} is in a call with you`}</span>

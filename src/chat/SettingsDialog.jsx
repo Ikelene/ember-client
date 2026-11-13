@@ -13,6 +13,7 @@ import { effectiveDesign, subscribeDesign } from './design.js';
 import ChatSettingsTab, { GROUPS, matches, useDesktopMac, desktopAppTitle, DesignSettings } from '../components/tabs/ChatSettingsTab.jsx';
 import ProfileEditor from './ProfileEditor.jsx';
 import { useChat, ask, getState } from './store.js';
+import { NameText } from './displayNames.js';
 import { isWebBonfire } from '../api.js';
 import { signOutVelora, startSignIn } from './session.js';
 import { Avatar } from './Profile.jsx';
@@ -189,7 +190,7 @@ export default function SettingsDialog({ page: startPage, onClose }) {
           {me && (
             <button type="button" className={`bf-sd-me${page === 'profile' ? ' on' : ''}`} onClick={() => go('profile')} data-tip="Edit profile" data-tip-side="right">
               <Avatar user={me} size={34} status={getState().presence[me.username]?.status || 'online'} />
-              <span><b>{me.username}</b><small>Edit profile</small></span>
+              <span><b><NameText u={{ username: me.username }} fallback={me.username} /></b><small>Edit profile</small></span>
               <ChevronRight className="bf-sd-chev" size={18} />
             </button>
           )}

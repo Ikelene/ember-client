@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { onEmberHost } from './hosts.js';
 import { ask, customEmoji, loadEmojis, useChat } from './store.js';
+import { NameText } from './displayNames.js';
 import { UNI_EMOJI, Twemoji, nameOfChar } from './emoji.jsx';
 import { emojiDataSync } from './EmojiPicker.jsx';
 import { extractInvites } from './gameInvite.js';
@@ -130,7 +131,7 @@ const RULES = [
   [/(?:^|(?<=[\s(]))@([A-Za-z0-9_.-]{2,32})/, (m, ctx, k) => {
     const me = ctx?.me && m[1].toLowerCase() === ctx.me.toLowerCase();
     const blocked = !me && !!ctx?.isBlocked?.(m[1]); // somebody I blocked, in a server: no name
-    return <button type="button" key={k} className={`vc-mention${me ? ' me' : ''}${blocked ? ' blocked' : ''}`} onClick={e => ctx?.onUser?.(m[1], e.currentTarget)}>@{blocked ? 'Blocked User' : m[1]}</button>;
+    return <button type="button" key={k} className={`vc-mention${me ? ' me' : ''}${blocked ? ' blocked' : ''}`} onClick={e => ctx?.onUser?.(m[1], e.currentTarget)} title={blocked ? undefined : `@${m[1]}`}>@{blocked ? 'Blocked User' : <NameText u={ctx?.personOf?.(m[1]) || { username: m[1], kind: 'local', inst: true }} fallback={m[1]} />}</button>;
   }],
   [/(?:^|(?<=[\s(]))#([a-z0-9_-]{1,40})/, (m, ctx, k) => {
     const c = ctx?.channels?.find(x => x.name === m[1]);

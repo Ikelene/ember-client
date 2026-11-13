@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AtSign, Bell, Check, CheckCheck, ChevronRight, Headphones, Inbox, MessageCircle, MessageSquareText, Server, ShieldCheck, Sparkles, UserPlus, Users, UsersRound, Volume2, X } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { useChat, go, isMuted, readNotifs, followNotifLink, loadFriends, toast, errorText } from './store.js';
+import { NameText } from './displayNames.js';
 import { Avatar, subtitle } from './Profile.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
 import { NotifIcon, NotifText, ago } from './Notifications.jsx';
@@ -157,7 +158,7 @@ export default function Dashboard({ onUser, onTab, bare = false }) {
           {me && <Avatar user={me} size={56} />}
           <div>
             <small>{now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}</small>
-            <h2>{hourWord(now.getHours())}{me ? `, ${me.username}` : ''}</h2>
+            <h2>{hourWord(now.getHours())}{me ? <>, <NameText u={{ username: me.username }} fallback={me.username} /></> : ''}</h2>
             <p>{summary}</p>
           </div>
         </div>}
@@ -220,7 +221,7 @@ export default function Dashboard({ onUser, onTab, bare = false }) {
               return (
                 <button type="button" key={f.friend_username} className="vc-dash-row" onClick={e => onUser(f.friend_username, e.currentTarget, 'left')}>
                   <Avatar user={{ username: f.friend_username, pfp: f.pfp_url }} size={36} status={p.status} />
-                  <span className="vc-dash-row-txt"><b style={f.color ? { color: f.color } : undefined}>{f.friend_username}</b><small>{subtitle(p)}</small></span>
+                  <span className="vc-dash-row-txt"><b style={f.color ? { color: f.color } : undefined}><NameText u={{ username: f.friend_username }} fallback={f.friend_username} /></b><small>{subtitle(p)}</small></span>
                 </button>
               );
             })}
@@ -248,7 +249,7 @@ export default function Dashboard({ onUser, onTab, bare = false }) {
               {dmReqs.slice(0, 3).map(r => (
                 <div key={`m${r.id}`} className="vc-dash-row static">
                   <Avatar user={{ username: r.username, pfp: r.pfp }} size={36} />
-                  <span className="vc-dash-row-txt"><b>{r.username}</b><small>Wants to message you</small></span>
+                  <span className="vc-dash-row-txt"><b><NameText u={{ username: r.username }} fallback={r.username} /></b><small>Wants to message you</small></span>
                   <button type="button" className="vc-round ok" title="Accept" onClick={() => answerDm(r.id, true)}><Check size={17} /></button>
                   <button type="button" className="vc-round no" title="Decline" onClick={() => answerDm(r.id, false)}><X size={17} /></button>
                 </div>

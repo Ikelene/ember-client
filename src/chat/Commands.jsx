@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { X, ExternalLink, Check, ChevronDown, Paperclip, EyeOff, Loader, LayoutGrid } from 'lucide-react';
 import { useChat, toast, errorText, sendInteraction, dismissEphemeral, closeInteractionModal, uploadAttachment } from './store.js';
+import { NameText, displayNameOf } from './displayNames.js';
 import { bare } from './ids.js';
 import { Avatar } from './Profile.jsx';
 import { Dialog } from './Dialogs.jsx';
@@ -452,7 +453,7 @@ export function InteractionLine({ m, sid, onUser }) {
       <span className="vc-reply-line" />
       <button type="button" className="vc-int-who" onClick={open} title={`Open ${user.username}'s profile`}>
         <Avatar user={user} size={16} />
-        <b>{user.username}</b>
+        <b><NameText u={user} fallback={user.username} /></b>
       </button>
       <span>used <span className="vc-cmd-used">/{i.name}</span></span>
     </div>

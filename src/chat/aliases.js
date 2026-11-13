@@ -1,4 +1,5 @@
 // Aliases (see Alias.jsx): which alias a message shows, and the name / picture to draw for it.
+import { personName, displayNameOf } from './displayNames.js';
 // the alias to show for a message, or null (only bots can post under one; the server enforces it, this is belt and braces)
 export const aliasOf = m => (m && !m.system && m.author?.bot && !m.author?.webhook && m.alias?.name ? m.alias : null);
 export const replyAliasOf = r => (r && r.author?.bot && r.alias?.name ? r.alias : null);
@@ -13,5 +14,6 @@ export const aliasKey = m => { const a = aliasOf(m); return a ? (isUnmarked(a) ?
 // bot's own. member: the matched member's live face when the caller has it (useFace), else alias.member
 export const aliasFace = (alias, face, member = aliasMemberOf(alias)) => (alias ? { ...face, username: alias.name, display_name: alias.name, pfp: alias.avatar_url || member?.pfp || face?.pfp || null, color: member ? member.color : face?.color } : face);
 // the name a message is shown under (notifications, search, pins, the reply bar)
-export const shownName = (m, fallback = 'Nookara') => aliasOf(m)?.name || m?.author?.username || fallback;
+// (a person's display name when one is known: displayNames.js; an Ember server's own name for them wins there)
+export const shownName = (m, fallback = 'Nookara') => aliasOf(m)?.name || (m?.author ? personName(m.inst ? { ...m.author, inst: m.inst } : m.author, displayNameOf(m.author.username)) : '') || fallback;
 export const shownPfp = m => { const a = aliasOf(m); return (a && (a.avatar_url || aliasMemberOf(a)?.pfp)) || m?.author?.pfp || null; };

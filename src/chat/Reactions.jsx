@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { apiFetch } from '../api.js';
 import { instOpt, instOf } from './ids.js';
 import { toast, errorText, customEmoji, getState, useChat, timedOutIn, untilText } from './store.js';
+import { personName, displayNameOf, useDisplayNamesVersion, wantDisplayNames } from './displayNames.js';
 import { frequentReactions, recordReaction } from './reactionUsage.js';
 import { reactionId, reactionBase } from './msg-actions.js';
 import EmojiPicker, { emojiDataSync } from './EmojiPicker.jsx';
@@ -84,16 +85,19 @@ export function QuickReactions({ id, inst, selected = [], onDone, limit = 6, cla
 }
 
 export function Reactions({ m, me, canReact }) {
+  useDisplayNamesVersion(); // (the tooltips read display names)
   if (!m.reactions?.length) return null;
+  // who reacted, by display name (an Ember server's member list first: its own name for them wins)
+  const nameFor = n => { const mem = m.server && getState().members[m.server]?.find(x => x.username === n); return personName(mem || { username: n }, displayNameOf(n)) || n; };
   const rid = reactionId(m);
   return (
     <div className="vc-reacts">
       {m.reactions.map(r => {
         const mine = r.users.includes(me);
         const others = r.count - r.users.length;
-        const who = `${r.users.slice(0, 8).join(', ')}${r.users.length > 8 || others > 0 ? ` and ${r.count - Math.min(8, r.users.length)} more` : ''}`;
+        const who = `${r.users.slice(0, 8).map(nameFor).join(', ')}${r.users.length > 8 || others > 0 ? ` and ${r.count - Math.min(8, r.users.length)} more` : ''}`;
         return (
-          <button type="button" key={r.emoji} className={`vc-react${mine ? ' on' : ''}`} disabled={!canReact} title={`${who} reacted with ${nameOf(r.emoji, r.emoji_id ? r : null, m.server)}`} onClick={() => setReaction(rid, r.emoji, !mine, instOpt(m.channel))}
+          <button type="button" key={r.emoji} className={`vc-react${mine ? ' on' : ''}`} disabled={!canReact} onMouseEnter={() => wantDisplayNames(r.users.slice(0, 8))} title={`${who} reacted with ${nameOf(r.emoji, r.emoji_id ? r : null, m.server)}`} onClick={() => setReaction(rid, r.emoji, !mine, instOpt(m.channel))}
             onContextMenu={e => { e.preventDefault(); e.stopPropagation(); openMenu(e, [{ label: 'View Reactions', icon: Users, onClick: () => openReactionsView(m, r.emoji) }]); }}>
             <EmojiNode emoji={r.emoji} info={r.emoji_id ? r : null} sid={m.server} /><span>{r.count}</span><ReactorFaces r={r} sid={m.server} />
           </button>

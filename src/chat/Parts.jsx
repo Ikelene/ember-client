@@ -13,6 +13,7 @@ import {
 import { RetryIn } from './Gate.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
 import { linkFor } from './store.js';
+import { useName, NameText, personName, displayNameOf, useDisplayNamesVersion, wantDisplayNames, serverOwnName } from './displayNames.js';
 import { useChat, retryNow, go, keyOf, setStatus, setCustom, isMuted, effectiveNotify, ask, refreshServer, toast, errorText, setDetailLayout, patchState, saveSettings, getState, statusOf, presenceFor, useFace, isBlockedPerson, isBlockedName, blockedFace, BLOCKED_NAME, loadMoreMembers } from './store.js';
 import { P, has, ChannelIcon, useNameStyle, colorFrom, NameDecor } from './roles.jsx';
 import { serverMenu, instanceMenu, channelMenu, userMenu, openMenu, copy } from './Menu.jsx';
@@ -36,9 +37,10 @@ export function typersOf(typing, key) {
 function TypingMark({ names, people, sid }) {
   const show = useChat(s => s.settings.show_typing);
   const blocked = useChat(s => (sid ? names.filter(n => isBlockedName(sid, n, s)).join('\n') : ''));
+  useDisplayNamesVersion(); // (the title below reads display names)
   if (!names.length || !show) return null;
   const masked = n => !!blocked && blocked.split('\n').includes(n);
-  const shown = names.map(n => (masked(n) ? BLOCKED_NAME : n));
+  const shown = names.map(n => (masked(n) ? BLOCKED_NAME : displayNameOf(n) || n));
   return (
     <span className="vc-ch-typing" title={`${shown.join(', ')} ${names.length === 1 ? 'is' : 'are'} typing`}>
       <span className="vc-ch-typing-avs">{names.slice(0, 3).map(u => <Avatar key={u} user={masked(u) ? { username: BLOCKED_NAME, pfp: null } : { username: u, pfp: people[u]?.pfp }} size={16} />)}</span>
@@ -239,7 +241,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
         <span className="vc-srv-ico vc-rail-dm"><MessageCircle size={24} /></span>
       </RailItem>
       {newDMs.map(c => (
-        <RailItem key={`dm-${c.username}`} unread badge={c.unread} onContextMenu={e => userMenu(e, c.username)} title={`${c.username === 'System' ? 'Nookara' : c.username} - ${c.unread} new`} onClick={() => go({ kind: 'dm', username: c.username })}>
+        <RailItem key={`dm-${c.username}`} unread badge={c.unread} onContextMenu={e => userMenu(e, c.username)} title={`${c.username === 'System' ? 'Nookara' : displayNameOf(c.username) || c.username} - ${c.unread} new`} onClick={() => go({ kind: 'dm', username: c.username })}>
           <span className="vc-srv-ico">{c.username === 'System' ? <Logo size={22} /> : (c.pfp || people[c.username]?.pfp) ? <img src={c.pfp || people[c.username].pfp} alt="" /> : initials(c.username)}</span>
         </RailItem>
       ))}
@@ -533,7 +535,7 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
               onContextMenu={e => (sys ? openMenu(e, [{ label: 'Open', onClick: () => go({ kind: 'dm', username: c.username }) }]) : userMenu(e, c.username, { onProfile: () => dispatchEvent(new CustomEvent('vc-open-big', { detail: { username: c.username } })) }))}
               onClick={() => go({ kind: 'dm', username: c.username })}>
               {sys ? <span className="vc-av vc-sys-av" style={{ width: 32, height: 32 }}><Logo size={18} /></span> : <Avatar user={{ username: c.username, pfp: c.pfp || people[c.username]?.pfp }} size={32} status={p?.status || 'offline'} />}
-              <span className="vc-dm-txt"><b>{sys ? 'Nookara' : c.username}</b>{!sys && subtitle(p) && <small>{subtitle(p)}</small>}</span>
+              <span className="vc-dm-txt"><b>{sys ? 'Nookara' : <NameText u={{ username: c.username }} />}</b>{!sys && subtitle(p) && <small>{subtitle(p)}</small>}</span>
               {!on && <TypingMark names={typersOf(typing, k)} people={people} />}
               {(c.unread > 0) && !on && <span className="vc-count">{c.unread > 99 ? '99+' : c.unread}</span>}
             </button>
@@ -582,6 +584,8 @@ export function MemberList({ sid, cid, onUser, embedded = false }) {
   const presence = useChat(s => s.presence);
   const names = useChat(s => s.veloraNames);
   const signedIn = useChat(s => s.signedIn);
+  const dnv = useDisplayNamesVersion(); // a display name came in / changed: sort again
+  useEffect(() => { wantDisplayNames((allMembers || []).filter(m => !serverOwnName(m)).map(m => m.username)); }, [allMembers]);
   const [shown, setShown] = useState(60);
   const roles = useChat(s => s.detail[sid]?.roles);
   const blocks = useChat(s => s.blocks); // people I blocked: masked below
@@ -592,7 +596,8 @@ export function MemberList({ sid, cid, onUser, embedded = false }) {
     const st = m => statusOf(sid, m) || 'offline';
     const none = m => statusOf(sid, m) === null; // an instance's own accounts and bots (or signed out of Velora): no presence, so no online / offline
     const on = members.filter(m => !none(m) && st(m) !== 'offline');
-    const by = (a, b) => a.username.localeCompare(b.username, undefined, { sensitivity: 'base' });
+    const nm = m => personName(m, displayNameOf(m.username)); // (display names sort the list, displayNames.js)
+    const by = (a, b) => nm(a).localeCompare(nm(b), undefined, { sensitivity: 'base' });
     // online people go under their highest "show separately" role (highest first), the rest under Online
     const hoisted = (roles || []).filter(r => r.hoist && !r.is_default).sort((a, b) => b.position - a.position);
     const used = new Set();
@@ -605,7 +610,7 @@ export function MemberList({ sid, cid, onUser, embedded = false }) {
     out.push(['Members', members.filter(none).sort(by)]);
     out.push(['Offline', members.filter(m => !none(m) && st(m) === 'offline').sort(by)]);
     return out.filter(([, l]) => l.length);
-  }, [members, presence, roles, names, signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [members, presence, roles, names, signedIn, dnv]); // eslint-disable-line react-hooks/exhaustive-deps
   const cls = `vc-members${embedded ? ' embedded' : ''}`;
   if (!members) return <aside className={cls}><div className="vc-loading"><i /><i /><i /></div></aside>;
   let n = 0;
@@ -739,7 +744,7 @@ export function UserPanel({ onSettings, onEditProfile }) {
       <button type="button" className={`vc-me-who${pop ? ' on' : ''}`} aria-expanded={!!pop} onClick={() => setPop(x => (x ? null : ref.current.getBoundingClientRect()))} title="Your profile and status">
         <Avatar user={me} size={36} status={showConn ? 'offline' : status} />
         <span className="vc-me-txt">
-          <b>{me.username}</b>
+          <b><NameText u={{ username: me.username }} fallback={me.username} /></b>
           <small>{showConn ? (conn === 'closed' ? 'Reconnecting...' : 'Connecting...') : (subtitle(p) || STATUS_LABEL[status])}</small>
         </span>
       </button>
@@ -781,7 +786,8 @@ function MemberAvatar({ m, status, ghost, blocked }) { const f = useFace(m); ret
 function MemberName({ sid, m: raw }) {
   const m = useFace(raw);
   const key = useNameStyle(sid, m);
-  return <b style={colorFrom(key) ? { color: colorFrom(key) } : undefined}>{m.username} <NameDecor sid={sid} user={m} />{m.bot && <BotTag small verified={!!m.verified} />}{m.role === 'owner' && <RoleChip role="owner" />}</b>;
+  const shown = useName(m);
+  return <b style={colorFrom(key) ? { color: colorFrom(key) } : undefined}>{shown || m.username} <NameDecor sid={sid} user={m} />{m.bot && <BotTag small verified={!!m.verified} />}{m.role === 'owner' && <RoleChip role="owner" />}</b>;
 }
 
 // "who posted recently" (Modern, Settings > Text & layout): up to 3 faces of people who posted in the channel in the last

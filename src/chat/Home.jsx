@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { MessageCircle, UserPlus, Check, X, House, Users, Inbox, ShieldOff, UsersRound, Sparkles, Bookmark, Search, Compass, Plus, ChevronRight } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { useChat, go, loadFriends, toast, errorText, ask, toggleBlock } from './store.js';
+import { NameText, displayNameOf } from './displayNames.js';
 import { Avatar, subtitle } from './Profile.jsx';
 import { VeloraConnNote } from './Parts.jsx';
 import Dashboard from './Dashboard.jsx';
@@ -107,7 +108,7 @@ export default function Home({ onUser }) {
       <div key={f.friend_username} className="hm-friend vl-rise">
         <button type="button" className="hm-friend-who" onClick={e => onUser(f.friend_username, e.currentTarget)}>
           <Avatar user={{ username: f.friend_username, pfp: f.pfp_url }} size={34} status={p?.status || 'offline'} />
-          <span><b style={f.color ? { color: f.color } : undefined}>{f.friend_username}</b><small>{statusText(p)}</small></span>
+          <span><b style={f.color ? { color: f.color } : undefined}><NameText u={{ username: f.friend_username }} fallback={f.friend_username} /></b><small>{statusText(p)}</small></span>
         </button>
         <button type="button" className="hm-friend-msg" title={`Message ${f.friend_username}`} onClick={() => go({ kind: 'dm', username: f.friend_username })}><MessageCircle size={16} /></button>
       </div>
@@ -123,7 +124,7 @@ export default function Home({ onUser }) {
             <header className="hm-hello vl-rise">
               {me && <Avatar user={me} size={46} status={presence[me.username]?.status || 'online'} />}
               <div>
-                <h2>{hourWord(now.getHours())}{me ? `, ${me.username}` : ''}</h2>
+                <h2>{hourWord(now.getHours())}{me ? <>, <NameText u={{ username: me.username }} fallback={me.username} /></> : ''}</h2>
                 <p>{onlineAll} {onlineAll === 1 ? 'friend' : 'friends'} online{unreadN ? ` · ${unreadN} unread ${unreadN === 1 ? 'message' : 'messages'}` : ''}</p>
               </div>
             </header>
@@ -156,7 +157,7 @@ export default function Home({ onUser }) {
                       {recent.map(c => (
                         <button type="button" key={c.username} className="hm-tile vl-rise" onClick={() => go({ kind: 'dm', username: c.username })}>
                           <Avatar user={{ username: c.username, pfp: c.pfp || people[c.username]?.pfp }} size={44} status={presence[c.username]?.status || 'offline'} />
-                          <b>{c.username}</b>
+                          <b><NameText u={{ username: c.username }} fallback={c.username} /></b>
                           {c.unread > 0 && <i>{c.unread > 99 ? '99+' : c.unread}</i>}
                         </button>
                       ))}
@@ -182,7 +183,7 @@ export default function Home({ onUser }) {
                 <div className="hm-sub">Wants to message you - {dmIn.length}</div>
                 {!dmIn.length && <div className="hm-none">No message requests.</div>}
                 <div className="hm-grid">{dmIn.map(r => (
-                  <div key={r.id} className="hm-friend"><span className="hm-friend-who"><Avatar user={{ username: r.username, pfp: r.pfp }} size={34} /><span><b>{r.username}</b><small>Message request</small></span></span>
+                  <div key={r.id} className="hm-friend"><span className="hm-friend-who"><Avatar user={{ username: r.username, pfp: r.pfp }} size={34} /><span><b><NameText u={{ username: r.username }} fallback={r.username} /></b><small>Message request</small></span></span>
                     <button type="button" className="vc-round ok" title="Accept" onClick={() => answerDm(r.id, true)}><Check size={16} /></button>
                     <button type="button" className="vc-round no" title="Decline" onClick={() => answerDm(r.id, false)}><X size={16} /></button></div>))}</div>
                 <div className="hm-sub">You sent - {reqs.outgoing.length}</div>

@@ -26,6 +26,7 @@ import { CommandPicker, CommandBar, MessageComponents, InteractionLine, Thinking
 import { slashEntries, matchEntries } from './commands.js';
 import { ViaBadge } from './ClientVia.jsx';
 import { usePronouns } from './pronouns.js';
+import { useName, NameText } from './displayNames.js';
 import { Reactions, QuickReactions, openReactionPicker } from './Reactions.jsx';
 import MediaPicker, { GifBadge, StarButton } from './MediaPicker.jsx';
 import GlintIntro from './GlintIntro.jsx';
@@ -474,6 +475,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
     ? openUser(aliasMember.username, el, 'right', m.inst ? { ...alias.member, inst: m.inst } : undefined)
     : openUser(name, el, 'right', m.inst ? (alias && !unmarked ? { ...m.author, alias_name: alias.name } : m.author) : undefined));
   const author = useFace(m.author); // a Velora person on an instance: their live Velora picture / colour / rank
+  const shown = useName(m.author && m.inst ? { ...m.author, inst: m.inst } : m.author); // display name (displayNames.js), else the username
   const replyAlias = replyAliasOf(m.reply);
   const replyAuthor = useFace(useMemo(() => (m.reply?.author && m.inst ? { ...m.reply.author, inst: m.inst } : m.reply?.author), [m.reply?.author, m.inst]));
   useEffect(() => { if (m.inst && m.author?.kind === 'velora') wantVeloraFaces([m.author]); }, [m.inst, m.author?.velora_id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -582,7 +584,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
           {replyAuthor ? <Avatar user={replyBlocked ? blockedFace(replyAuthor) : aliasFace(replyAlias, replyAuthor)} size={16} /> : null}
           {replyBlocked
             ? <><b className="vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={11} /></b><span className="vc-reply-text vc-blocked-quote">Message from someone you blocked</span></>
-            : <><b style={replyAuthor?.color ? { color: replyAuthor.color } : undefined}>{replyAlias ? replyAlias.name : replyAuthor?.username || 'Nookara'}</b>
+            : <><b style={replyAuthor?.color ? { color: replyAuthor.color } : undefined}>{replyAlias ? replyAlias.name : <NameText u={replyAuthor} fallback="Nookara" />}</b>
               {replyAlias && <AliasMark alias={replyAlias} by={replyAuthor} size={12} />}
               <ReplyText body={m.reply.body} ctx={ctx} /></>}
         </div>
@@ -600,7 +602,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
             {hook ? <><span className="vc-msg-name hook">{name}</span>{m.author.staff ? <><span className="vc-app-tag staff">STAFF</span>{m.staffBy && <small className="vc-staff-by">sent by {m.staffBy} (only staff see this)</small>}</> : m.author.bridge === 'cloudlink' ? <><span className="vc-app-tag cl" title="This message came in over the channel's CloudLink bridge.">CLOUDLINK</span>{m.author.bridge_from && <span className="vc-game-tag" title="The chat it came from before CloudLink">{m.author.bridge_from}</span>}</> : m.author.bridge ? <><span className="vc-plat-tag" title={m.author.bridge === 'minecraft' ? 'Sent from the linked Minecraft server.' : `This message was sent from the linked ${PLATFORM_NAMES[m.author.bridge] || m.author.bridge} community.`}><PlatformIcon p={m.author.bridge} size={16} /></span>{m.author.bridge_from && <span className="vc-game-tag" title="The server it was sent from">{m.author.bridge_from}</span>}</> : <span className="vc-app-tag">APP</span>}</> : <>
             {blockedAuthor
               ? <><button type="button" className="vc-msg-name vc-blocked-name" onClick={e => onUser(name, e.currentTarget)}>{BLOCKED_NAME}</button><BlockedMark /></>
-              : <><button type="button" className="vc-msg-name" style={colorFrom(nameKey) && !distrust ? { color: colorFrom(nameKey) } : undefined} onClick={e => onUser(name, e.currentTarget)}>{alias ? alias.name : name}</button>
+              : <><button type="button" className="vc-msg-name" style={colorFrom(nameKey) && !distrust ? { color: colorFrom(nameKey) } : undefined} onClick={e => onUser(name, e.currentTarget)} title={!alias && shown !== name ? `@${name}` : undefined}>{alias ? alias.name : shown || name}</button>
                 {alias && !unmarked ? <AliasMark alias={alias} by={author} /> : <NameDecor sid={view.sid} user={aliasMember || author} />}</>}{m.author?.bot && !unmarked && <BotTag verified={!!m.author.verified} />}<SigBadge m={m} />{m.via && <ViaBadge via={m.via} inst={m.inst} />}</>}
             {pronouns && <span className="vc-pronouns" title="Pronouns">{pronouns}</span>}
             <span className="vc-time" title={new Date(m.created_at).toLocaleString()}>{stampOf(m.created_at)}</span>
@@ -705,6 +707,8 @@ export function MessageList({ view, onUser, onReply, canPost, canMod, channels, 
     onChannel: c => go({ kind: 'channel', sid: view.sid, cid: c.cid }),
     onLink: openLink,
     isBlocked: view.kind === 'channel' && blocks?.length ? n => isBlockedName(view.sid, n) : null, // @mentions of somebody I blocked
+    // @mentions show the display name: the server's member (an Ember server's own name wins there), else Nookara's (displayNames.js)
+    personOf: n => members?.find(x => x.username.toLowerCase() === String(n).toLowerCase()) || (view.sid && isInst(view.sid) ? { username: n, kind: 'local', inst: true } : { username: n }),
   }), [me, canPost, channels, view.sid, linkImages, roles, blocks, members]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // opening a conversation always starts at the bottom; unread messages get a "New" line and a banner at the top
@@ -877,7 +881,7 @@ export function Typing({ view }) {
   // in a server, somebody I blocked types as "Blocked User" with the default picture
   const blockedNames = useChat(s => (view.kind === 'channel' ? names.filter(n => isBlockedName(view.sid, n, s)).join('\n') : ''));
   const isB = n => !!blockedNames && blockedNames.split('\n').includes(n);
-  const who = n => (isB(n) ? <b className="vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={11} /></b> : <b>{n}</b>);
+  const who = n => (isB(n) ? <b className="vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={11} /></b> : <b><NameText u={members?.find(x => x.username === n) || { username: n }} fallback={n} /></b>);
   return (
     <div className={`vc-typing${names.length ? ' on' : ''}`} aria-live="polite">
       {names.length > 0 && <span className="vc-ch-typing-avs">{names.slice(0, 3).map(u => <Avatar key={u} user={isB(u) ? { username: BLOCKED_NAME, pfp: null } : { username: u, pfp: pfpOf(u) }} size={18} />)}</span>}
@@ -1296,7 +1300,7 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
         , document.body)}
       {replyTo && (
         <div className="vc-replybar">
-          <span className="vc-replybar-main">Replying to <b>{aliasOf(replyTo)?.name || replyTo.author?.username || 'Nookara'}</b>{replyTo.body ? <ReplyText body={replyTo.body} ctx={barCtx} /> : null}</span>
+          <span className="vc-replybar-main">Replying to <b>{aliasOf(replyTo)?.name || <NameText u={replyTo.author && replyTo.inst ? { ...replyTo.author, inst: replyTo.inst } : replyTo.author} fallback="Nookara" />}</b>{replyTo.body ? <ReplyText body={replyTo.body} ctx={barCtx} /> : null}</span>
           <button type="button" onClick={() => setReplyTo(null)} title="Cancel reply"><X size={14} /></button>
         </div>
       )}

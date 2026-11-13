@@ -7,6 +7,7 @@ import { Users, Copy, Check, Upload, Trash2, Hash, Search, Globe, ShieldCheck, B
 import { BotGallery } from './BotGallery.jsx';
 import { apiFetch } from '../api.js';
 import { getState, useChat, go, loadServersOf, refreshServer, loadGroups, toast, errorText, ask, answerAsk, loadFriends, sendMessage, linkFor } from './store.js';
+import { NameText, displayNameOf } from './displayNames.js';
 import { VELORA, instOf, isInst, fromInstance, normOrigin } from './ids.js';
 import { SignInPrompt } from './Gate.jsx';
 import { Avatar } from './Profile.jsx';
@@ -151,7 +152,7 @@ function InviteFriends({ sid, link }) {
         {list.map((f, i) => (
           <div key={f.username} className="vc-invite-friend vl-rise" style={{ '--i': Math.min(i, 12) }}>
             <Avatar user={f} size={32} status={f.status} />
-            <b>{f.username}</b>
+            <b><NameText u={{ username: f.username }} fallback={f.username} /></b>
             <span className="grow" />
             {f.here ? <small className="vc-muted">Already here</small>
               : <button type="button" className={`btn btn-sm ${sent[f.username] ? 'btn-surface' : 'btn-primary'}`} disabled={sent[f.username]} onClick={() => send(f)}>{sent[f.username] ? <><Check size={13} /> Sent</> : 'Send'}</button>}
@@ -303,7 +304,7 @@ function PeoplePicker({ multi, onDone, button }) {
         {hits.map(u => (
           <button type="button" key={u.username} className={`vc-pick${picked.includes(u.username) ? ' on' : ''}`} onClick={() => pick(u.username)}>
             <span className="vc-av" style={{ width: 30, height: 30 }}>{u.pfp_url ? <img src={u.pfp_url} alt="" /> : <span className="vc-av-l">{u.username[0].toUpperCase()}</span>}</span>
-            <span>{u.username}</span>{picked.includes(u.username) && <Check size={14} />}
+            <span><NameText u={u} fallback={u.username} /></span>{picked.includes(u.username) && <Check size={14} />}
           </button>
         ))}
         {!hits.length && q.trim() && !multi && <button type="button" className="vc-pick" onClick={() => onDone([q.trim()])}>Message "{q.trim()}"</button>}
@@ -350,8 +351,8 @@ export function QuickSwitcher({ onClose }) {
   const friends = useChat(s => s.friends);
   const items = useMemo(() => {
     const out = [];
-    dms.forEach(c => out.push({ k: `d${c.username}`, label: c.username === 'System' ? 'Nookara' : c.username, hint: 'Direct message', v: { kind: 'dm', username: c.username } }));
-    friends.filter(f => !dms.some(c => c.username === f.friend_username)).forEach(f => out.push({ k: `f${f.friend_username}`, label: f.friend_username, hint: 'Friend', v: { kind: 'dm', username: f.friend_username } }));
+    dms.forEach(c => out.push({ k: `d${c.username}`, label: c.username === 'System' ? 'Nookara' : displayNameOf(c.username) || c.username, hint: displayNameOf(c.username) ? `@${c.username} - direct message` : 'Direct message', alt: c.username.toLowerCase(), v: { kind: 'dm', username: c.username } }));
+    friends.filter(f => !dms.some(c => c.username === f.friend_username)).forEach(f => out.push({ k: `f${f.friend_username}`, label: displayNameOf(f.friend_username) || f.friend_username, hint: displayNameOf(f.friend_username) ? `@${f.friend_username} - friend` : 'Friend', alt: f.friend_username.toLowerCase(), v: { kind: 'dm', username: f.friend_username } }));
     groups.forEach(g => out.push({ k: `g${g.room}`, label: g.name, hint: 'Group chat', v: { kind: 'group', room: g.room } }));
     servers.forEach(s => {
       out.push({ k: `s${s.sid}`, label: s.name, hint: 'Server', v: { kind: 'server', sid: s.sid } });
@@ -359,8 +360,10 @@ export function QuickSwitcher({ onClose }) {
     });
     const t = q.trim().toLowerCase().replace(/^[#@]/, '');
     if (!t) return out.slice(0, 12);
-    return out.filter(i => i.label.toLowerCase().replace(/^#/, '').includes(t))
-      .sort((a, b) => a.label.toLowerCase().replace(/^#/, '').indexOf(t) - b.label.toLowerCase().replace(/^#/, '').indexOf(t)).slice(0, 12);
+    // (people match by display name or username: alt)
+    const pos = i => { const a = i.label.toLowerCase().replace(/^#/, '').indexOf(t); return a >= 0 ? a : i.alt?.includes(t) ? 50 + i.alt.indexOf(t) : -1; };
+    return out.filter(i => pos(i) >= 0)
+      .sort((a, b) => pos(a) - pos(b)).slice(0, 12);
   }, [q, detail, servers, dms, groups, friends]);
   useEffect(() => setSel(0), [q]);
   return (

@@ -11,7 +11,7 @@ import { signOutVelora, startSignIn, savedBonfireAccounts, rememberAccount, swit
 import { useChat, lookup, wantPresence, setStatus, setCustom, toast, getState, onUserUpdate } from './store.js';
 import { copy } from './Menu.jsx';
 import { renderBody } from './text.jsx';
-import { Avatar, STATUS_LABEL, ActivityCard } from './Profile.jsx';
+import { Avatar, STATUS_LABEL, ActivityCard, HandleLine } from './Profile.jsx';
 import { ManageFacts } from './ClientVia.jsx';
 import './ProfilePopout.css';
 
@@ -38,7 +38,7 @@ function Custom({ text }) {
   return nodes?.length ? <div className="bf-pp-custom">{nodes}</div> : null;
 }
 
-// the card. p = { username, pfp, banner, color, bio, pronouns, website, badges: [{name, icon_url, description}], rank, created, localTime }
+// the card. p = { username, display_name?, pfp, banner, color, bio, pronouns, website, badges: [{name, icon_url, description}], rank, created, localTime }
 // activities: what they're doing right now (games, music...), shown under the custom status like the mini profile
 export function PopoutCard({ p, status = 'online', custom, activities, children, preview = false }) {
   const [, tick] = useState(0);
@@ -46,6 +46,7 @@ export function PopoutCard({ p, status = 'online', custom, activities, children,
   const color = isHex(p?.color) ? p.color : '';
   const badges = (p?.badges || []).filter(b => b.icon_url).slice(0, 5);
   const name = p?.username || '';
+  const shown = p?.display_name || name; // (display names: the big name; @username goes beside the pronouns)
   return (
     <div className={`bf-pp-card${preview ? ' preview' : ''}`} style={color ? { '--pe-accent': color } : undefined}>
       <div className="bf-pp-banner" style={color ? { background: `linear-gradient(135deg, ${color}66, ${color}14)` } : undefined}>
@@ -62,10 +63,10 @@ export function PopoutCard({ p, status = 'online', custom, activities, children,
       </div>
       <div className="bf-pp-body">
         <div className="bf-pp-name-row">
-          <b className="bf-pp-name" style={color ? { color } : undefined}>{name || ' '}</b>
+          <b className="bf-pp-name" style={color ? { color } : undefined}>{shown || ' '}</b>
           {name && <button type="button" className="bf-pp-copy" data-tip="Copy username" aria-label="Copy username" onClick={() => copy(name, 'Username copied')}><Copy size={13} /></button>}
         </div>
-        {p?.pronouns && <div className="bf-pp-pronouns">{p.pronouns}</div>}
+        <HandleLine name={shown} handle={name} pronouns={p?.pronouns || ''} cls="bf-pp-pronouns" />
         <Custom text={custom} />
         {activities?.map((a, i) => <ActivityCard key={`${a.name}${i}`} a={a} compact />)}
         <Bio text={p?.bio} />
@@ -206,6 +207,7 @@ export function MePopout({ anchor, onClose, onEditProfile, onCustomStatus }) {
   const uid = me.id || p?.id;
   const card = {
     username,
+    display_name: p?.display_name || '',
     pfp: p?.pfp_url ?? me.pfp,
     banner: p?.banner_url || null,
     color: p?.color || me.color,

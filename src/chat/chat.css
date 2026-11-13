@@ -2563,3 +2563,10 @@ html.vc-rounded .vc-sticker.gone { border-radius: calc(8px * var(--rk, 1)); }
 .vc-clients-toggle:hover svg, .vc-clients-toggle:hover .vc-clients-n { color: var(--text); }
 .vc-clients-more { margin-top: 3px; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; color: var(--dim); cursor: pointer; }
 .vc-clients-more:hover { color: var(--text); text-decoration: underline; }
+
+/* profiles: @username beside the pronouns under a display name (Profile.jsx HandleLine) */
+.vc-handle-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; }
+.vc-handle-line > span + span::before { content: '\00b7'; margin-right: 6px; color: var(--muted); }
+.vc-handle-line .vc-handle { color: var(--dim); font-weight: 500; }
+.bf-pp-pronouns .vc-handle { color: var(--dim); }
+

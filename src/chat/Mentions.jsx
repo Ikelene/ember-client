@@ -5,17 +5,18 @@ import { Avatar } from './Profile.jsx';
 import { P, has, nameColor, ChannelIcon } from './roles.jsx';
 import { loadEmojiData, emojiDataSync, emojiToken } from './EmojiPicker.jsx';
 import { shortName, allNames, Twemoji } from './emoji.jsx';
+import { personName, displayNameOf, useDisplayNamesVersion, wantDisplayNames, serverOwnName } from './displayNames.js';
 
 // the "@word" right before the caret, if there is one
 export function mentionQuery(text, caret) {
-  const m = /(^|\s)@([\w.-]{0,32})$/.exec(text.slice(0, caret));
+  const m = /(^|\s)@([\p{L}\p{N}_.-]{0,32})$/u.exec(text.slice(0, caret)); // (letters of any language: display names match too)
   return m ? { q: m[2], start: caret - m[2].length - 1 } : null;
 }
 
 // what's being typed right before the caret: @someone, :emoji or #channel
 export function suggestQuery(text, caret) {
   const b = text.slice(0, caret);
-  let m = /(^|\s)@([\w.-]{0,32})$/.exec(b);
+  let m = /(^|\s)@([\p{L}\p{N}_.-]{0,32})$/u.exec(b);
   if (m) return { ch: '@', q: m[2] };
   m = /(^|\s):([A-Za-z0-9_+-]{2,32})$/.exec(b);
   if (m) return { ch: ':', q: m[2] };
@@ -65,6 +66,7 @@ export function useMentionItems(view, q) {
   const detail = useChat(s => (sid ? s.detail[sid] : null));
   const group = useChat(s => (view.kind === 'group' ? s.groups.find(g => g.room === view.room) : null));
   const people = useChat(s => s.people);
+  const dnv = useDisplayNamesVersion(); // display names arriving: match + label again
   return useMemo(() => {
     if (q == null) return [];
     const t = q.toLowerCase();
@@ -75,10 +77,16 @@ export function useMentionItems(view, q) {
     else if (group) users = group.members.map(u => ({ username: u, ...(people[u] || {}) }));
     const st = getState();
     const online = u => (botPresenceOf(u) || st.presence[u.username]?.status || u.presence?.status || 'offline') !== 'offline';
-    users.filter(u => u.username.toLowerCase().includes(t))
-      .sort((a, b) => (b.username.toLowerCase().startsWith(t) - a.username.toLowerCase().startsWith(t)) || (online(b) - online(a)) || a.username.localeCompare(b.username))
+    // usernames AND display names match (displayNames.js); what goes in is always the stable @username
+    wantDisplayNames(users.filter(u => u.username && !serverOwnName(u)).map(u => u.username));
+    const dn = u => personName(u, displayNameOf(u.username)) || u.username;
+    const words = s => s.toLowerCase().split(/\s+/);
+    // 0 starts the username or display name, 1 starts a word of the display name, 2 inside either, 9 no match
+    const rank = u => { const un = u.username.toLowerCase(), d = dn(u).toLowerCase(); return un.startsWith(t) || d.startsWith(t) ? 0 : words(d).some(w => w.startsWith(t)) ? 1 : un.includes(t) || d.includes(t) ? 2 : 9; };
+    users.filter(u => u.username && rank(u) < 9)
+      .sort((a, b) => (rank(a) - rank(b)) || (online(b) - online(a)) || dn(a).localeCompare(dn(b)))
       .slice(0, 8)
-      .forEach(u => out.push({ kind: 'user', key: `u${u.username}`, label: u.username, insert: `@${u.username} `, user: u, hint: u.username === st.me?.username ? 'you' : '' }));
+      .forEach(u => { const name = dn(u), you = u.username === st.me?.username; out.push({ kind: 'user', key: `u${u.username}`, label: name, insert: `@${u.username} `, user: u, hint: [name !== u.username ? `@${u.username}` : '', you ? 'you' : ''].filter(Boolean).join(' - ') }); });
     if (detail) {
       const big = has(detail.server.perms, P.MENTION_EVERYONE);
       if (big) {
@@ -90,7 +98,7 @@ export function useMentionItems(view, q) {
         .forEach(r => out.push({ kind: 'role', key: r.rid, label: `@${r.name}`, insert: `@${r.name} `, role: r, hint: 'Notify people with this role.' }));
     }
     return out;
-  }, [q, sid, members, detail, group, people, view.kind, view.username]);
+  }, [q, sid, members, detail, group, people, view.kind, view.username, dnv]);
 }
 
 export function MentionPicker({ items, sel, setSel, onPick, sid }) {
