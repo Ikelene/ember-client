@@ -535,7 +535,7 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
               onContextMenu={e => (sys ? openMenu(e, [{ label: 'Open', onClick: () => go({ kind: 'dm', username: c.username }) }]) : userMenu(e, c.username, { onProfile: () => dispatchEvent(new CustomEvent('vc-open-big', { detail: { username: c.username } })) }))}
               onClick={() => go({ kind: 'dm', username: c.username })}>
               {sys ? <span className="vc-av vc-sys-av" style={{ width: 32, height: 32 }}><Logo size={18} /></span> : <Avatar user={{ username: c.username, pfp: c.pfp || people[c.username]?.pfp }} size={32} status={p?.status || 'offline'} />}
-              <span className="vc-dm-txt"><b>{sys ? 'Nookara' : <NameText u={{ username: c.username }} />}</b>{!sys && subtitle(p) && <small>{subtitle(p)}</small>}</span>
+              <span className="vc-dm-txt"><b>{sys ? 'Nookara' : <NameText u={{ username: c.username }} />}{c.bot && <BotTag small />}</b>{!sys && subtitle(p) && <small>{subtitle(p)}</small>}</span>
               {!on && <TypingMark names={typersOf(typing, k)} people={people} />}
               {(c.unread > 0) && !on && <span className="vc-count">{c.unread > 99 ? '99+' : c.unread}</span>}
             </button>

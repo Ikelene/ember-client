@@ -56,7 +56,7 @@ function GifIcon() {
   );
 }
 import { packActive } from './messageSounds.js';
-import { playSound, loadEmojis, loadMembers, loadCommands, clearStatusReply, useTimedOut, untilText, dismissEphemeral } from './store.js';
+import { playSound, loadEmojis, loadMembers, loadCommands, clearStatusReply, useTimedOut, untilText, dismissEphemeral, useBotPeer } from './store.js';
 import { sendSticker } from './personal.js';
 import { takeJump, fileKind, uploadMedia, saveToMedia, isMineMsg, loadUploadLimits, getUploadLimits, chooseUploadDest, rememberedUploadDest, tempFileInfo, tempFileInfoNow, onTempInfo, TEMP_LINK } from './store.js';
 import { useStarboardFor, starredByMe, STAR } from './Starboard.jsx';
@@ -914,7 +914,8 @@ export function Composer(props) {
   const status = useChat(s => s.e2eeStatus);
   const { view } = props;
   const dm = view.kind === 'dm' && view.username !== 'System';
-  if (dm && status !== 'ready') return <E2eeLockedPanel />;
+  const bot = useBotPeer(dm ? view.username : null); // (a bot DM is never encrypted: no unlock needed)
+  if (dm && !bot && status !== 'ready') return <E2eeLockedPanel />;
   return <><E2eeComposerNotes view={view} /><ComposerBox {...props} /></>;
 }
 // a sticker in a message (Ember servers): bigger than an emoji, never stretched; a deleted one says so

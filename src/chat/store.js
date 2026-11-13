@@ -31,6 +31,7 @@ let state = {
   e2eeStatus: 'loading',   // end-to-end encrypted DMs on this device: loading | none (no keys yet) | locked | ready
   e2eeGate: null,          // the set up / unlock popup is open
   e2eeKeyChanged: {},      // username (lower) -> their key changed since I last saw it
+  botPeers: {},            // username (lower) -> true: a bot account. DMs with bots are never encrypted (bots can't hold keys)
   signedIn: false,         // signed in with Velora: DMs, groups, friends, modmail, legacy servers, Velora-login instances
   conn: 'connecting',      // connecting | open | closed
   connected: false,        // the home socket has been open at least once since the page loaded
@@ -656,6 +657,8 @@ function onEvent(m, inst = VELORA) {
       break;
     case 'im_received':
     case 'im_sent': {
+      if (m.message?.from_bot) markBotPeer(m.message.from);
+      if (m.message?.to_bot) markBotPeer(m.message.to);
       E2EE.openMessage(m.message).then(opened => {
         const msg = imToMsg(opened);
         if (m.nonce || m.message.nonce) msg.nonce = m.nonce || m.message.nonce;
@@ -923,11 +926,11 @@ export function imToMsg(m) {
   const meName = state.me?.username;
   const fromMe = m.from === meName;
   return {
-    id: `im${m.id}`, imId: m.id, body: m.body, attachments: sealedAtts(m), system: !!m.from_system, sealed: m.sealed || null, notEncrypted: !m.enc && !m.from_system && !m.from_bot && !/^\[Voice call\]/i.test(m.body || ''),
+    id: `im${m.id}`, imId: m.id, body: m.body, attachments: sealedAtts(m), system: !!m.from_system, sealed: m.sealed || null, notEncrypted: !m.enc && !m.from_system && !m.from_bot && !m.to_bot && !/^\[Voice call\]/i.test(m.body || ''),
     wire: m.sealed?.wire, fromId: m.from_id, toId: m.to_id, quote: m.sealed?.quote || null,
     statusReply: m.status_reply?.text ? String(m.status_reply.text) : null,
     reply: m.reply ? { id: `im${m.reply.id}`, author: m.reply.gone ? null : { username: m.reply.from, pfp: state.people[m.reply.from]?.pfp || null }, body: m.reply.gone ? 'Original message was deleted' : m.reply.body } : null,
-    author: m.from_system ? null : { username: m.from, pfp: fromMe ? state.me?.pfp : m.from_pfp, color: fromMe ? state.me?.color : state.people[m.from]?.color, rank: state.people[m.from]?.rank },
+    author: m.from_system ? null : { username: m.from, pfp: fromMe ? state.me?.pfp : m.from_pfp, color: fromMe ? state.me?.color : state.people[m.from]?.color, rank: state.people[m.from]?.rank, ...(m.from_bot ? { bot: true } : {}) },
     created_at: new Date(m.sent_at).getTime(), edited_at: m.edited_at ? new Date(m.edited_at).getTime() : null, reactions: m.reactions || undefined, pinned: !!m.pinned,
   };
 }
@@ -975,6 +978,7 @@ export async function loadMessages(v, { older = false } = {}) {
       const d = await apiFetch(`/chat/channels/${v.cid}/messages?limit=50${first ? `&before=${first.id}` : ''}`);
       list = d.messages; hasMore = d.has_more;
     } else if (v.kind === 'dm') {
+      if (!older) checkBotPeer(v.username);
       const d = await apiFetch(`/im/with/${encodeURIComponent(v.username)}?limit=50${first ? `&before=${first.imId}` : ''}`);
       list = (await Promise.all(d.messages.map(E2EE.openMessage))).map(imToMsg); hasMore = d.has_more;
     } else if (v.kind === 'modmail') {
@@ -1104,11 +1108,32 @@ export function sendMessage(v, text, { replyTo, attachments, uploads, noStatusRe
   setTyping(v, false);
   return n;
 }
+// ── bots in DMs: never encrypted, no key lookups, no "set up encryption" (Ikelene, 2026-11-12: "bots cant use it") ──
+export const isBotPeer = username => !!username && !!state.botPeers[String(username).toLowerCase()];
+export function markBotPeer(username) {
+  const k = String(username || '').toLowerCase();
+  if (!k || state.botPeers[k]) return;
+  set(s => ({ botPeers: { ...s.botPeers, [k]: true } }));
+}
+// a DM opened before any message says who they are (a link, the quick switcher): ask once whether it's a bot
+const botChecked = new Set();
+export function checkBotPeer(username) {
+  const k = String(username || '').toLowerCase();
+  if (!k || k === 'system' || state.botPeers[k] || botChecked.has(k)) return;
+  botChecked.add(k);
+  apiFetch(`/chat/users/${encodeURIComponent(username)}`).then(d => { if (d?.bot?.bot) markBotPeer(username); }).catch(() => botChecked.delete(k));
+}
+export const useBotPeer = username => useChat(s => !!username && !!s.botPeers[String(username).toLowerCase()]);
 // ── encrypted DMs going out ──
 const dmSends = new Map(); // nonce -> what it was, until the server took it
 async function sendDm(d) {
   dmSends.set(d.nonce, d);
   const patch = f => set(s => ({ msgs: upd(s.msgs, d.key, b => b && { ...b, list: b.list.map(x => (x.nonce === d.nonce ? f(x) : x)) }) }));
+  if (isBotPeer(d.to)) { // a bot: plain text straight away, whatever this device's encryption state is
+    if (!send({ type: 'im_send', to: d.to, message: d.wire, reply_to: d.reply_to, nonce: d.nonce })) { dmSends.delete(d.nonce); patch(x => ({ ...x, failed: 'offline' })); return; }
+    pendingAcks.set(d.nonce, d.key);
+    return;
+  }
   try {
     const enc = await E2EE.seal(d.to, d.wire, { replyQuote: d.quote, fresh: !!d.retried });
     if (!send({ type: 'im_send', to: d.to, enc, reply_to: d.reply_to, status_reply: d.status_reply, nonce: d.nonce })) throw new Error('offline');
@@ -1258,7 +1283,8 @@ export async function editMessage(id, text, m) {
   // a DM (im<id>): its own route; both people get im_edited
   if (/^im\d+$/.test(String(id))) {
     // an unencrypted DM to someone who still hasn't set up stays unencrypted
-    if (!m?.sealed && m?.author?.username === state.me?.username && (await E2EE.bundleFor(state.view?.username, { fresh: true }).catch(() => ({}))).none) {
+    // (a DM with a bot is always plain: no key lookup)
+    if (!m?.sealed && m?.author?.username === state.me?.username && (isBotPeer(state.view?.username) || (await E2EE.bundleFor(state.view?.username, { fresh: true }).catch(() => ({}))).none)) {
       await apiFetch(`/im/${String(id).slice(2)}/edit`, { method: 'PATCH', body: JSON.stringify({ body: text }) });
       return;
     }
@@ -1457,7 +1483,7 @@ export async function uploadAttachment(v, file, opts = {}) {
   // DMs / group chats: opts.dest picked in the composer (a file without one, e.g. a command option, follows the setting)
   const dest = opts.dest || rememberedUploadDest() || 'temp';
   // encrypted here first: Nookara stores a file it can't open, its key travels inside the encrypted message. Not to someone who hasn't set up: their DM isn't encrypted
-  if (v.kind === 'dm' && !(await E2EE.bundleFor(v.username).catch(() => ({ none: false }))).none) {
+  if (v.kind === 'dm' && !isBotPeer(v.username) && !(await E2EE.bundleFor(v.username).catch(() => ({ none: false }))).none) {
     const { upload, key, iv } = await E2EE.sealFile(file);
     const a = await (dest === 'account' ? uploadAccount(upload, opts) : uploadTemp(upload, opts));
     return { url: E2EE.fileLink(a.url, { key, iv, name: file.name, mime: file.type }), sealed: true, type: fileKindOfMime(file.type), name: file.name, size: file.size };
@@ -1598,6 +1624,7 @@ export async function loadDMs() {
   const here = viewingDm();
   if (here) d.conversations = d.conversations.map(c => (c.username.toLowerCase() === here.toLowerCase() && c.unread ? (markDmRead(here), { ...c, unread: 0 }) : c));
   remember(d.conversations.filter(c => c.username !== 'System').map(c => ({ username: c.username, pfp: c.pfp || undefined })));
+  d.conversations.forEach(c => { if (c.bot) markBotPeer(c.username); });
   set(s => {
     const unread = { ...s.unread };
     d.conversations.forEach(c => { const k = `d:${c.username.toLowerCase()}`; if (c.unread && keyOf(s.view) !== k) unread[k] = true; });

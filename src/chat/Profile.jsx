@@ -7,7 +7,7 @@ import { createPortal } from 'react-dom';
 import { MessageCircle, Maximize2, X, UserPlus, Check, Clock, ExternalLink, Globe, Gamepad2, Music, Tv, Trophy, Radio, MoreHorizontal, Pencil, CalendarDays, LogIn, ShieldCheck, Crown, UserMinus, Ban, Link as LinkIcon } from 'lucide-react';
 import { apiFetch, getToken } from '../api.js';
 import { BotTag, AddBotButton, TrustedIn } from './Bots.jsx';
-import { useChat, lookup, go, wantPresence, toast, errorText, getState, setCustom, ask, loadFriends, toggleBlock, memberRef, faceOf, botPresenceOf, loadMembers, onUserUpdate } from './store.js';
+import { useChat, lookup, go, wantPresence, toast, errorText, getState, setCustom, ask, loadFriends, toggleBlock, memberRef, faceOf, botPresenceOf, loadMembers, onUserUpdate, markBotPeer } from './store.js';
 import { isInst } from './ids.js';
 import { ServerIcon } from './ServerIcon.jsx';
 // your own profile's "Edit profile": Ember's settings, Profile page (Chat.jsx listens for vc-dialog)
@@ -187,6 +187,29 @@ async function instanceBotInfo(who, username) {
     return { bot: { bot, can_add_to: null } };
   } catch { return null; } // sign-in needed / unreachable / odd data: keep the plain card
 }
+// "Message" on a bot's profile. A Nookara bot is DMed by its name; an Ember server's bot only when it's linked to a Nookara bot
+// (gallery_id = that bot's Nookara account), since DMs live on Nookara. A bot made only on that server has nowhere to take DMs.
+// The DM is never encrypted (bots can't hold keys): markBotPeer makes Ember skip encryption from the first message.
+export function MessageBotButton({ name, who, info, className, size = 15, onGo }) {
+  const [busy, setBusy] = useState(false);
+  const gid = info?.gallery_id;
+  if (who?.inst && !gid) return null;
+  if (String(name || '').toLowerCase() === 'hyperfocus') return null; // (store notices only, can't read replies)
+  const open = async () => {
+    let target = name;
+    if (who?.inst) {
+      setBusy(true);
+      const d = await apiFetch(`/chat/bots/by-id/${encodeURIComponent(gid)}`).catch(() => null);
+      setBusy(false);
+      if (!d?.username || d.dm === false) { toast("This bot can't take DMs."); return; }
+      target = d.username;
+    }
+    markBotPeer(target);
+    onGo?.();
+    go({ kind: 'dm', username: target });
+  };
+  return <button type="button" className={className} disabled={busy} onClick={open}><MessageCircle size={size} /> Message</button>;
+}
 function useProfile(username, who) {
   const [p, setP] = useState(null);
   const [extra, setExtra] = useState(null);
@@ -364,7 +387,7 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
           <div className="vc-card-btns">
             {isMe
               ? <button type="button" className="pe-msg vc-btn-msg" onClick={() => { onClose?.(); openProfileEditor(); }}><Pencil size={14} /> Edit profile</button>
-              : extra?.bot ? <AddBotButton username={vname} info={extra.bot} className="btn btn-primary vc-addbot-btn" />
+              : extra?.bot ? <><AddBotButton username={vname} info={extra.bot} className="btn btn-primary vc-addbot-btn" /><MessageBotButton name={vname} who={who} info={extra.bot.bot} className="pe-msg vc-btn-msg" size={14} onGo={onClose} /></>
               : <button type="button" className="pe-msg vc-btn-msg" onClick={() => { onClose?.(); go({ kind: 'dm', username: vname }); }}><MessageCircle size={14} /> Message</button>}
           </div>
         )}
@@ -485,6 +508,7 @@ export function ProfileModal({ username: shown, from, sid, who, onClose }) {
           <Avatar user={{ username, pfp: p?.pfp_url }} size={112} status={status} className="vc-big-av" />
           <div className="vc-big-btns">
             {extra?.bot && <AddBotButton username={username} info={extra.bot} />}
+            {!isMe && extra?.bot && <MessageBotButton name={username} who={who} info={extra.bot.bot} className="btn btn-primary" onGo={close} />}
             {!isMe && !extra?.bot && <button type="button" className="btn btn-primary" onClick={() => { close(); go({ kind: 'dm', username }); }}><MessageCircle size={15} /> Message</button>}
             {!isMe && !extra?.bot && friend === 'none' && <button type="button" className="btn btn-surface" onClick={addFriend}><UserPlus size={15} /> Add friend</button>}
             {!isMe && friend === 'pending_outgoing' && <span className="vc-chip">Request sent</span>}

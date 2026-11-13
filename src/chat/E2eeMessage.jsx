@@ -1,7 +1,7 @@
 // Encrypted DMs where they meet the message list and the composer. Separate from Messages.jsx so E2ee.jsx's dialogs stay out of its imports.
 import { useEffect, useState } from 'react';
 import { Lock, LockOpen, AlertTriangle, Clock, File as FileIcon, Download, Link2 } from 'lucide-react';
-import { useChat, openE2eeGate, dismissKeyChange, dropFailed } from './store.js';
+import { useChat, openE2eeGate, dismissKeyChange, dropFailed, useBotPeer } from './store.js';
 import { LinkEmbeds } from './LinkEmbeds.jsx';
 import { openSafety, E2eeLockedPanel } from './E2ee.jsx';
 import * as E2EE from './e2ee/session.js';
@@ -68,28 +68,32 @@ export function PreviewOnAsk({ urls, inst, priv }) {
   return <div className="e2-msg-note"><Link2 size={13} /> <span><button type="button" onClick={() => setOn(true)}>Show link preview</button>{priv && ' (Nookara fetches it, so Nookara sees the link)'}</span></div>;
 }
 
-// has the other person set up encrypted DMs? (they haven't: what's sent now isn't encrypted)
-function useUnset(view) {
+// has the other person set up encrypted DMs? (they haven't: what's sent now isn't encrypted). A bot never can: no lookup at all
+function useUnset(view, bot) {
   const [unset, setUnset] = useState(false);
   useEffect(() => {
     let live = true;
     setUnset(false);
-    if (view.kind === 'dm' && view.username !== 'System') E2EE.bundleFor(view.username).then(v => { if (live) setUnset(!!v.none); }).catch(() => {});
+    if (view.kind === 'dm' && view.username !== 'System' && !bot) E2EE.bundleFor(view.username).then(v => { if (live) setUnset(!!v.none); }).catch(() => {});
+    if (bot) return () => { live = false; };
     const again = e => { if (String(e.detail || '').toLowerCase() === String(view.username).toLowerCase()) E2EE.bundleFor(view.username, { fresh: true }).then(v => live && setUnset(!!v.none)).catch(() => {}); };
     addEventListener('e2ee-keys-changed', again);
     return () => { live = false; removeEventListener('e2ee-keys-changed', again); };
-  }, [view.kind, view.username]);
+  }, [view.kind, view.username, bot]);
   return unset;
 }
 
 // the lock beside the name at the top of a DM / group: hover says how private it is, click (an encrypted DM) compares keys.
-// Not encrypted (they haven't set up, or a group chat): a yellow open lock.
+// Not encrypted (they haven't set up, a bot, or a group chat): a yellow open lock.
 export function E2eeHeadLock({ view }) {
-  const unset = useUnset(view);
+  const bot = useBotPeer(view.kind === 'dm' ? view.username : null);
+  const unset = useUnset(view, bot);
   if (view.kind !== 'dm' && view.kind !== 'group') return null;
   if (view.kind === 'dm' && view.username === 'System') return null;
-  if (view.kind === 'group' || unset) {
-    const text = view.kind === 'group' ? 'Nookara can read group chats.' : `@${view.username} hasn't set up encrypted DMs yet. They can read this, and have to set up to reply.`;
+  if (view.kind === 'group' || unset || bot) {
+    const text = view.kind === 'group' ? 'Nookara can read group chats.'
+      : bot ? `@${view.username} is a bot. Bots can't use end-to-end encryption, so this chat isn't encrypted: the bot's program, and Nookara, can read it.`
+      : `@${view.username} hasn't set up encrypted DMs yet. They can read this, and have to set up to reply.`;
     return <span className="e2-head-lock off" tabIndex={0} role="img" aria-label={`Not end-to-end encrypted. ${text}`} data-tip={text} data-tip-title="Not end-to-end encrypted" data-tip-kind="warn" data-tip-side="bottom"><LockOpen size={16} /></span>;
   }
   return (

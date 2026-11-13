@@ -17,7 +17,8 @@ import { Hash, Lock, Users, Menu, ChevronLeft, Search, X, AtSign, UsersRound, Lo
 import { reportDmUser } from '../chat/report.js';
 import { api, getToken, cachedMe, apiFetch, isWebBonfire } from '../api.js';
 import { applyAccentColor } from '../theme.js';
-import { jumpToMessage, loginAgain, retryNow } from '../chat/store.js';
+import { jumpToMessage, loginAgain, retryNow, useBotPeer } from '../chat/store.js';
+import { BotTag } from '../chat/Bots.jsx';
 import { useChat, init, open, go, readHash, keyOf, loadGroups, loadMembers, toast, errorText, getState, ask, unreadTotals } from '../chat/store.js';
 import { Rail, ServerSidebar, HomeSidebar, MemberList, UserPanel, VoiceQuotaNote, OutdatedNote, useConnLost } from '../chat/Parts.jsx';
 
@@ -466,6 +467,7 @@ function ChatPage() {
   const channel = detail?.channels.find(c => c.cid === view.cid);
   const group = useChat(s => (view.kind === 'group' ? s.groups.find(g => g.room === view.room) : null));
   const dmPresence = useChat(s => (view.kind === 'dm' ? s.presence[view.username] : null));
+  const dmIsBot = useBotPeer(view.kind === 'dm' ? view.username : null);
   const unreadCount = useTabBadge();
   const gateName = useChat(s => (view.kind === 'instance' ? s.instances.find(i => i.origin === view.inst)?.name : null));
   useEffect(() => { document.title = `${unreadCount ? `(${unreadCount > 999 ? '999+' : unreadCount}) ` : ''}${channel ? `#${channel.name} - ${detail.server.name}` : view.kind === 'instance' ? gateName || 'Server' : view.kind === 'dm' ? `@${view.username}` : group ? group.name : 'Home'} | Ember`; }, [unreadCount, channel, detail, view, group, gateName]);
@@ -567,6 +569,7 @@ function ChatPage() {
                   <button type="button" className="vc-head-user" onClick={e => openMini(view.username, e.currentTarget)}>
                     <Avatar user={{ username: view.username, pfp: getState().people[view.username]?.pfp }} size={26} status={dmPresence?.status || 'offline'} />
                     <b className="vc-head-name">{view.username}</b>
+                    {dmIsBot && <BotTag small />}
                   </button>
                   <E2eeHeadLock view={view} />
                   {subtitle(dmPresence) && <span className="vc-head-topic">{subtitle(dmPresence)}</span>}
