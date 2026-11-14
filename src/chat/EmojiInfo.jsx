@@ -42,8 +42,8 @@ export function EmojiInfoHost() {
   }, [info]);
   if (!info) return null;
   const r = info.rect;
-  const below = innerHeight - r.bottom > 200;
-  const style = { left: Math.max(8, Math.min(r.left + r.width / 2 - 140, innerWidth - 288)), ...(below ? { top: r.bottom + 8 } : { bottom: innerHeight - r.top + 8 }) };
+  const below = innerHeight - r.bottom > 240; // (room for the popup under it: it got taller with the bigger emoji)
+  const style = { left: Math.max(8, Math.min(r.left + r.width / 2 - 150, innerWidth - 308)), ...(below ? { top: r.bottom + 8 } : { bottom: innerHeight - r.top + 8 }) };
   const name = info.eid ? info.name : nameOfChar(info.char, emojiDataSync());
   async function join() {
     setBusy(true);

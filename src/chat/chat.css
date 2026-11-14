@@ -1404,9 +1404,9 @@ ol.vc-list > li::marker { color: var(--accent); font-weight: 700; }
 .vc-em-foot .vc-em-big { width: 28px; height: 28px; object-fit: contain; }
 img.vc-sug-emoji { width: 20px; height: 20px; object-fit: contain; }
 /* click-an-emoji pop-up */
-.vc-eminfo { position: fixed; z-index: 3400; width: 280px; padding: 12px; background: linear-gradient(180deg, #19191c, #141416); border: 1px solid var(--border-2); box-shadow: 0 16px 44px rgba(0, 0, 0, .6); }
-.vc-eminfo-top { display: flex; align-items: center; gap: 12px; }
-.vc-eminfo-big { width: 48px; height: 48px; object-fit: contain; flex: none; font-size: 40px; line-height: 48px; }
+.vc-eminfo { position: fixed; z-index: 3400; width: 300px; padding: 12px; background: linear-gradient(180deg, #19191c, #141416); border: 1px solid var(--border-2); box-shadow: 0 16px 44px rgba(0, 0, 0, .6); }
+.vc-eminfo-top { display: flex; align-items: center; gap: 14px; }
+.vc-eminfo-big { width: 80px; height: 80px; object-fit: contain; flex: none; font-size: 66px; line-height: 80px; } /* (bigger: Ikelene 2026-11-14 "its too small") */
 .vc-eminfo-txt { display: flex; flex: 1; flex-direction: column; min-width: 0; }
 .vc-eminfo-txt b { color: var(--text); font-size: 15px; overflow: hidden; text-overflow: ellipsis; }
 .vc-eminfo-txt small { color: var(--muted); font-size: 12px; }
