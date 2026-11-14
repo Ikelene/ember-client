@@ -846,20 +846,20 @@ export function mentionsMe(msg) {
   return new RegExp(`(^|\\W)@${me.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\W|$)`, 'i').test(msg.body || '');
 }
 // the Hyperfocus sounds (public/assets/sounds/chat)
-const SOUNDS = { message: '/assets/sounds/chat/message.mp3', mention: '/assets/sounds/chat/mention.m4a', join: '/assets/sounds/chat/joinVC.mp3', leave: '/assets/sounds/chat/leaveVC.mp3', call: '/assets/sounds/chat/call.mp3', ringtone: '/assets/sounds/chat/ringtone-deltarune.mp3?v=20261012', ringtone_epic: '/assets/sounds/chat/ringtone-epic.mp3?v=20261011', notify: '/assets/sounds/chat/notify.mp3?v=20261011', notify_short: '/assets/sounds/chat/message-short.mp3?v=20261114', notify_soft: '/assets/sounds/chat/message-new.mp3?v=20261103', voice_start: '/assets/sounds/chat/voice-start.mp3', voice_send: '/assets/sounds/chat/voice-send.mp3', voice_delete: '/assets/sounds/chat/voice-delete.mp3', notify_classic: '/assets/sounds/chat/message.mp3', mute: '/assets/sounds/chat/mute.mp3', unmute: '/assets/sounds/chat/unmute.mp3', deafen: '/assets/sounds/chat/deafen.mp3', undeafen: '/assets/sounds/chat/undeafen.mp3' };
+const SOUNDS = { message: '/assets/sounds/chat/message.mp3', mention: '/assets/sounds/chat/mention.m4a', join: '/assets/sounds/chat/joinVC.mp3', leave: '/assets/sounds/chat/leaveVC.mp3', call: '/assets/sounds/chat/call.mp3', ringtone: '/assets/sounds/chat/ringtone-deltarune.mp3?v=20261012', ringtone_epic: '/assets/sounds/chat/ringtone-epic.mp3?v=20261011', notify: '/assets/sounds/chat/notify.mp3?v=20261011', notify_short: '/assets/sounds/chat/message-short.mp3?v=20261114', notify_soft: '/assets/sounds/chat/message-default.mp3?v=20261113', voice_start: '/assets/sounds/chat/voice-start.mp3', voice_send: '/assets/sounds/chat/voice-send.mp3', voice_delete: '/assets/sounds/chat/voice-delete.mp3', notify_classic: '/assets/sounds/chat/message.mp3', mute: '/assets/sounds/chat/mute.mp3', unmute: '/assets/sounds/chat/unmute.mp3', deafen: '/assets/sounds/chat/deafen.mp3', undeafen: '/assets/sounds/chat/undeafen.mp3' };
 let lastSound = 0;
 export function playSound(name, volume = 0.6) {
-  if (name === 'message') name = { long: 'notify', classic: 'notify_classic', soft: 'notify_soft' }[state.settings.notify_sound] || 'notify_short'; // new-message sound (My Account > Chat > Notification sound)
+  if (name === 'message') name = { classic: 'notify_classic', soft: 'notify_soft' }[state.settings.notify_sound] || 'notify_short'; // new-message sound (My Account > Chat > Notification sound)
   if (!state.settings.sounds || !SOUNDS[name]) return null;
   const now = Date.now();
-  const burst = name === 'notify' || name === 'notify_short' || name === 'notify_soft' || name === 'notify_classic' || name === 'mention';
+  const burst = name === 'notify_short' || name === 'notify_soft' || name === 'notify_classic' || name === 'mention';
   if (burst && now - lastSound < 600) return null; // a burst of messages = one sound
   if (burst) lastSound = now;
   try { const a = new Audio(SOUNDS[name]); a.volume = volume; a.play().catch(() => {}); return a; } catch { return null; }
 }
 // settings preview: always plays, whatever the Sounds switch says
 export function previewNotifySound(kind) {
-  try { const a = new Audio(SOUNDS[{ long: 'notify', classic: 'notify_classic', soft: 'notify_soft' }[kind] || 'notify_short']); a.volume = 0.6; a.play().catch(() => {}); } catch { /* no audio */ }
+  try { const a = new Audio(SOUNDS[{ classic: 'notify_classic', soft: 'notify_soft' }[kind] || 'notify_short']); a.volume = 0.6; a.play().catch(() => {}); } catch { /* no audio */ }
 }
 // incoming-call ringtone: loops while a call rings; 1 in 100 calls rings the rare EPIC variant (rolled once per call)
 const ringPick = new Map(); // callId -> 'ringtone' | 'ringtone_epic'
