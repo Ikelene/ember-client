@@ -26,7 +26,8 @@ import { startSignIn } from './session.js';
 import { Avatar, subtitle, RoleChip, STATUS_LABEL, BlockedMark } from './Profile.jsx';
 import { MePopout } from './ProfilePopout.jsx';
 import { PinCategoryHost, pinMenuItems, catMenuItems, pinItem, unpinItem, moveCategory } from './DmPins.jsx';
-import { cleanPins, pinnedSet, dmKey, groupKey } from './dmPinsCore.js';
+import { cleanPins, pinnedSet, dmKey, groupKey, viewKeyOf } from './dmPinsCore.js';
+import { PinItemRow } from './PinItems.jsx';
 // which pinned DM categories are folded (this device only)
 const FOLD_KEY = 'ember:dmpins:folded';
 const readFolded = () => { try { const v = JSON.parse(localStorage.getItem(FOLD_KEY) || '[]'); return new Set(Array.isArray(v) ? v : []); } catch { return new Set(); } };
@@ -577,6 +578,11 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
       </button>
     );
   };
+  // a pinned server channel (PinItems.jsx draws it; its menu has Open, the pin items and Add to Home)
+  const chanRow = (k, catId, index, isLast) => {
+    const { dropCls, dragCls, ...dp } = dragProps(k, catId, index, isLast);
+    return <PinItemRow key={k} k={k} className={`${dropCls}${dragCls}`} {...dp} />;
+  };
   const groupRow = (g, catId, index = 0, isLast = false) => {
     const k = groupKey(g.room);
     const on = keyOf(view) === k;
@@ -612,8 +618,8 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
         )}
         {cats.map((cat, ci) => {
           const shut = folded.has(cat.id);
-          const rows = cat.items.map((k, i) => [k, i, byKey.get(k)]).filter(([, , x]) => x);
-          const n = rows.reduce((a, [k, , x]) => a + (x.dm ? Number(x.dm.unread) || (unread[k] ? 1 : 0) : unread[k] ? 1 : 0), 0);
+          const rows = cat.items.map((k, i) => [k, i, byKey.get(k) || (k.startsWith('c:') ? { chan: true } : null)]).filter(([, , x]) => x);
+          const n = rows.reduce((a, [k, , x]) => a + (x.dm ? Number(x.dm.unread) || (unread[k] ? 1 : 0) : unread[viewKeyOf(k)] ? 1 : 0), 0);
           const last = rows.length ? rows[rows.length - 1][1] : -1;
           return (
             <div key={cat.id} className={`vc-pin-cat${drag?.kind === 'cat' && drag.id === cat.id ? ' dragging' : ''}${over?.catAt === ci ? ' drop-before' : ''}${over?.catAt === ci + 1 && ci === cats.length - 1 ? ' drop-after' : ''}`} style={{ '--pin': cat.color }}>
@@ -633,7 +639,7 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
                 <span className="vc-pin-name">{cat.name}</span>
                 {shut && n > 0 && <span className="vc-count">{n > 99 ? '99+' : n}</span>}
               </button>
-              {!shut && rows.map(([k, i, x]) => (x.dm ? dmRow(x.dm, cat.id, i, i === last) : groupRow(x.group, cat.id, i, i === last)))}
+              {!shut && rows.map(([k, i, x]) => (x.dm ? dmRow(x.dm, cat.id, i, i === last) : x.group ? groupRow(x.group, cat.id, i, i === last) : chanRow(k, cat.id, i, i === last)))}
               {!shut && !rows.length && (
                 <div className={`vc-pin-empty${over?.cat === cat.id ? ' drop-in' : ''}`} onDragOver={e => { if (drag?.kind !== 'item') return; e.preventDefault(); overTo({ cat: cat.id, index: -1 }); }} onDrop={e => { e.preventDefault(); drop(); }}>
                   Drag conversations here

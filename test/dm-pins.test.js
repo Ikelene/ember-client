@@ -43,3 +43,22 @@ test('categories: add (with a DM), rename, recolour, move, delete', () => {
   c = removeCat(c, 'a');
   assert.deepEqual(c.map(x => x.id), ['b', 'n']);
 });
+
+import { chanKey, parseItem, viewKeyOf, cleanShortcuts, toggleShortcut, moveShortcut } from '../src/chat/dmPinsCore.js';
+test('channel keys', () => {
+  const k = chanKey('https://e-x.nookara.cc|s1', 'https://e-x.nookara.cc|c2');
+  assert.deepEqual(parseItem(k), { kind: 'channel', sid: 'https://e-x.nookara.cc|s1', cid: 'https://e-x.nookara.cc|c2' });
+  assert.equal(viewKeyOf(k), 'c:https://e-x.nookara.cc|c2');
+  assert.equal(viewKeyOf('d:nat'), 'd:nat');
+  assert.equal(parseItem('c:only'), null);
+  assert.deepEqual(cleanPins([{ id: 'a', name: 'x', color: '#000000', items: [k, 'd:nat'] }])[0].items, [k, 'd:nat']);
+});
+test('home shortcuts', () => {
+  assert.deepEqual(cleanShortcuts(['d:nat', 'd:nat', 'bad', 'g:bfc_1']), ['d:nat', 'g:bfc_1']);
+  let l = toggleShortcut([], 'd:nat');
+  l = toggleShortcut(l, 'c:s1 c2');
+  assert.deepEqual(l, ['d:nat', 'c:s1 c2']);
+  assert.deepEqual(moveShortcut(l, 'c:s1 c2', -1), ['c:s1 c2', 'd:nat']);
+  assert.deepEqual(moveShortcut(l, 'd:nat', -1), l);
+  assert.deepEqual(toggleShortcut(l, 'd:nat'), ['c:s1 c2']);
+});

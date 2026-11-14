@@ -385,3 +385,6 @@ html.vc-rounded .vc-em-sec { border-radius: calc(8px * var(--rk, 1)); }
 @media (max-width: 1100px) {
   html.vc-rounded .vc-mainrow > .vc-panel { border-radius: var(--m-card) 0 0 var(--m-card); overflow: hidden; }
 }
+
+/* jumbo emojis (a message that is only emojis) follow the message text size too (look.js --m-jumbo) */
+html.vc-rounded .vc-text.jumbo :is(.vc-cemoji, .vc-temoji) { width: var(--m-jumbo, 48px); height: var(--m-jumbo, 48px); }

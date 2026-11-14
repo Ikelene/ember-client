@@ -7,6 +7,8 @@
 // Developer mode (Chat settings) adds "Copy ... ID" items at the bottom (dev: true).
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { pinMenuItems } from './DmPins.jsx';
+import { chanKey } from './dmPinsCore.js';
 import { ChevronRight, Check, Hash, Copy, Link2, BellOff, Bell, CheckCheck, UserPlus, Settings, LogOut, Pencil, Trash2, Reply, User, MessageCircle, ExternalLink, Image as ImageIcon, Code2, Forward, Pin, Download, SmilePlus, BookmarkPlus, Bookmark, BookmarkCheck, Languages, Ellipsis, RefreshCw, LogIn, ShieldCheck, BellRing, Flag, Ban, Info, Users } from 'lucide-react';
 import { openReactionsView } from './ReactionsView.jsx';
 import { apiFetch } from '../api.js';
@@ -218,6 +220,7 @@ export function channelMenu(e, c, sid, { admin, onEdit, onDelete } = {}) {
     ...notifyItems(c.cid, true),
     'sep',
     { label: 'Copy link', icon: Link2, onClick: () => copy(linkFor({ kind: 'channel', sid, cid: c.cid }), 'Link copied') },
+    ...pinMenuItems(chanKey(sid, c.cid)), // (into a DM list category, or onto Home)
     admin && { label: 'Edit channel', icon: Pencil, onClick: onEdit },
     admin && { label: 'Delete channel', icon: Trash2, danger: true, onClick: onDelete },
     'sep',

@@ -77,7 +77,7 @@ function loadCustomFont() {
   loadedFont.load().then(f => document.fonts.add(f)).catch(() => { loadedFont = null; });
 }
 
-const VARS = ['--m-app', '--m-side', '--m-main', '--m-raised', '--m-hover', '--m-on', '--m-text-color', '--rk', '--m-text', '--m-emoji', '--m-gap-msg', '--m-font', '--m-mention', '--m-bgimg'];
+const VARS = ['--m-app', '--m-side', '--m-main', '--m-raised', '--m-hover', '--m-on', '--m-text-color', '--rk', '--m-text', '--m-emoji', '--m-jumbo', '--m-gap-msg', '--m-font', '--m-mention', '--m-bgimg'];
 const hexOk = v => /^#[0-9a-f]{6}$/i.test(v || '');
 const mix = (a, b, p) => `color-mix(in srgb, ${a} ${100 - p}%, ${b} ${p}%)`;
 export function applyLook() {
@@ -106,7 +106,10 @@ export function applyLook() {
   set('--m-text-color', hexOk(L.text) ? L.text : t.text);
   set('--rk', String(RADIUS[L.radius] ?? 1));
   set('--m-text', `${Math.min(22, Math.max(12, Number(L.textSize) || 15.5))}px`);
-  set('--m-emoji', `${EMOJI[L.emoji] || 22}px`);
+  // emojis grow and shrink with the message text size too (Ikelene 2026-11-14), on top of their own small / default / large
+  const textK = Math.min(22, Math.max(12, Number(L.textSize) || 15.5)) / 15.5;
+  set('--m-emoji', `${Math.round((EMOJI[L.emoji] || 22) * textK)}px`);
+  set('--m-jumbo', `${Math.round(48 * textK)}px`);
   set('--m-gap-msg', `${DENSITY[L.density] ?? 14}px`);
   if (L.font === 'custom') loadCustomFont();
   set('--m-font', (FONTS[L.font] || FONTS.roboto).stack);

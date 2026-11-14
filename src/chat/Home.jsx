@@ -10,6 +10,7 @@ import { Avatar, subtitle } from './Profile.jsx';
 import { VeloraConnNote } from './Parts.jsx';
 import Dashboard from './Dashboard.jsx';
 import { SavedList } from './SidePanel.jsx';
+import { HomeShortcuts, PinnedHome } from './PinItems.jsx';
 import './dashboard.css';
 import './home.css';
 
@@ -128,6 +129,7 @@ export default function Home({ onUser }) {
                 <p>{onlineAll} {onlineAll === 1 ? 'friend' : 'friends'} online{unreadN ? ` · ${unreadN} unread ${unreadN === 1 ? 'message' : 'messages'}` : ''}</p>
               </div>
             </header>
+            <HomeShortcuts />
             <section className="hm-tip vl-rise" style={{ '--i': 1 }}>
               <span className="hm-tip-ico"><tip.icon size={20} /></span>
               <div><b>{tip.title}</b><span>{tip.text}</span></div>
@@ -150,6 +152,7 @@ export default function Home({ onUser }) {
 
             {tab === 'friends' && (
               <div className="hm-body" key="friends">
+                <PinnedHome />
                 {recent.length > 0 && (
                   <>
                     <div className="hm-sub">Recent chats</div>

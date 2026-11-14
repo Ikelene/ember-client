@@ -831,7 +831,7 @@ label.btn.disabled { opacity: .5; pointer-events: none; }
 .vc-cemoji { width: 22px; height: 22px; object-fit: contain; vertical-align: -5px; margin: 0 1px; }
 .vc-text.jumbo { font-size: 40px; line-height: 1.2; }
 .vc-text.jumbo .vc-cemoji { width: 48px; height: 48px; vertical-align: -8px; }
-.vc-emoji-picker { width: min(400px, calc(100vw - 20px)); }
+.vc-emoji-picker { width: min(456px, calc(100vw - 20px)); }
 .vc-em-body { flex: 1; min-height: 0; display: flex; }
 .vc-em-nav { flex: none; width: 40px; display: flex; flex-direction: column; gap: 2px; padding: 0 4px 8px; overflow-y: auto; scrollbar-width: none; border-right: 1px solid var(--border); }
 .vc-em-nav button { width: 32px; height: 32px; display: grid; place-items: center; padding: 0; background: none; border: 0; color: var(--muted); cursor: pointer; overflow: hidden; font-size: 10px; font-weight: 700; }
@@ -841,10 +841,12 @@ label.btn.disabled { opacity: .5; pointer-events: none; }
 .vc-sb-sec { display: flex; align-items: center; gap: 6px; }
 .vc-sb-ico { width: 16px; height: 16px; border-radius: 50%; flex: none; object-fit: cover; display: inline-flex; align-items: center; justify-content: center; background: var(--accent-dim); color: var(--text); font-size: 9px; letter-spacing: 0; }
 .vc-em-sec { position: sticky; top: 0; z-index: 1; padding: 6px 2px 4px; background: #18181b; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.vc-em-grid { display: grid; grid-template-columns: repeat(auto-fill, 36px); gap: 2px; }
-.vc-em { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; background: none; border: 0; font-size: 24px; line-height: 1; cursor: pointer; transition: background .1s, transform .12s; }
+.vc-em-grid { display: grid; grid-template-columns: repeat(auto-fill, 44px); gap: 2px; }
+.vc-em { width: 44px; height: 44px; display: grid; place-items: center; padding: 0; background: none; border: 0; font-size: 30px; line-height: 1; cursor: pointer; transition: background .1s, transform .12s; }
 .vc-em:hover { background: rgba(255, 255, 255, .08); transform: scale(1.12); }
-.vc-em img { width: 28px; height: 28px; object-fit: contain; }
+.vc-em img { width: 34px; height: 34px; object-fit: contain; }
+.vc-emoji-picker .vc-em-tw { width: 34px; height: 34px; } /* (bigger in the picker: Ikelene 2026-11-14 "a bit hard to see") */
+.vc-emoji-picker .vc-em-tw.txt { font-size: 30px; width: auto; height: auto; }
 .vc-em-foot { flex: none; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 10px; border-top: 1px solid var(--border); font-size: 13px; overflow: hidden; }
 .vc-em-foot img { width: 28px; height: 28px; object-fit: contain; }
 .vc-em-foot small { color: var(--muted); font-size: 11.5px; }
@@ -2634,3 +2636,20 @@ html.vc-rounded .vc-drawer-badge { border-radius: 999px; }
 
 /* the recommended size under an upload button (imgHints.js) */
 .vc-img-hint { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+
+/* pinned server channels + Home shortcuts (PinItems.jsx) */
+.vc-pin-srv { position: relative; flex: none; display: grid; place-items: center; background: var(--accent-dim); color: var(--text); font-size: 12px; font-weight: 700; }
+.vc-pin-srv > img, .vc-pin-srv > span { width: 100%; height: 100%; object-fit: cover; display: grid; place-items: center; }
+.vc-pin-chico { position: absolute; right: -4px; bottom: -4px; display: grid; place-items: center; width: 16px; height: 16px; background: var(--bg, #0e0e10); color: var(--dim); font-style: normal; }
+.vc-pin-hash { flex: none; margin-right: 2px; vertical-align: -2px; color: var(--muted); }
+.vc-pin-dot-unread { flex: none; width: 8px; height: 8px; margin-left: auto; background: var(--text); }
+.vc-dm.gone, .hm-tile.gone { opacity: .5; }
+.hm-shortcuts { display: flex; flex-direction: column; gap: 8px; }
+.hm-sc small { max-width: 100%; margin-top: -6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11.5px; }
+.hm-sc > i:empty { min-width: 10px; width: 10px; height: 10px; padding: 0; }
+/* Home's pinned categories: phones only (on a computer they're right there in the DM list) */
+.hm-pins { display: none; }
+@media (max-width: 760px) {
+  .hm-pins { display: flex; flex-direction: column; gap: 2px; padding: 4px 0 8px; }
+  .hm-pins .vc-pin-cat:first-child { margin-top: 0; }
+}
