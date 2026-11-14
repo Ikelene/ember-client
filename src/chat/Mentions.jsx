@@ -4,6 +4,7 @@ import { useChat, getState, botPresenceOf } from './store.js';
 import { Avatar } from './Profile.jsx';
 import { P, has, nameColor, ChannelIcon } from './roles.jsx';
 import { loadEmojiData, emojiDataSync, emojiToken } from './EmojiPicker.jsx';
+import { loadPersonalEmojis } from './personal.js';
 import { shortName, allNames, Twemoji } from './emoji.jsx';
 import { personName, displayNameOf, useDisplayNamesVersion, wantDisplayNames, serverOwnName } from './displayNames.js';
 
@@ -32,13 +33,17 @@ export function useSuggestItems(view, sq) {
 }
 function useEmojiItems(q) {
   const custom = useChat(s => s.emojis);
+  const personal = useChat(s => s.personalEmojis?.list); // your personal emojis (usable anywhere), listed first
   const [data, setData] = useState(emojiDataSync);
   useEffect(() => { if (q != null && !data) loadEmojiData().then(setData); }, [q, data]);
+  useEffect(() => { if (q != null && !getState().personalEmojis) loadPersonalEmojis(); }, [q]);
   return useMemo(() => {
     if (q == null) return [];
     const t = q.toLowerCase();
     const rank = n => (n.startsWith(t) ? 0 : 1);
-    const cus = (custom || []).flatMap(s => s.emojis.map(e => ({ ...e, server: s.name }))).filter(e => e.name.toLowerCase().includes(t))
+    const seen = new Set();
+    const cus = [...(personal || []).map(e => ({ ...e, server: 'Personal emoji' })), ...(custom || []).flatMap(s => s.emojis.map(e => ({ ...e, server: s.name })))]
+      .filter(e => e.name.toLowerCase().includes(t) && !seen.has(e.eid) && seen.add(e.eid))
       .sort((a, b) => rank(a.name.toLowerCase()) - rank(b.name.toLowerCase())).slice(0, 6)
       .map(e => ({ kind: 'emoji', key: e.eid, label: `:${e.name}:`, token: emojiToken(e), img: e.url, hint: e.server }));
     const words = t.replace(/_/g, ' ');
@@ -48,7 +53,7 @@ function useEmojiItems(q) {
       .sort((a, b) => a[1] - b[1] || shortName(a[0]).length - shortName(b[0]).length).slice(0, 10 - cus.length)
       .map(([e]) => ({ kind: 'emoji', key: e[0], label: `:${shortName(e)}:`, token: e[0], char: e[0] }));
     return [...cus, ...uni];
-  }, [q, custom, data]);
+  }, [q, custom, personal, data]);
 }
 function useChannelItems(view, q) {
   const list = useChat(s => (view.kind === 'channel' ? s.detail[view.sid]?.channels : null));
