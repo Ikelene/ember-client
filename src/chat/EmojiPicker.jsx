@@ -9,7 +9,7 @@ import { isInst } from './ids.js';
 import { Twemoji, shortName, allNames } from './emoji.jsx';
 import { usePlan, PlanGate, PlanNotice, PlanUsage } from './PlanGate.jsx';
 import { emojiMenuItems } from './cloneEmoji.js';
-import { loadPersonalEmojis, loadStickers } from './personal.js';
+import { loadPersonalEmojis, loadStickers, loadPersonalStickers } from './personal.js';
 import { openMenu } from './Menu.jsx';
 
 const GROUPS = [
@@ -45,8 +45,9 @@ function LazyGrid({ items, render, root }) {
   return <div ref={ref} className="vc-em-grid" style={on ? undefined : { height: rows * 38 }}>{on && items.map(render)}</div>;
 }
 
-// stickerSid + onSticker: on an Ember server's channel, a Stickers tab with that server's stickers (onSticker(tid))
-export default function EmojiPicker({ onPick, onClose, reactionSid, stickerSid, onSticker }) {
+// stickerSid + onSticker: on an Ember server's channel, that server's stickers (onSticker(tid)) in the Stickers tab
+// onPersonalSticker: your personal stickers (anywhere you can send) in the Stickers tab (onPersonalSticker(sticker))
+export default function EmojiPicker({ onPick, onClose, reactionSid, stickerSid, onSticker, onPersonalSticker }) {
   const [data, setData] = useState(dataSync);
   const [q, setQ] = useState('');
   const [tab, setTab] = useState('emoji');
@@ -56,6 +57,9 @@ export default function EmojiPicker({ onPick, onClose, reactionSid, stickerSid, 
   const stickers = useChat(s => (stickerSid ? s.stickers?.[stickerSid]?.list : null));
   useEffect(() => { if (!getState().personalEmojis) loadPersonalEmojis(); }, []);
   useEffect(() => { if (stickerSid) loadStickers(stickerSid); }, [stickerSid]);
+  const mine = useChat(s => (onPersonalSticker ? s.personalStickers?.list : null));
+  useEffect(() => { if (onPersonalSticker && !getState().personalStickers) loadPersonalStickers(); }, [onPersonalSticker]);
+  const stickerTab = !!(stickerSid || onPersonalSticker);
   const [hover, setHover] = useState(null);
   const allCustom = useChat(s => s.emojis);
   const custom = useMemo(() => reactionSid === undefined ? allCustom : (allCustom || []).filter(s => s.sid === reactionSid), [allCustom, reactionSid]);
@@ -87,21 +91,34 @@ export default function EmojiPicker({ onPick, onClose, reactionSid, stickerSid, 
     : <button type="button" key={e[0]} className="vc-em" onClick={() => pickUni(e)} onMouseEnter={() => setHover({ name: `:${shortName(e)}:`, char: e[0] })}><Twemoji char={e[0]} className="vc-em-tw" lazy /></button>);
   return (
     <div className="vc-picker vc-emoji-picker" ref={box}>
-      {stickerSid && (
+      {stickerTab && (
         <div className="vc-em-tabs" role="tablist">
           <button type="button" role="tab" aria-selected={tab === 'emoji'} className={tab === 'emoji' ? 'on' : ''} onClick={() => setTab('emoji')}><Smile size={15} /> Emoji</button>
           <button type="button" role="tab" aria-selected={tab === 'stickers'} className={tab === 'stickers' ? 'on' : ''} onClick={() => setTab('stickers')}><Sticker size={15} /> Stickers</button>
         </div>
       )}
-      {tab === 'stickers' && stickerSid ? (
+      {tab === 'stickers' && stickerTab ? (
         <div className="vc-stk-body">
-          {!stickers && <div className="vc-loading"><i /><i /><i /></div>}
-          {stickers && !stickers.length && <div className="vc-empty-note">This server has no stickers yet. People with Manage server can add them in Server settings &gt; Stickers.</div>}
-          {stickers && stickers.length > 0 && (
-            <div className="vc-stk-grid">
-              {stickers.map(s => <button type="button" key={s.tid} className="vc-stk" title={s.name} onClick={() => { onSticker?.(s.tid); onClose(); }}><img src={s.url} alt={s.name} loading="lazy" /><span>{s.name}</span></button>)}
-            </div>
-          )}
+          {onPersonalSticker && <>
+            <div className="vc-em-sec">Your stickers</div>
+            {!mine && <div className="vc-loading"><i /><i /><i /></div>}
+            {mine && !mine.length && <div className="vc-empty-note">No personal stickers yet. Add some in Settings &gt; Personal stickers, or right-click a sticker someone sent and pick Save to my stickers.</div>}
+            {mine && mine.length > 0 && (
+              <div className="vc-stk-grid">
+                {mine.map(s => <button type="button" key={s.sid} className="vc-stk" title={s.name} onClick={() => { onPersonalSticker(s); onClose(); }}><img src={s.url} alt={s.name} loading="lazy" /><span>{s.name}</span></button>)}
+              </div>
+            )}
+          </>}
+          {stickerSid && <>
+            {onPersonalSticker && <div className="vc-em-sec">This server</div>}
+            {!stickers && <div className="vc-loading"><i /><i /><i /></div>}
+            {stickers && !stickers.length && <div className="vc-empty-note">This server has no stickers yet. People with Manage server can add them in Server settings &gt; Stickers.</div>}
+            {stickers && stickers.length > 0 && (
+              <div className="vc-stk-grid">
+                {stickers.map(s => <button type="button" key={s.tid} className="vc-stk" title={s.name} onClick={() => { onSticker?.(s.tid); onClose(); }}><img src={s.url} alt={s.name} loading="lazy" /><span>{s.name}</span></button>)}
+              </div>
+            )}
+          </>}
         </div>
       ) : <>
       <label className="vc-search vc-picker-search"><Search size={15} /><input autoFocus placeholder="Find an emoji" value={q} onChange={e => setQ(e.target.value)} /></label>

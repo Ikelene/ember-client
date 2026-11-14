@@ -87,6 +87,7 @@ let state = {
   veloraFaces: {},         // Velora id -> their live public face on Velora { id, username, pfp, color, rank } (v: people on instances)
   emojiUrls: {},
   personalEmojis: null,    // { list, max, pro_max }: my personal emojis (personal.js)
+  personalStickers: null,  // { list, max, pro_max }: my personal stickers (personal.js)
   stickers: {},            // sid -> { list, max }: an Ember server's stickers (personal.js)           // eid -> picture of an instance's custom emoji
   notifUnread: 0,          // Velora notifications not read yet (the bell's badge)
   homeRequests: 0,         // friend requests + message requests waiting for me (the Home button's count)

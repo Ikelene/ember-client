@@ -15,6 +15,7 @@ const STILL = 'PNG, JPG or WebP';
 const NOOKARA = {
   emoji: [128, 128, 2, ANY, 'GIFs and animated WebP stay animated'],
   personalEmoji: [128, 128, 2, ANY, 'GIFs and animated WebP stay animated'],
+  personalSticker: [320, 320, 4, ANY, 'shown at about 160 px; GIFs and animated WebP stay animated (1 MB after shrinking)'],
   serverIcon: [512, 512, 12, STILL, 'saved as a still picture'],
   serverBanner: [960, 320, 12, STILL, 'cropped to 3:1, saved as a still picture'],
   roleIcon: [64, 64, 12, STILL, 'shown small, saved as a still picture'],

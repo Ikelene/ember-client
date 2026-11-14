@@ -57,7 +57,9 @@ function GifIcon() {
 }
 import { packActive } from './messageSounds.js';
 import { playSound, loadEmojis, loadMembers, loadCommands, clearStatusReply, useTimedOut, untilText, dismissEphemeral, useBotPeer } from './store.js';
-import { sendSticker } from './personal.js';
+import { sendSticker, savePersonalSticker, isMyPersonalSticker } from './personal.js';
+import { stickerOfBody } from './stickerLink.js';
+import { Sticker as StickerIco } from 'lucide-react';
 import { takeJump, fileKind, uploadMedia, saveToMedia, isMineMsg, loadUploadLimits, getUploadLimits, chooseUploadDest, rememberedUploadDest, tempFileInfo, tempFileInfoNow, onTempInfo, TEMP_LINK } from './store.js';
 import { useStarboardFor, starredByMe, STAR } from './Starboard.jsx';
 import { CALL_LINE, callLineText } from './callText.js';
@@ -269,6 +271,8 @@ function UploadBar({ m, view }) {
 const URL_IN_TEXT = /https?:\/\/[^\s<>"')\]]+[^\s<>"'.,;:!?)\]]/g;
 function ReplyText({ body, ctx }) {
   const nodes = useMemo(() => {
+    const st = stickerOfBody(body); // a personal sticker
+    if (st) return renderBody(`*Sticker: ${st.name}*`, { ...ctx, bio: true, linkImages: false }).nodes;
     let t = inviteSummary(String(body || '')).replace(/<[^<>]*$/, ''); // (the server cuts long quotes: drop a half-cut <:emoji:id> / <@role>)
     t = t.replace(/```([\s\S]*?)```/g, (_, c) => `\`${c.trim().replace(/`/g, "'")}\``);
     t = t.replace(URL_IN_TEXT, u => { const l = isVoiceLink(u) ? 'Voice message' : embedLabel(u); return l ? `*${l}*` : u; });
@@ -506,7 +510,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
       .then(r => setTr(r ? (r.same ? { ...r, text: null } : r) : null))
       .catch(e => { setTr(null); toast(e.message === 'translate_unavailable' ? "Translation isn't available right now." : e.message === 'rate_limited' ? 'Too many translations - try again in a minute.' : "Couldn't translate that."); });
   };
-  const { nodes, images, media, jumbo, links, invites } = useMemo(() => renderBody(m.body, ctx), [m.body, ctx]);
+  const { nodes, images, media, jumbo, links, invites, sticker: pSticker } = useMemo(() => renderBody(m.body, ctx), [m.body, ctx]);
   const mentionsMe = isMention(m);
   const nameKey = useNameStyle(view.sid, aliasMember || author); // (an unmarked alias that matched a member: their colour + role icon)
   const distrust = useDistrust(m);
@@ -619,7 +623,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
         <Embeds list={m.embeds} ctx={ctx} />
         {!m.embeds?.length && !m.pending && (linkPreviews ? <LinkEmbeds urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group'} /> : <PreviewOnAsk urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group'} />)}
         <E2eeMessageNote m={m} view={view} />
-        {m.sticker && <StickerView s={m.sticker} />}
+        {(m.sticker || pSticker) && <StickerView s={m.sticker || pSticker} />}
         <OpenedAttachments list={[...(m.attachments || []), ...media]} extra={images} m={m} Attachments={Attachments} />
         {m.uploading && <UploadBar m={m} view={view} />}
         <Reactions m={m} me={ctx.me} canReact={canReact} />
@@ -919,10 +923,16 @@ export function Composer(props) {
   if (dm && !bot && status !== 'ready') return <E2eeLockedPanel />;
   return <><E2eeComposerNotes view={view} /><ComposerBox {...props} /></>;
 }
-// a sticker in a message (Ember servers): bigger than an emoji, never stretched; a deleted one says so
+// a sticker in a message (an Ember server's, or a personal one = a message that is just its link): bigger than an emoji,
+// never stretched; a deleted one says so. Right-click: Save to my stickers (your personal stickers).
 function StickerView({ s }) {
-  if (s.deleted || !s.url) return <div className="vc-sticker gone">Sticker deleted</div>;
-  return <img className="vc-sticker" src={s.url} alt={s.name || 'sticker'} title={s.name ? `:${s.name}:` : undefined} draggable={false} loading="lazy" />;
+  const [broken, setBroken] = useState(false);
+  if (s.deleted || !s.url || broken) return <div className="vc-sticker gone">Sticker deleted</div>;
+  const menu = e => {
+    if (!getState().signedIn || (s.psid && isMyPersonalSticker(s.psid))) return;
+    openMenu(e, [{ label: 'Save to my stickers', icon: StickerIco, onClick: () => savePersonalSticker(s) }]);
+  };
+  return <img className="vc-sticker" src={s.url} alt={s.name || 'sticker'} title={s.name || undefined} draggable={false} loading="lazy" onError={() => setBroken(true)} onContextMenu={menu} />;
 }
 
 function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo, setReplyTo }) {
@@ -1422,7 +1432,8 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
         {!voice.active && <button type="button" className={`vc-ico-btn vc-gif-btn${picker ? ' on' : ''}`} title="Media (GIFs, Saved Media, Game Clips)" onClick={() => { setPicker(p => (p ? false : 'saved')); setEmoji(false); }}><GifIcon /></button>}
         {!voice.active && <button type="button" className={`vc-ico-btn vc-emoji-btn${emoji ? ' on' : ''}`} title="Emoji" onClick={() => { setEmoji(x => !x); setPicker(false); }}><Smile size={19} /></button>}
         {emoji && !voice.active && <EmojiPicker onClose={() => setEmoji(false)} onPick={t => { insertText(t); setEmoji(false); }}
-          stickerSid={view.kind === 'channel' && isInst(view.sid) ? view.sid : undefined} onSticker={tid => { sendSticker(view.cid, tid, replyTo); setReplyTo?.(null); }} />}
+          stickerSid={view.kind === 'channel' && isInst(view.sid) ? view.sid : undefined} onSticker={tid => { sendSticker(view.cid, tid, replyTo); setReplyTo?.(null); }}
+          onPersonalSticker={s => { sendMessage(view, s.send, { replyTo }); setReplyTo?.(null); }} />}
         <button type="button" className={`vc-ico-btn send${canVoice || voice.active ? ' voice' : ''}${cmd && cmdMissing ? ' blocked' : ''}`} title={voice.active ? 'Send voice message' : canVoice ? 'Record a voice message' : cmd && cmdMissing ? `Fill in ${cmdMissing} first` : 'Send'} aria-label={voice.active ? 'Send voice message' : canVoice ? 'Record a voice message' : 'Send'} disabled={!voice.active && !canVoice && !cmd && !text.trim() && !atts.length}
           onPointerDown={e => { e.preventDefault(); voicePress(e); }} onPointerMove={voiceMove} onPointerUp={voiceRelease} onPointerCancel={voiceCancel} onContextMenu={e => { if (canVoice || voice.active) e.preventDefault(); }} onMouseDown={e => e.preventDefault()}
           onClick={() => {

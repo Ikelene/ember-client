@@ -1,6 +1,7 @@
 // Message text: a little markdown (**bold**, *italic*, __underline__, ~~strike~~, `code`,
 // ```blocks```, ||spoilers||), links, @mentions, #channels, and picture links shown as pictures.
 import { useMemo, useState } from 'react';
+import { stickerOfBody } from './stickerLink.js';
 import { onEmberHost } from './hosts.js';
 import { ask, customEmoji, loadEmojis, useChat } from './store.js';
 import { NameText } from './displayNames.js';
@@ -153,6 +154,9 @@ function format(text, ctx, k) {
 
 // the whole body: ``` blocks, quotes (> ...), then lines; returns { nodes, images }
 export function renderBody(body, ctx) {
+  // a personal sticker (stickerLink.js): the message is just its picture link
+  const sticker = ctx?.bio ? null : stickerOfBody(body);
+  if (sticker) return { nodes: [], images: [], media: [], invites: [], links: [], jumbo: false, sticker };
   const nodes = [];
   const images = [];
   const media = [];

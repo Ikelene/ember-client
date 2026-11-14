@@ -3,6 +3,7 @@
 // plus three small reads: friend requests, message requests and the unread notifications (the bell's own endpoint).
 // Works in both looks; dashboard.css draws it square by default and soft under html.vc-rounded.
 import { useEffect, useMemo, useState } from 'react';
+import { stickerOfBody } from './stickerLink.js';
 import { AtSign, Bell, Check, CheckCheck, ChevronRight, Headphones, Inbox, MessageCircle, MessageSquareText, Server, ShieldCheck, Sparkles, UserPlus, Users, UsersRound, Volume2, X } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { useChat, go, isMuted, readNotifs, followNotifLink, loadFriends, toast, errorText } from './store.js';
@@ -16,6 +17,8 @@ const lc = s => String(s || '').toLowerCase();
 export function snippet(body) {
   let t = String(body || '');
   if (!t.trim()) return '';
+  const st = stickerOfBody(t); // a personal sticker (stickerLink.js)
+  if (st) return `Sticker: ${st.name}`;
   t = t.replace(/<a?:(\w+):\w+>/g, ':$1:').replace(/<@&\w+>/g, '@role').replace(/<#\w+>/g, '#channel').replace(/<t:(\d+)(:\w)?>/g, (m, s) => new Date(Number(s) * 1000).toLocaleString());
   t = t.replace(/https?:\/\/(files\.|litter\.)?catbox\.moe\/\S+/g, '[file]').replace(/https?:\/\/\S+/g, u => { try { return new URL(u).host; } catch { return u; } });
   t = t.replace(/^(#{1,3}|-#|>>>|>)\s+/gm, '').replace(/(\*\*|__|~~|\|\||`)/g, '').replace(/\s+/g, ' ').trim();

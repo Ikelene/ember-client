@@ -1,4 +1,4 @@
-// Personal emojis (on your Nookara account, usable anywhere) and server stickers (Ember servers only).
+// Personal emojis + personal stickers (on your Nookara account, usable anywhere) and server stickers (Ember servers only).
 // Personal emojis: Nookara /chat/personal-emojis (25 free / 100 Pro). Same <:name:eid> token and /uploads/emojis/<eid> picture
 // as server emojis, so every client can already show them; only the owner gets them in their picker.
 // Stickers: an Ember server's /api/v1/servers/:sid/stickers; a message carries one as `sticker: { tid, name, url, animated }`.
@@ -105,3 +105,48 @@ export async function sendSticker(cid, tid, replyTo) {
     }
   } catch (e) { toast(e.message === 'unknown_sticker' ? 'That sticker is gone.' : errorText(e.message)); }
 }
+
+// ── personal stickers: Nookara /chat/personal-stickers (10 free / 50 Pro) ──
+// Sent anywhere as a message whose whole text is the sticker's picture link (stickerLink.js), so nothing on the
+// other end needs to know about them; Ember draws that message as a sticker.
+const STK_ERR = { too_many_stickers: 'You have as many personal stickers as you can (10, or 50 with Pro).', invalid_sticker: "That picture couldn't be read. Try a PNG, JPG, GIF or WebP." };
+const stkMsg = e => STK_ERR[e?.message] || msg(e);
+export async function loadPersonalStickers() {
+  if (!getState().signedIn) return null;
+  const d = await apiFetch('/chat/personal-stickers').catch(() => null);
+  if (d) patchState({ personalStickers: { list: d.stickers || [], max: d.max, pro_max: d.pro_max } });
+  return d;
+}
+export async function addPersonalSticker(fileOrBlob, name, { quiet = false } = {}) {
+  const fd = new FormData();
+  const nm = nameOf(name || fileOrBlob.name?.replace(/\.[^.]+$/, '')).replace(/^emoji$/, 'sticker');
+  fd.append('name', nm);
+  fd.append('file', fileOrBlob, fileOrBlob.name || `${nm}.png`);
+  try {
+    const d = await uploadFetch('/chat/personal-stickers', fd);
+    await loadPersonalStickers();
+    if (!quiet) toast(`Added ${d.sticker?.name || nm} to your stickers.`, true);
+    return d.sticker;
+  } catch (e) { toast(stkMsg(e)); return null; }
+}
+// "Save to my stickers" on a sticker someone sent (a personal one or an Ember server's): its picture, as-is
+export async function savePersonalSticker(s) {
+  try {
+    const res = await fetch(new URL(s.url, location.href).href, { credentials: 'omit' });
+    if (!res.ok) throw new Error('gone');
+    const blob = await res.blob();
+    const gif = s.animated || /\.gif(\?|#|$)/i.test(s.url) || blob.type === 'image/gif';
+    return addPersonalSticker(new File([blob], `${nameOf(s.name)}.${gif ? 'gif' : 'png'}`, { type: blob.type || 'image/png' }), s.name);
+  } catch { toast("Couldn't get that sticker's picture."); return null; }
+}
+export async function renamePersonalSticker(psid, name) {
+  try { await apiFetch(`/chat/personal-stickers/${encodeURIComponent(psid)}`, { method: 'PATCH', body: JSON.stringify({ name: nameOf(name) }) }); }
+  catch (e) { toast(stkMsg(e)); }
+  return loadPersonalStickers();
+}
+export async function deletePersonalSticker(psid) {
+  try { await apiFetch(`/chat/personal-stickers/${encodeURIComponent(psid)}`, { method: 'DELETE' }); }
+  catch (e) { toast(stkMsg(e)); }
+  return loadPersonalStickers();
+}
+export const isMyPersonalSticker = psid => !!getState().personalStickers?.list?.some(s => s.sid === psid);
