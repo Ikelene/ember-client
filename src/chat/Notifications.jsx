@@ -5,7 +5,7 @@ import { siteHref } from './hosts.js';
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Bell, Settings, Megaphone, ShieldAlert, Coins, UserPlus, ShoppingBag, Gem, Award, Server, LifeBuoy, UserCheck, MessageCircle, Gift, Info, Star, Heart, CheckCheck } from 'lucide-react';
-import { useChat, getState, loadNotifs, closeNotifs, readNotifs, followNotifLink } from './store.js';
+import { useChat, getState, loadNotifs, closeNotifs, readNotifs, seeNotifs, followNotifLink } from './store.js';
 
 // the category icon names Velora sends (lucide names) -> the components; anything else is a bell
 const ICONS = {
@@ -103,10 +103,29 @@ export function NotifList({ onPicked, own = false }) {
     readNotifs([n.id]);
     if (n.link) { onPicked?.(); followNotifLink(n.link); }
   };
+  // reading by looking: one that's at least 60% on screen for half a second is read (seeNotifs); ones further down
+  // stay unread until they're scrolled to. (Mark all read is still there for the lot.)
+  const box = useRef(null);
+  const unseen = list.filter(n => !n.seen).map(n => String(n.id)).join(',');
+  useEffect(() => {
+    if (!unseen || !box.current || typeof IntersectionObserver === 'undefined') return undefined;
+    const timers = new Map();
+    const stop = id => { clearTimeout(timers.get(id)); timers.delete(id); };
+    const io = new IntersectionObserver(es => {
+      for (const e of es) {
+        const id = e.target.dataset.nid;
+        if (e.intersectionRatio >= 0.6 && document.visibilityState === 'visible') {
+          if (!timers.has(id)) timers.set(id, setTimeout(() => { timers.delete(id); seeNotifs([id]); }, 500));
+        } else stop(id);
+      }
+    }, { threshold: [0, 0.6, 1] });
+    box.current.querySelectorAll('.vc-notif[data-nid]:not(.seen)').forEach(el => io.observe(el));
+    return () => { io.disconnect(); timers.forEach(t => clearTimeout(t)); };
+  }, [unseen]);
   return (
-    <div className="vc-notifs-list">
+    <div className="vc-notifs-list" ref={box}>
         {list.map(n => (
-          <button type="button" key={n.id} className="vc-notif" onClick={() => pick(n)}>
+          <button type="button" key={n.id} data-nid={String(n.id)} className={`vc-notif${n.seen ? ' seen' : ''}`} onClick={() => pick(n)}>
             <NotifIcon n={n} />
             <span className="vc-notif-txt">
               <span className="vc-notif-top"><b><NotifText text={n.title} /></b><small>{ago(n.created_at)}</small></span>

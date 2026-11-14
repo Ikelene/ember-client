@@ -2597,3 +2597,37 @@ html.vc-rounded .vc-sticker.gone { border-radius: calc(8px * var(--rk, 1)); }
 .vc-drawer-badge { position: absolute; top: 1px; right: -3px; min-width: 17px; height: 17px; padding: 0 4px; display: grid; place-items: center; background: var(--red, #e5484d); color: #fff; font-size: 10.5px; font-weight: 800; line-height: 1; box-shadow: 0 0 0 2px var(--bg, #0e0e10); pointer-events: none; animation: vc-pop .2s cubic-bezier(.2, .8, .2, 1); }
 .vc-drawer-badge.dot { min-width: 0; width: 9px; height: 9px; padding: 0; top: 4px; right: 1px; background: var(--text, #ececf0); }
 html.vc-rounded .vc-drawer-badge { border-radius: 999px; }
+
+/* pinned DM categories (DmPins.jsx, HomeSidebar): a coloured header per category, its conversations under it */
+.vc-pin-cat { position: relative; margin-top: 6px; }
+.vc-pin-cat.dragging { opacity: .45; }
+.vc-pin-cat.drop-before::before, .vc-pin-cat.drop-after::after { content: ""; position: absolute; left: 4px; right: 4px; height: 2px; background: var(--accent); }
+.vc-pin-cat.drop-before::before { top: -4px; }
+.vc-pin-cat.drop-after::after { bottom: -4px; }
+.vc-pin-head { display: flex; align-items: center; gap: 6px; width: 100%; padding: 8px 6px 4px; background: none; border: 0; border-left: 2px solid transparent; color: var(--pin); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; text-align: left; }
+.vc-pin-head:hover { filter: brightness(1.15); }
+.vc-pin-head svg { flex: none; color: var(--muted); transition: transform .12s; }
+.vc-pin-head svg.shut { transform: rotate(-90deg); }
+.vc-pin-head.drop-in { background: color-mix(in srgb, var(--pin) 18%, transparent); border-left-color: var(--pin); }
+.vc-pin-head .vc-count { margin-left: auto; }
+.vc-pin-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vc-pin-dot { flex: none; width: 8px; height: 8px; background: var(--pin); }
+.vc-pin-cat > .vc-dm { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--pin) 55%, transparent); }
+.vc-pin-cat > .vc-dm.on { box-shadow: none; }
+.vc-pin-empty { margin: 2px 0 2px 6px; padding: 8px 10px; border: 1px dashed var(--border); color: var(--muted); font-size: 12px; }
+.vc-pin-empty.drop-in { border-color: var(--pin); color: var(--text); }
+.vc-dm.dragging { opacity: .45; }
+.vc-dm.drop-before { box-shadow: inset 0 2px 0 var(--accent) !important; }
+.vc-dm.drop-after { box-shadow: inset 0 -2px 0 var(--accent) !important; }
+.vc-cat-name.drop-out { color: var(--text); background: var(--accent-dim); }
+/* the category dialog */
+.vc-pin-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.vc-pin-sw { position: relative; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 2px solid transparent; color: #fff; cursor: pointer; }
+.vc-pin-sw.on { border-color: var(--text); }
+.vc-pin-sw.custom { background: var(--surface-3); color: var(--dim); }
+.vc-pin-sw.custom.on { color: #fff; }
+.vc-pin-sw input[type=color] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.vc-pin-preview { --pin: var(--accent); display: flex; align-items: center; gap: 6px; margin: 4px 0 12px; padding: 8px 10px; background: rgba(255, 255, 255, .03); color: var(--pin); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+
+/* notifications seen in the open list: read already (off the badge), they stay until it closes */
+.vc-notif.seen { opacity: .62; }

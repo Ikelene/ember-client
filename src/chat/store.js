@@ -713,6 +713,7 @@ function onEvent(m, inst = VELORA) {
     case 'chat_pins_update': bumpPins(m.channel); break;
     case 'friend_request': case 'friend_request_accepted': loadFriends(); loadHomeRequests(); break;
     case 'blocks_changed': loadBlocks(); break;
+    case 'chat_settings_changed': if (m.settings && typeof m.settings === 'object') set(s => ({ settings: { ...s.settings, ...m.settings } })); break; // (pinned DM categories from another device)
     case 'balance_changed': dispatchEvent(new CustomEvent('vc-balance', { detail: m })); break; // (your account card's credits row) // I blocked / unblocked someone (here or on another device)
     case 'notification_new': notificationNew(m); if (/request/.test(String(m.notification?.type || m.notification?.kind || ''))) loadHomeRequests(); break; // (a message request comes as a notification)
     case 'notifications_updated': notificationsUpdated(m); break; // read / deleted somewhere else (another tab, the site, a phone)
@@ -1982,12 +1983,37 @@ export async function loadNotifs({ more = false } = {}) {
     });
   } catch { set(s => (s.notifs ? { notifs: { ...s.notifs, loading: false, error: true } } : {})); }
 }
-export const closeNotifs = () => set({ notifs: null });
+export const closeNotifs = () => { flushSeen(); set({ notifs: null }); };
+// Seen in the open list (Ikelene 2026-11-14: no need to click Mark all read): the ones actually on screen get read on
+// Nookara and come off the badge right away, but stay in the list (dimmed, .seen) until it closes, so nothing jumps
+// around under you. Batched: one request for everything seen within ~0.4 s.
+const seenQueue = new Map(); // key -> the id as Nookara gave it
+let seenTimer = null;
+export function seeNotifs(keys) {
+  const list = state.notifs?.list || [];
+  const fresh = list.filter(n => keys.includes(notifKey(n.id)) && !n.seen && !seenQueue.has(notifKey(n.id)));
+  if (!fresh.length) return;
+  const f = new Set(fresh.map(n => notifKey(n.id)));
+  for (const n of fresh) seenQueue.set(notifKey(n.id), n.id);
+  set(s => ({ notifs: s.notifs && { ...s.notifs, list: s.notifs.list.map(n => (f.has(notifKey(n.id)) ? { ...n, seen: true } : n)) }, notifUnread: Math.max(0, s.notifUnread - f.size) }));
+  clearTimeout(seenTimer);
+  seenTimer = setTimeout(flushSeen, 400);
+}
+async function flushSeen() {
+  clearTimeout(seenTimer);
+  const ids = [...seenQueue.values()];
+  seenQueue.clear();
+  if (!ids.length) return;
+  try {
+    const d = await apiFetch('/account/notifications/read', { method: 'POST', body: JSON.stringify({ ids }) });
+    if (typeof d?.unread === 'number') set({ notifUnread: d.unread });
+  } catch { loadNotifCount(); }
+}
 // ids = [id, ...] or 'all': gone from the popup straight away, the server's count wins after
 export async function readNotifs(ids) {
   const all = ids === 'all';
   const drop = new Set(all ? [] : ids.map(notifKey));
-  set(s => ({ notifs: s.notifs && { ...s.notifs, list: all ? [] : s.notifs.list.filter(n => !drop.has(notifKey(n.id))) }, notifUnread: all ? 0 : Math.max(0, s.notifUnread - drop.size) }));
+  set(s => ({ notifs: s.notifs && { ...s.notifs, list: all ? [] : s.notifs.list.filter(n => !drop.has(notifKey(n.id))) }, notifUnread: all ? 0 : Math.max(0, s.notifUnread - (drop.size - (s.notifs?.list || []).filter(n => n.seen && drop.has(notifKey(n.id))).length)) }));
   try {
     const d = await apiFetch('/account/notifications/read', { method: 'POST', body: JSON.stringify(all ? { all: true } : { ids }) });
     if (typeof d?.unread === 'number') set({ notifUnread: d.unread });

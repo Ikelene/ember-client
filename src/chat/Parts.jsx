@@ -25,6 +25,12 @@ import { removeInstance, reorderInstances, reconnect as reconnectInstance } from
 import { startSignIn } from './session.js';
 import { Avatar, subtitle, RoleChip, STATUS_LABEL, BlockedMark } from './Profile.jsx';
 import { MePopout } from './ProfilePopout.jsx';
+import { PinCategoryHost, pinMenuItems, catMenuItems, pinItem, unpinItem, moveCategory } from './DmPins.jsx';
+import { cleanPins, pinnedSet, dmKey, groupKey } from './dmPinsCore.js';
+// which pinned DM categories are folded (this device only)
+const FOLD_KEY = 'ember:dmpins:folded';
+const readFolded = () => { try { const v = JSON.parse(localStorage.getItem(FOLD_KEY) || '[]'); return new Set(Array.isArray(v) ? v : []); } catch { return new Set(); } };
+const writeFolded = set => { try { localStorage.setItem(FOLD_KEY, JSON.stringify([...set])); } catch { /* private mode */ } };
 import Logo from '../components/Logo.jsx';
 
 // who's typing in a conversation right now
@@ -511,12 +517,91 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
     }
     return () => { previousDmRects.current = new Map([...dmNodes.current].map(([key, el]) => [key, el.getBoundingClientRect()])); };
   }, [dms]);
+  // ── pinned categories (DmPins.jsx): at the top, each with its conversations; drag to move things around ──
+  const pinsRaw = useChat(s => s.settings?.dm_pins);
+  const cats = useMemo(() => cleanPins(pinsRaw), [pinsRaw]);
+  const pinned = useMemo(() => pinnedSet(cats), [cats]);
+  const byKey = useMemo(() => new Map([...dms.map(c => [dmKey(c.username), { dm: c }]), ...groups.map(g => [groupKey(g.room), { group: g }])]), [dms, groups]);
+  const [folded, setFolded] = useState(readFolded); // (this device's own)
+  const fold = id => setFolded(f => { const n = new Set(f); if (n.has(id)) n.delete(id); else n.add(id); writeFolded(n); return n; });
+  const [drag, setDrag] = useState(null); // { kind: 'item', key } | { kind: 'cat', id }
+  const [over, setOver] = useState(null); // where it would land: { cat: id | null, index, head } | { catAt }
+  const overTo = o => setOver(cur => (JSON.stringify(cur) === JSON.stringify(o) ? cur : o));
+  const endDrag = () => { setDrag(null); setOver(null); };
+  const drop = () => {
+    if (drag?.kind === 'item' && over && 'cat' in over) {
+      if (over.cat == null) { if (pinned.has(drag.key)) unpinItem(drag.key); }
+      else {
+        const old = cats.find(c => c.id === over.cat)?.items.indexOf(drag.key) ?? -1;
+        pinItem(drag.key, over.cat, over.index >= 0 && old >= 0 && old < over.index ? over.index - 1 : over.index);
+      }
+    } else if (drag?.kind === 'cat' && over?.catAt != null) {
+      const old = cats.findIndex(c => c.id === drag.id);
+      moveCategory(drag.id, old < over.catAt ? over.catAt - 1 : over.catAt);
+    }
+    endDrag();
+  };
+  const outHere = drag?.kind === 'item' && over && over.cat === null && pinned.has(drag.key);
+  const outOver = e => { if (drag?.kind !== 'item') return; e.preventDefault(); overTo({ cat: null }); };
+  // a conversation row can be dragged; over a pinned one it shows where it would go, over the normal list it unpins
+  const dragProps = (k, catId, index, isLast) => ({
+    draggable: true,
+    onDragStart: e => { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', k); } catch { /* fine */ } setDrag({ kind: 'item', key: k }); },
+    onDragEnd: endDrag,
+    onDragOver: e => {
+      if (drag?.kind !== 'item') return;
+      e.preventDefault();
+      if (catId == null) { overTo({ cat: null }); return; }
+      const r = e.currentTarget.getBoundingClientRect();
+      overTo({ cat: catId, index: index + (e.clientY > r.top + r.height / 2 ? 1 : 0) });
+    },
+    onDrop: e => { e.preventDefault(); drop(); },
+    dropCls: catId != null && over?.cat === catId && !over.head ? (over.index === index ? ' drop-before' : isLast && over.index === index + 1 ? ' drop-after' : '') : '',
+    dragCls: drag?.kind === 'item' && drag.key === k ? ' dragging' : '',
+  });
+  const dmRow = (c, catId, index = 0, isLast = false) => {
+    const k = dmKey(c.username);
+    const on = keyOf(view) === k;
+    const p = presence[c.username];
+    const sys = c.username === 'System';
+    const { dropCls, dragCls, ...dp } = dragProps(k, catId, index, isLast);
+    return (
+      <button type="button" key={c.username} ref={el => { const key = c.username.toLowerCase(); if (el) dmNodes.current.set(key, el); else dmNodes.current.delete(key); }} className={`vc-dm${on ? ' on' : ''}${!on && (c.unread || unread[k]) ? ' unread' : ''}${dropCls}${dragCls}`}
+        {...dp}
+        onContextMenu={e => (sys ? openMenu(e, [{ label: 'Open', onClick: () => go({ kind: 'dm', username: c.username }) }, 'sep', ...pinMenuItems(k)]) : userMenu(e, c.username, { onProfile: () => dispatchEvent(new CustomEvent('vc-open-big', { detail: { username: c.username } })), extra: ['sep', ...pinMenuItems(k)] }))}
+        onClick={() => go({ kind: 'dm', username: c.username })}>
+        {sys ? <span className="vc-av vc-sys-av" style={{ width: 32, height: 32 }}><Logo size={18} /></span> : <Avatar user={{ username: c.username, pfp: c.pfp || people[c.username]?.pfp }} size={32} status={p?.status || 'offline'} />}
+        <span className="vc-dm-txt"><b>{sys ? 'Nookara' : <NameText u={{ username: c.username }} />}{c.bot && <BotTag small />}</b>{!sys && subtitle(p) && <small>{subtitle(p)}</small>}</span>
+        {!on && <TypingMark names={typersOf(typing, k)} people={people} />}
+        {(c.unread > 0) && !on && <span className="vc-count">{c.unread > 99 ? '99+' : c.unread}</span>}
+      </button>
+    );
+  };
+  const groupRow = (g, catId, index = 0, isLast = false) => {
+    const k = groupKey(g.room);
+    const on = keyOf(view) === k;
+    const { dropCls, dragCls, ...dp } = dragProps(k, catId, index, isLast);
+    return (
+      <button type="button" key={g.room} className={`vc-dm${on ? ' on' : ''}${!on && unread[k] ? ' unread' : ''}${dropCls}${dragCls}`} onClick={() => go({ kind: 'group', room: g.room })}
+        {...dp}
+        onContextMenu={e => openMenu(e, [
+          { label: 'Open', onClick: () => go({ kind: 'group', room: g.room }) },
+          ...pinMenuItems(k),
+          { label: 'Leave group', danger: true, onClick: () => dialog('leave-group', null, { room: g.room }) },
+          'sep',
+          { label: 'Copy group ID', dev: true, onClick: () => copy(g.room, 'Group ID copied') },
+        ])}>
+        <span className="vc-av vc-grp-av" style={{ width: 32, height: 32 }}><UsersRound size={16} /></span>
+        <span className="vc-dm-txt"><b>{g.name}</b><small>{g.members.length} members</small></span>
+        {!on && <TypingMark names={typersOf(typing, k)} people={people} />}
+      </button>
+    );
+  };
   return (
     <div className="vc-side">
       <div className="vc-side-head"><button type="button" className="vc-quick" onClick={onQuick}><span>Quick switcher</span><kbd>Ctrl</kbd><kbd>K</kbd></button></div>
       <div className="vc-side-list">
         <button type="button" className={`vc-ch vc-home-link${view.kind === 'home' ? ' on' : ''}`} onClick={() => go({ kind: 'home' })}><House size={18} /> <span>Home</span></button>
-        <div className="vc-cat-name static">Direct messages <span className="vc-cat-add" role="button" tabIndex={0} title="New message" onClick={onNewDM}><Plus size={14} /></span></div>
         <VeloraConnNote />
         {modmail.messages.length > 0 && (
           <button type="button" className={`vc-dm vc-dm-mod${keyOf(view) === 'mm:' ? ' on' : ''}${keyOf(view) !== 'mm:' && modmail.unread ? ' unread' : ''}`} onClick={() => go({ kind: 'modmail' })}>
@@ -525,42 +610,45 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
             {modmail.unread > 0 && keyOf(view) !== 'mm:' && <span className="vc-count">{modmail.unread}</span>}
           </button>
         )}
+        {cats.map((cat, ci) => {
+          const shut = folded.has(cat.id);
+          const rows = cat.items.map((k, i) => [k, i, byKey.get(k)]).filter(([, , x]) => x);
+          const n = rows.reduce((a, [k, , x]) => a + (x.dm ? Number(x.dm.unread) || (unread[k] ? 1 : 0) : unread[k] ? 1 : 0), 0);
+          const last = rows.length ? rows[rows.length - 1][1] : -1;
+          return (
+            <div key={cat.id} className={`vc-pin-cat${drag?.kind === 'cat' && drag.id === cat.id ? ' dragging' : ''}${over?.catAt === ci ? ' drop-before' : ''}${over?.catAt === ci + 1 && ci === cats.length - 1 ? ' drop-after' : ''}`} style={{ '--pin': cat.color }}>
+              <button type="button" className={`vc-pin-head${over?.cat === cat.id && over.head ? ' drop-in' : ''}`} draggable aria-expanded={!shut}
+                onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', cat.name); } catch { /* fine */ } setDrag({ kind: 'cat', id: cat.id }); }}
+                onDragEnd={endDrag}
+                onDragOver={e => {
+                  if (!drag) return;
+                  e.preventDefault();
+                  if (drag.kind === 'cat') { const r = e.currentTarget.getBoundingClientRect(); overTo({ catAt: ci + (e.clientY > r.top + r.height / 2 ? 1 : 0) }); }
+                  else overTo({ cat: cat.id, index: shut ? -1 : 0, head: true });
+                }}
+                onDrop={e => { e.preventDefault(); drop(); }}
+                onClick={() => fold(cat.id)} onContextMenu={e => openMenu(e, catMenuItems(cat))} title={`${cat.name} - drag to move, right-click to edit`}>
+                <ChevronDown size={12} className={shut ? 'shut' : ''} />
+                <span className="vc-pin-dot" />
+                <span className="vc-pin-name">{cat.name}</span>
+                {shut && n > 0 && <span className="vc-count">{n > 99 ? '99+' : n}</span>}
+              </button>
+              {!shut && rows.map(([k, i, x]) => (x.dm ? dmRow(x.dm, cat.id, i, i === last) : groupRow(x.group, cat.id, i, i === last)))}
+              {!shut && !rows.length && (
+                <div className={`vc-pin-empty${over?.cat === cat.id ? ' drop-in' : ''}`} onDragOver={e => { if (drag?.kind !== 'item') return; e.preventDefault(); overTo({ cat: cat.id, index: -1 }); }} onDrop={e => { e.preventDefault(); drop(); }}>
+                  Drag conversations here
+                </div>
+              )}
+            </div>
+          );
+        })}
+        <div className={`vc-cat-name static${outHere ? ' drop-out' : ''}`} onDragOver={outOver} onDrop={e => { e.preventDefault(); drop(); }}>Direct messages <span className="vc-cat-add" role="button" tabIndex={0} title="New message" onClick={onNewDM}><Plus size={14} /></span></div>
         {dms.length === 0 && <div className="vc-side-empty">No messages yet. Start one with the + above.</div>}
-        {dms.map(c => {
-          const k = `d:${c.username.toLowerCase()}`;
-          const on = keyOf(view) === k;
-          const p = presence[c.username];
-          const sys = c.username === 'System';
-          return (
-            <button type="button" key={c.username} ref={el => { const key = c.username.toLowerCase(); if (el) dmNodes.current.set(key, el); else dmNodes.current.delete(key); }} className={`vc-dm${on ? ' on' : ''}${!on && (c.unread || unread[k]) ? ' unread' : ''}`}
-              onContextMenu={e => (sys ? openMenu(e, [{ label: 'Open', onClick: () => go({ kind: 'dm', username: c.username }) }]) : userMenu(e, c.username, { onProfile: () => dispatchEvent(new CustomEvent('vc-open-big', { detail: { username: c.username } })) }))}
-              onClick={() => go({ kind: 'dm', username: c.username })}>
-              {sys ? <span className="vc-av vc-sys-av" style={{ width: 32, height: 32 }}><Logo size={18} /></span> : <Avatar user={{ username: c.username, pfp: c.pfp || people[c.username]?.pfp }} size={32} status={p?.status || 'offline'} />}
-              <span className="vc-dm-txt"><b>{sys ? 'Nookara' : <NameText u={{ username: c.username }} />}{c.bot && <BotTag small />}</b>{!sys && subtitle(p) && <small>{subtitle(p)}</small>}</span>
-              {!on && <TypingMark names={typersOf(typing, k)} people={people} />}
-              {(c.unread > 0) && !on && <span className="vc-count">{c.unread > 99 ? '99+' : c.unread}</span>}
-            </button>
-          );
-        })}
-        <div className="vc-cat-name static">Group chats <span className="vc-cat-add" role="button" tabIndex={0} title="New group chat" onClick={onNewGroup}><Plus size={14} /></span></div>
+        {dms.filter(c => !pinned.has(dmKey(c.username))).map(c => dmRow(c, null))}
+        <div className={`vc-cat-name static${outHere ? ' drop-out' : ''}`} onDragOver={outOver} onDrop={e => { e.preventDefault(); drop(); }}>Group chats <span className="vc-cat-add" role="button" tabIndex={0} title="New group chat" onClick={onNewGroup}><Plus size={14} /></span></div>
         {groups.length === 0 && <div className="vc-side-empty">No group chats.</div>}
-        {groups.map(g => {
-          const k = `g:${g.room}`;
-          const on = keyOf(view) === k;
-          return (
-            <button type="button" key={g.room} className={`vc-dm${on ? ' on' : ''}${!on && unread[k] ? ' unread' : ''}`} onClick={() => go({ kind: 'group', room: g.room })}
-              onContextMenu={e => openMenu(e, [
-                { label: 'Open', onClick: () => go({ kind: 'group', room: g.room }) },
-                { label: 'Leave group', danger: true, onClick: () => dialog('leave-group', null, { room: g.room }) },
-                'sep',
-                { label: 'Copy group ID', dev: true, onClick: () => copy(g.room, 'Group ID copied') },
-              ])}>
-              <span className="vc-av vc-grp-av" style={{ width: 32, height: 32 }}><UsersRound size={16} /></span>
-              <span className="vc-dm-txt"><b>{g.name}</b><small>{g.members.length} members</small></span>
-              {!on && <TypingMark names={typersOf(typing, k)} people={people} />}
-            </button>
-          );
-        })}
+        {groups.filter(g => !pinned.has(groupKey(g.room))).map(g => groupRow(g, null))}
+        <PinCategoryHost />
       </div>
     </div>
   );
