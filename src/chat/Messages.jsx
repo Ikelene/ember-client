@@ -57,9 +57,9 @@ function GifIcon() {
 }
 import { packActive } from './messageSounds.js';
 import { playSound, loadEmojis, loadMembers, loadCommands, clearStatusReply, useTimedOut, untilText, dismissEphemeral, useBotPeer } from './store.js';
-import { sendSticker, savePersonalSticker, isMyPersonalSticker } from './personal.js';
+import { sendSticker } from './personal.js';
+import { openStickerInfo, stickerMenuItems } from './StickerInfo.jsx';
 import { stickerOfBody } from './stickerLink.js';
-import { Sticker as StickerIco } from 'lucide-react';
 import { takeJump, fileKind, uploadMedia, saveToMedia, isMineMsg, loadUploadLimits, getUploadLimits, chooseUploadDest, rememberedUploadDest, tempFileInfo, tempFileInfoNow, onTempInfo, TEMP_LINK } from './store.js';
 import { useStarboardFor, starredByMe, STAR } from './Starboard.jsx';
 import { CALL_LINE, callLineText } from './callText.js';
@@ -623,7 +623,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
         <Embeds list={m.embeds} ctx={ctx} />
         {!m.embeds?.length && !m.pending && (linkPreviews ? <LinkEmbeds urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group'} /> : <PreviewOnAsk urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group'} />)}
         <E2eeMessageNote m={m} view={view} />
-        {(m.sticker || pSticker) && <StickerView s={m.sticker || pSticker} />}
+        {(m.sticker || pSticker) && <StickerView s={m.sticker || pSticker} sid={m.sticker ? view.sid : null} />}
         <OpenedAttachments list={[...(m.attachments || []), ...media]} extra={images} m={m} Attachments={Attachments} />
         {m.uploading && <UploadBar m={m} view={view} />}
         <Reactions m={m} me={ctx.me} canReact={canReact} />
@@ -924,15 +924,16 @@ export function Composer(props) {
   return <><E2eeComposerNotes view={view} /><ComposerBox {...props} /></>;
 }
 // a sticker in a message (an Ember server's, or a personal one = a message that is just its link): bigger than an emoji,
-// never stretched; a deleted one says so. Right-click: Save to my stickers (your personal stickers).
-function StickerView({ s }) {
+// never stretched; a deleted one says so. Click: its info (StickerInfo.jsx: name, server / owner, Clone + Add to personal);
+// right-click: the same two choices. sid = the message's server for a server sticker.
+function StickerView({ s, sid }) {
   const [broken, setBroken] = useState(false);
   if (s.deleted || !s.url || broken) return <div className="vc-sticker gone">Sticker deleted</div>;
-  const menu = e => {
-    if (!getState().signedIn || (s.psid && isMyPersonalSticker(s.psid))) return;
-    openMenu(e, [{ label: 'Save to my stickers', icon: StickerIco, onClick: () => savePersonalSticker(s) }]);
-  };
-  return <img className="vc-sticker" src={s.url} alt={s.name || 'sticker'} title={s.name || undefined} draggable={false} loading="lazy" onError={() => setBroken(true)} onContextMenu={menu} />;
+  return (
+    <button type="button" className="vc-sticker-btn" title={s.name || undefined} onClick={e => openStickerInfo(s, sid, e.currentTarget)} onContextMenu={e => openMenu(e, stickerMenuItems(s))}>
+      <img className="vc-sticker" src={s.url} alt={s.name || 'sticker'} draggable={false} loading="lazy" onError={() => setBroken(true)} />
+    </button>
+  );
 }
 
 function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo, setReplyTo }) {

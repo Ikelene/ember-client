@@ -74,8 +74,10 @@ export async function addSticker(sid, file, name) {
   const fd = new FormData();
   fd.append('name', nameOf(name || file.name?.replace(/\.[^.]+$/, '')));
   fd.append('file', file);
-  try { await uploadFetch(`/chat/servers/${sid}/stickers`, fd); } catch (e) { toast(msg(e)); }
-  return loadStickers(sid);
+  let ok = true;
+  try { await uploadFetch(`/chat/servers/${sid}/stickers`, fd); } catch (e) { ok = false; toast(msg(e)); }
+  await loadStickers(sid);
+  return ok; // (Clone to server says so when it worked)
 }
 export async function renameSticker(sid, tid, name) {
   try { await apiFetch(`/chat/servers/${sid}/stickers/${tid}`, { method: 'PATCH', body: JSON.stringify({ name: nameOf(name) }) }); } catch (e) { toast(msg(e)); }

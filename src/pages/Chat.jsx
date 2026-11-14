@@ -28,6 +28,7 @@ import { ImportServer } from '../chat/Bridge.jsx';
 import { PlatformIcon } from '../chat/platforms.jsx';
 import { CrashGuard } from '../chat/Crash.jsx';
 import { EmojiInfoHost } from '../chat/EmojiInfo.jsx';
+import { StickerInfoHost } from '../chat/StickerInfo.jsx';
 import { ReactionPickerHost } from '../chat/Reactions.jsx';
 import { ReactionsViewHost } from '../chat/ReactionsView.jsx';
 import { UpdatePopup } from '../chat/UpdatePopup.jsx';
@@ -628,6 +629,7 @@ function ChatPage() {
       <TooltipHost />
       <MediaViewerHost />
       <EmojiInfoHost />
+      <StickerInfoHost />
       <ModernNotice />
       <ReactionPickerHost />
       <ReactionsViewHost />
