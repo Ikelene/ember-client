@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Clock, Smile, Users, Cat, Apple, Plane, Trophy, Lightbulb, Heart, Flag, Upload, Trash2, UserRound, Sticker } from 'lucide-react';
 import { apiFetch, uploadFetch } from '../api.js';
 import { useChat, getState, loadEmojis, toast, errorText, customEmoji } from './store.js';
+import { imgHint, warnImage } from './imgHints.js';
+import { isInst } from './ids.js';
 import { Twemoji, shortName, allNames } from './emoji.jsx';
 import { usePlan, PlanGate, PlanNotice, PlanUsage } from './PlanGate.jsx';
 import { emojiMenuItems } from './cloneEmoji.js';
@@ -159,6 +161,7 @@ export function EmojiManager({ sid }) {
   useEffect(() => { reload(); }, [sid]); // eslint-disable-line react-hooks/exhaustive-deps
   async function add(files) {
     for (const f of [...files].slice(0, 20)) {
+      warnImage(f, 'emoji', isInst(sid));
       setBusy(n => n + 1);
       const fd = new FormData();
       fd.append('file', f);
@@ -182,7 +185,7 @@ export function EmojiManager({ sid }) {
     <div className="vc-emoji-man">
       {!plan.gate && <PlanUsage what="emojis" used={list ? list.length : undefined} />}
       <PlanNotice block={plan.full} />
-      <p className="vc-dialog-sub">Upload PNG, JPG, WebP or GIF emojis, up to 2 MB. GIFs and animated WebP keep their animation; images are resized to 128 px. Everyone in Ember can use your server's emojis anywhere. {list ? `${list.length} / ${max} used.` : ''}</p>
+      <p className="vc-dialog-sub">{imgHint('emoji', isInst(sid))} Everyone in Ember can use your server's emojis anywhere. {list ? `${list.length} / ${max} used.` : ''}</p>
       <button type="button" className="btn btn-primary" disabled={busy > 0 || !!plan.full || !!plan.gate || (list && list.length >= max)} onClick={() => file.current?.click()}><Upload size={14} /> {busy ? 'Uploading...' : 'Upload emoji'}</button>
       <input ref={file} type="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp" onChange={e => { add(e.target.files); e.target.value = ''; }} />
       <div className="vc-emoji-list" data-drop-own onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); add(e.dataTransfer.files); }}>

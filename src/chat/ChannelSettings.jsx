@@ -5,6 +5,8 @@ import { useMemo, useState } from 'react';
 import { Hash, Upload, Trash2, Shield, ArrowLeftRight, LayoutGrid, Settings, Image as ImageIcon, MessageSquare, TriangleAlert } from 'lucide-react';
 import { apiFetch, uploadFetch } from '../api.js';
 import { useChat, getState, go, ask, toast, errorText, refreshServer } from './store.js';
+import { imgHint, warnImage } from './imgHints.js';
+import { isInst } from './ids.js';
 import { P, has, CHANNEL_ICONS, ChannelIcon, Toggle } from './roles.jsx';
 import { TYPES, TypePicker, TypeSettings } from './ChannelTypes.jsx';
 import { ChannelBridge } from './Bridge.jsx';
@@ -65,6 +67,7 @@ function Overview({ sid, channel, onDirty }) {
   // a picture is uploaded straight away (not part of the bar)
   async function upload(file) {
     if (!file) return;
+    warnImage(file, 'channelIcon', isInst(sid));
     try {
       const fd = new FormData(); fd.append('file', file);
       const res = await uploadFetch(`/chat/channels/${channel.cid}/icon`, fd);
@@ -89,6 +92,7 @@ function Overview({ sid, channel, onDirty }) {
             <input type="file" hidden accept="image/*" onChange={e => upload(e.target.files[0])} />
           </label>
         </div>
+        <small className="vc-hint vc-img-hint">{imgHint('channelIcon', isInst(sid))}</small>
       </Card>
       <Card title="Channel type" icon={LayoutGrid}>
         <TypePicker value={type} onChange={v => set('type', v)} />

@@ -7,6 +7,7 @@ import { Dialog } from './Dialogs.jsx';
 import { Toggle } from './roles.jsx';
 import { initials } from './Parts.jsx';
 import { useChat, toast, errorText, ask, go, refreshServer } from './store.js';
+import { imgHint, warnImage } from './imgHints.js';
 import { refreshInstance, loadInstanceData, hostOf } from './instances.js';
 import { VeloraImport } from './Bridge.jsx';
 import { PlatformIcon } from './platforms.jsx';
@@ -114,7 +115,7 @@ export function SetupWizard({ origin, onClose, name: givenName = '' }) {
                 <div className="vc-img-row"><span className="vc-srv-ico lg">{icon ? <img src={icon.url} alt="" /> : initials(f.name || 'My server')}</span>
                   <button type="button" className="btn btn-surface" onClick={() => pick.current?.click()}><Upload size={14} /> Upload</button>
                   {icon && <button type="button" className="btn btn-surface" onClick={() => setIcon(null)}>Remove</button>}
-                  <input ref={pick} type="file" hidden accept="image/*" onChange={e => { const x = e.target.files[0]; e.target.value = ''; if (x) setIcon({ file: x, url: URL.createObjectURL(x) }); }} /></div></div>
+                  <small className="vc-hint vc-img-hint">{imgHint('serverIcon', true)}</small><input ref={pick} type="file" hidden accept="image/*" onChange={e => { const x = e.target.files[0]; e.target.value = ''; if (x) { warnImage(x, 'serverIcon', true); setIcon({ file: x, url: URL.createObjectURL(x) }); } }} /></div></div>
               <label className="vc-field"><span>Server name</span><input className="form-input" autoFocus maxLength={60} value={f.name} placeholder="My server" onChange={e => setF(x => ({ ...x, name: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter' && f.name.trim()) createServer(); }} /></label>
               <label className="vc-field"><span>Description</span><textarea className="form-textarea" rows={3} maxLength={300} value={f.description} onChange={e => setF(x => ({ ...x, description: e.target.value }))} placeholder="What is it for?" /></label>
               <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" onClick={close}>Finish later</button><span className="grow" />

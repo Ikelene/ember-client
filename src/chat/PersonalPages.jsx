@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Upload, Trash2 } from 'lucide-react';
 import { useChat } from './store.js';
+import { imgHint, warnImage } from './imgHints.js';
 import { loadPersonalEmojis, addPersonalEmoji, renamePersonalEmoji, deletePersonalEmoji, loadStickers, addSticker, renameSticker, deleteSticker } from './personal.js';
 
 function ItemRow({ url, name, animated, onRename, onDelete, big }) {
@@ -25,11 +26,11 @@ export function PersonalEmojisPage() {
   const list = box?.list || null;
   const full = !!list && list.length >= (box?.max || 25);
   async function add(files) {
-    for (const f of [...files].slice(0, 20)) { setBusy(n => n + 1); await addPersonalEmoji(f, undefined, { quiet: true }); setBusy(n => n - 1); }
+    for (const f of [...files].slice(0, 20)) { warnImage(f, 'personalEmoji'); setBusy(n => n + 1); await addPersonalEmoji(f, undefined, { quiet: true }); setBusy(n => n - 1); }
   }
   return (
     <div className="vc-emoji-man">
-      <p className="vc-dialog-sub">Your personal emojis live on your Nookara account, so you can use them on any Ember server, in DMs and in group chats, from any app signed in as you. Only you have them in your picker; anyone can clone one to their own server or personal emojis. PNG, JPG, WebP or GIF, up to 2 MB. {list ? `${list.length} / ${box.max} used${box.max < box.pro_max ? ` (${box.pro_max} with Pro)` : ''}.` : ''}</p>
+      <p className="vc-dialog-sub">Your personal emojis live on your Nookara account, so you can use them on any Ember server, in DMs and in group chats, from any app signed in as you. Only you have them in your picker; anyone can clone one to their own server or personal emojis. {imgHint('personalEmoji')} {list ? `${list.length} / ${box.max} used${box.max < box.pro_max ? ` (${box.pro_max} with Pro)` : ''}.` : ''}</p>
       <button type="button" className="btn btn-primary" disabled={busy > 0 || full || !list} onClick={() => file.current?.click()}><Upload size={14} /> {busy ? 'Uploading...' : 'Add emoji'}</button>
       <input ref={file} type="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp" onChange={e => { add(e.target.files); e.target.value = ''; }} />
       <div className="vc-emoji-list" data-drop-own onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); add(e.dataTransfer.files); }}>
@@ -49,11 +50,11 @@ export function StickerManager({ sid }) {
   const list = box?.list || null;
   const max = box?.max || 30;
   async function add(files) {
-    for (const f of [...files].slice(0, 10)) { setBusy(n => n + 1); await addSticker(sid, f); setBusy(n => n - 1); }
+    for (const f of [...files].slice(0, 10)) { warnImage(f, 'sticker', true); setBusy(n => n + 1); await addSticker(sid, f); setBusy(n => n - 1); }
   }
   return (
     <div className="vc-emoji-man">
-      <p className="vc-dialog-sub">Stickers are big pictures people can send on their own from the Stickers tab of the emoji picker. PNG, GIF or WebP (animated ones stay animated), up to 512 KB; they show at about 160 px. {list ? `${list.length} / ${max} used.` : ''}</p>
+      <p className="vc-dialog-sub">Stickers are big pictures people can send on their own from the Stickers tab of the emoji picker. {imgHint('sticker', true)} They show at about 160 px. {list ? `${list.length} / ${max} used.` : ''}</p>
       <button type="button" className="btn btn-primary" disabled={busy > 0 || !list || list.length >= max} onClick={() => file.current?.click()}><Upload size={14} /> {busy ? 'Uploading...' : 'Upload sticker'}</button>
       <input ref={file} type="file" multiple hidden accept="image/png,image/gif,image/webp" onChange={e => { add(e.target.files); e.target.value = ''; }} />
       <div className="vc-emoji-list" data-drop-own onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); add(e.dataTransfer.files); }}>

@@ -11,6 +11,7 @@ import { viewPicture } from './MediaViewer.jsx';
 import { has, P } from './roles.jsx';
 import { Dialog } from './Dialogs.jsx';
 import { instOpt, isInst } from './ids.js';
+import { imgHint, warnImage } from './imgHints.js';
 
 export const TYPES = [
   { id: 'text', label: 'Text', hint: 'Messages, pictures and GIFs.', Icon: Hash },
@@ -228,6 +229,7 @@ function WebhookManager({ cid, logs }) {
     try { await apiFetch(`/chat/hooks/${h.wid}`, { method: 'PATCH', body: JSON.stringify(body), inst }); reload(); } catch (e) { toast(errorText(e.message)); }
   }
   async function avatar(h, f) {
+    warnImage(f, 'webhookAvatar', isInst(cid));
     const fd = new FormData();
     fd.append('file', f);
     try { await uploadFetch(`/chat/hooks/${h.wid}/avatar`, fd, { inst }); reload(); } catch (e) { toast(errorText(e.message)); }
@@ -236,6 +238,7 @@ function WebhookManager({ cid, logs }) {
     <div className="vc-field"><span>Webhooks</span>
       <p className="vc-dialog-sub">{logs ? 'Webhooks are how things post into a logs channel. ' : ''}They work like Discord webhooks: anything that can post to a Discord webhook URL can post to these (content, username, avatar_url and embeds). Keep the URLs secret - anyone with one can post.</p>
       <div className="vc-hooks">
+        <small className="vc-hint vc-img-hint">{imgHint('webhookAvatar', isInst(cid))}</small>
         {list === null && <div className="vc-loading"><i /><i /><i /></div>}
         {list?.map(h => (
           <div key={h.wid} className="vc-hook">

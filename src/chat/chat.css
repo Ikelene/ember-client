@@ -2631,3 +2631,6 @@ html.vc-rounded .vc-drawer-badge { border-radius: 999px; }
 
 /* notifications seen in the open list: read already (off the badge), they stay until it closes */
 .vc-notif.seen { opacity: .62; }
+
+/* the recommended size under an upload button (imgHints.js) */
+.vc-img-hint { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.4; }

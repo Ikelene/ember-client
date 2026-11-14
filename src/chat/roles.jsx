@@ -10,6 +10,7 @@ const TYPE_ICONS = { logs: ScrollText, roles: BadgeCheck, welcome: DoorOpen, lin
 import { apiFetch, uploadFetch } from '../api.js';
 import { useChat, getState, toast, errorText, ask, refreshServer, memberRef, loadMembers, untilText } from './store.js';
 import { isInst, instOf } from './ids.js';
+import { imgHint, warnImage } from './imgHints.js';
 import { userScrolled } from './userscroll.js';
 
 export const P = {
@@ -284,6 +285,7 @@ export function RolesEditor({ sid }) {
   }
   async function icon(file) {
     if (!file) return;
+    warnImage(file, 'roleIcon', isInst(sid));
     const fd = new FormData(); fd.append('file', file);
     try { await uploadFetch(`/chat/servers/${sid}/roles/${r.rid}/icon`, fd); } catch (e) { toast(errorText(e.message)); }
   }
@@ -348,7 +350,7 @@ export function RolesEditor({ sid }) {
                     <span className="vc-role-ico-prev">{r.icon ? <img src={r.icon} alt="" /> : <Shield size={16} />}</span>
                     <label className={`btn btn-surface${editable ? '' : ' disabled'}`}><Upload size={14} /> Upload<input type="file" hidden accept="image/*" disabled={!editable} onChange={e => icon(e.target.files[0])} /></label>
                     {r.icon && editable && <button type="button" className="btn btn-surface" onClick={() => apiFetch(`/chat/servers/${sid}/roles/${r.rid}/icon`, { method: 'DELETE' }).catch(e => toast(errorText(e.message)))}>Remove</button>}
-                  </div><small className="vc-hint">Shows next to the names of people with this role.</small></div>
+                  </div><small className="vc-hint">Shows next to the names of people with this role. {imgHint('roleIcon', isInst(sid))}</small></div>
                 <Toggle label="Show separately in the member list" hint="People with this role get their own group." on={r.hoist} disabled={!editable} onChange={v => save({ hoist: v })} />
                 <Toggle label="Anyone can @mention this role" hint="Otherwise only people with Mention @everyone can." on={r.mentionable} disabled={!editable} onChange={v => save({ mentionable: v })} />
                 {isInst(sid) && <RoleUploadField key={r.rid} sid={sid} role={r} editable={editable} save={save} />}

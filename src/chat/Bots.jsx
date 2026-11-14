@@ -8,6 +8,7 @@ import { apiFetch, uploadFetch } from '../api.js';
 import { confirmBox } from '../components/confirmBox.jsx';
 import { useChat } from './store.js';
 import { bare } from './ids.js';
+import { imgHint, warnImage } from './imgHints.js';
 import { P, has } from './roles.jsx';
 import { BotGallerySection } from './BotGalleryDev.jsx';
 import { usePlan, PlanGate, PlanNotice, PlanUsage } from './PlanGate.jsx';
@@ -237,6 +238,7 @@ export function BotsManager({ inst, sid }) {
   async function patch(b, body) { try { await apiFetch(`/chat/bots/${bid(b)}`, { ...o, method: 'PATCH', body: JSON.stringify(body) }); load(); } catch (er) { setErr(errText(er)); } }
   async function avatar(b, file) {
     if (!file) return;
+    warnImage(file, 'botAvatar', !!inst);
     const fd = new FormData(); fd.append('file', file);
     try { await uploadFetch(`/chat/bots/${bid(b)}/avatar`, fd, o); } catch { setErr("That picture didn't upload."); }
     load();
@@ -282,6 +284,7 @@ export function BotsManager({ inst, sid }) {
           </div>
         )}
         {list === null && !err && <div>Loading...</div>}
+        {list?.length > 0 && <small className="vc-hint vc-img-hint">Bot pictures: {imgHint('botAvatar', !!inst)}</small>}
         <div className="bm-list">
           {list?.map(b => (
             <div className="bm-bot" key={b.id}>

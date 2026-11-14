@@ -10,6 +10,7 @@ import { applyAccentColor } from '../theme.js';
 import ImageCropper from '../components/ImageCropper.jsx';
 import { COUNTRIES, TIMEZONES } from '../profile-locales.js';
 import { useChat, useScopeStatus, loginAgain, ask, patchState, getState, remember, forgetProfile } from './store.js';
+import { imgHint, warnImage } from './imgHints.js';
 import { PopoutCard, localTimeFrom } from './ProfilePopout.jsx';
 
 const isHex = c => /^#[0-9a-f]{6}$/i.test(c || '');
@@ -159,7 +160,7 @@ function Editor({ user, reload, presence, onDirty }) {
   const bannerInput = useRef(null);
   const [cropping, setCropping] = useState(null);
   const [mediaMsg, setMediaMsg] = useState(null);
-  const pick = (e, type) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) { setMediaMsg(null); setCropping({ type, file }); } };
+  const pick = (e, type) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) { setMediaMsg(null); warnImage(file, type === 'pfp' ? 'pfp' : 'banner', false, { cropped: true }); setCropping({ type, file }); } };
   const dropMedia = type => setMedia(x => { if (x[type]?.url) URL.revokeObjectURL(x[type].url); const n = { ...x }; delete n[type]; return n; });
   async function stage(type, file, crop) {
     setCropping(null); setMediaMsg(null);
@@ -247,6 +248,7 @@ function Editor({ user, reload, presence, onDirty }) {
               {media.pfp && <button type="button" className="btn btn-surface btn-sm" disabled={saving} onClick={() => dropMedia('pfp')}>Undo</button>}
             </div>
             <input ref={pfpInput} type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden onChange={e => pick(e, 'pfp')} />
+            <small className="vc-hint vc-img-hint">{imgHint('pfp', false)}</small>
           </div>
 
           <div className="bf-pe-sec">
@@ -257,6 +259,7 @@ function Editor({ user, reload, presence, onDirty }) {
               {media.banner && <button type="button" className="btn btn-surface btn-sm" disabled={saving} onClick={() => dropMedia('banner')}>Undo</button>}
             </div>
             <input ref={bannerInput} type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden onChange={e => pick(e, 'banner')} />
+            <small className="vc-hint vc-img-hint">{imgHint('banner', false)}</small>
             {mediaMsg && <div className={`inline-msg ${mediaMsg.type}`}>{mediaMsg.text}</div>}
           </div>
 

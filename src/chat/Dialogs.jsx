@@ -10,6 +10,7 @@ import { apiFetch } from '../api.js';
 import { getState, useChat, go, loadServersOf, refreshServer, loadGroups, toast, errorText, ask, answerAsk, loadFriends, sendMessage, linkFor } from './store.js';
 import { NameText, displayNameOf } from './displayNames.js';
 import { VELORA, instOf, isInst, fromInstance, normOrigin } from './ids.js';
+import { imgHint, warnImage } from './imgHints.js';
 import { SignInPrompt } from './Gate.jsx';
 import { Avatar } from './Profile.jsx';
 import { initials } from './Parts.jsx';
@@ -249,7 +250,7 @@ export function ChannelEditor({ sid, channel, onClose }) {
               {editing && (
                 <label className={`vc-icon-up${/^https?:\/\//.test(icon) ? ' on' : ''}`} title="Upload a picture">
                   {/^https?:\/\//.test(icon) ? <img src={icon} alt="" /> : <Upload size={15} />}
-                  <input type="file" hidden accept="image/*" onChange={async e => { const f = e.target.files[0]; if (!f) return; try { const res = await uploadTo(`/chat/channels/${channel.cid}/icon`, f); setIcon(res.channel.icon); } catch (er) { toast(errorText(er.message)); } }} />
+                  <input type="file" hidden accept="image/*" onChange={async e => { const f = e.target.files[0]; if (!f) return; warnImage(f, 'channelIcon', isInst(channel.cid)); try { const res = await uploadTo(`/chat/channels/${channel.cid}/icon`, f); setIcon(res.channel.icon); } catch (er) { toast(errorText(er.message)); } }} />
                 </label>
               )}
             </div></div>

@@ -12,6 +12,7 @@ import {
 import { apiFetch, uploadFetch } from '../api.js';
 import { useChat, go, ask, toast, errorText, refreshServer, loadServersOf, loadMembers, useFace } from './store.js';
 import { instOf, isInst } from './ids.js';
+import { imgHint, warnImage } from './imgHints.js';
 import { initials } from './Parts.jsx';
 import { Avatar } from './Profile.jsx';
 import { stampOf } from './text.jsx';
@@ -175,6 +176,7 @@ function Overview({ sid, origin, instAdmin, onDirty, goTo }) {
   }
   async function img(kind, file) {
     if (!file) return;
+    warnImage(file, kind === 'icon' ? 'serverIcon' : 'serverBanner', isInst(sid));
     setBusy(kind);
     try { await uploadTo(`/chat/servers/${sid}/${kind}`, file); await refreshServer(sid); await loadServersOf(sid); } catch (e) { toast(errorText(e.message)); }
     setBusy('');
@@ -206,11 +208,11 @@ function Overview({ sid, origin, instAdmin, onDirty, goTo }) {
           <div className="vc-field"><span>Icon</span>
             <div className="vc-img-row"><span className="vc-srv-ico lg">{srv.icon ? <img src={srv.icon} alt="" /> : initials(srv.name)}</span>
               <label className="btn btn-surface"><Upload size={14} /> {busy === 'icon' ? 'Uploading...' : 'Upload'}<input type="file" hidden accept="image/*" onChange={e => img('icon', e.target.files[0])} /></label>
-              {srv.icon && <button type="button" className="btn btn-surface" onClick={() => clearImg('icon')}>Remove</button>}</div></div>
+              {srv.icon && <button type="button" className="btn btn-surface" onClick={() => clearImg('icon')}>Remove</button>}</div><small className="vc-hint vc-img-hint">{imgHint('serverIcon', isInst(sid))}</small></div>
           <div className="vc-field"><span>Banner</span>
             <div className="vc-img-row"><span className="vc-banner-prev">{srv.banner && <img src={srv.banner} alt="" />}</span>
               <label className="btn btn-surface"><Upload size={14} /> {busy === 'banner' ? 'Uploading...' : 'Upload'}<input type="file" hidden accept="image/*" onChange={e => img('banner', e.target.files[0])} /></label>
-              {srv.banner && <button type="button" className="btn btn-surface" onClick={() => clearImg('banner')}>Remove</button>}</div></div>
+              {srv.banner && <button type="button" className="btn btn-surface" onClick={() => clearImg('banner')}>Remove</button>}</div><small className="vc-hint vc-img-hint">{imgHint('serverBanner', isInst(sid))}</small></div>
         </div>
         <label className="vc-field"><span>Name</span><input className="form-input" maxLength={60} value={name} onChange={e => setName(e.target.value)} /></label>
         <label className="vc-field"><span>Description</span><textarea className="form-textarea" rows={3} maxLength={300} value={desc} onChange={e => setDesc(e.target.value)} /></label>
