@@ -2554,6 +2554,12 @@ html.vc-rounded .vc-sticker.gone { border-radius: calc(8px * var(--rk, 1)); }
 /* clone lock (cloneLock.js): instead of Clone / Add when its owner or server locked it */
 .vc-eminfo-lock { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; padding: 8px 10px; background: var(--bg-tertiary, rgba(255,255,255,.04)); color: var(--text-muted); font-size: 12.5px; line-height: 1.35; }
 .vc-eminfo-lock svg { flex: none; margin-top: 1px; }
+/* a copied emoji / sticker: "Originally from" (cloneLock.js originLabel) */
+.vc-eminfo-origin { display: flex; align-items: center; gap: 7px; margin-top: 8px; color: var(--text-muted); font-size: 12.5px; min-width: 0; }
+.vc-eminfo-origin svg { flex: none; }
+.vc-eminfo-origin span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vc-eminfo-origin b { color: var(--text); font-weight: 600; }
+.vc-eminfo-origin small { opacity: .75; }
 .vc-eminfo-owner { align-items: center; }
 
 /* a profile badge's hover card (Tooltip.jsx BadgeTip): big icon, name, how it's earned */

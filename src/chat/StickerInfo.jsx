@@ -3,14 +3,14 @@
 // + Add to personal stickers. Right-click has the same two choices (stickerMenuItems).
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Copy, Sticker, Lock } from 'lucide-react';
+import { Copy, Sticker, Lock, History } from 'lucide-react';
 import { ServerIcon, serverMenuIcon } from './ServerIcon.jsx';
 import { apiFetch } from '../api.js';
 import { go, getState, toast } from './store.js';
 import { isInst } from './ids.js';
 import { cloneTargets } from './cloneEmoji.js';
 import { addSticker, savePersonalSticker, isMyPersonalSticker, LOCK_TOAST } from './personal.js';
-import { stickerLock, stickerLockNow, rememberLock, LOCK_HINT } from './cloneLock.js';
+import { stickerLock, stickerLockNow, rememberLock, LOCK_HINT, originLabel } from './cloneLock.js';
 import { Avatar } from './Profile.jsx';
 import { openMenu } from './Menu.jsx';
 
@@ -58,12 +58,13 @@ export function stickerMenuItems(s, sid = null) {
 export function StickerInfoHost() {
   const [info, setInfo] = useState(null); // { s, sid, rect }
   const [owner, setOwner] = useState(null); // a personal sticker's owner { username, pfp } (false = not found)
+  const [pOrigin, setPOrigin] = useState(null); // a personal one's origin (a server sticker carries its own: s.origin)
   const box = useRef(null);
   useEffect(() => {
     const on = e => {
       const d = e.detail;
-      setInfo(d); setOwner(null);
-      if (d.s.psid) apiFetch(`/chat/personal-stickers/${encodeURIComponent(d.s.psid)}/info`).then(x => { rememberLock(`s:${d.s.psid}`, !!x.locked); setOwner(x.owner || false); }).catch(() => setOwner(false));
+      setInfo(d); setOwner(null); setPOrigin(null);
+      if (d.s.psid) apiFetch(`/chat/personal-stickers/${encodeURIComponent(d.s.psid)}/info`).then(x => { rememberLock(`s:${d.s.psid}`, !!x.locked); setOwner(x.owner || false); setPOrigin(x.origin || null); }).catch(() => setOwner(false));
     };
     addEventListener('vc-sticker-info', on);
     return () => removeEventListener('vc-sticker-info', on);
@@ -86,6 +87,7 @@ export function StickerInfoHost() {
   const signedIn = !!getState().signedIn;
   // a personal one: known once its owner answered (owner !== null)
   const lock = s.psid && owner === null ? null : stickerLock(s, sid);
+  const origin = s.psid ? pOrigin : s.origin || null; // a copy: where it was first seen
   return createPortal(
     <div className="vc-eminfo vc-stkinfo vl-rise" ref={box} style={style}>
       <div className="vc-eminfo-top">
@@ -109,6 +111,7 @@ export function StickerInfoHost() {
           {srv && <button type="button" className="btn btn-surface btn-sm" onClick={() => { setInfo(null); go({ kind: 'server', sid: srv.sid }); }}>Open</button>}
         </div>
       )}
+      {origin && <div className="vc-eminfo-origin"><History size={13} /><span>Originally from <b>{originLabel(origin)}</b>{origin.type === 'server' && origin.host ? <small> {origin.host}</small> : null}</span></div>}
       {lock && owner !== false && (targets.length > 0 || signedIn) && <div className="vc-eminfo-lock"><Lock size={13} /><span>{lock === 'owner' ? 'Its owner locked their stickers, so it can\'t be cloned or added.' : 'This server doesn\'t allow copying its stickers.'}</span></div>}
       {!lock && (targets.length > 0 || (signedIn && !mine(s))) && (
         <div className="vc-eminfo-acts">

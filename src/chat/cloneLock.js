@@ -11,6 +11,8 @@ import { isPersonalEmoji, isMyPersonalSticker, LOCK_TOAST } from './personal.js'
 
 export { LOCK_TOAST };
 export const LOCK_HINT = { owner: 'Locked by its owner', server: "This server doesn't allow copying" };
+// a copy's origin (where its bytes were first seen) as the text after "Originally from": @user or the server's name
+export const originLabel = o => (!o ? null : o.type === 'user' ? (o.username ? `@${o.username}` : 'a deleted account') : o.name || 'an Ember server');
 
 const known = new Map(); // 'e:<eid>' / 's:<psid>' -> a personal emoji's / sticker's owner lock (from the info answers)
 export const rememberLock = (key, locked) => { if (typeof locked === 'boolean') known.set(key, locked); };
