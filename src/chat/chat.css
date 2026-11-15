@@ -2659,3 +2659,8 @@ html.vc-rounded .vc-drawer-badge { border-radius: 999px; }
   .hm-pins { display: flex; flex-direction: column; gap: 2px; padding: 4px 0 8px; }
   .hm-pins .vc-pin-cat:first-child { margin-top: 0; }
 }
+
+/* Settings > Personal Expressions (PersonalPages.jsx): the lock, then Emojis, then Stickers */
+.vc-expr { display: flex; flex-direction: column; gap: 18px; }
+.vc-expr-sec + .vc-expr-sec { border-top: 1px solid var(--border); padding-top: 18px; }
+.vc-expr-h { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 15px; font-weight: 700; color: var(--text); }

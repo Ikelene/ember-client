@@ -4,8 +4,8 @@
 // the profile editor.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronLeft, ChevronRight, Search, UserRound, CircleUser, Shield, Bell, MessageSquare, Monitor, Sparkles, SlidersHorizontal, Bot, Info, Bug, LifeBuoy, ExternalLink, Users, Cloud, ShieldOff, Palette, Type, Mic, LayoutTemplate, SmilePlus, Sticker } from 'lucide-react';
-import { PersonalEmojisPage, PersonalStickersPage } from './PersonalPages.jsx';
+import { X, ChevronLeft, ChevronRight, Search, UserRound, CircleUser, Shield, Bell, MessageSquare, Monitor, Sparkles, SlidersHorizontal, Bot, Info, Bug, LifeBuoy, ExternalLink, Users, Cloud, ShieldOff, Palette, Type, Mic, LayoutTemplate, SmilePlus } from 'lucide-react';
+import { PersonalExpressionsPage } from './PersonalPages.jsx';
 import { AccountsPage, HostingPage } from './settings/AccountsPages.jsx';
 import VoicePage from './settings/VoicePage.jsx';
 import { ThemePage, TextLayoutPage, BlockingPage, NotifLevels } from './settings/LookPages.jsx';
@@ -27,8 +27,7 @@ const PAGES = [
     ['accounts', 'Signed-in accounts', Users, ['Accounts', 'Sign out', 'Log out', 'Switch accounts', 'Server accounts', 'Instances', 'Signed in']],
     ['Account', 'Nookara account', CircleUser, ['Log out', 'Sign out', 'Account management', 'Email', 'Password', 'Security', 'Signing key', 'Message signing', 'Signed messages', 'Sign messages as you', 'Ed25519']],
     ['profile', 'My profile', UserRound, ['Edit profile', 'Profile customization', 'Username', 'Change username', 'Avatar', 'Profile picture', 'Banner', 'Accent colour', 'Accent color', 'About me', 'Bio', 'Website', 'Country', 'Local time', 'Time zone', 'Profile visibility', 'Friends only', 'Badges']],
-    ['emojis', 'Personal emojis', SmilePlus, ['Emojis', 'Personal emoji', 'My emojis', 'Custom emoji', 'Add emoji']],
-    ['stickers', 'Personal stickers', Sticker, ['Stickers', 'Personal sticker', 'My stickers', 'Add sticker', 'Save sticker']],
+    ['expressions', 'Personal Expressions', SmilePlus, ['Emojis', 'Personal emoji', 'Personal emojis', 'My emojis', 'Custom emoji', 'Add emoji', 'Stickers', 'Personal sticker', 'Personal stickers', 'My stickers', 'Add sticker', 'Save sticker', 'Lock my emojis and stickers', 'Clone lock']],
     ['hosting', 'Server hosting', Cloud, ['Hosting', 'Hosted servers', 'Plan', 'Billing', 'Backups', 'Ember server']],
   ]],
   ['Privacy & safety', [
@@ -220,7 +219,7 @@ export default function SettingsDialog({ page: startPage, onClose }) {
         <div className="bf-sd-main">
           <header className="bf-sd-head">
             <button type="button" className="bf-sd-backbtn" aria-label="Back to settings" onClick={backToList}><ChevronLeft size={22} /></button>
-            {['accounts', 'hosting', 'voice', 'theme', 'text', 'blocking', 'design', 'emojis', 'stickers'].includes(page)
+            {['accounts', 'hosting', 'voice', 'theme', 'text', 'blocking', 'design', 'expressions'].includes(page)
               ? <h2 className="bf-sd-crumbs"><span>Settings</span><ChevronRight size={14} /><span>{groups.find(([, items]) => items.some(it => it[0] === page))?.[0]}</span><ChevronRight size={14} /><b>{current?.[1]}</b></h2>
               : <h2>{Icon && <Icon size={19} />} {current?.[1] || 'Settings'}</h2>}
             <button type="button" className="bf-sd-x" aria-label="Close settings" data-tip="Close (Esc)" onClick={() => close()}><X size={18} /></button>
@@ -229,8 +228,7 @@ export default function SettingsDialog({ page: startPage, onClose }) {
             {page === 'profile' ? <ProfileEditor onDirty={(on, nudge) => { dirty.current = { on, nudge }; }} />
               : page === 'accounts' ? <AccountsPage onClose={() => close()} />
                 : page === 'hosting' ? <HostingPage onClose={() => close()} />
-                  : page === 'emojis' ? <PersonalEmojisPage />
-                  : page === 'stickers' ? <PersonalStickersPage />
+                  : page === 'expressions' ? <PersonalExpressionsPage />
                   : page === 'design' ? <DesignSettings />
                   : page === 'voice' ? <VoicePage />
                     : page === 'theme' ? <ThemePage />

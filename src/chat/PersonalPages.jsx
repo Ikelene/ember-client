@@ -1,8 +1,9 @@
-// Settings > Personal emojis + Personal stickers (your Nookara account) and Server settings > Stickers (an Ember server).
+// Settings > Personal Expressions (your Nookara account's personal emojis on top, personal stickers below, and the clone lock)
+// and Server settings > Stickers (an Ember server).
 // personal.js does the calls.
 import { useEffect, useRef, useState } from 'react';
-import { Upload, Trash2 } from 'lucide-react';
-import { useChat, toast, errorText, refreshServer, loadEmojis } from './store.js';
+import { Upload, Trash2, SmilePlus, Sticker } from 'lucide-react';
+import { useChat, toast, errorText, refreshServer, loadEmojis, saveSettings } from './store.js';
 import { apiFetch } from '../api.js';
 import { isInst } from './ids.js';
 import { Toggle } from './roles.jsx';
@@ -22,7 +23,7 @@ function ItemRow({ url, name, animated, onRename, onDelete, big }) {
   );
 }
 
-export function PersonalEmojisPage() {
+function PersonalEmojis() {
   const box = useChat(s => s.personalEmojis);
   const [busy, setBusy] = useState(0);
   const file = useRef(null);
@@ -33,8 +34,9 @@ export function PersonalEmojisPage() {
     for (const f of [...files].slice(0, 20)) { warnImage(f, 'personalEmoji'); setBusy(n => n + 1); await addPersonalEmoji(f, undefined, { quiet: true }); setBusy(n => n - 1); }
   }
   return (
-    <div className="vc-emoji-man">
-      <p className="vc-dialog-sub">Your personal emojis live on your Nookara account, so you can use them on any Ember server, in DMs and in group chats, from any app signed in as you. Only you have them in your picker; anyone can clone one to their own server or personal emojis. {imgHint('personalEmoji')} {list ? `${list.length} / ${box.max} used${box.max < box.pro_max ? ` (${box.pro_max} with Pro)` : ''}.` : ''}</p>
+    <section className="vc-emoji-man vc-expr-sec">
+      <h3 className="vc-expr-h"><SmilePlus size={16} /> Emojis</h3>
+      <p className="vc-dialog-sub">Your personal emojis live on your Nookara account, so you can use them on any Ember server, in DMs and in group chats, from any app signed in as you. Only you have them in your picker; anyone can clone one to their own server or personal emojis unless you lock them. {imgHint('personalEmoji')} {list ? `${list.length} / ${box.max} used${box.max < box.pro_max ? ` (${box.pro_max} with Pro)` : ''}.` : ''}</p>
       <button type="button" className="btn btn-primary" disabled={busy > 0 || full || !list} onClick={() => file.current?.click()}><Upload size={14} /> {busy ? 'Uploading...' : 'Add emoji'}</button>
       <input ref={file} type="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp" onChange={e => { add(e.target.files); e.target.value = ''; }} />
       <div className="vc-emoji-list" data-drop-own onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); add(e.dataTransfer.files); }}>
@@ -42,11 +44,11 @@ export function PersonalEmojisPage() {
         {list && !list.length && <div className="vc-empty-note">No personal emojis yet. Add one here, or right-click any custom emoji and pick Add to personal emojis.</div>}
         {list?.map(e => <ItemRow key={e.eid} url={e.url} name={e.name} animated={e.animated} onRename={v => renamePersonalEmoji(e.eid, v)} onDelete={() => deletePersonalEmoji(e.eid)} />)}
       </div>
-    </div>
+    </section>
   );
 }
 
-export function PersonalStickersPage() {
+function PersonalStickers() {
   const box = useChat(s => s.personalStickers);
   const [busy, setBusy] = useState(0);
   const file = useRef(null);
@@ -57,8 +59,9 @@ export function PersonalStickersPage() {
     for (const f of [...files].slice(0, 10)) { warnImage(f, 'personalSticker'); setBusy(n => n + 1); await addPersonalSticker(f, undefined, { quiet: true }); setBusy(n => n - 1); }
   }
   return (
-    <div className="vc-emoji-man">
-      <p className="vc-dialog-sub">Your personal stickers live on your Nookara account, so you can send them anywhere: Ember servers, DMs and group chats, from the Stickers tab of the emoji picker. A sticker is sent as its picture link, so other apps show it as a picture. Anyone can save one you sent to their own stickers. {imgHint('personalSticker')} {list ? `${list.length} / ${box.max} used${box.max < box.pro_max ? ` (${box.pro_max} with Pro)` : ''}.` : ''}</p>
+    <section className="vc-emoji-man vc-expr-sec">
+      <h3 className="vc-expr-h"><Sticker size={16} /> Stickers</h3>
+      <p className="vc-dialog-sub">Your personal stickers live on your Nookara account, so you can send them anywhere: Ember servers, DMs and group chats, from the Stickers tab of the emoji picker. A sticker is sent as its picture link, so other apps show it as a picture. Anyone can save one you sent to their own stickers unless you lock them. {imgHint('personalSticker')} {list ? `${list.length} / ${box.max} used${box.max < box.pro_max ? ` (${box.pro_max} with Pro)` : ''}.` : ''}</p>
       <button type="button" className="btn btn-primary" disabled={busy > 0 || full || !list} onClick={() => file.current?.click()}><Upload size={14} /> {busy ? 'Uploading...' : 'Add sticker'}</button>
       <input ref={file} type="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp" onChange={e => { add(e.target.files); e.target.value = ''; }} />
       <div className="vc-emoji-list" data-drop-own onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); add(e.dataTransfer.files); }}>
@@ -66,6 +69,24 @@ export function PersonalStickersPage() {
         {list && !list.length && <div className="vc-empty-note">No personal stickers yet. Add one here, or right-click any sticker in a chat and pick Save to my stickers.</div>}
         {list?.map(s => <ItemRow key={s.sid} big url={s.url} name={s.name} animated={s.animated} onRename={v => renamePersonalSticker(s.sid, v)} onDelete={() => deletePersonalSticker(s.sid)} />)}
       </div>
+    </section>
+  );
+}
+
+// Settings > Personal Expressions: the lock (same setting as Privacy > Lock my emojis and stickers), emojis, then stickers
+export function PersonalExpressionsPage() {
+  const locked = useChat(s => !!s.settings?.lock_emojis);
+  const [busy, setBusy] = useState(false);
+  async function flip(next) {
+    setBusy(true);
+    try { await saveSettings({ lock_emojis: next }); } catch (e) { saveSettings({ lock_emojis: !next }).catch(() => {}); toast(errorText(e.message)); }
+    setBusy(false);
+  }
+  return (
+    <div className="vc-expr">
+      <Toggle label="Lock my emojis and stickers" hint={locked ? 'On: nobody else can clone them to a server or add them to their own. They still show in your messages.' : 'Off: anyone can clone them to their server or add them to their own personal emojis and stickers.'} on={locked} disabled={busy} onChange={flip} />
+      <PersonalEmojis />
+      <PersonalStickers />
     </div>
   );
 }
