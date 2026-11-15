@@ -11,6 +11,7 @@ import { usePlan, PlanGate, PlanNotice, PlanUsage } from './PlanGate.jsx';
 import { emojiMenuItems } from './cloneEmoji.js';
 import { loadPersonalEmojis, loadStickers, loadPersonalStickers } from './personal.js';
 import { openMenu } from './Menu.jsx';
+import { CloneSetting } from './PersonalPages.jsx';
 
 const GROUPS = [
   [0, 'Smileys', Smile], [1, 'People', Users], [3, 'Animals and nature', Cat], [4, 'Food and drink', Apple],
@@ -203,6 +204,7 @@ export function EmojiManager({ sid }) {
       {!plan.gate && <PlanUsage what="emojis" used={list ? list.length : undefined} />}
       <PlanNotice block={plan.full} />
       <p className="vc-dialog-sub">{imgHint('emoji', isInst(sid))} Everyone in Ember can use your server's emojis anywhere. {list ? `${list.length} / ${max} used.` : ''}</p>
+      <CloneSetting sid={sid} />
       <button type="button" className="btn btn-primary" disabled={busy > 0 || !!plan.full || !!plan.gate || (list && list.length >= max)} onClick={() => file.current?.click()}><Upload size={14} /> {busy ? 'Uploading...' : 'Upload emoji'}</button>
       <input ref={file} type="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp" onChange={e => { add(e.target.files); e.target.value = ''; }} />
       <div className="vc-emoji-list" data-drop-own onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); add(e.dataTransfer.files); }}>

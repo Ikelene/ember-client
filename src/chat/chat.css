@@ -2551,6 +2551,9 @@ html.vc-rounded .vc-em-tabs button, html.vc-rounded .vc-stk { border-radius: cal
 html.vc-rounded .vc-sticker.gone { border-radius: calc(8px * var(--rk, 1)); }
 .vc-eminfo-acts { display: flex; gap: 8px; margin-top: 10px; }
 .vc-eminfo-acts .btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+/* clone lock (cloneLock.js): instead of Clone / Add when its owner or server locked it */
+.vc-eminfo-lock { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; padding: 8px 10px; background: var(--bg-tertiary, rgba(255,255,255,.04)); color: var(--text-muted); font-size: 12.5px; line-height: 1.35; }
+.vc-eminfo-lock svg { flex: none; margin-top: 1px; }
 .vc-eminfo-owner { align-items: center; }
 
 /* a profile badge's hover card (Tooltip.jsx BadgeTip): big icon, name, how it's earned */

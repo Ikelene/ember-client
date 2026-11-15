@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Users, Lock, Copy, SmilePlus } from 'lucide-react';
+import { emojiLock, rememberLock } from './cloneLock.js';
 import { serverMenuIcon } from './ServerIcon.jsx';
 import { apiFetch } from '../api.js';
 import { go, loadServersOf, toast, errorText, customEmoji, getState } from './store.js';
@@ -25,7 +26,7 @@ export function EmojiInfoHost() {
       setInfo(d); setSrv(null); setOwner(null);
       // an instance's emoji is asked about on that instance (the one whose emoji list has it), the rest (personal emojis) on Nookara
       const from = getState().emojis?.find(sv => sv.emojis?.some(x => x.eid === d.eid))?.sid;
-      if (d.eid) apiFetch(`/chat/emojis/${encodeURIComponent(d.eid)}/info`, { inst: instOpt(from) }).then(x => { setSrv(x.server || false); setOwner(x.personal?.owner || null); }).catch(() => setSrv(false));
+      if (d.eid) apiFetch(`/chat/emojis/${encodeURIComponent(d.eid)}/info`, { inst: instOpt(from) }).then(x => { if (x.personal) rememberLock(`e:${d.eid}`, !!x.personal.locked); setSrv(x.server || false); setOwner(x.personal?.owner || null); }).catch(() => setSrv(false));
       else if (!emojiDataSync()) loadEmojiData().then(() => setInfo(x => (x ? { ...x } : x)));
     };
     addEventListener('vc-emoji-info', on);
@@ -45,6 +46,8 @@ export function EmojiInfoHost() {
   const below = innerHeight - r.bottom > 240; // (room for the popup under it: it got taller with the bigger emoji)
   const style = { left: Math.max(8, Math.min(r.left + r.width / 2 - 150, innerWidth - 308)), ...(below ? { top: r.bottom + 8 } : { bottom: innerHeight - r.top + 8 }) };
   const name = info.eid ? info.name : nameOfChar(info.char, emojiDataSync());
+  // locked: its owner locked their personal emojis, or its Ember server doesn't allow copying (known once the info answered)
+  const lock = info.eid && srv !== null ? emojiLock(info) : null;
   async function join() {
     setBusy(true);
     try { await apiFetch(`/chat/servers/${srv.sid}/join`, { method: 'POST', body: JSON.stringify({}) }); await loadServersOf(srv.sid); setInfo(null); go({ kind: 'server', sid: srv.sid }); }
@@ -74,7 +77,8 @@ export function EmojiInfoHost() {
           <div className="grow"><b>{owner.username}</b><small>Their personal emoji</small></div>
         </div>
       )}
-      {info.eid && (cloneTargets().length > 0 || (getState().signedIn && !isPersonalEmoji(info.eid))) && (
+      {lock && (cloneTargets().length > 0 || getState().signedIn) && <div className="vc-eminfo-lock"><Lock size={13} /><span>{lock === 'owner' ? 'Its owner locked their emojis, so it can\'t be cloned or added.' : 'This server doesn\'t allow copying its emojis.'}</span></div>}
+      {info.eid && !lock && (cloneTargets().length > 0 || (getState().signedIn && !isPersonalEmoji(info.eid))) && (
         <div className="vc-eminfo-acts">
           {cloneTargets().length > 0 && <button type="button" className="btn btn-surface btn-sm" onClick={e => { const emoji = { eid: info.eid, name: info.name, animated: info.animated }; openMenu(e, cloneTargets().map(x => ({ label: x.name, icon: serverMenuIcon(x), onClick: () => { setInfo(null); cloneEmoji(emoji, x.sid); } }))); }}><Copy size={14} /> Clone emoji</button>}
           {getState().signedIn && !isPersonalEmoji(info.eid) && <button type="button" className="btn btn-surface btn-sm" onClick={() => { const emoji = { eid: info.eid, name: info.name, animated: info.animated }; setInfo(null); addPersonalFromEmoji(emoji); }}><SmilePlus size={14} /> Add to personal</button>}

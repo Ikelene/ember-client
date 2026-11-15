@@ -23,6 +23,7 @@ export const GROUPS = [
     ['share_typing', 'Let others see when I am typing', 'Turn this off to type without the "is typing..." showing for anyone.'],
     ['allow_vc_calls', 'Let people call me into voice channels', 'Where a voice channel allows it, people in that server can ring you straight into it. Turn off to never get those calls.'],
     ['dm_privacy', 'Who can send me direct messages', 'Friends only stops people you are not friends with from starting a DM or calling you. The servers option also lets in people who share an Ember server with you. Nookara staff can always reach you.', [['everyone', 'Everyone'], ['friends', 'Friends only'], ['servers', "Members in servers I'm in"]]],
+    ['lock_emojis', 'Lock my emojis and stickers', 'Nobody else can clone your personal emojis and stickers to a server or add them to their own. People can still see them in your messages.'],
   ]],
   ['Notifications', [
     ['sounds', 'Sounds', 'A sound for new direct messages and when someone @mentions you.'],

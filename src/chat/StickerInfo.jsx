@@ -3,13 +3,14 @@
 // + Add to personal stickers. Right-click has the same two choices (stickerMenuItems).
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Copy, Sticker } from 'lucide-react';
+import { Copy, Sticker, Lock } from 'lucide-react';
 import { ServerIcon, serverMenuIcon } from './ServerIcon.jsx';
 import { apiFetch } from '../api.js';
 import { go, getState, toast } from './store.js';
 import { isInst } from './ids.js';
 import { cloneTargets } from './cloneEmoji.js';
-import { addSticker, savePersonalSticker, isMyPersonalSticker } from './personal.js';
+import { addSticker, savePersonalSticker, isMyPersonalSticker, LOCK_TOAST } from './personal.js';
+import { stickerLock, stickerLockNow, rememberLock, LOCK_HINT } from './cloneLock.js';
 import { Avatar } from './Profile.jsx';
 import { openMenu } from './Menu.jsx';
 
@@ -19,14 +20,18 @@ export const openStickerInfo = (s, sid, el) => dispatchEvent(new CustomEvent('vc
 // only Ember servers have stickers
 const stickerTargets = () => cloneTargets().filter(x => isInst(x.sid));
 
-export async function cloneSticker(s, sid) {
+// s, fromSid: the sticker and the server it belongs to (null for a personal one); sid: where it goes
+export async function cloneSticker(s, sid, fromSid = null) {
+  const lock = await stickerLockNow(s, fromSid);
+  if (lock) { toast(LOCK_TOAST[lock]); return; }
+  const from = new URL(s.url, location.href).href;
   try {
-    const res = await fetch(new URL(s.url, location.href).href, { credentials: 'omit' });
+    const res = await fetch(from, { credentials: 'omit' });
     if (!res.ok) throw new Error('gone');
     const blob = await res.blob();
     const gif = s.animated || blob.type === 'image/gif';
     const name = String(s.name || 'sticker').replace(/[^A-Za-z0-9_]/g, '_').slice(0, 32) || 'sticker';
-    if (!(await addSticker(sid, new File([blob], `${name}.${gif ? 'gif' : 'png'}`, { type: blob.type || 'image/png' }), name))) return;
+    if (!(await addSticker(sid, new File([blob], `${name}.${gif ? 'gif' : 'png'}`, { type: blob.type || 'image/png' }), name, from))) return;
     const srv = getState().servers.find(x => x.sid === sid);
     toast(`Added ${name} to ${srv?.name || 'your server'}'s stickers.`, true);
   } catch { toast("Couldn't get that sticker's picture."); }
@@ -34,14 +39,19 @@ export async function cloneSticker(s, sid) {
 
 const mine = s => !!s.psid && isMyPersonalSticker(s.psid);
 
-// right-click: Clone to server (your Ember servers as a submenu) + Add to personal stickers
-export function stickerMenuItems(s) {
+// right-click: Clone to server (your Ember servers as a submenu) + Add to personal stickers. sid: the server a server sticker is from
+export function stickerMenuItems(s, sid = null) {
   const targets = stickerTargets();
+  const lock = stickerLock(s, sid);
+  if (lock) return [
+    { label: 'Clone to server', icon: Lock, disabled: true, hint: LOCK_HINT[lock] },
+    getState().signedIn && { label: 'Add to personal stickers', icon: Lock, disabled: true, hint: LOCK_HINT[lock] },
+  ].filter(Boolean);
   return [
     targets.length
-      ? { label: 'Clone to server', icon: Copy, sub: targets.map(x => ({ label: x.name, icon: serverMenuIcon(x), onClick: () => cloneSticker(s, x.sid) })) }
+      ? { label: 'Clone to server', icon: Copy, sub: targets.map(x => ({ label: x.name, icon: serverMenuIcon(x), onClick: () => cloneSticker(s, x.sid, sid) })) }
       : { label: 'Clone to server', icon: Copy, disabled: true, hint: 'Needs Manage server on an Ember server' },
-    getState().signedIn && { label: mine(s) ? 'In your personal stickers' : 'Add to personal stickers', icon: Sticker, disabled: mine(s), onClick: () => savePersonalSticker(s) },
+    getState().signedIn && { label: mine(s) ? 'In your personal stickers' : 'Add to personal stickers', icon: Sticker, disabled: mine(s), onClick: () => savePersonalSticker(s, sid) },
   ].filter(Boolean);
 }
 
@@ -53,7 +63,7 @@ export function StickerInfoHost() {
     const on = e => {
       const d = e.detail;
       setInfo(d); setOwner(null);
-      if (d.s.psid) apiFetch(`/chat/personal-stickers/${encodeURIComponent(d.s.psid)}/info`).then(x => setOwner(x.owner || false)).catch(() => setOwner(false));
+      if (d.s.psid) apiFetch(`/chat/personal-stickers/${encodeURIComponent(d.s.psid)}/info`).then(x => { rememberLock(`s:${d.s.psid}`, !!x.locked); setOwner(x.owner || false); }).catch(() => setOwner(false));
     };
     addEventListener('vc-sticker-info', on);
     return () => removeEventListener('vc-sticker-info', on);
@@ -74,6 +84,8 @@ export function StickerInfoHost() {
   const style = { left: Math.max(8, Math.min(r.left + r.width / 2 - 150, innerWidth - 308)), ...(below ? { top: r.bottom + 8 } : { bottom: innerHeight - r.top + 8 }) };
   const targets = stickerTargets();
   const signedIn = !!getState().signedIn;
+  // a personal one: known once its owner answered (owner !== null)
+  const lock = s.psid && owner === null ? null : stickerLock(s, sid);
   return createPortal(
     <div className="vc-eminfo vc-stkinfo vl-rise" ref={box} style={style}>
       <div className="vc-eminfo-top">
@@ -97,10 +109,11 @@ export function StickerInfoHost() {
           {srv && <button type="button" className="btn btn-surface btn-sm" onClick={() => { setInfo(null); go({ kind: 'server', sid: srv.sid }); }}>Open</button>}
         </div>
       )}
-      {(targets.length > 0 || (signedIn && !mine(s))) && (
+      {lock && owner !== false && (targets.length > 0 || signedIn) && <div className="vc-eminfo-lock"><Lock size={13} /><span>{lock === 'owner' ? 'Its owner locked their stickers, so it can\'t be cloned or added.' : 'This server doesn\'t allow copying its stickers.'}</span></div>}
+      {!lock && (targets.length > 0 || (signedIn && !mine(s))) && (
         <div className="vc-eminfo-acts">
-          {targets.length > 0 && <button type="button" className="btn btn-surface btn-sm" onClick={e => openMenu(e, targets.map(x => ({ label: x.name, icon: serverMenuIcon(x), onClick: () => { setInfo(null); cloneSticker(s, x.sid); } })))}><Copy size={14} /> Clone to server</button>}
-          {signedIn && !mine(s) && <button type="button" className="btn btn-surface btn-sm" onClick={() => { setInfo(null); savePersonalSticker(s); }}><Sticker size={14} /> Add to personal</button>}
+          {targets.length > 0 && <button type="button" className="btn btn-surface btn-sm" onClick={e => openMenu(e, targets.map(x => ({ label: x.name, icon: serverMenuIcon(x), onClick: () => { setInfo(null); cloneSticker(s, x.sid, sid); } })))}><Copy size={14} /> Clone to server</button>}
+          {signedIn && !mine(s) && <button type="button" className="btn btn-surface btn-sm" onClick={() => { setInfo(null); savePersonalSticker(s, sid); }}><Sticker size={14} /> Add to personal</button>}
         </div>
       )}
     </div>,

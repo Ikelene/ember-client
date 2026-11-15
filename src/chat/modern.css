@@ -388,3 +388,6 @@ html.vc-rounded .vc-em-sec { border-radius: calc(8px * var(--rk, 1)); }
 
 /* jumbo emojis (a message that is only emojis) follow the message text size too (look.js --m-jumbo) */
 html.vc-rounded .vc-text.jumbo :is(.vc-cemoji, .vc-temoji) { width: var(--m-jumbo, 48px); height: var(--m-jumbo, 48px); }
+
+/* clone lock note in the emoji / sticker card (cloneLock.js) */
+html.vc-rounded .vc-eminfo-lock { border-radius: var(--r-md); }

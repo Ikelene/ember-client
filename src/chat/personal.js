@@ -8,7 +8,14 @@ import { isInst, instOf, bare } from './ids.js';
 import { signMessage, refreshSigningKey } from './signing.js';
 import { connections } from './instances.js';
 
+// clone locks (cloneLock.js): the owner locked them / the server doesn't allow copying
+export const LOCK_TOAST = {
+  owner: "Its owner locked their emojis and stickers, so it can't be copied.",
+  server: "That server doesn't allow copying its emojis and stickers.",
+};
 const ERR = {
+  clone_locked: LOCK_TOAST.owner,
+  cloning_disabled: LOCK_TOAST.server,
   too_many_emojis: 'You have as many personal emojis as you can (25, or 100 with Pro).',
   too_many_stickers: 'This server has as many stickers as it can (30).',
   file_too_large: 'That file is too big.',
@@ -29,10 +36,12 @@ export async function loadPersonalEmojis() {
   return d;
 }
 const nameOf = n => String(n || '').replace(/[^A-Za-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 32) || 'emoji';
-export async function addPersonalEmoji(fileOrBlob, name, { quiet = false } = {}) {
+// from: the address of the picture it was copied from (the server checks the owner's clone lock)
+export async function addPersonalEmoji(fileOrBlob, name, { quiet = false, from = null } = {}) {
   const fd = new FormData();
   const nm = nameOf(name || fileOrBlob.name?.replace(/\.[^.]+$/, ''));
   fd.append('name', nm);
+  if (from) fd.append('from', from);
   fd.append('file', fileOrBlob, fileOrBlob.name || `${nm}.png`);
   try {
     const d = await uploadFetch('/chat/personal-emojis', fd);
@@ -43,11 +52,14 @@ export async function addPersonalEmoji(fileOrBlob, name, { quiet = false } = {})
 }
 // "Add to personal emojis" on someone's emoji: its picture, as-is (GIFs stay animated)
 export async function addPersonalFromEmoji(emoji) {
+  const lock = await (await import('./cloneLock.js')).emojiLockNow(emoji);
+  if (lock) { toast(LOCK_TOAST[lock]); return null; }
+  const from = new URL(customEmoji(emoji.eid, emoji.animated), location.href).href;
   try {
-    const res = await fetch(new URL(customEmoji(emoji.eid, emoji.animated), location.href).href, { credentials: 'omit' });
+    const res = await fetch(from, { credentials: 'omit' });
     if (!res.ok) throw new Error('emoji_unavailable');
     const blob = await res.blob();
-    return addPersonalEmoji(new File([blob], `${nameOf(emoji.name)}.${emoji.animated ? 'gif' : 'png'}`, { type: blob.type || 'image/png' }), emoji.name);
+    return addPersonalEmoji(new File([blob], `${nameOf(emoji.name)}.${emoji.animated ? 'gif' : 'png'}`, { type: blob.type || 'image/png' }), emoji.name, { from });
   } catch { toast("Couldn't get that emoji's picture."); return null; }
 }
 export async function renamePersonalEmoji(eid, name) {
@@ -70,9 +82,10 @@ export async function loadStickers(sid) {
   return d;
 }
 export const setStickers = (sid, list) => patchState({ stickers: { ...(getState().stickers || {}), [sid]: { ...(getState().stickers?.[sid] || { max: 30 }), list: list || [] } } });
-export async function addSticker(sid, file, name) {
+export async function addSticker(sid, file, name, from = null) {
   const fd = new FormData();
   fd.append('name', nameOf(name || file.name?.replace(/\.[^.]+$/, '')));
+  if (from) fd.append('from', from); // (Clone to server: where it was copied from)
   fd.append('file', file);
   let ok = true;
   try { await uploadFetch(`/chat/servers/${sid}/stickers`, fd); } catch (e) { ok = false; toast(msg(e)); }
@@ -119,10 +132,11 @@ export async function loadPersonalStickers() {
   if (d) patchState({ personalStickers: { list: d.stickers || [], max: d.max, pro_max: d.pro_max } });
   return d;
 }
-export async function addPersonalSticker(fileOrBlob, name, { quiet = false } = {}) {
+export async function addPersonalSticker(fileOrBlob, name, { quiet = false, from = null } = {}) {
   const fd = new FormData();
   const nm = nameOf(name || fileOrBlob.name?.replace(/\.[^.]+$/, '')).replace(/^emoji$/, 'sticker');
   fd.append('name', nm);
+  if (from) fd.append('from', from);
   fd.append('file', fileOrBlob, fileOrBlob.name || `${nm}.png`);
   try {
     const d = await uploadFetch('/chat/personal-stickers', fd);
@@ -132,13 +146,17 @@ export async function addPersonalSticker(fileOrBlob, name, { quiet = false } = {
   } catch (e) { toast(stkMsg(e)); return null; }
 }
 // "Save to my stickers" on a sticker someone sent (a personal one or an Ember server's): its picture, as-is
-export async function savePersonalSticker(s) {
+// sid: the server a server sticker belongs to (its clone setting)
+export async function savePersonalSticker(s, sid = null) {
+  const lock = await (await import('./cloneLock.js')).stickerLockNow(s, sid);
+  if (lock) { toast(LOCK_TOAST[lock]); return null; }
+  const from = new URL(s.url, location.href).href;
   try {
-    const res = await fetch(new URL(s.url, location.href).href, { credentials: 'omit' });
+    const res = await fetch(from, { credentials: 'omit' });
     if (!res.ok) throw new Error('gone');
     const blob = await res.blob();
     const gif = s.animated || /\.gif(\?|#|$)/i.test(s.url) || blob.type === 'image/gif';
-    return addPersonalSticker(new File([blob], `${nameOf(s.name)}.${gif ? 'gif' : 'png'}`, { type: blob.type || 'image/png' }), s.name);
+    return addPersonalSticker(new File([blob], `${nameOf(s.name)}.${gif ? 'gif' : 'png'}`, { type: blob.type || 'image/png' }), s.name, { from });
   } catch { toast("Couldn't get that sticker's picture."); return null; }
 }
 export async function renamePersonalSticker(psid, name) {

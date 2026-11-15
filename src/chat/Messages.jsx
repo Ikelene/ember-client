@@ -930,7 +930,7 @@ function StickerView({ s, sid }) {
   const [broken, setBroken] = useState(false);
   if (s.deleted || !s.url || broken) return <div className="vc-sticker gone">Sticker deleted</div>;
   return (
-    <button type="button" className="vc-sticker-btn" title={s.name || undefined} onClick={e => openStickerInfo(s, sid, e.currentTarget)} onContextMenu={e => openMenu(e, stickerMenuItems(s))}>
+    <button type="button" className="vc-sticker-btn" title={s.name || undefined} onClick={e => openStickerInfo(s, sid, e.currentTarget)} onContextMenu={e => openMenu(e, stickerMenuItems(s, sid))}>
       <img className="vc-sticker" src={s.url} alt={s.name || 'sticker'} draggable={false} loading="lazy" onError={() => setBroken(true)} />
     </button>
   );

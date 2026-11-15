@@ -2,7 +2,10 @@
 // personal.js does the calls.
 import { useEffect, useRef, useState } from 'react';
 import { Upload, Trash2 } from 'lucide-react';
-import { useChat } from './store.js';
+import { useChat, toast, errorText, refreshServer, loadEmojis } from './store.js';
+import { apiFetch } from '../api.js';
+import { isInst } from './ids.js';
+import { Toggle } from './roles.jsx';
 import { imgHint, warnImage } from './imgHints.js';
 import { loadPersonalEmojis, addPersonalEmoji, renamePersonalEmoji, deletePersonalEmoji, loadStickers, addSticker, renameSticker, deleteSticker, loadPersonalStickers, addPersonalSticker, renamePersonalSticker, deletePersonalSticker } from './personal.js';
 
@@ -67,6 +70,30 @@ export function PersonalStickersPage() {
   );
 }
 
+// Ember servers: Server settings > Emojis / Stickers > "Allow cloning server emojis & stickers" (settings emojis.allow_cloning, on
+// by default). Off = other servers and people's personal emojis/stickers can't copy them (cloneLock.js); the owner and admins still can.
+export function CloneSetting({ sid }) {
+  const [on, setOn] = useState(null); // null = not loaded
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!isInst(sid)) return undefined;
+    let off = false;
+    setOn(null);
+    apiFetch(`/chat/servers/${sid}/settings`).then(d => { if (!off) setOn(d.settings?.emojis?.allow_cloning !== false); }).catch(() => { if (!off) setOn(true); });
+    return () => { off = true; };
+  }, [sid]);
+  if (!isInst(sid) || on === null) return null;
+  async function flip(next) {
+    setBusy(true);
+    try {
+      const d = await apiFetch(`/chat/servers/${sid}/settings`, { method: 'PATCH', body: JSON.stringify({ emojis: { allow_cloning: next } }) });
+      setOn(d.settings?.emojis?.allow_cloning !== false); refreshServer(sid); loadEmojis();
+    } catch (e) { toast(e.message === 'invalid_emojis' ? 'This server needs an update before it has this setting.' : errorText(e.message)); }
+    setBusy(false);
+  }
+  return <Toggle label="Allow cloning server emojis & stickers" hint={on ? 'On: anyone can copy them to their own server or personal emojis and stickers.' : 'Off: only this server\'s owner and admins can copy them somewhere else.'} on={on} disabled={busy} onChange={flip} />;
+}
+
 export function StickerManager({ sid }) {
   const box = useChat(s => s.stickers?.[sid]);
   const [busy, setBusy] = useState(0);
@@ -80,6 +107,7 @@ export function StickerManager({ sid }) {
   return (
     <div className="vc-emoji-man">
       <p className="vc-dialog-sub">Stickers are big pictures people can send on their own from the Stickers tab of the emoji picker. {imgHint('sticker', true)} They show at about 160 px. {list ? `${list.length} / ${max} used.` : ''}</p>
+      <CloneSetting sid={sid} />
       <button type="button" className="btn btn-primary" disabled={busy > 0 || !list || list.length >= max} onClick={() => file.current?.click()}><Upload size={14} /> {busy ? 'Uploading...' : 'Upload sticker'}</button>
       <input ref={file} type="file" multiple hidden accept="image/png,image/gif,image/webp" onChange={e => { add(e.target.files); e.target.value = ''; }} />
       <div className="vc-emoji-list" data-drop-own onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); add(e.dataTransfer.files); }}>
