@@ -7,8 +7,14 @@
 (function fixAlbertaTime() {
   try {
     const NativeDTF = Intl.DateTimeFormat;
-    if (new NativeDTF().resolvedOptions().timeZone !== 'America/Edmonton') return;
-    if (new Date(Date.UTC(2026, 11, 1, 12)).getTimezoneOffset() !== 420) return; // the browser already knows
+    // two ways a browser gets Alberta wrong: (1) it knows America/Edmonton but its data still has UTC-7 for the winter;
+    // (2) it doesn't know Windows' new "Mountain Time (Alberta)" zone at all: no zone name and a fixed UTC-7 all year
+    // (Samsung Internet / Chromium on Windows, seen 2026-11-14). Arizona isn't caught: browsers name it America/Phoenix.
+    const zone = new NativeDTF().resolvedOptions().timeZone;
+    const winter = new Date(Date.UTC(2026, 11, 1, 12)).getTimezoneOffset(), summer = new Date(Date.UTC(2026, 6, 1, 12)).getTimezoneOffset();
+    const oldData = zone === 'America/Edmonton' && winter === 420;
+    const unknownZone = (!zone || zone === 'Etc/Unknown') && winter === 420 && summer === 420;
+    if (!oldData && !unknownZone) return; // the browser already knows
     const ZONE = 'Etc/GMT+6'; // (POSIX sign: UTC-6)
     const FROM = Date.UTC(2026, 10, 1, 8); // 2026-11-01 02:00 MDT, when Alberta stopped changing clocks
     const withZone = (date, opts) => {
