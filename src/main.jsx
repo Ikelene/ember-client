@@ -1,3 +1,4 @@
+import './tzfix.js'; // first: Alberta's UTC-6 before anything formats a time
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
