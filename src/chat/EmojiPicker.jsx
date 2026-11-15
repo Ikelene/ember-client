@@ -26,6 +26,10 @@ export const emojiToken = e => `<${e.animated ? 'a' : ''}:${e.name}:${e.eid}>`;
 export const emojiUrl = customEmoji;
 
 function recents() { try { return JSON.parse(localStorage.getItem('velora_chat_emoji_recent') || '[]'); } catch { return []; } }
+// a custom emoji you deleted from your personal emojis leaves Recent for good (personal.js deletePersonalEmoji)
+export function forgetRecent(eid) {
+  try { localStorage.setItem('velora_chat_emoji_recent', JSON.stringify(recents().filter(r => !r.c || r.c.eid !== eid))); } catch { /* fine */ }
+}
 function addRecent(item) {
   try { localStorage.setItem('velora_chat_emoji_recent', JSON.stringify([item, ...recents().filter(x => x.k !== item.k)].slice(0, 24))); } catch { /* fine */ }
 }
@@ -86,7 +90,13 @@ export default function EmojiPicker({ onPick, onClose, reactionSid, stickerSid, 
   function pickUni(e) { addRecent({ k: e[0], u: e[0], label: e[1], n: shortName(e) }); onPick(e[0]); }
   function pickCustom(e) { addRecent({ k: e.eid, c: e }); onPick(emojiToken(e)); }
   const jump = id => scroller.current?.querySelector(`[data-sec="${id}"]`)?.scrollIntoView({ block: 'start' });
-  const rec = recents().filter(r => !r.c || reactionSid === undefined || (custom || []).some(s => s.emojis.some(e => e.eid === r.c.eid)));
+  // a custom emoji that's gone (deleted from your personal emojis, or from its server) isn't shown in Recent once both lists
+  // have loaded (it would only be a broken picture). Only hidden, not forgotten: a server that's just disconnected comes back
+  const known = useMemo(() => {
+    if (!allCustom || !personalAll) return null;
+    return new Set([...personalAll.map(e => e.eid), ...allCustom.flatMap(s => s.emojis.map(e => e.eid))]);
+  }, [allCustom, personalAll]);
+  const rec = recents().filter(r => !r.c || ((!known || known.has(r.c.eid)) && (reactionSid === undefined || (custom || []).some(s => s.emojis.some(e => e.eid === r.c.eid)))));
   const cell = (e, c) => (c
     ? <button type="button" key={e.eid} className="vc-em" onClick={() => pickCustom(e)} onContextMenu={ev => { const items = emojiMenuItems(e); if (items.length) openMenu(ev, items); else ev.preventDefault(); }} onMouseEnter={() => setHover({ name: `:${e.name}:`, img: e.url, sub: e.server })}><img src={e.url} alt={e.name} loading="lazy" /></button>
     : <button type="button" key={e[0]} className="vc-em" onClick={() => pickUni(e)} onMouseEnter={() => setHover({ name: `:${shortName(e)}:`, char: e[0] })}><Twemoji char={e[0]} className="vc-em-tw" lazy /></button>);
