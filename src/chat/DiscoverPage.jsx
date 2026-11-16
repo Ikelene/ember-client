@@ -8,8 +8,25 @@ import { normOrigin } from './ids.js';
 import { initials } from './Parts.jsx';
 import { BotGallery } from './BotGallery.jsx';
 
-export default function DiscoverPage({ onClose }) {
-  const [tab, setTab] = useState('servers');
+// While Discovery is open the sidebar lists its sections (Servers, Bots) instead of the last server's channels (Ikelene
+// 2026-11-16); Chat.jsx keeps which one is open, so the sidebar and the tabs under the header stay in step.
+export const DISCOVER_TABS = [['servers', 'Servers', Globe], ['bots', 'Bots', Bot]];
+export function DiscoverSidebar({ tab, onTab }) {
+  return (
+    <div className="vc-side vc-disc-side">
+      <div className="vc-side-head"><div className="vc-side-title static"><span><Compass size={16} className="vc-inline-ico" /> Discover</span></div></div>
+      <div className="vc-side-list" role="tablist" aria-label="Discover">
+        {DISCOVER_TABS.map(([id, label, Icon]) => (
+          <button key={id} type="button" role="tab" aria-selected={tab === id} className={`vc-ch vc-home-link${tab === id ? ' on' : ''}`} onClick={() => onTab(id)}><Icon size={18} /> <span>{label}</span></button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function DiscoverPage({ onClose, tab: tabIn = 'servers', onTab }) {
+  const [own, setOwn] = useState(tabIn); // (on its own, without Chat.jsx keeping the section)
+  const tab = onTab ? tabIn : own, setTab = onTab || setOwn;
   const [q, setQ] = useState('');
   useEffect(() => { const k = e => { if (e.key === 'Escape' && !document.querySelector('.vc-modal-back')) onClose(); }; addEventListener('keydown', k); return () => removeEventListener('keydown', k); }, [onClose]);
   return (

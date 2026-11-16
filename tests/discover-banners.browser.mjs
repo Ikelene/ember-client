@@ -9,8 +9,9 @@ const { build } = await import(process.env.ESBUILD_MODULE || 'esbuild');
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const chat = join(root, 'src/chat').replaceAll('\\', '/');
-const entry = `import React from 'react';import{createRoot}from'react-dom/client';import DiscoverPage from'${chat}/DiscoverPage.jsx';
-createRoot(document.getElementById('root')).render(<div className="vc"><DiscoverPage onClose={()=>{}}/></div>);`;
+const entry = `import React from 'react';import{createRoot}from'react-dom/client';import DiscoverPage,{DiscoverSidebar}from'${chat}/DiscoverPage.jsx';
+function App(){const[tab,setTab]=React.useState('servers');return <div className="vc" style={{display:'flex',height:'100vh'}}><div className="vc-side-col"><DiscoverSidebar tab={tab} onTab={setTab}/></div><main className="vc-main" style={{flex:1,overflow:'auto'}}><DiscoverPage onClose={()=>{}} tab={tab} onTab={setTab}/></main></div>;}
+createRoot(document.getElementById('root')).render(<App/>);`;
 const built = await build({ stdin: { contents: entry, loader: 'jsx', resolveDir: root }, nodePaths: [join(root, 'node_modules')], jsx: 'automatic', bundle: true, write: false, loader: { '.json': 'json', '.css': 'empty', '.png': 'dataurl', '.svg': 'dataurl', '.mp3': 'dataurl', '.woff2': 'dataurl' }, define: { __EMBER_COMMIT__: '"test"', __EMBER_REPO__: '"test"', 'process.env.NODE_ENV': '"development"' }, logLevel: 'error' });
 const css = readFileSync(join(chat, 'chat.css'), 'utf8') + readFileSync(join(root, 'src/styles.css'), 'utf8');
 const results = [
@@ -22,6 +23,7 @@ const results = [
 const server = createServer((req, res) => {
   const url = req.url.split('?')[0];
   if (url === '/app.js') { res.setHeader('content-type', 'text/javascript'); return res.end(built.outputFiles[0].text); }
+  if (url === '/bonfire/bots/gallery') { res.setHeader('content-type', 'application/json'); return res.end(JSON.stringify({ page: 1, has_more: false, results: [], bots: [] })); }
   if (url === '/bonfire/directory') { res.setHeader('content-type', 'application/json'); return res.end(JSON.stringify({ page: 1, page_size: 24, has_more: false, results })); }
   if (url === '/') { res.setHeader('content-type', 'text/html'); return res.end(`<!doctype html><style>${css}body{margin:0;background:#111}</style><div id="root"></div><script src="/app.js"></script>`); }
   res.setHeader('content-type', 'application/json'); res.end('{}');
@@ -46,6 +48,16 @@ try {
   console.log('PASS no banner (or a non-https one): the tinted card as before');
   assert.equal(cards.find(c => c.name === 'Broken').img?.shown, false);
   console.log('PASS a banner that fails to load is hidden, leaving the tint');
+  // the sidebar lists Discover's sections instead of channels, in step with the tabs under the header
+  assert.deepEqual(await page.$$eval('.vc-disc-side .vc-ch', b => b.map(x => x.textContent.trim() + (x.classList.contains('on') ? '*' : ''))), ['Servers*', 'Bots']);
+  await page.screenshot({ path: join(root, 'test-results/discover-sidebar.png') });
+  await page.click('.vc-disc-side .vc-ch:nth-child(2)');
+  await page.waitForSelector('.vc-disc-bots');
+  assert.equal(await page.$eval('.vc-disc-tabs [aria-selected=true]', b => b.textContent.trim()), 'Bots');
+  await page.click('.vc-disc-tabs button:first-child');
+  await page.waitForSelector('.vc-disc-grid');
+  assert.equal(await page.$eval('.vc-disc-side .vc-ch.on', b => b.textContent.trim()), 'Servers');
+  console.log('PASS the sidebar shows Servers / Bots and stays in step with the header tabs');
   assert.deepEqual(errors, []);
   console.log('all ok');
 } finally { await browser.close(); server.close(); }

@@ -2,7 +2,7 @@ import { clientUrl } from '../chat/hosts.js';
 // Ember (/chat): servers + channels, DMs and group chats in one place, with presence.
 import { ForwardDialog } from '../chat/MsgTools.jsx';
 import { SidePanel, useInboxCount } from '../chat/SidePanel.jsx';
-import DiscoverPage from '../chat/DiscoverPage.jsx';
+import DiscoverPage, { DiscoverSidebar } from '../chat/DiscoverPage.jsx';
 import ModernNotice from '../chat/ModernNotice.jsx';
 import { TooltipHost } from '../chat/Tooltip.jsx';
 import { MediaViewerHost, viewPicture, copyImage, downloadImage } from '../chat/MediaViewer.jsx';
@@ -356,6 +356,7 @@ function ChatPage() {
   const error = useChat(s => s.error);
   const [dialog, setDialog] = useState(null); // { kind, ... }
   const [discover, setDiscover] = useState(false); // the full-page Discovery (DiscoverPage.jsx) instead of the conversation
+  const [discoverTab, setDiscoverTab] = useState('servers'); // its section (Servers / Bots), picked in the sidebar or under its header
   const [showMembers, setShowMembers] = useState(() => { try { return innerWidth >= 1100 && localStorage.getItem('velora_chat_members') !== '0'; } catch { return innerWidth >= 1100; } });
   const [drawer, setDrawer] = useState(false);
   useEffect(() => initSheets(), []); // phones: pop-ups and menus open as bottom sheets
@@ -515,7 +516,7 @@ function ChatPage() {
     : view.kind === 'dm'
       ? (sysDM ? { icon: <AtSign size={34} />, big: 'Nookara', sub: 'Notices about your account: credits, reports and more.' } : { icon: <AtSign size={34} />, big: view.username, sub: `This is the start of your conversation with ${view.username}.` })
       : { icon: <UsersRound size={34} />, big: group?.name || 'Group chat', sub: 'This is the start of the group chat.' };
-  const sideKey = view.kind === 'channel' ? view.sid : 'home';
+  const sideKey = discover ? 'discover' : view.kind === 'channel' ? view.sid : 'home';
 
   return (
     <div className={`vc${drawer ? ' drawer' : ''}${settings.compact ? ' compact' : ''}${settings.animations === false ? ' still' : ''}`}
@@ -541,7 +542,8 @@ function ChatPage() {
         <Rail discoverOn={discover} onDiscover={() => { if (drawer) { closeDrawer(); setTimeout(() => setDiscover(true), 320); } else setDiscover(true); }} onAddInstance={() => setDialog({ kind: 'add-instance' })} onCreate={() => setDialog({ kind: 'create-server' })} />
         <div className="vc-side-col">
           <div className="vc-side-swap" key={sideKey}>
-            {view.kind === 'channel'
+            {discover ? <DiscoverSidebar tab={discoverTab} onTab={setDiscoverTab} />
+              : view.kind === 'channel'
               ? <ServerSidebar sid={view.sid} onInvite={() => setDialog({ kind: 'invite' })} onSettings={() => setDialog({ kind: 'settings' })} onChannel={c => setDialog({ kind: 'channel', channel: c })} onLeave={leaveServer} onUser={openMini} />
               : view.kind === 'instance' ? <div className="vc-side" /> // a server that isn't connected yet: no channel list
                 : signedIn ? <HomeSidebar onNewDM={() => setDialog({ kind: 'dm' })} onNewGroup={() => setDialog({ kind: 'group' })} onQuick={() => setDialog({ kind: 'quick' })} /> : <SignedOutSidebar />}
@@ -562,7 +564,7 @@ function ChatPage() {
         <RestrictedBar />
         <ReadOnlyBar />
         <LegacyReadOnlyBar />
-        {discover ? <DiscoverPage onClose={() => setDiscover(false)} /> : view.kind === 'home' || view.kind === 'instance' ? (
+        {discover ? <DiscoverPage onClose={() => setDiscover(false)} tab={discoverTab} onTab={setDiscoverTab} /> : view.kind === 'home' || view.kind === 'instance' ? (
           <>
             <button type="button" className="vc-ico-btn vc-burger floating" onClick={openDrawer} title="Menu"><Menu size={19} /><DrawerBadge /></button>
             {view.kind === 'instance' ? <InstanceGate origin={view.inst} /> : signedIn ? <Home onUser={openMini} /> : <SignInPrompt />}
