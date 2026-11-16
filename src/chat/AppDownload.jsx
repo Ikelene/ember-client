@@ -3,36 +3,69 @@
 // MobileAppPromo instead, because their rail is usually out of view. Neither shows in the Android or desktop apps.
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, Monitor, Laptop, Smartphone } from 'lucide-react';
-import { openSite } from './hosts.js';
+import { Download, Monitor, Laptop, Smartphone, Terminal, Package, Box, Archive } from 'lucide-react';
+import { openSite, siteHref } from './hosts.js';
 import { Dialog } from './Dialogs.jsx';
 import { isDesktopApp } from './BonfireLogo.jsx';
 import { isMobileDevice } from './store.js';
-import { APP_TARGETS, detectAppTarget } from './appDownloadInfo.js';
+import { APP_TARGETS, detectAppTarget, linuxDownloads } from './appDownloadInfo.js';
 
-const ICONS = { windows: Monitor, mac: Laptop, android: Smartphone };
+const ICONS = { windows: Monitor, mac: Laptop, linux: Terminal, android: Smartphone };
+const PKG_ICONS = { appimage: Package, deb: Box, pacman: Archive };
+
+// the Linux packages in /ember/latest.json (null until there's a Linux build: then Linux isn't offered)
+function useLinux() {
+  const [linux, setLinux] = useState(null);
+  useEffect(() => {
+    let on = true;
+    fetch(siteHref('/ember/latest.json'), { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(d => { if (on) setLinux(linuxDownloads(d)); }).catch(() => {});
+    return () => { on = false; };
+  }, []);
+  return linux;
+}
 
 export function AppDownload({ onClose }) {
   const [detected] = useState(() => detectAppTarget(navigator.userAgent, navigator.maxTouchPoints));
   const [picked, setPicked] = useState(detected);
-  const target = APP_TARGETS[picked];
+  const linux = useLinux();
+  const targets = Object.entries(APP_TARGETS).filter(([id]) => id !== 'linux' || linux);
+  if (linux && detected === 'linux') targets.sort(([a], [b]) => (a === 'linux' ? -1 : b === 'linux' ? 1 : 0)); // this device first
+  const shown = picked === 'linux' && !linux ? null : picked;
+  const target = APP_TARGETS[shown];
   return (
-    <Dialog title="Get the Ember app" sub="Ember has apps for Windows, macOS and Android with extra features." onClose={onClose}>
+    <Dialog title="Get the Ember app" sub={`Ember has apps for Windows, macOS, ${linux ? 'Linux and ' : ''}Android with extra features.`} onClose={onClose}>
       {close => (
         <>
           <div className="vc-appdl-list" role="radiogroup" aria-label="Your device">
-            {Object.entries(APP_TARGETS).map(([id, t]) => {
+            {targets.map(([id, t]) => {
               const Icon = ICONS[id];
               return (
-                <button key={id} type="button" role="radio" aria-checked={picked === id} className={`vc-appdl-opt${picked === id ? ' on' : ''}`} onClick={() => setPicked(id)}>
+                <button key={id} type="button" role="radio" aria-checked={shown === id} className={`vc-appdl-opt${shown === id ? ' on' : ''}`} onClick={() => setPicked(id)}>
                   <Icon size={20} />
                   <span className="vc-appdl-txt"><b>{t.name}{id === detected && <small>This device</small>}</b><span>{t.about}</span></span>
                 </button>
               );
             })}
           </div>
+          {shown === 'linux' && linux && (
+            <div className="vc-appdl-list vc-appdl-linux" aria-label="Linux downloads">
+              {linux.items.map(p => {
+                const Icon = PKG_ICONS[p.id];
+                return (
+                  <div key={p.id} className="vc-appdl-pkg">
+                    <a className="vc-appdl-opt" href={p.url} download={p.file} rel="noopener noreferrer" onClick={close}>
+                      <Icon size={20} />
+                      <span className="vc-appdl-txt"><b>{p.name}{linux.version && <small>{linux.version}{p.mb ? `, ${p.mb} MB` : ''}</small>}</b><span>{p.who}{p.note ? `. ${p.note}` : ''}</span></span>
+                      <Download size={16} />
+                    </a>
+                    <code className="vc-code vc-appdl-cmd">{p.command}</code>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <div className="vc-dialog-btns">
-            <button type="button" className="btn btn-primary" disabled={!target} onClick={() => { openSite(target.path); close(); }}><Download size={15} /> {target ? `Download for ${target.name}` : 'Choose your device'}</button>
+            {shown !== 'linux' && <button type="button" className="btn btn-primary" disabled={!target} onClick={() => { openSite(target.path); close(); }}><Download size={15} /> {target ? `Download for ${target.name}` : 'Choose your device'}</button>}
             <button type="button" className="btn btn-surface" onClick={close}>Close</button>
           </div>
         </>
@@ -83,7 +116,7 @@ export function AppDownloadTip({ onOpen }) {
       <i className="vc-appdl-ring" style={{ left: box.x - 4, top: box.y - 4, width: box.w + 8, height: box.h + 8 }} />
       <div className="vc-appdl-tip" role="dialog" aria-labelledby="vc-appdl-tip-t" style={{ left: box.x + box.w + 14, top }}>
         <b id="vc-appdl-tip-t">Ember has apps</b>
-        <p>Download Ember for Android or desktop (macOS and Windows) to get extra features.</p>
+        <p>Download Ember for Android or desktop (Windows, macOS and Linux) to get extra features.</p>
         <div className="vc-dialog-btns">
           <button type="button" className="btn btn-primary btn-sm" onClick={() => end(true)}><Download size={13} /> See downloads</button>
           <button type="button" className="btn btn-surface btn-sm" onClick={() => end(false)}>Not now</button>
