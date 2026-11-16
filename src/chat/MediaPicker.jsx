@@ -67,12 +67,12 @@ export default function MediaPicker({ onPick, onSendLink, onClose, tab: tab0, do
         <button type="button" className={tab === 'gifs' ? 'on' : ''} onClick={() => setTab('gifs')}>GIFs</button>
         {(hasClips || tab === 'clips') && <button type="button" className={`vc-picker-clips-tab${tab === 'clips' ? ' on' : ''}`} onClick={() => setTab('clips')}>Game Clips <NewTag /></button>}
       </div>
-      <div className="vc-picker-body" key={tab}>{tab === 'gifs' ? <Gifs onPick={onPick} /> : tab === 'clips' ? <Clips clips={clips} onSendLink={onSendLink} /> : <Saved onPick={onPick} add={add} uploading={uploading} clips={clips} />}</div>
+      <div className="vc-picker-body" key={tab}>{tab === 'gifs' ? <Gifs onPick={onPick} docked={docked} /> : tab === 'clips' ? <Clips clips={clips} onSendLink={onSendLink} /> : <Saved onPick={onPick} add={add} uploading={uploading} clips={clips} />}</div>
     </div>
   );
 }
 
-function Gifs({ onPick }) {
+function Gifs({ onPick, docked = false }) {
   const [q, setQ] = useState('');
   const [list, setList] = useState(null);
   const [page, setPage] = useState(1);

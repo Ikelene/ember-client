@@ -82,6 +82,10 @@ try {
   await page.tap('.vc-gif-btn');
   await page.waitForSelector('.vc-picker-dock .vc-picker.docked');
   assert.equal(await page.evaluate(() => document.activeElement?.tagName === 'INPUT'), false, 'media search not focused');
+  await page.tap('.vc-picker.docked .vc-picker-tabs button:nth-child(2)');
+  await page.waitForSelector('.vc-picker.docked input[placeholder="Search KLIPY"]');
+  assert.equal(await page.evaluate(() => document.activeElement?.tagName === 'INPUT'), false, 'GIF search not focused');
+  assert.deepEqual(errors, [], 'the GIFs tab opens without crashing');
   await page.tap(editor);
   await page.waitForSelector('.vc-picker-dock', { state: 'detached', timeout: 2000 });
   assert.equal(await focused(page), true, 'chat box focused again (keyboard back)');
@@ -104,6 +108,12 @@ try {
   assert.equal(await dp.$eval('.vc-emoji-picker', e => getComputedStyle(e).position), 'absolute');
   assert.equal(await dp.evaluate(() => document.activeElement?.closest?.('.vc-picker-search') != null), true, 'desktop still focuses the search');
   pass('desktop keeps the pop-up picker with its search focused');
+  await dp.keyboard.press('Escape');
+  await dp.click('.vc-gif-btn');
+  await dp.click('.vc-picker .vc-picker-tabs button:nth-child(2)');
+  await dp.waitForSelector('.vc-picker input[placeholder="Search KLIPY"]');
+  assert.equal(await dp.evaluate(() => document.activeElement?.placeholder), 'Search KLIPY');
+  pass('desktop: the GIFs tab opens with its search focused');
   await dctx.close();
   console.log('all ok');
 } finally { await browser.close(); server.close(); }
