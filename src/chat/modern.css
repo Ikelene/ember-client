@@ -374,6 +374,7 @@ html.vc-rounded.vc-light .vc-disc-hero h1 { -webkit-text-fill-color: #fff; }
 html.vc-rounded :is(.vc-patt-dest, .vc-patt-spoiler, .vc-patt-x, .vc-patt button) { border-radius: calc(6px * var(--rk, 1)); }
 html.vc-rounded .vc-patt, html.vc-rounded .vc-patt.thumb, html.vc-rounded .vc-patt.card, html.vc-rounded .vc-patt.busy { border-radius: calc(10px * var(--rk, 1)); overflow: hidden; }
 html.vc-rounded .vc-patt-kind, html.vc-rounded .vc-patt-ico b { border-radius: calc(4px * var(--rk, 1)); }
+html.vc-rounded .vc-unread-pill { border-radius: 999px; }
 html.vc-rounded .vc-updest-card, html.vc-rounded .vc-appdl-opt { border-radius: calc(10px * var(--rk, 1)); }
 html.vc-rounded .vc-appdl-tip { border-radius: calc(12px * var(--rk, 1)); }
 html.vc-rounded .vc-appdl-ring { border-radius: calc(14px * var(--rk, 1)); }

@@ -28,6 +28,7 @@ import { MePopout } from './ProfilePopout.jsx';
 import { PinCategoryHost, pinMenuItems, catMenuItems, pinItem, unpinItem, moveCategory } from './DmPins.jsx';
 import { cleanPins, pinnedSet, dmKey, groupKey, viewKeyOf } from './dmPinsCore.js';
 import { PinItemRow } from './PinItems.jsx';
+import { UnreadPills } from './UnreadPills.jsx';
 // which pinned DM categories are folded (this device only)
 const FOLD_KEY = 'ember:dmpins:folded';
 const readFolded = () => { try { const v = JSON.parse(localStorage.getItem(FOLD_KEY) || '[]'); return new Set(Array.isArray(v) ? v : []); } catch { return new Set(); } };
@@ -297,6 +298,7 @@ export function ServerSidebar({ sid, onInvite, onSettings, onChannel, onLeave, o
   const instances = useChat(s => s.instances);
   useChat(s => s.notify); // redraw when mute / notification settings change
   const [menu, setMenu] = useState(false);
+  const listRef = useRef(null);
   const [closed, setClosed] = useState(() => new Set());
   const [drag, setDrag] = useState(null);   // { kind: 'channel' | 'category', id }
   const [dropAt, setDropAt] = useState(null); // where it would land (for the line)
@@ -408,7 +410,9 @@ export function ServerSidebar({ sid, onInvite, onSettings, onChannel, onLeave, o
           </div>
         )}
       </div>
-      <div className="vc-side-list" onContextMenu={e => { if (canChannels && e.target === e.currentTarget) openMenu(e, [{ label: 'Create channel', icon: Plus, onClick: () => onChannel(null) }, { label: 'Create category', icon: FolderPlus, onClick: newCategory }]); }}>
+      <div className="vc-side-scroll">
+      <UnreadPills listRef={listRef} />
+      <div className="vc-side-list" ref={listRef} onContextMenu={e => { if (canChannels && e.target === e.currentTarget) openMenu(e, [{ label: 'Create channel', icon: Plus, onClick: () => onChannel(null) }, { label: 'Create category', icon: FolderPlus, onClick: newCategory }]); }}>
         {d.server.description && <p className="vc-side-desc">{d.server.description}</p>}
         {groups.map(g => (g.name ? (g.list.length || canChannels || instAdmin) : (g.list.length || drag?.kind === 'channel')) && (
           <div key={g.name || '-'} className={`vc-cat${drag?.kind === 'category' && drag.id === g.name ? ' dragging' : ''}`}>
@@ -460,6 +464,7 @@ export function ServerSidebar({ sid, onInvite, onSettings, onChannel, onLeave, o
           </div>
         ))}
       </div>
+      </div>
     </div>
   );
 }
@@ -505,6 +510,7 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
   const presence = useChat(s => s.presence);
   const people = useChat(s => s.people);
   const dmNodes = useRef(new Map());
+  const listRef = useRef(null);
   const previousDmRects = useRef(new Map());
   useLayoutEffect(() => {
     // Keep existing rows still; only a conversation that moved up gets a FLIP slide.
@@ -606,7 +612,9 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
   return (
     <div className="vc-side">
       <div className="vc-side-head"><button type="button" className="vc-quick" onClick={onQuick}><span>Quick switcher</span><kbd>Ctrl</kbd><kbd>K</kbd></button></div>
-      <div className="vc-side-list">
+      <div className="vc-side-scroll">
+      <UnreadPills listRef={listRef} />
+      <div className="vc-side-list" ref={listRef}>
         <button type="button" className={`vc-ch vc-home-link${view.kind === 'home' ? ' on' : ''}`} onClick={() => go({ kind: 'home' })}><House size={18} /> <span>Home</span></button>
         <VeloraConnNote />
         {modmail.messages.length > 0 && (
@@ -655,6 +663,7 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
         {groups.length === 0 && <div className="vc-side-empty">No group chats.</div>}
         {groups.filter(g => !pinned.has(groupKey(g.room))).map(g => groupRow(g, null))}
         <PinCategoryHost />
+      </div>
       </div>
     </div>
   );
