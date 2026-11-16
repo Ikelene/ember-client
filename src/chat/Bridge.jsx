@@ -9,7 +9,9 @@ import { Dialog, ServerCreationNotice } from './Dialogs.jsx';
 import serverCreationPolicy from '../server-creation-policy.json';
 import { Toggle } from './roles.jsx';
 import { PlatformIcon } from './platforms.jsx';
-import { instOpt } from './ids.js';
+import { instOpt, bare } from './ids.js';
+// bridge links name channels by the server's own id; Ember keeps an Ember server's ids as origin|id (ids.js)
+const sameCh = (a, b) => String(bare(a)) === String(bare(b));
 import { usePlan, PlanGate, PlanNotice, planOf } from './PlanGate.jsx';
 
 const ERR = {
@@ -241,8 +243,8 @@ export function BridgeSettings({ sid, gated, onPlan }) {
           <Toggle label={`${b.platform_name} bridge on`} hint="Turn it off to pause it without losing the channel links." on={b.enabled} disabled={!!busy} onChange={v => call(`on-${b.platform}`, () => apiFetch(`/chat/bridge/servers/${sid}`, { method: 'PATCH', body: JSON.stringify({ platform: b.platform, enabled: v }) }))} />
           <div className="vc-br-head"><b>Linked channels</b><small>Link each channel from its own settings (Edit channel &gt; Bridge)</small></div>
           <div className="vc-br-map">
-            {text.filter(c => b.links.some(l => l.cid === c.cid)).map(c => {
-              const l = b.links.find(x => x.cid === c.cid);
+            {text.filter(c => b.links.some(l => sameCh(l.cid, c.cid))).map(c => {
+              const l = b.links.find(x => sameCh(x.cid, c.cid));
               return <div key={c.cid} className="vc-br-row ro">
                 <span className="vc-br-ch"><Hash size={14} /> {c.name}</span>
                 <ArrowLeftRight size={14} className="vc-br-arrow on" />
@@ -285,7 +287,7 @@ export function ChannelBridge({ sid, channel }) {
           <button type="button" className="btn btn-surface btn-sm" onClick={() => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'settings', sid, tab: 'bridge' } }))}><Link2 size={13} /> Link a server</button>
         </div>
       ) : bridges.map(b => {
-        const l = b.links.find(x => x.cid === channel.cid);
+        const l = b.links.find(x => sameCh(x.cid, channel.cid));
         return <div key={b.platform}>
           <div className="vc-row"><PlatformIcon p={b.platform} size={16} />
             <select className="form-input" aria-label={`${b.platform_name} channel`} value={l?.ext_channel_id || ''} disabled={busy} onChange={async e => {
