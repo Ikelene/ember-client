@@ -32,6 +32,7 @@ import MediaPicker, { GifBadge, StarButton } from './MediaPicker.jsx';
 import GlintIntro from './GlintIntro.jsx';
 import { GlintMark, NewTag, loadMyClips, liveClips } from './glint.jsx';
 import EmojiPicker, { loadEmojiData } from './EmojiPicker.jsx';
+import { useDocked, watchKeyboard, dockHeight, closeKeyboard, withoutKeyboard, useBackCloses } from './pickerDock.js';
 import { TriangleAlert, Shield, Clock, HardDrive } from 'lucide-react';
 import { expiryAt, expiryLabel } from './temp-expiry.js';
 import { tempId, isCdnTemp } from './upload-dest.js';
@@ -1003,6 +1004,21 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
   const [picker, setPicker] = useState(false); // false | 'saved' | 'clips' (the tab it opens on)
   const [glintIntro, setGlintIntro] = useState(false);
   const [emoji, setEmoji] = useState(false);
+  // phones: the pickers take the keyboard's place under the chat box (pickerDock.js)
+  const docked = useDocked();
+  useEffect(() => { watchKeyboard(); }, []);
+  useEffect(() => { if (docked && (emoji || picker)) closeKeyboard(); }, [docked, emoji, picker]);
+  useBackCloses(docked && !!(emoji || picker), () => { setEmoji(false); setPicker(false); });
+  // an emoji picked from the docked picker goes in without bringing the keyboard back; the picker stays open for more
+  function insertDocked(t) {
+    const el = ta.current;
+    if (!el) return;
+    withoutKeyboard(el, () => {
+      insertText(t);
+      const s = getSelection();
+      if (s.rangeCount && el.contains(s.anchorNode)) saved.current = s.getRangeAt(0).cloneRange();
+    });
+  }
   useEffect(() => {
     const keep = () => {
       const sel = getSelection();
@@ -1300,6 +1316,12 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
   if (locked) {
     return <div className="vc-composer locked"><Lock size={15} /> {lockedText || "This channel is locked - only the server's admins can post here."}</div>;
   }
+  // the pickers: pop-ups by the buttons on desktop, under the chat box on phones (docked: the keyboard's place)
+  const emojiEl = emoji && !voice.active ? <EmojiPicker docked={docked} onClose={() => setEmoji(false)} onPick={t => { if (docked) insertDocked(t); else { insertText(t); setEmoji(false); } }}
+    stickerSid={view.kind === 'channel' && isInst(view.sid) ? view.sid : undefined} onSticker={tid => { sendSticker(view.cid, tid, replyTo); setReplyTo?.(null); }}
+    onPersonalSticker={s => { sendMessage(view, s.send, { replyTo }); setReplyTo?.(null); }} /> : null;
+  const mediaEl = picker ? <MediaPicker key={picker} docked={docked} tab={picker === 'clips' ? 'clips' : undefined} onClose={() => setPicker(false)} onPick={a => { setPicker(false); sendMessage(view, '', { replyTo, attachments: [a] }); setReplyTo?.(null); }}
+    onSendLink={url => { setPicker(false); sendMessage(view, url, { replyTo }); setReplyTo?.(null); }} /> : null;
   return (
     <div className="vc-composer-wrap">
       {dropping && createPortal(
@@ -1432,20 +1454,18 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
         {voice.active && <VoiceBar voice={voice} mode={voiceHolding ? 'hold' : 'click'} dragX={voiceDrag} onDiscard={voiceDelete} />}
         {!voice.active && <button type="button" className={`vc-ico-btn vc-gif-btn${picker ? ' on' : ''}`} title="Media (GIFs, Saved Media, Game Clips)" onClick={() => { setPicker(p => (p ? false : 'saved')); setEmoji(false); }}><GifIcon /></button>}
         {!voice.active && <button type="button" className={`vc-ico-btn vc-emoji-btn${emoji ? ' on' : ''}`} title="Emoji" onClick={() => { setEmoji(x => !x); setPicker(false); }}><Smile size={19} /></button>}
-        {emoji && !voice.active && <EmojiPicker onClose={() => setEmoji(false)} onPick={t => { insertText(t); setEmoji(false); }}
-          stickerSid={view.kind === 'channel' && isInst(view.sid) ? view.sid : undefined} onSticker={tid => { sendSticker(view.cid, tid, replyTo); setReplyTo?.(null); }}
-          onPersonalSticker={s => { sendMessage(view, s.send, { replyTo }); setReplyTo?.(null); }} />}
+        {!docked && emojiEl}
         <button type="button" className={`vc-ico-btn send${canVoice || voice.active ? ' voice' : ''}${cmd && cmdMissing ? ' blocked' : ''}`} title={voice.active ? 'Send voice message' : canVoice ? 'Record a voice message' : cmd && cmdMissing ? `Fill in ${cmdMissing} first` : 'Send'} aria-label={voice.active ? 'Send voice message' : canVoice ? 'Record a voice message' : 'Send'} disabled={!voice.active && !canVoice && !cmd && !text.trim() && !atts.length}
           onPointerDown={e => { e.preventDefault(); voicePress(e); }} onPointerMove={voiceMove} onPointerUp={voiceRelease} onPointerCancel={voiceCancel} onContextMenu={e => { if (canVoice || voice.active) e.preventDefault(); }} onMouseDown={e => e.preventDefault()}
           onClick={() => {
             if (voiceTouch.current) { voiceTouch.current = false; return; } // (the click a browser adds after a touch: the press already did it)
             if (voice.active) sendVoice(); else if (canVoice) { setVoiceHolding(false); voice.start(); } else if (cmd) cmdSubmit.current?.(); else submit();
           }}>{voice.active && !voiceHolding ? <SendHorizontal size={18} /> : canVoice || voice.active ? <AudioLines size={18} /> : <SendHorizontal size={18} />}</button>
-        {picker && <MediaPicker key={picker} tab={picker === 'clips' ? 'clips' : undefined} onClose={() => setPicker(false)} onPick={a => { setPicker(false); sendMessage(view, '', { replyTo, attachments: [a] }); setReplyTo?.(null); }}
-          onSendLink={url => { setPicker(false); sendMessage(view, url, { replyTo }); setReplyTo?.(null); }} />}
+        {!docked && mediaEl}
         {glintIntro && <GlintIntro onClose={() => setGlintIntro(false)} />}
       </div>
       <Typing view={view} />
+      {docked && (emojiEl || mediaEl) && <div className="vc-picker-dock" style={{ height: dockHeight() }}>{emojiEl || mediaEl}</div>}
     </div>
   );
 }

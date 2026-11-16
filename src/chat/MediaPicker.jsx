@@ -23,7 +23,8 @@ export function StarButton({ gif }) {
 }
 
 // onPick(attachment) for GIFs + Saved Media, onSendLink(url) for a Glint clip; tab = the tab to open on ('clips' from the + menu)
-export default function MediaPicker({ onPick, onSendLink, onClose, tab: tab0 }) {
+// docked: under the chat box on a phone (pickerDock.js): no search focus
+export default function MediaPicker({ onPick, onSendLink, onClose, tab: tab0, docked = false }) {
   const [tab, setTab] = useState(tab0 || 'saved'); // Saved Media opens first
   const clips = useMyClips();
   const hasClips = liveClips(clips).length > 0;
@@ -55,7 +56,7 @@ export default function MediaPicker({ onPick, onSendLink, onClose, tab: tab0 }) 
     return () => { removeEventListener('mousedown', off); removeEventListener('keydown', key); };
   }, [onClose]);
   return (
-    <div className={`vc-picker${hot ? ' drop-hot' : ''}`} ref={box} data-drop-own
+    <div className={`vc-picker${hot ? ' drop-hot' : ''}${docked ? ' docked' : ''}`} ref={box} data-drop-own
       onDragEnter={e => { if (!hasFiles(e)) return; e.preventDefault(); depth.current++; setHot(true); }}
       onDragOver={e => { if (!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
       onDragLeave={e => { if (!hasFiles(e)) return; depth.current = Math.max(0, depth.current - 1); if (!depth.current) setHot(false); }}
@@ -97,7 +98,7 @@ function Gifs({ onPick }) {
   }
   return (
     <>
-      <label className="vc-search vc-picker-search"><Search size={15} /><input autoFocus placeholder="Search KLIPY" value={q} onChange={e => setQ(e.target.value)} /><img className="vc-klipy-logo" src="/assets/klipy/powered-white.png" alt="Powered by KLIPY" /></label>
+      <label className="vc-search vc-picker-search"><Search size={15} /><input autoFocus={!docked} placeholder="Search KLIPY" value={q} onChange={e => setQ(e.target.value)} /><img className="vc-klipy-logo" src="/assets/klipy/powered-white.png" alt="Powered by KLIPY" /></label>
       <div className="vc-picker-scroll" onScroll={e => { const el = e.currentTarget; if (el.scrollHeight - el.scrollTop - el.clientHeight < 200) loadMore(); }}>
         {err === 'gifs_not_configured' && <div className="vc-empty-note">GIF search isn't set up yet (it needs a Klipy API key on the server).</div>}
         {err && err !== 'gifs_not_configured' && <div className="vc-empty-note">Couldn't load GIFs right now.</div>}

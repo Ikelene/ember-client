@@ -52,7 +52,8 @@ function LazyGrid({ items, render, root }) {
 
 // stickerSid + onSticker: on an Ember server's channel, that server's stickers (onSticker(tid)) in the Stickers tab
 // onPersonalSticker: your personal stickers (anywhere you can send) in the Stickers tab (onPersonalSticker(sticker))
-export default function EmojiPicker({ onPick, onClose, reactionSid, stickerSid, onSticker, onPersonalSticker }) {
+// docked: under the chat box on a phone (pickerDock.js): no search focus (it would bring the keyboard back)
+export default function EmojiPicker({ onPick, onClose, reactionSid, stickerSid, onSticker, onPersonalSticker, docked = false }) {
   const [data, setData] = useState(dataSync);
   const [q, setQ] = useState('');
   const [tab, setTab] = useState('emoji');
@@ -101,7 +102,7 @@ export default function EmojiPicker({ onPick, onClose, reactionSid, stickerSid, 
     ? <button type="button" key={e.eid} className="vc-em" onClick={() => pickCustom(e)} onContextMenu={ev => { const items = emojiMenuItems(e); if (items.length) openMenu(ev, items); else ev.preventDefault(); }} onMouseEnter={() => setHover({ name: `:${e.name}:`, img: e.url, sub: e.server })}><img src={e.url} alt={e.name} loading="lazy" /></button>
     : <button type="button" key={e[0]} className="vc-em" onClick={() => pickUni(e)} onMouseEnter={() => setHover({ name: `:${shortName(e)}:`, char: e[0] })}><Twemoji char={e[0]} className="vc-em-tw" lazy /></button>);
   return (
-    <div className="vc-picker vc-emoji-picker" ref={box}>
+    <div className={`vc-picker vc-emoji-picker${docked ? ' docked' : ''}`} ref={box}>
       {stickerTab && (
         <div className="vc-em-tabs" role="tablist">
           <button type="button" role="tab" aria-selected={tab === 'emoji'} className={tab === 'emoji' ? 'on' : ''} onClick={() => setTab('emoji')}><Smile size={15} /> Emoji</button>
@@ -132,7 +133,7 @@ export default function EmojiPicker({ onPick, onClose, reactionSid, stickerSid, 
           </>}
         </div>
       ) : <>
-      <label className="vc-search vc-picker-search"><Search size={15} /><input autoFocus placeholder="Find an emoji" value={q} onChange={e => setQ(e.target.value)} /></label>
+      <label className="vc-search vc-picker-search"><Search size={15} /><input autoFocus={!docked} placeholder="Find an emoji" value={q} onChange={e => setQ(e.target.value)} /></label>
       <div className="vc-em-body">
         {!t && (
           <nav className="vc-em-nav">

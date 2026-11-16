@@ -2676,3 +2676,7 @@ html.vc-rounded .vc-drawer-badge { border-radius: 999px; }
 .vc-expr { display: flex; flex-direction: column; gap: 18px; }
 .vc-expr-sec + .vc-expr-sec { border-top: 1px solid var(--border); padding-top: 18px; }
 .vc-expr-h { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 15px; font-weight: 700; color: var(--text); }
+
+/* phones: the composer's emoji / media pickers sit under the chat box in the keyboard's place (pickerDock.js) */
+.vc-picker-dock { flex: none; position: relative; display: flex; min-height: 0; padding-bottom: env(safe-area-inset-bottom); background: #17171a; border-top: 1px solid var(--border-2); }
+.vc-picker-dock > .vc-picker.docked { position: static; flex: 1; width: auto; height: auto; min-height: 0; border: 0; box-shadow: none; animation: vc-fade .15s ease-out; background: transparent; }

@@ -14,7 +14,8 @@ export function initSheets() {
   let pushed = false;      // we added one history entry for "a sheet is open"
   let selfBack = 0;        // history.back() calls we made ourselves (their popstate is ignored)
 
-  const wanted = el => el.nodeType === 1 && el.matches(SEL) && !(el.matches('.vc-picker') && el.closest('.vc-react-pop'));
+  // (the composer's docked pickers aren't sheets: they sit under the chat box, pickerDock.js; the back button still closes them)
+  const wanted = el => el.nodeType === 1 && el.matches(SEL) && !(el.matches('.vc-picker') && el.closest('.vc-react-pop')) && !el.matches('.vc-picker.docked');
   const dismiss = el => { if (el && backdrop) backdrop.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true })); };
   const topSheet = () => { const all = [...backs.keys()]; return all[all.length - 1]; };
 
