@@ -168,7 +168,7 @@ function Skeleton() {
   );
 }
 
-export function InsightsPage({ sid }) {
+export function InsightsPage({ sid, children }) {
   const [range, setRange] = useState(() => { try { return localStorage.getItem('bf_insights_range') || '7d'; } catch { return '7d'; } });
   const [bots, setBots] = useState(false);
   const [d, setD] = useState(null);
@@ -196,8 +196,8 @@ export function InsightsPage({ sid }) {
       </label>
     </div>
   );
-  if (failed) return <div className="bf-ss-page">{controls}<Card title="Insights" icon={ChartLine}><p className="vc-hint">Insights need a newer version of this server.</p></Card></div>;
-  if (!d) return <div className="bf-ss-page">{controls}<Skeleton /></div>;
+  if (failed) return <div className="bf-ss-page">{controls}<Card title="Insights" icon={ChartLine}><p className="vc-hint">Insights need a newer version of this server.</p></Card>{children}</div>;
+  if (!d) return <div className="bf-ss-page">{controls}<Skeleton />{children}</div>;
 
   const m = d.members;
   const tiles = [
@@ -299,6 +299,7 @@ export function InsightsPage({ sid }) {
       <Card title="Voice" icon={Mic}>
         <p className="vc-hint">Voice activity isn't recorded by this server yet, so there's nothing to chart here.</p>
       </Card>
+      {children}
     </div>
   );
 }

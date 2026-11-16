@@ -3,7 +3,7 @@
 // numbers a Velora hosting plan caps show the plan's number and a lock.
 import { useEffect, useMemo, useState } from 'react';
 import {
-  LayoutGrid, DoorOpen, MessageSquare, Flag, ShieldAlert, ScrollText, Upload, Users, Ban, HardDrive, Activity, Hash, Lock, X, Plus,
+  DoorOpen, MessageSquare, Flag, ShieldAlert, ScrollText, Upload, Users, Ban, HardDrive, Hash, Lock, X, Plus,
   KeyRound, Link2, Trash2, UserMinus, ArrowUpRight, Check, RotateCcw, Timer, Image, Bot,
 } from 'lucide-react';
 import { apiFetch } from '../api.js';
@@ -15,14 +15,12 @@ import { stampOf } from './text.jsx';
 import { Card } from './SettingsShell.jsx';
 import { useUnsaved, UnsavedBar } from './unsaved.jsx';
 import { JoinInvites, UploadsTab } from './Community.jsx';
-import { OperatorTermsNotice } from './OperatorTerms.jsx';
 
 const clone = v => JSON.parse(JSON.stringify(v));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const fail = e => toast(errorText(e.message));
 const url = sid => `/chat/servers/${sid}/settings`;
 export const fmtBytes = n => { if (!n) return '0 B'; const u = ['B', 'KB', 'MB', 'GB', 'TB']; const i = Math.min(u.length - 1, Math.floor(Math.log(n) / Math.log(1024))); return `${(n / 1024 ** i).toFixed(i ? 1 : 0)} ${u[i]}`; };
-const fmtUptime = s => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60); return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`; };
 
 // one page's draft of some settings sections. keys: section names, or 'join_policy'. extra: { changed, body(), reset() } for
 // fields that aren't settings (a new join password)
@@ -141,39 +139,18 @@ function Donut({ parts, total }) {
     </svg>
   );
 }
-export function DashboardPage({ sid, goTo }) {
+// Server settings > Insights, at the bottom: what the server stores and its top channels (from /servers/:sid/dashboard; the
+// Dashboard tab itself is gone - Ikelene 2026-11-16: its QR code is on Overview, these two cards moved to Insights)
+export function StorageCards({ sid }) {
   const [d, setD] = useState(null);
   const [by, setBy] = useState('messages');
-  const canMod = useChat(s => { const p = s.detail[sid]?.server?.perms; return has(p, P.KICK) || has(p, P.BAN) || has(p, P.MANAGE_MESSAGES) || has(p, P.MANAGE_SERVER); });
-  useEffect(() => { apiFetch(`/chat/servers/${sid}/dashboard`).then(setD).catch(e => { fail(e); setD(false); }); }, [sid]);
-  if (d === null) return <div className="bf-ss-page"><Loading /></div>;
-  if (!d) return <div className="bf-ss-page"><Card title="Dashboard" icon={LayoutGrid}><p className="vc-hint">The dashboard needs a newer version of this server.</p></Card></div>;
+  useEffect(() => { apiFetch(`/chat/servers/${sid}/dashboard`).then(setD).catch(e => { if (!/not_found|404/.test(String(e.message))) fail(e); setD(false); }); }, [sid]);
+  if (d === null) return <Loading />;
+  if (!d) return null; // (an older server without /dashboard)
   const top = by === 'messages' ? d.channels.by_messages : d.channels.by_storage;
   const most = Math.max(1, ...top.map(x => (by === 'messages' ? x.messages : x.bytes)));
-  const tiles = [
-    [Users, 'Members', d.members.toLocaleString(), d.bots ? `+ ${d.bots} bot${d.bots === 1 ? '' : 's'}` : 'people', () => goTo('members')],
-    [Ban, 'Banned', d.banned.toLocaleString(), d.timeouts ? `${d.timeouts} timed out` : 'members', () => goTo('members')],
-    [MessageSquare, 'Messages', d.messages.toLocaleString(), `in ${d.channels.with_messages} channel${d.channels.with_messages === 1 ? '' : 's'}`],
-    [HardDrive, 'Disk', fmtBytes(d.disk), 'used by this server'],
-  ];
   return (
-    <div className="bf-ss-page">
-      <OperatorTermsNotice sid={sid} />
-      <div className="bf-sr-tiles">
-        {tiles.map(([I, label, big, small, onClick]) => {
-          const T = onClick ? 'button' : 'div';
-          return <T key={label} type={onClick ? 'button' : undefined} className="bf-sr-tile" onClick={onClick}><span><I size={14} /> {label}</span><b>{big}</b><small>{small}</small></T>;
-        })}
-      </div>
-      {canMod && d.open_reports > 0 && <button type="button" className="bf-ss-reg warn bf-sr-reports-note" onClick={() => goTo('reports')}><Flag size={14} /><span><b>{d.open_reports} open report{d.open_reports === 1 ? '' : 's'}</b> waiting for a moderator.</span><ArrowUpRight size={14} /></button>}
-      <Card title="Server health" icon={Activity}>
-        <div className="bf-sr-health">
-          <div><small>Runtime</small><b>{d.health.runtime}</b></div>
-          <div><small>Memory</small><b>{fmtBytes(d.health.memory)}</b></div>
-          <div><small>Uptime</small><b>{fmtUptime(d.health.uptime_s || 0)}</b></div>
-          <div><small>Version</small><b>{d.health.version}{d.health.commit_short ? ` (${d.health.commit_short})` : ''}</b></div>
-        </div>
-      </Card>
+    <>
       <Card title="Storage" icon={HardDrive}>
         <div className="bf-sr-storage">
           <Donut parts={d.storage} total={d.disk} />
@@ -194,7 +171,7 @@ export function DashboardPage({ sid, goTo }) {
         </ol>
         <small className="vc-hint">{d.channels.with_messages} channel{d.channels.with_messages === 1 ? ' has' : 's have'} messages, {d.channels.empty} {d.channels.empty === 1 ? 'is' : 'are'} empty.</small>
       </Card>
-    </div>
+    </>
   );
 }
 

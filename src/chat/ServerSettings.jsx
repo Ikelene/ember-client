@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Search, LayoutGrid, Shield, Smile, Volume2, Upload, Users, DoorOpen, Bot, ArrowLeftRight, Gamepad2,
   KeyRound, Mic, Globe, UserCog, TriangleAlert, Trash2, RefreshCw, Check, Ban, UserMinus, Compass, Download, Rocket, Archive, Info, Copy, CircleArrowUp,
-  Gauge, MessageSquare, Flag, ShieldAlert, ScrollText, ChartLine, Sticker,
+  MessageSquare, Flag, ShieldAlert, ScrollText, ChartLine, Sticker,
 
 
 } from 'lucide-react';
@@ -25,7 +25,7 @@ import { GameServersSettings } from './GameServer.jsx';
 import { BotsManager } from './Bots.jsx';
 import { ExportButton } from './Community.jsx';
 import { InsightsPage } from './Insights.jsx';
-import { DashboardPage, JoiningPage, MessageRulesPage, ReportsPage, AutoModPage, AuditLogPage, UploadRulesPage } from './ServerRules.jsx';
+import { StorageCards, JoiningPage, MessageRulesPage, ReportsPage, AutoModPage, AuditLogPage, UploadRulesPage } from './ServerRules.jsx';
 import { InstanceTab, BridgeBots, restartInstance } from './Instances.jsx';
 import { UpdateServerRow } from './UpdateServer.jsx';
 import { HostingPage, useHostedFor, loadHosted, deleteHostedServer } from './Hosting.jsx';
@@ -37,6 +37,7 @@ import { useUnsaved, UnsavedBar } from './unsaved.jsx';
 import './SettingsDialog.css';
 import QRCode from 'qrcode';
 import { linkFor } from './store.js';
+import { OperatorTermsNotice } from './OperatorTerms.jsx';
 
 // [id, label, icon, words the search box answers to]
 function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, owner, legacyDefault, hosted }) {
@@ -44,9 +45,8 @@ function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, 
   const danger = (owner && !legacyDefault) || instAdmin ? ['danger', 'Danger zone', TriangleAlert, ['Delete server', 'Export', 'Restart', 'Update', 'Backup', 'Advanced', 'Unmarked aliases']] : null;
   return [
     ['Server', [
-      onInst && canServer && ['dashboard', 'Dashboard', Gauge, ['Stats', 'Health', 'Storage', 'Disk', 'Top channels', 'Memory', 'Uptime']],
-      onInst && canServer && ['insights', 'Insights', ChartLine, ['Activity', 'Engagement', 'Graphs', 'Joins', 'Leaves', 'Messages', 'Chatters', 'Active', 'Reactions', 'Busiest hours', 'Top chatters']],
-      canServer && ['overview', 'Overview', LayoutGrid, ['Name', 'Icon', 'Banner', 'Description', 'Accent colour', 'Invite code', 'Discover', 'Directory', 'Tags', 'List']],
+      canServer && ['overview', 'Overview', LayoutGrid, ['Name', 'Icon', 'Banner', 'Description', 'Accent colour', 'Invite code', 'QR code', 'Discover', 'Directory', 'Tags', 'List']],
+      onInst && canServer && ['insights', 'Insights', ChartLine, ['Activity', 'Engagement', 'Graphs', 'Joins', 'Leaves', 'Messages', 'Chatters', 'Active', 'Reactions', 'Busiest hours', 'Top chatters', 'Storage', 'Disk', 'Top channels']],
       canRoles && ['roles', 'Roles', Shield, ['Permissions', 'Colour']],
       canServer && ['emojis', 'Emojis', Smile, ['Custom emoji']],
       onInst && canServer && ['stickers', 'Stickers', Sticker, ['Sticker', 'Big emoji']],
@@ -109,9 +109,7 @@ export function ServerSettings({ sid, onClose, tab: startTab, autoUpdate = false
         {page === 'emojis' && <EmojiManager sid={sid} />}
         {page === 'stickers' && <StickerManager sid={sid} />}
         {page === 'sounds' && <SoundManager sid={sid} />}
-        {page === 'dashboard' && <div className="bf-ss-dash-top"><ServerCard sid={sid} srv={srv} origin={origin} goTo={goTo} /></div>}
-        {page === 'dashboard' && <DashboardPage sid={sid} goTo={goTo} />}
-        {page === 'insights' && <InsightsPage sid={sid} />}
+        {page === 'insights' && <InsightsPage sid={sid}><StorageCards sid={sid} /></InsightsPage>}
         {page === 'messages' && <MessageRulesPage sid={sid} onDirty={onDirty} goTo={goTo} />}
         {page === 'uploads' && <UploadRulesPage sid={sid} onDirty={onDirty} />}
         {page === 'reports' && <ReportsPage sid={sid} />}
@@ -202,6 +200,7 @@ function Overview({ sid, origin, instAdmin, onDirty, goTo }) {
   const dir = v.directory || {};
   return (
     <div className="bf-ss-page">
+      <OperatorTermsNotice sid={sid} />
       <ServerCard sid={sid} srv={srv} origin={origin} goTo={goTo} />
       <Card title="Server profile" icon={LayoutGrid}>
         <div className="vc-settings-imgs">
