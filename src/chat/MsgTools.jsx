@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Hash, UsersRound, Pin, X, Forward } from 'lucide-react';
 import { apiFetch } from '../api.js';
-import { instOpt } from './ids.js';
+import { instOpt, instOf } from './ids.js';
 import { useChat, getState, sendMessage, refreshServer, toast, errorText, dmErrorText, keyOf, dropFailed, imToMsg, groupToMsg } from './store.js';
 import { pinsKey, pinsPath, pinPath } from './msg-actions.js';
 import { openMessage } from './e2ee/session.js';
@@ -11,6 +11,7 @@ import { Dialog } from './Dialogs.jsx';
 import { Avatar } from './Profile.jsx';
 import { ChannelIcon, P, has } from './roles.jsx';
 import { decodeRoleMentions } from './Mentions.jsx';
+import { plainText } from './tokens.js';
 import { renderBody, stampOf } from './text.jsx';
 import { GameInvites } from './GameInvite.jsx';
 import { AliasMark, aliasOf, aliasFace, shownName } from './Alias.jsx';
@@ -22,7 +23,8 @@ function forwardedBody(m, from, to) {
   let where = '';
   if (from.kind === 'channel') { const d = st.detail[from.sid]; const c = d?.channels.find(x => x.cid === from.cid); if (c) where = ` in #${c.name}${d ? ` (${d.server.name})` : ''}`; }
   else if (from.kind === 'group') where = ' in a group chat';
-  const body = from.kind === 'channel' ? decodeRoleMentions(m.body || '', from.sid) : String(m.body || '');
+  // a forward never pings again: people / channels / roles go over as their names
+  const body = from.kind === 'channel' ? plainText(decodeRoleMentions(m.body || '', from.sid), instOf(from.sid), from.sid) : plainText(String(m.body || ''));
   // (a channel message's attachments become links on the end of the text in a DM or group chat)
   const extra = to.kind === 'channel' ? 0 : (m.attachments || []).reduce((n, a) => n + String(a.url || '').length + 80, 0);
   return forwardText({ author: m.author?.username, where, body }, forwardLimit(to) - extra);

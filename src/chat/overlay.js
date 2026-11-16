@@ -8,6 +8,7 @@
 //     DND and your notification setting still apply.
 // Streams stay opt-in: only the screens you clicked Watch on have frames; others are "X is streaming" chips.
 // Speaking + loudness come from levels.js (one WebAudio meter per mic track, also drives the web UI's rings).
+import { plainText } from './tokens.js';
 import { getState, onOverlayToast } from './store.js';
 import { pollLevels, levelOf } from './levels.js';
 import { inviteSummary } from './gameInvite.js';
@@ -156,7 +157,7 @@ function setActive(on) {
   if (on) { lastSig = ''; tick(); timer = setInterval(tick, 150); }
   else { clearInterval(timer); timer = null; syncFeeds(); }
 }
-const cleanText = t => String(t || '')
+const cleanText = t => plainText(t)
   .replace(/<a?:(\w+):[\w-]+>/g, ':$1:')
   .replace(/<@&[\w-]+>/g, '@role')
   .replace(/<t:(\d+)(:\w)?>/g, (_, n) => new Date(Number(n) * 1000).toLocaleString())

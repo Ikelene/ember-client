@@ -1,6 +1,7 @@
 // Typing @ in the composer: pick a member, a role (that you're allowed to ping) or @everyone / @here.
 import { useEffect, useMemo, useState } from 'react';
 import { useChat, getState, botPresenceOf } from './store.js';
+import { userToken, channelToken } from './tokens.js';
 import { Avatar } from './Profile.jsx';
 import { P, has, nameColor, ChannelIcon } from './roles.jsx';
 import { loadEmojiData, emojiDataSync, emojiToken } from './EmojiPicker.jsx';
@@ -61,7 +62,7 @@ function useChannelItems(view, q) {
     if (q == null || !list) return [];
     const t = q.toLowerCase();
     return list.filter(c => c.name.includes(t)).sort((a, b) => (b.name.startsWith(t) - a.name.startsWith(t)) || a.position - b.position).slice(0, 10)
-      .map(c => ({ kind: 'channel', key: c.cid, label: c.name, token: `#${c.name}`, channel: c, hint: c.category || '' }));
+      .map(c => ({ kind: 'channel', key: c.cid, label: c.name, token: channelToken(c.cid), channel: c, hint: c.category || '' }));
   }, [q, list]);
 }
 
@@ -91,7 +92,7 @@ export function useMentionItems(view, q) {
     users.filter(u => u.username && rank(u) < 9)
       .sort((a, b) => (rank(a) - rank(b)) || (online(b) - online(a)) || dn(a).localeCompare(dn(b)))
       .slice(0, 8)
-      .forEach(u => { const name = dn(u), you = u.username === st.me?.username; out.push({ kind: 'user', key: `u${u.username}`, label: name, insert: `@${u.username} `, user: u, hint: [name !== u.username ? `@${u.username}` : '', you ? 'you' : ''].filter(Boolean).join(' - ') }); });
+      .forEach(u => { const name = dn(u), you = u.username === st.me?.username; out.push({ kind: 'user', key: `u${u.username}`, label: name, insert: `@${u.username} `, token: u.id != null ? userToken(u.id) : undefined, user: u, hint: [name !== u.username ? `@${u.username}` : '', you ? 'you' : ''].filter(Boolean).join(' - ') }); });
     if (detail) {
       const big = has(detail.server.perms, P.MENTION_EVERYONE);
       if (big) {

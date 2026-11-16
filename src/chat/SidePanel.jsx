@@ -131,7 +131,7 @@ function InboxFeed() {
   const rows = useMemo(() => {
     const fresh = [];
     const earlier = [];
-    (mentions || []).forEach(m => (m.unread ? fresh : earlier).push({ k: `m:${m.id}`, at: msOf(m.created_at), unread: m.unread, face: m.author, title: shownName(m), where: `#${m.channel_name} · ${m.server_name}`, time: ago(m.created_at), text: snippet(m.body) || (m.attachments?.length ? 'Sent an attachment' : ''), open: () => jumpToMessage({ kind: 'channel', sid: m.server, cid: m.channel }, m.id) }));
+    (mentions || []).forEach(m => (m.unread ? fresh : earlier).push({ k: `m:${m.id}`, at: msOf(m.created_at), unread: m.unread, face: m.author, title: shownName(m), where: `#${m.channel_name} · ${m.server_name}`, time: ago(m.created_at), text: snippet(m.body, m.server) || (m.attachments?.length ? 'Sent an attachment' : ''), open: () => jumpToMessage({ kind: 'channel', sid: m.server, cid: m.channel }, m.id) }));
     (nlist || []).forEach(n => fresh.push({ k: `n:${n.id}`, at: msOf(n.created_at), unread: true, icon: <NotifIcon n={n} />, title: <NotifText text={n.title} />, where: 'Notification', time: ago(n.created_at), text: n.body ? <NotifText text={n.body} /> : '', open: () => { readNotifs([n.id]); if (n.link) followNotifLink(n.link); } }));
     unreadRows.forEach(r => fresh.push({ ...r, k: `u:${r.k}`, at: r.at || 0, unread: true, open: () => go(r.go) }));
     // newest first; chats/channels with no time go after the dated ones, the ones with pings first
@@ -257,7 +257,7 @@ function SearchTab({ view, channel, detail }) {
         {res && !res.results && <div className="vc-loading"><i /><i /><i /></div>}
         {res?.results && <div className="vc-panel-sub">{res.total} result{res.total === 1 ? '' : 's'}</div>}
         {res?.results?.map(m => (
-          <InboxRow key={m.id} face={m.author} title={shownName(m)} where={m.channel_name ? `#${m.channel_name}` : ''} time={stampOf(m.created_at)} text={m.body || (m.attachments?.length ? `[${m.attachments.length} attachment${m.attachments.length === 1 ? '' : 's'}]` : '')}
+          <InboxRow key={m.id} face={m.author} title={shownName(m)} where={m.channel_name ? `#${m.channel_name}` : ''} time={stampOf(m.created_at)} text={snippet(m.body, view.sid) || (m.attachments?.length ? `[${m.attachments.length} attachment${m.attachments.length === 1 ? '' : 's'}]` : '')}
             onClick={() => jumpToMessage({ kind: 'channel', sid: view.sid, cid: m.channel }, m.id)} />
         ))}
         {res?.results && !res.results.length && <Note icon={Search}>Nothing found.</Note>}

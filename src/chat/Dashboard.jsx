@@ -12,10 +12,12 @@ import { Avatar, subtitle } from './Profile.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
 import { NotifIcon, NotifText, ago } from './Notifications.jsx';
 
+import { plainText } from './tokens.js';
+import { VELORA, instOf } from './ids.js';
 const lc = s => String(s || '').toLowerCase();
 // a message body as one plain line: custom emoji / mentions / links made readable, markdown marks dropped
-export function snippet(body) {
-  let t = String(body || '');
+export function snippet(body, sid = null) {
+  let t = plainText(body, sid ? instOf(sid) : VELORA, sid);
   if (!t.trim()) return '';
   const st = stickerOfBody(t); // a personal sticker (stickerLink.js)
   if (st) return `Sticker: ${st.name}`;

@@ -16,6 +16,7 @@ import { applyIdentity } from './identity.js';
 import { applyUserUpdate, instancesWithAccount } from './userUpdate.js';
 import { findPending, dropSettled, wireText, settle } from './pending.js';
 import { VELORA, K, parseK, instOf, bare, isInst, normOrigin, acctKey } from './ids.js';
+import { myIdOn } from './tokens.js';
 import { connections, sendTo, startInstances, loadInstanceData, retryInstances, renewVeloraSession, holdInstances, forgetIfEmpty } from './instances.js';
 import { attachmentRefs } from './signing-payload.js';
 import { spoilerName } from './spoiler.js';
@@ -112,7 +113,8 @@ function set(patch) {
 const subscribe = f => { subs.add(f); return () => subs.delete(f); };
 export const getState = () => state;
 // a custom emoji's picture: an instance's own (from its emoji list), else Velora's
-export const customEmoji = (eid, animated) => state.emojiUrls[eid] || `/uploads/emojis/${eid}.${animated ? 'gif' : 'png'}`;
+// (an emoji Ember doesn't know yet - one a bridge brought in from Discord / Fluxer, say - is looked for where the message lives)
+export const customEmoji = (eid, animated, inst) => state.emojiUrls[eid] || `${inst && inst !== VELORA ? inst : ''}/uploads/emojis/${eid}.${animated ? 'gif' : 'png'}`;
 export const patchState = p => set(p);
 // Ember desktop: games' Discord rich presence (captured by the app) becomes your status, tied to this socket
 let rpcNow = null;
@@ -837,6 +839,7 @@ export function unreadTotals(s = state) {
 export function mentionsMe(msg) {
   const inst = msg.inst || instOf(msg.channel || '');
   const me = (inst === VELORA ? state.me : connections.get(inst)?.user)?.username;
+  const myId = myIdOn(inst);
   if (!me || isMine(msg)) return false;
   if (msg.reply?.author?.username === me) return true;
   if (msg.mention_everyone) return true;
@@ -844,7 +847,8 @@ export function mentionsMe(msg) {
     const mine = state.members[msg.server]?.find(x => x.username === me)?.roles || [];
     if (msg.mention_roles.some(r => mine.includes(r))) return true;
   }
-  return new RegExp(`(^|\\W)@${me.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\W|$)`, 'i').test(msg.body || '');
+  // only a <@my id> token pings (a plain "@name" in the text is just text)
+  return myId != null && String(msg.body || '').includes(`<@${myId}>`);
 }
 // the Hyperfocus sounds (public/assets/sounds/chat)
 const SOUNDS = { message: '/assets/sounds/chat/message.mp3', mention: '/assets/sounds/chat/mention.m4a', join: '/assets/sounds/chat/joinVC.mp3', leave: '/assets/sounds/chat/leaveVC.mp3', call: '/assets/sounds/chat/call.mp3', ringtone: '/assets/sounds/chat/ringtone-deltarune.mp3?v=20261012', ringtone_epic: '/assets/sounds/chat/ringtone-epic.mp3?v=20261011', notify: '/assets/sounds/chat/notify.mp3?v=20261011', notify_short: '/assets/sounds/chat/message-short.mp3?v=20261114', notify_soft: '/assets/sounds/chat/message-default.mp3?v=20261113', voice_start: '/assets/sounds/chat/voice-start.mp3', voice_send: '/assets/sounds/chat/voice-send.mp3', voice_delete: '/assets/sounds/chat/voice-delete.mp3', notify_classic: '/assets/sounds/chat/message.mp3', mute: '/assets/sounds/chat/mute.mp3', unmute: '/assets/sounds/chat/unmute.mp3', deafen: '/assets/sounds/chat/deafen.mp3', undeafen: '/assets/sounds/chat/undeafen.mp3' };
@@ -1703,7 +1707,8 @@ export async function toggleBlock(username, blocked) {
 // #/s/<sid>/<cid> for Velora's own servers, #/i/<instance>/s/<sid>/<cid> and #/i/<instance>/invite/<code> for instances
 export function hashFor(v) {
   const at = k => { const p = parseK(k); return p.inst === VELORA ? '' : `#/i/${encodeURIComponent(p.inst)}`; };
-  if (v.kind === 'channel') return at(v.sid) ? `${at(v.sid)}/s/${bare(v.sid)}/${bare(v.cid)}` : `#/s/${v.sid}/${v.cid}`;
+  const mid = v.kind === 'channel' && v.mid ? `/${v.mid}` : ''; // a message link: #/s/<sid>/<cid>/<message id>
+  if (v.kind === 'channel') return at(v.sid) ? `${at(v.sid)}/s/${bare(v.sid)}/${bare(v.cid)}${mid}` : `#/s/${v.sid}/${v.cid}${mid}`;
   if (v.kind === 'server') return at(v.sid) ? `${at(v.sid)}/s/${bare(v.sid)}` : `#/s/${v.sid}`;
   if (v.kind === 'instance') return `#/i/${encodeURIComponent(v.inst)}`;
   if (v.kind === 'invite') return v.inst && v.inst !== VELORA ? `#/i/${encodeURIComponent(v.inst)}/invite/${v.code}` : `#/invite/${v.code}`;
@@ -1724,15 +1729,15 @@ export function readHash() {
   if (parts[1] === 'i' && parts[2]) {
     let inst = null;
     try { inst = decodeURIComponent(parts[2]); } catch { /* bad */ }
-    const [, , , a, b, c] = parts;
+    const [, , , a, b, c, d] = parts;
     inst = normOrigin(inst); // only a proper, normalised origin is an instance
     if (!inst || inst.includes('|')) return { kind: 'home' };
-    if (a === 's' && b) return { kind: c ? 'channel' : 'server', sid: K(inst, b), cid: c ? K(inst, c) : undefined };
+    if (a === 's' && b) return { kind: c ? 'channel' : 'server', sid: K(inst, b), cid: c ? K(inst, c) : undefined, ...(c && /^\d{1,20}$/.test(d || '') ? { mid: d } : {}) };
     if (a === 'invite' && b) return { kind: 'invite', code: b, inst };
     return a ? { kind: 'home' } : { kind: 'instance', inst };
   }
-  const [, a, b, c] = parts;
-  if (a === 's' && b) return { kind: c ? 'channel' : 'server', sid: b, cid: c };
+  const [, a, b, c, d] = parts;
+  if (a === 's' && b) return { kind: c ? 'channel' : 'server', sid: b, cid: c, ...(c && /^\d{1,20}$/.test(d || '') ? { mid: d } : {}) };
   if (a === 'dm' && b) return { kind: 'dm', username: decodeURIComponent(b) };
   if (a === 'g' && b) return { kind: 'group', room: b };
   if (a === 'invite' && b) return { kind: 'invite', code: b };
@@ -1769,6 +1774,8 @@ export function resumeInstanceView(origin) {
   if (srv && connections.get(origin)?.status === 'open') open(v.then && instOf(v.then.sid || '') === origin ? v.then : { kind: 'server', sid: srv.sid });
 }
 export async function open(v) {
+  // a message link: open its channel and scroll to the message
+  if (v.kind === 'channel' && v.mid) { const { mid, ...at } = v; return jumpToMessage(at, mid); }
   // Velora-only places (DMs, groups, modmail, Velora's own servers) need the Velora sign-in
   if (!state.signedIn && (['dm', 'group', 'modmail'].includes(v.kind) || ((v.kind === 'server' || v.kind === 'channel') && !isInst(v.sid)))) { set({ view: { kind: 'home' } }); return; }
   const io = (v.kind === 'server' || v.kind === 'channel') && isInst(v.sid) ? instOf(v.sid) : v.kind === 'instance' ? v.inst : null;

@@ -1,11 +1,18 @@
 // The composer is a contenteditable box so custom emojis, @mentions, @roles, @everyone and #channels
 // show styled while you type. Its value is still plain message text: pills/emojis carry data-token.
+// People and channels are <@id> / <#cid> tokens (tokens.js): only a picked suggestion (or a name typed in full and
+// followed by a space) becomes one, so pasted text like "@yell at me" stays plain text and pings nobody.
 import { getState, customEmoji } from './store.js';
 import { emojiDataSync } from './EmojiPicker.jsx';
+import { userById, channelById, userToken, channelToken, nameOf } from './tokens.js';
+import { VELORA, instOf } from './ids.js';
 
 const EMOJI_TOKEN = /^<(a?):([A-Za-z0-9_]{1,32}):(e[0-9a-f]{10})>$/;
 const ROLE_TOKEN = /^<@&(r[0-9a-f]{10})>$/;
-const SPLIT_RE = /(<a?:[A-Za-z0-9_]{1,32}:e[0-9a-f]{10}>|<@&r[0-9a-f]{10}>)/;
+const USER_TOKEN = /^<@!?((?:[vlb]:)?\d{1,20})>$/;
+const CHAN_TOKEN = /^<#(c[0-9a-f]{10})>$/;
+const SPLIT_RE = /(<a?:[A-Za-z0-9_]{1,32}:e[0-9a-f]{10}>|<@&r[0-9a-f]{10}>|<@!?(?:[vlb]:)?\d{1,20}>|<#c[0-9a-f]{10}>)/;
+const instOfSid = sid => (sid ? instOf(sid) : VELORA);
 
 // the element for one token (or null if it isn't one we style)
 export function pillNode(token, sid) {
@@ -31,13 +38,19 @@ export function pillNode(token, sid) {
     return span;
   }
   if (/^@(everyone|here)$/.test(token)) { span.className = 'vc-mention all vc-tok'; span.textContent = token; return span; }
-  if (token[0] === '@') {
+  if ((m = USER_TOKEN.exec(token))) {
+    const u = userById(m[1], instOfSid(sid), sid);
     const me = getState().me?.username;
-    span.className = `vc-mention vc-tok${me && me.toLowerCase() === token.slice(1).toLowerCase() ? ' me' : ''}`;
-    span.textContent = token;
+    span.className = `vc-mention vc-tok${u && me && me.toLowerCase() === String(u.username).toLowerCase() ? ' me' : ''}`;
+    span.textContent = `@${u ? nameOf(u) : 'unknown-user'}`;
     return span;
   }
-  if (token[0] === '#') { span.className = 'vc-mention ch vc-tok'; span.textContent = token; return span; }
+  if ((m = CHAN_TOKEN.exec(token))) {
+    const c = channelById(m[1], instOfSid(sid));
+    span.className = 'vc-mention ch vc-tok';
+    span.textContent = `#${c ? c.channel.name : 'unknown'}`;
+    return span;
+  }
   return null;
 }
 
@@ -52,18 +65,20 @@ export function resolveWord(word, view) {
     const data = emojiDataSync();
     return data?.find(e => Array.isArray(e[4]) && e[4].includes(name))?.[0] || data?.find(e => e[1] === label)?.[0] || data?.find(e => String(e[1]).replace(/[^a-z0-9]+/g, ' ').trim() === label.replace(/[^a-z0-9]+/g, ' ').trim())?.[0] || null;
   }
-  if (word[0] === '#') return sid && st.detail[sid]?.channels.some(c => c.name === word.slice(1)) ? word : null;
+  if (word[0] === '#') { const c = sid && st.detail[sid]?.channels.find(x => x.name === word.slice(1)); return c ? channelToken(c.cid) : null; }
   const n = word.slice(1).toLowerCase();
   if (sid && (n === 'everyone' || n === 'here')) return `@${n}`;
   if (sid) {
     const r = (st.detail[sid]?.roles || []).find(x => !x.is_default && x.name.toLowerCase() === n);
     if (r) return `<@&${r.rid}>`;
     const u = (st.members[sid] || []).find(x => x.username.toLowerCase() === n);
-    return u ? `@${u.username}` : null;
+    return u?.id != null ? userToken(u.id) : null;
   }
-  if (view.kind === 'dm') return [view.username, st.me?.username].find(x => x && x.toLowerCase() === n) ? `@${[view.username, st.me?.username].find(x => x && x.toLowerCase() === n)}` : null;
-  if (view.kind === 'group') { const g = st.groups.find(x => x.room === view.room); const u = g?.members.find(x => x.toLowerCase() === n); return u ? `@${u}` : null; }
-  return null;
+  // DMs / groups: a person Ember knows the id of
+  const names = view.kind === 'dm' ? [view.username, st.me?.username] : view.kind === 'group' ? st.groups.find(x => x.room === view.room)?.members || [] : [];
+  const name = names.find(x => x && x.toLowerCase() === n);
+  const id = name && (name === st.me?.username ? st.me?.id : st.people[name]?.id);
+  return id != null ? userToken(id) : null;
 }
 
 // box contents -> message text
@@ -85,8 +100,9 @@ export function serialize(root) {
   return out.replace(/​/g, '').replace(/ /g, ' ');
 }
 
-// message text (a saved draft) -> box contents
-const WORD_RE = /(^|\s)(@[\w.-]{2,32}|#[a-z0-9_-]{1,40})(?=\s|$)/g;
+// message text (a saved draft) -> box contents. Tokens come back as pills; of plain words only @everyone / @here do
+// (a pasted "@name" or "#name" stays text - it's never turned into a mention behind your back)
+const WORD_RE = /(^|\s)(@everyone|@here)(?=\s|$)/g;
 export function fill(root, text, view) {
   const sid = view?.kind === 'channel' ? view.sid : null;
   root.textContent = '';

@@ -12,8 +12,9 @@ import { chanKey } from './dmPinsCore.js';
 import { ChevronRight, Check, Hash, Copy, Link2, BellOff, Bell, CheckCheck, UserPlus, Settings, LogOut, Pencil, Trash2, Reply, User, MessageCircle, ExternalLink, Image as ImageIcon, Code2, Forward, Pin, Download, SmilePlus, BookmarkPlus, Bookmark, BookmarkCheck, Languages, Ellipsis, RefreshCw, LogIn, ShieldCheck, BellRing, Flag, Ban, Info, Users } from 'lucide-react';
 import { openReactionsView } from './ReactionsView.jsx';
 import { apiFetch } from '../api.js';
+import { plainText } from './tokens.js';
 import { useChat, getState, setMenu, toggleBlock, toast, setNotify, notifyOf, go, markServerRead, markChannelRead, linkFor } from './store.js';
-import { bare, instOpt, isInst } from './ids.js';
+import { bare, instOpt, isInst, instOf } from './ids.js';
 import { reportTo, reportDmMessage } from './report.js';
 import { canReportDm } from './dm-report.js';
 import { reactionId } from './msg-actions.js';
@@ -247,8 +248,8 @@ export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, 
   const dev = !!getState().settings?.developer_mode;
   const copyItems = [
     sel && { label: 'Copy selection', icon: Copy, onClick: () => copy(sel, 'Text copied') },
-    m.body && { label: 'Copy text', icon: Copy, onClick: () => copy(m.body, 'Text copied') },
-    canCopyLink && { label: 'Copy message link', icon: Link2, onClick: () => copy(linkFor(view), 'Link copied') },
+    m.body && { label: 'Copy text', icon: Copy, onClick: () => copy(plainText(m.body, view.sid ? instOf(view.sid) : undefined, view.sid), 'Text copied') },
+    canCopyLink && { label: 'Copy message link', icon: Link2, onClick: () => copy(linkFor(view.kind === 'channel' && m.id && !m.pending ? { ...view, mid: String(m.id) } : view), 'Link copied') },
     link && { label: 'Copy link', icon: Link2, onClick: () => copy(link.href, 'Link copied') },
     pic && { label: 'Copy image', icon: ImageIcon, onClick: () => copyImage(pic.src) },
     dev && { label: 'Copy message ID', icon: Code2, onClick: () => copy(m.imId || m.gid || m.id, 'Message ID copied') },

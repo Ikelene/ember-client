@@ -4,7 +4,8 @@ import { SAVEABLE } from './uploadLinks.js';
 import { saveMedia } from './mediaDownload.js';
 import { canAttachInChannel } from './attachment-permissions.js';
 import { apiFetch } from '../api.js';
-import { instOpt, isInst, instOf } from './ids.js';
+import { instOpt, isInst, instOf, VELORA } from './ids.js';
+import { isLegacyMessage } from './tokens.js';
 import { sigId } from './signing.js';
 import { VideoPlayer, AudioPlayer, VoicePlayer } from './MediaPlayer.jsx';
 import { useVoiceRecorder, VoiceBar } from './VoiceNote.jsx';
@@ -75,7 +76,7 @@ import { Avatar, BlockedMark } from './Profile.jsx';
 import { messageMenu, userMenu, openMenu } from './Menu.jsx';
 import { useScope, mentionsMe as isMention, useFace, wantVeloraFaces, useBlocked, blockedFace, isBlockedName, faceOf, BLOCKED_NAME } from './store.js';
 import { useNameStyle, colorFrom, NameDecor, P, has } from './roles.jsx';
-import { suggestQuery, useSuggestItems, MentionPicker, encodeRoleMentions, decodeRoleMentions } from './Mentions.jsx';
+import { suggestQuery, useSuggestItems, MentionPicker, encodeRoleMentions } from './Mentions.jsx';
 import { serialize, fill, caretToEnd, caretText, replaceBeforeCaret, insertAt, resolveWord, markdownShortcut, styleMarkdown } from './richInput.js';
 
 const GROUP_MS = 7 * 60 * 1000;
@@ -301,7 +302,7 @@ function EditMessageInput({ m, view, onSave, onCancel }) {
   useLayoutEffect(() => {
     const el = input.current;
     if (!el) return;
-    fill(el, decodeRoleMentions(m.body, sid), view);
+    fill(el, m.body, view); // tokens (people, channels, roles, emojis) come back as pills
     styleMarkdown(el, view);
     el.focus();
     caretToEnd(el);
@@ -511,7 +512,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
       .then(r => setTr(r ? (r.same ? { ...r, text: null } : r) : null))
       .catch(e => { setTr(null); toast(e.message === 'translate_unavailable' ? "Translation isn't available right now." : e.message === 'rate_limited' ? 'Too many translations - try again in a minute.' : "Couldn't translate that."); });
   };
-  const { nodes, images, media, jumbo, links, invites, sticker: pSticker } = useMemo(() => renderBody(m.body, ctx), [m.body, ctx]);
+  const { nodes, images, media, jumbo, links, invites, sticker: pSticker } = useMemo(() => renderBody(m.body, isLegacyMessage(m) ? { ...ctx, legacy: true } : ctx), [m.body, ctx]); // eslint-disable-line react-hooks/exhaustive-deps
   const mentionsMe = isMention(m);
   const nameKey = useNameStyle(view.sid, aliasMember || author); // (an unmarked alias that matched a member: their colour + role icon)
   const distrust = useDistrust(m);
@@ -708,7 +709,7 @@ export function MessageList({ view, onUser, onReply, canPost, canMod, channels, 
   const blocks = useChat(s => s.blocks);
   const members = useChat(s => (view.sid ? s.members[view.sid] : null));
   const ctx = useMemo(() => ({
-    me, canPost, channels, linkImages, roles,
+    me, canPost, channels, linkImages, roles, sid: view.sid || null, inst: view.sid ? instOf(view.sid) : VELORA,
     onUser: (u, el) => onUser(u, el),
     onChannel: c => go({ kind: 'channel', sid: view.sid, cid: c.cid }),
     onLink: openLink,

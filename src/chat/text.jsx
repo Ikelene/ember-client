@@ -1,6 +1,11 @@
 // Message text: a little markdown (**bold**, *italic*, __underline__, ~~strike~~, `code`,
 // ```blocks```, ||spoilers||), links, @mentions, #channels, and picture links shown as pictures.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Hash, MessageSquare, ChevronRight } from 'lucide-react';
+import { apiFetch } from '../api.js';
+import { VELORA, instOf } from './ids.js';
+import { ServerIcon } from './ServerIcon.jsx';
+import { userById, channelById, parseEmberLink } from './tokens.js';
 import { stickerOfBody } from './stickerLink.js';
 import { onEmberHost } from './hosts.js';
 import { ask, customEmoji, loadEmojis, useChat } from './store.js';
@@ -87,10 +92,10 @@ function emojiInfo(e, what) {
 }
 // a custom emoji in a message; follows the emoji list so it fixes itself once the instance's pictures have loaded
 let emojiRetryAt = 0;
-function CustomEmojiImg({ eid, animated, name }) {
+function CustomEmojiImg({ eid, animated, name, inst }) {
   const known = useChat(s => s.emojiUrls[eid]);
   const [tries, setTries] = useState(0);
-  const src = customEmoji(eid, animated);
+  const src = customEmoji(eid, animated, inst);
   // a picture that fails (address not known yet, or a hiccup) asks for the list again and tries a few more times
   const retry = () => {
     if (tries >= 3) return;
@@ -100,13 +105,74 @@ function CustomEmojiImg({ eid, animated, name }) {
   return <img className="vc-cemoji" src={tries ? `${src}${src.includes('?') ? '&' : '?'}r=${tries}` : src} onError={retry} alt={`:${name}:`} title={`:${name}:`} draggable={false}
     data-eid={eid} data-name={name} data-animated={animated ? '1' : '0'} onClick={e => emojiInfo(e, { eid, name, animated: !!animated })} />;
 }
+const ctxInst = ctx => ctx?.inst || (ctx?.sid ? instOf(ctx.sid) : VELORA);
+const hashOfChannel = (sid, cid) => {
+  const inst = instOf(sid), b = x => String(x).split('|').pop();
+  return inst === VELORA ? `/s/${sid}/${cid}` : `/i/${encodeURIComponent(inst)}/s/${b(sid)}/${b(cid)}`;
+};
+// <@id> -> @Name (the server's member first, then anyone Ember has seen with that id)
+function UserMention({ id, ctx }) {
+  const inst = ctxInst(ctx);
+  useChat(s => (ctx?.sid ? s.members[ctx.sid] : s.people)); // a member list arriving fills the name in
+  const u = userById(id, inst, ctx?.sid);
+  if (!u) return <span className="vc-mention unknown" title="Someone Ember doesn't know">@unknown-user</span>;
+  const me = ctx?.me && String(u.username).toLowerCase() === String(ctx.me).toLowerCase();
+  const blocked = !me && !!ctx?.isBlocked?.(u.username);
+  return (
+    <button type="button" className={`vc-mention${me ? ' me' : ''}${blocked ? ' blocked' : ''}`} onClick={e => ctx?.onUser?.(u.username, e.currentTarget)} title={blocked ? undefined : `@${u.username}`}>
+      @{blocked ? 'Blocked User' : <NameText u={ctx?.personOf?.(u.username) || u} fallback={u.username} />}
+    </button>
+  );
+}
+// what a server + channel are called, for a link pill: what I already know, else asked once (Nookara or that Ember server)
+const linkInfos = new Map();
+function askLinkInfo(link) {
+  const key = `${link.sid}/${link.cid}`;
+  if (!linkInfos.has(key)) {
+    const b = x => String(x).split('|').pop();
+    const p = apiFetch(`/chat/link-info/${b(link.sid)}/${b(link.cid)}`, link.inst === VELORA ? {} : { inst: link.inst })
+      .then(d => ({ server: d.server || null, channel: d.channel || null }))
+      .catch(() => null);
+    linkInfos.set(key, p);
+  }
+  return linkInfos.get(key);
+}
+// a pasted link to a channel / message in Ember: [server icon] Server > #channel > (message), like Discord's
+function EmberLinkPill({ href, link, ctx }) {
+  const known = useChat(s => {
+    const d = s.detail[link.sid];
+    const srv = d?.server || s.servers.find(x => x.sid === link.sid);
+    const ch = d?.channels?.find(c => c.cid === link.cid);
+    return srv ? JSON.stringify([srv.name, srv.icon || '', ch?.name || '']) : null;
+  });
+  const [asked, setAsked] = useState(null);
+  useEffect(() => {
+    if (known) return undefined;
+    let live = true;
+    askLinkInfo(link).then(r => { if (live) setAsked(r || false); });
+    return () => { live = false; };
+  }, [known, link.sid, link.cid]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [sName, sIcon, cName] = known ? JSON.parse(known) : [asked?.server?.name, asked?.server?.icon, asked?.channel?.name];
+  const same = !!ctx?.sid && link.sid === ctx.sid;
+  let host = '';
+  try { host = link.inst === VELORA ? '' : new URL(link.inst).host; } catch { /* none */ }
+  const server = sName || host || (asked === false ? 'Unknown server' : '');
+  const open = e => { e.preventDefault(); ctx?.onLink?.(link.hash); };
+  return (
+    <a href={href} className="vc-linkpill" onClick={open} title={href} rel="noopener noreferrer nofollow">
+      {!same && <><span className="vc-linkpill-ico"><ServerIcon src={sIcon} name={server || '?'} /></span><span className="vc-linkpill-srv">{server || '...'}</span><ChevronRight size={12} className="vc-linkpill-sep" /></>}
+      <Hash size={13} className="vc-linkpill-hash" /><span>{cName || (sName || asked === false ? 'unknown' : '...')}</span>
+      {link.mid && <><ChevronRight size={12} className="vc-linkpill-sep" /><MessageSquare size={13} className="vc-linkpill-msg" aria-label="message" /></>}
+    </a>
+  );
+}
 const RULES = [
   [/<t:(-?\d{1,13})(?::([tTdDfFR]))?>/, (m, ctx, k) => {
     const txt = stampText(Number(m[1]), m[2] || 'f');
     return txt ? <time key={k} className="vc-stamp" dateTime={new Date(Number(m[1]) * 1000).toISOString()} title={new Date(Number(m[1]) * 1000).toLocaleString()}>{txt}</time> : m[0];
   }],
   [/<(a?):([A-Za-z0-9_]{1,32}):(e[0-9a-f]{10})>/, (m, ctx, k) => (
-    <CustomEmojiImg key={k} eid={m[3]} animated={m[1]} name={m[2]} />
+    <CustomEmojiImg key={k} eid={m[3]} animated={m[1]} name={m[2]} inst={ctxInst(ctx)} />
   )],
   // standard emojis show as Twemoji (Discord's look); click one for its name
   [UNI_EMOJI, (m, ctx, k) => {
@@ -118,6 +184,15 @@ const RULES = [
     return <span key={k} className="vc-mention role" style={r?.color ? { '--rc': r.color } : undefined}>@{r ? r.name : 'deleted-role'}</span>;
   }],
   [/(?:^|(?<=\s))@(everyone|here)\b/, (m, ctx, k) => <span key={k} className="vc-mention all">@{m[1]}</span>],
+  // <@id>: a person (Nookara ids are numbers, an Ember server's are v:/l:/b: principals)
+  [/<@!?((?:[vlb]:)?\d{1,20})>/, (m, ctx, k) => <UserMention key={k} id={m[1]} ctx={ctx} />],
+  // <#cid>: a channel (any server of mine on the same backend; otherwise "#unknown", like Discord)
+  [/<#(c[0-9a-f]{10})>/, (m, ctx, k) => {
+    const found = channelById(m[1], ctxInst(ctx));
+    if (!found) return <span key={k} className="vc-mention ch unknown" title="A channel you can't see">#unknown</span>;
+    const same = !ctx?.sid || found.sid === ctx.sid;
+    return <button type="button" key={k} className="vc-mention ch" title={same ? undefined : found.server?.name} onClick={() => (same && ctx?.onChannel ? ctx.onChannel(found.channel) : ctx?.onLink?.(`#${hashOfChannel(found.sid, found.channel.cid)}`))}>#{found.channel.name}</button>;
+  }],
   [/\|\|([\s\S]+?)\|\|/, (m, ctx, k) => <Spoiler key={k}>{format(m[1], ctx, k)}</Spoiler>],
   [/\*\*([\s\S]+?)\*\*/, (m, ctx, k) => <b key={k}>{format(m[1], ctx, k)}</b>],
   [/__([\s\S]+?)__/, (m, ctx, k) => <u key={k}>{format(m[1], ctx, k)}</u>],
@@ -128,13 +203,16 @@ const RULES = [
   [/\[([^\]\n]{1,200})\]\((https?:\/\/[^\s<>()]+)\)/, (m, ctx, k) => (
     <a key={k} href={m[2]} className="vc-masked" target="_blank" rel="noopener noreferrer nofollow" title={m[2]} onClick={e => { e.preventDefault(); if (!inAppLink(m[2], ctx, e.currentTarget)) maskedLink(m[2]); }}>{format(m[1], ctx, k)}</a>
   )],
-  [URL_RE, (m, ctx, k) => <a key={k} href={m[0]} target="_blank" rel="noopener noreferrer nofollow" onClick={e => { if (inAppLink(m[0], ctx, e.currentTarget)) e.preventDefault(); }}>{m[0]}</a>],
+  [URL_RE, (m, ctx, k) => (ctx?.bio ? null : parseEmberLink(m[0])) ? <EmberLinkPill key={k} href={m[0]} link={parseEmberLink(m[0])} ctx={ctx} /> : <a key={k} href={m[0]} target="_blank" rel="noopener noreferrer nofollow" onClick={e => { if (inAppLink(m[0], ctx, e.currentTarget)) e.preventDefault(); }}>{m[0]}</a>],
+  // plain @name / #name: only in messages from before tokens (and bios); anywhere else it's just text
   [/(?:^|(?<=[\s(]))@([A-Za-z0-9_.-]{2,32})/, (m, ctx, k) => {
+    if (!ctx?.legacy) return m[0];
     const me = ctx?.me && m[1].toLowerCase() === ctx.me.toLowerCase();
     const blocked = !me && !!ctx?.isBlocked?.(m[1]); // somebody I blocked, in a server: no name
     return <button type="button" key={k} className={`vc-mention${me ? ' me' : ''}${blocked ? ' blocked' : ''}`} onClick={e => ctx?.onUser?.(m[1], e.currentTarget)} title={blocked ? undefined : `@${m[1]}`}>@{blocked ? 'Blocked User' : <NameText u={ctx?.personOf?.(m[1]) || { username: m[1], kind: 'local', inst: true }} fallback={m[1]} />}</button>;
   }],
   [/(?:^|(?<=[\s(]))#([a-z0-9_-]{1,40})/, (m, ctx, k) => {
+    if (!ctx?.legacy) return m[0];
     const c = ctx?.channels?.find(x => x.name === m[1]);
     return c ? <button type="button" key={k} className="vc-mention ch" onClick={() => ctx.onChannel?.(c)}>#{c.name}</button> : m[0];
   }],
@@ -257,6 +335,7 @@ export function renderBody(body, ctx) {
       // so do Velora-stored DM files (never unfurled: Velora fetching its own temporary file would count as someone opening it)
       if (isVel(u)) { const it = velItem(u); if (!images.includes(u) && !images.includes(it.url) && !media.some(x => x.url === it.url)) { if (IMG.test(u)) images.push(u); else media.push(it); } continue; }
       if (IMG.test(u) || VID.test(u) || AUD.test(u) || /^https:\/\/([a-z0-9-]+\.)*klipy\.com\//i.test(u) || NOOKARA_FILE.test(u)) continue;
+      if (!ctx?.bio && parseEmberLink(u)) continue; // a channel / message in Ember: the pill in the text is enough
       if (!links.includes(u)) links.push(u);
     }
   });
@@ -266,7 +345,7 @@ export function renderBody(body, ctx) {
 // a profile bio: the same markdown as chat (bold, italic, underline, strike, code, spoilers, links, lists, quotes,
 // small headers, -# subtext), but a link on its own line stays a link (no pictures / players) and headers stay small.
 // inert = a preview (the /me profile tab): links don't do anything, there is no Ember pop-up host there.
-const BIO_CTX = { linkImages: false, bio: true };
+const BIO_CTX = { linkImages: false, bio: true, legacy: true };
 export function BioText({ text, className = 'pe-bio', inert = false }) {
   const nodes = useMemo(() => renderBody(text || '', BIO_CTX).nodes, [text]);
   return <div className={`${className} vc-bio`} onClickCapture={inert ? e => { if (e.target.closest?.('a')) { e.preventDefault(); e.stopPropagation(); } } : undefined}>{nodes}</div>;

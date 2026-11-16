@@ -395,3 +395,5 @@ html.vc-rounded .vc-eminfo-lock { border-radius: var(--r-md); }
 
 /* docked pickers (pickerDock.js) fill the keyboard space edge to edge, no rounded card */
 html.vc-rounded .vc-picker.docked { border-radius: 0; box-shadow: none; background: transparent; }
+html.vc-rounded .vc-linkpill { border-radius: calc(4px * var(--rk, 1)); }
+html.vc-rounded .vc-linkpill-ico { border-radius: calc(4px * var(--rk, 1)); }
