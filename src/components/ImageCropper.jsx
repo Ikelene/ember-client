@@ -8,7 +8,7 @@ import { ZoomIn, ZoomOut, X } from 'lucide-react';
 //   round  - show a round mask (profile pictures are shown in a circle)
 const MAX_ZOOM = 6;
 
-export default function ImageCropper({ file, aspect = 1, round = false, title, onCancel: cancelNow, onDone: doneNow }) {
+export default function ImageCropper({ file, aspect = 1, round = false, title, onCancel: cancelNow, onDone: doneNow, gifsAnimate = true }) {
   // leaving plays the fade + shrink first, then tells the editor
   const [closing, setClosing] = useState(false);
   const leave = fn => { if (closing) return; setClosing(true); setTimeout(fn, 190); };
@@ -117,7 +117,7 @@ export default function ImageCropper({ file, aspect = 1, round = false, title, o
           <input type="range" min={1} max={MAX_ZOOM} step={0.01} value={zoom} onChange={e => zoomTo(Number(e.target.value))} aria-label="Zoom" />
           <button type="button" onClick={() => zoomTo(zoom * 1.25)} aria-label="Zoom in"><ZoomIn size={15} /></button>
         </div>
-        <div className="crop-hint">Drag to move it, scroll or use the slider to zoom.{file.type === 'image/gif' ? ' GIFs stay animated.' : ''}</div>
+        <div className="crop-hint">Drag to move it, scroll or use the slider to zoom.{file.type === 'image/gif' ? (gifsAnimate ? ' GIFs stay animated.' : ' A GIF is saved as a still picture.') : ''}</div>
         <div className="crop-actions">
           <button type="button" className="btn btn-surface" onClick={onCancel}>Cancel</button>
           <button type="button" className="btn btn-primary" onClick={apply} disabled={!nat}>Apply</button>

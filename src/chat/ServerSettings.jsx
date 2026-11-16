@@ -2,6 +2,9 @@
 // title and a close X; on phones the list first, then a page slides in). Server / Members / Integrations, and for an
 // instance's admins its own pages (Instance). Velora-hosted servers use the same shell with the pages they have.
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import ImageCropper from '../components/ImageCropper.jsx';
+import { cropToFile, keepsAnimation } from './cropImage.js';
 import {
   Search, LayoutGrid, Shield, Smile, Volume2, Upload, Users, DoorOpen, Bot, ArrowLeftRight, Gamepad2,
   KeyRound, Mic, Globe, UserCog, TriangleAlert, Trash2, RefreshCw, Check, Ban, UserMinus, Compass, Download, Rocket, Archive, Info, Copy, CircleArrowUp,
@@ -12,7 +15,7 @@ import {
 import { apiFetch, uploadFetch } from '../api.js';
 import { useChat, go, ask, toast, errorText, refreshServer, loadServersOf, loadMembers, useFace } from './store.js';
 import { instOf, isInst } from './ids.js';
-import { imgHint, warnImage } from './imgHints.js';
+import { imgHint, warnImage, imgSpec } from './imgHints.js';
 import { initials } from './Parts.jsx';
 import { Avatar } from './Profile.jsx';
 import { stampOf } from './text.jsx';
@@ -149,6 +152,7 @@ function Overview({ sid, origin, instAdmin, onDirty, goTo }) {
   const [cfg, setCfg] = useState(null); // the instance's settings (Discover listing), for its admins
   const [tags, setTags] = useState('');
   const [busy, setBusy] = useState('');
+  const [cropping, setCropping] = useState(null); // { kind: 'icon' | 'banner', file } while the crop tool is open
   const call = (path, o = {}) => apiFetch(`/api/v1${path}`, { inst: origin, ...o });
   const loadCfg = () => call('/instance/settings').then(c => { setCfg(c); setTags(tagText(c.tags)); return c; }).catch(e => toast(errorText(e.message)));
   useEffect(() => { if (instAdmin) loadCfg(); }, [instAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -172,9 +176,26 @@ function Overview({ sid, origin, instAdmin, onDirty, goTo }) {
     } catch (e) { toast(errorText(e.message)); }
     setBusy('');
   }
-  async function img(kind, file) {
+  const specOf = kind => imgSpec(kind === 'icon' ? 'serverIcon' : 'serverBanner', isInst(sid));
+  // pick -> crop (square icon, banner at its own shape) -> upload. A GIF on an Ember server goes up as it is, so it stays animated.
+  function pick(kind, e) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // (the same file can be picked again)
     if (!file) return;
-    warnImage(file, kind === 'icon' ? 'serverIcon' : 'serverBanner', isInst(sid));
+    if (keepsAnimation(file, isInst(sid))) { toast('GIFs go up uncropped, so they stay animated.', true); img(kind, file); return; }
+    setCropping({ kind, file });
+  }
+  async function cropped(box) {
+    const { kind, file } = cropping;
+    setCropping(null);
+    const s = specOf(kind);
+    let out = file;
+    try { out = await cropToFile(file, box, s?.w || 1024, s?.h || 1024); } catch { toast("Couldn't crop that picture."); return; }
+    img(kind, out, true);
+  }
+  async function img(kind, file, isCropped = false) {
+    if (!file) return;
+    warnImage(file, kind === 'icon' ? 'serverIcon' : 'serverBanner', isInst(sid), { cropped: isCropped });
     setBusy(kind);
     try { await uploadTo(`/chat/servers/${sid}/${kind}`, file); await refreshServer(sid); await loadServersOf(sid); } catch (e) { toast(errorText(e.message)); }
     setBusy('');
@@ -200,17 +221,24 @@ function Overview({ sid, origin, instAdmin, onDirty, goTo }) {
   const dir = v.directory || {};
   return (
     <div className="bf-ss-page">
+      {cropping && createPortal(
+        <div className="bf-pe-crop">
+          <ImageCropper file={cropping.file} aspect={cropping.kind === 'icon' ? 1 : (specOf('banner')?.w || 3) / (specOf('banner')?.h || 1)}
+            title={cropping.kind === 'icon' ? 'Crop the server icon' : 'Crop the server banner'} gifsAnimate={false} onCancel={() => setCropping(null)} onDone={cropped} />
+        </div>,
+        document.body,
+      )}
       <OperatorTermsNotice sid={sid} />
       <ServerCard sid={sid} srv={srv} origin={origin} goTo={goTo} />
       <Card title="Server profile" icon={LayoutGrid}>
         <div className="vc-settings-imgs">
           <div className="vc-field"><span>Icon</span>
             <div className="vc-img-row"><span className="vc-srv-ico lg">{srv.icon ? <img src={srv.icon} alt="" /> : initials(srv.name)}</span>
-              <label className="btn btn-surface"><Upload size={14} /> {busy === 'icon' ? 'Uploading...' : 'Upload'}<input type="file" hidden accept="image/*" onChange={e => img('icon', e.target.files[0])} /></label>
+              <label className="btn btn-surface"><Upload size={14} /> {busy === 'icon' ? 'Uploading...' : 'Upload'}<input type="file" hidden accept="image/*" onChange={e => pick('icon', e)} /></label>
               {srv.icon && <button type="button" className="btn btn-surface" onClick={() => clearImg('icon')}>Remove</button>}</div><small className="vc-hint vc-img-hint">{imgHint('serverIcon', isInst(sid))}</small></div>
           <div className="vc-field"><span>Banner</span>
             <div className="vc-img-row"><span className="vc-banner-prev">{srv.banner && <img src={srv.banner} alt="" />}</span>
-              <label className="btn btn-surface"><Upload size={14} /> {busy === 'banner' ? 'Uploading...' : 'Upload'}<input type="file" hidden accept="image/*" onChange={e => img('banner', e.target.files[0])} /></label>
+              <label className="btn btn-surface"><Upload size={14} /> {busy === 'banner' ? 'Uploading...' : 'Upload'}<input type="file" hidden accept="image/*" onChange={e => pick('banner', e)} /></label>
               {srv.banner && <button type="button" className="btn btn-surface" onClick={() => clearImg('banner')}>Remove</button>}</div><small className="vc-hint vc-img-hint">{imgHint('serverBanner', isInst(sid))}</small></div>
         </div>
         <label className="vc-field"><span>Name</span><input className="form-input" maxLength={60} value={name} onChange={e => setName(e.target.value)} /></label>
