@@ -37,6 +37,8 @@ export default function DiscoverPage({ onClose }) {
   );
 }
 
+// directory pictures are untrusted links: only https ones show (the banner across the top of the card, its tint where there's none)
+const safeImg = u => /^https:\/\//i.test(u || '');
 function ServerResults({ q, onClose }) {
   const [deb, setDeb] = useState('');
   const [d, setD] = useState(null); // { results, page, has_more }
@@ -64,8 +66,8 @@ function ServerResults({ q, onClose }) {
           const added = mine.some(x => x.origin === url);
           return (
             <div key={r.id || r.url} className="vc-disc-card vl-rise" style={{ '--i': Math.min(i, 12) }}>
-              <div className="vc-disc-banner" style={{ '--hue': (Array.from(String(r.name || '')).reduce((h, c) => h + c.charCodeAt(0), 0) * 37) % 360 }} />
-              <span className="vc-srv-ico lg">{/^https:\/\//i.test(r.icon_url || '') ? <img src={r.icon_url} alt="" /> : initials(r.name)}</span>
+              <div className="vc-disc-banner" style={{ '--hue': hueOf(r.name) }}>{safeImg(r.banner_url) && <img src={r.banner_url} alt="" loading="lazy" onError={e => { e.currentTarget.hidden = true; }} />}</div>
+              <span className="vc-srv-ico lg">{safeImg(r.icon_url) ? <img src={r.icon_url} alt="" /> : initials(r.name)}</span>
               <div className="vc-disc-body">
                 <b>{r.name}{r.trusted && <ShieldCheck size={14} className="vc-inline-ico vc-disc-trusted" title="Trusted by Nookara" />}</b>
                 <small className="vc-disc-host"><Globe size={11} /> {url ? url.replace(/^https?:\/\//, '') : ''}</small>
