@@ -113,8 +113,9 @@ function set(patch) {
 const subscribe = f => { subs.add(f); return () => subs.delete(f); };
 export const getState = () => state;
 // a custom emoji's picture: an instance's own (from its emoji list), else Velora's
-// (an emoji Ember doesn't know yet - one a bridge brought in from Discord / Fluxer, say - is looked for where the message lives)
-export const customEmoji = (eid, animated, inst) => state.emojiUrls[eid] || `${inst && inst !== VELORA ? inst : ''}/uploads/emojis/${eid}.${animated ? 'gif' : 'png'}`;
+// an emoji Ember doesn't know yet is looked for on Nookara (personal emojis and Nookara servers' emojis live there);
+// CustomEmojiImg (text.jsx) then tries the Ember server the message is on (emojis a bridge brought in from Discord / Fluxer)
+export const customEmoji = (eid, animated) => state.emojiUrls[eid] || `/uploads/emojis/${eid}.${animated ? 'gif' : 'png'}`;
 export const patchState = p => set(p);
 // Ember desktop: games' Discord rich presence (captured by the app) becomes your status, tied to this socket
 let rpcNow = null;

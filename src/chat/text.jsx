@@ -95,9 +95,13 @@ let emojiRetryAt = 0;
 function CustomEmojiImg({ eid, animated, name, inst }) {
   const known = useChat(s => s.emojiUrls[eid]);
   const [tries, setTries] = useState(0);
-  const src = customEmoji(eid, animated, inst);
+  // not on Nookara (someone's personal emoji is, so is every Nookara server's): an emoji only the message's Ember server has
+  const [onServer, setOnServer] = useState(false);
+  const there = !known && inst && inst !== VELORA;
+  const src = onServer && there ? `${inst}/uploads/emojis/${eid}.${animated ? 'gif' : 'png'}` : customEmoji(eid, animated);
   // a picture that fails (address not known yet, or a hiccup) asks for the list again and tries a few more times
   const retry = () => {
+    if (there && !onServer) { setOnServer(true); return; }
     if (tries >= 3) return;
     if (!known && Date.now() - emojiRetryAt > 3000) { emojiRetryAt = Date.now(); loadEmojis(); }
     setTimeout(() => setTries(t => t + 1), 1500 * (tries + 1));
