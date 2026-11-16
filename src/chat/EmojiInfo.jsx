@@ -18,16 +18,19 @@ export function EmojiInfoHost() {
   const [info, setInfo] = useState(null); // { char } | { eid, name, animated, server? } + rect
   const [srv, setSrv] = useState(null);
   const [owner, setOwner] = useState(null); // a personal emoji's owner { username, pfp }
+  const [external, setExternal] = useState(null); // one a Discord / Fluxer bridge brought in: { platform, server }
   const [origin, setOrigin] = useState(null); // a copy: where it was first seen ({ type: 'user', username } | { type: 'server', name, host })
   const [busy, setBusy] = useState(false);
   const box = useRef(null);
   useEffect(() => {
     const on = e => {
       const d = e.detail;
-      setInfo(d); setSrv(null); setOwner(null); setOrigin(null);
+      setInfo(d); setSrv(null); setOwner(null); setOrigin(null); setExternal(null);
       // an instance's emoji is asked about on that instance (the one whose emoji list has it), the rest (personal emojis) on Nookara
       const from = getState().emojis?.find(sv => sv.emojis?.some(x => x.eid === d.eid))?.sid;
-      if (d.eid) apiFetch(`/chat/emojis/${encodeURIComponent(d.eid)}/info`, { inst: instOpt(from) }).then(x => { if (x.personal) rememberLock(`e:${d.eid}`, !!x.personal.locked); setSrv(x.server || false); setOwner(x.personal?.owner || null); setOrigin(x.personal?.origin || x.origin || null); }).catch(() => setSrv(false));
+      // (one in none of my lists - a bridge brought it in, say - is asked about where its message lives)
+      const where = instOpt(from) || (d.inst && d.inst !== 'velora' ? d.inst : undefined);
+      if (d.eid) apiFetch(`/chat/emojis/${encodeURIComponent(d.eid)}/info`, { inst: where }).then(x => { if (x.personal) rememberLock(`e:${d.eid}`, !!x.personal.locked); setSrv(x.server || false); setOwner(x.personal?.owner || null); setExternal(x.external || null); setOrigin(x.personal?.origin || x.origin || null); }).catch(() => setSrv(false));
       else if (!emojiDataSync()) loadEmojiData().then(() => setInfo(x => (x ? { ...x } : x)));
     };
     addEventListener('vc-emoji-info', on);
@@ -78,6 +81,7 @@ export function EmojiInfoHost() {
           <div className="grow"><b>{owner.username}</b><small>Their personal emoji</small></div>
         </div>
       )}
+      {info.eid && external && <div className="vc-eminfo-origin"><History size={13} /><span>From <b>{external.platform}</b>{external.server ? <small> {external.server}</small> : null}</span></div>}
       {info.eid && origin && <div className="vc-eminfo-origin"><History size={13} /><span>Originally from <b>{originLabel(origin)}</b>{origin.type === 'server' && origin.host ? <small> {origin.host}</small> : null}</span></div>}
       {lock && (cloneTargets().length > 0 || getState().signedIn) && <div className="vc-eminfo-lock"><Lock size={13} /><span>{lock === 'owner' ? 'Its owner locked their emojis, so it can\'t be cloned or added.' : 'This server doesn\'t allow copying its emojis.'}</span></div>}
       {info.eid && !lock && (cloneTargets().length > 0 || (getState().signedIn && !isPersonalEmoji(info.eid))) && (
