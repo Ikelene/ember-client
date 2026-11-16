@@ -6,7 +6,7 @@
 import { createContext, useContext, useState } from 'react';
 import { Lock, Rocket, Server, TriangleAlert } from 'lucide-react';
 
-export const SELF_HOST_URL = 'https://github.com/Ikelene/bonfire-server#readme'; // (no Ember self-hosting guide on /guides yet: the server's own README)
+export const SELF_HOST_URL = 'https://github.com/Nookara-Project/ember-server#readme'; // (no Ember self-hosting guide on /guides yet: the server's own README)
 
 // feature key -> [Name at the start of a sentence, plural noun for "used N of M ___"]
 const NAMES = {

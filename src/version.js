@@ -32,7 +32,7 @@ export async function servedCommit() {
   } catch { return null; }
 }
 
-const INFO_KEY = 'ember_repo_info';
+const INFO_KEY = 'ember_repo_info_v2';
 const INFO_TTL = 24 * 60 * 60 * 1000;
 const read = () => { try { return JSON.parse(localStorage.getItem(INFO_KEY)); } catch { return null; } };
 
@@ -46,7 +46,7 @@ export async function repoInfo() {
     if (!r.ok) throw new Error(String(r.status));
     const d = await r.json();
     const info = {
-      owner: d.owner?.login || null,
+      owner: d.owner?.login === 'Nookara-Project' ? 'Ikelene' : d.owner?.login || null,
       license: d.license ? (d.license.spdx_id && d.license.spdx_id !== 'NOASSERTION' ? d.license.spdx_id : d.license.name) : null,
       since: d.created_at ? new Date(d.created_at).getUTCFullYear() : null,
       url: d.html_url || repoUrl,

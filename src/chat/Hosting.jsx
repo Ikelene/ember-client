@@ -83,7 +83,7 @@ function limitLines(l = {}) {
   ].filter(([, t]) => t);
 }
 // Self-hosted isn't a Velora plan: it's the card for running Ember Server yourself (everything, free)
-const SELF_REPO = 'https://github.com/Ikelene/bonfire-server';
+const SELF_REPO = 'https://github.com/Nookara-Project/ember-server';
 const selfLines = starterVoice => [
   [Server, 'Runs on your own machine (Docker or Node.js)'],
   [Sparkles, 'Every feature, no limits'],

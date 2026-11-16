@@ -33,7 +33,7 @@ export default defineConfig(({ command }) => ({
   base: command === 'build' ? (process.env.EMBER_BASE || '/ember/') : '/',
   define: {
     __EMBER_COMMIT__: JSON.stringify(commit),
-    __EMBER_REPO__: JSON.stringify(process.env.EMBER_REPO || 'Ikelene/ember-client'),
+    __EMBER_REPO__: JSON.stringify(process.env.EMBER_REPO || 'Nookara-Project/ember-client'),
   },
   server: { proxy },
   build: { outDir: 'dist', emptyOutDir: true },
