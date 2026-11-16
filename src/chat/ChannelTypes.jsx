@@ -12,6 +12,7 @@ import { has, P } from './roles.jsx';
 import { Dialog } from './Dialogs.jsx';
 import { instOpt, isInst } from './ids.js';
 import { imgHint, warnImage } from './imgHints.js';
+import { pictureAccept } from './accept.js';
 
 export const TYPES = [
   { id: 'text', label: 'Text', hint: 'Messages, pictures and GIFs.', Icon: Hash },
@@ -245,7 +246,7 @@ function WebhookManager({ cid, logs }) {
             <label className="vc-hook-av" title="Change picture">
               {h.avatar ? <img src={h.avatar} alt="" /> : <Webhook size={18} />}
               <span><Upload size={12} /></span>
-              <input type="file" hidden accept="image/*" onChange={e => { if (e.target.files[0]) avatar(h, e.target.files[0]); e.target.value = ''; }} />
+              <input type="file" hidden accept={pictureAccept('image/*')} onChange={e => { if (e.target.files[0]) avatar(h, e.target.files[0]); e.target.value = ''; }} />
             </label>
             <input className="form-input" maxLength={80} defaultValue={h.name} onBlur={e => { if (e.target.value.trim() && e.target.value !== h.name) patch(h, { name: e.target.value }); }} />
             <button type="button" className="btn btn-surface btn-sm" onClick={() => { navigator.clipboard?.writeText(h.url); toast('Webhook URL copied'); }}><Copy size={13} /> Copy URL</button>

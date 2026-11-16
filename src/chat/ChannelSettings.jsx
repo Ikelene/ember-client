@@ -13,6 +13,7 @@ import { ChannelBridge } from './Bridge.jsx';
 import { ChannelPerms } from './ChannelPerms.jsx';
 import { SettingsShell, Card } from './SettingsShell.jsx';
 import { useUnsaved, UnsavedBar } from './unsaved.jsx';
+import { pictureAccept } from './accept.js';
 
 const LINK_OK = /^https?:\/\/\S+\.\S+/;
 // the PATCH body for a channel (the config shaped per type), also used to tell whether anything changed
@@ -89,7 +90,7 @@ function Overview({ sid, channel, onDirty }) {
           {Object.keys(CHANNEL_ICONS).map(k => <button type="button" key={k} className={icon === k ? 'on' : ''} title={k} onClick={() => set('icon', k)}><ChannelIcon c={{ icon: k }} size={16} /></button>)}
           <label className={`vc-icon-up${/^https?:\/\//.test(icon) ? ' on' : ''}`} title="Upload a picture">
             {/^https?:\/\//.test(icon) ? <img src={icon} alt="" /> : <Upload size={15} />}
-            <input type="file" hidden accept="image/*" onChange={e => upload(e.target.files[0])} />
+            <input type="file" hidden accept={pictureAccept('image/*')} onChange={e => upload(e.target.files[0])} />
           </label>
         </div>
         <small className="vc-hint vc-img-hint">{imgHint('channelIcon', isInst(sid))}</small>

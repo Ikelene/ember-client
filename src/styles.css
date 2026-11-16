@@ -2281,6 +2281,7 @@ a.acct-nav-item { text-decoration: none }
 .crop-frame:active { cursor: grabbing }
 .crop-frame img { position: absolute; left: 0; top: 0; max-width: none; transform-origin: 0 0; pointer-events: none }
 .crop-mask { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5) }
+.crop-failed { position: absolute; inset: 0; display: grid; place-items: center; padding: 8px 14px; text-align: center; font-size: 13px; color: #bbb }
 .crop-frame.round .crop-mask { border-radius: 50%; box-shadow: 0 0 0 999px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(255, 255, 255, .6) }
 .crop-zoom { display: flex; align-items: center; gap: 10px }
 .crop-zoom input { flex: 1; accent-color: var(--accent) }

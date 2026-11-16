@@ -11,7 +11,17 @@ export function cropSize(box, maxW, maxH) {
 // an Ember server keeps GIFs animated; a crop would turn one into a still, so those go up uncropped
 export const keepsAnimation = (file, inst) => !!inst && /^image\/gif$/i.test(file?.type || '');
 
-export function cropToFile(file, box, maxW, maxH) {
+// A photo from Android's picker can be a file whose blob: address won't load as a picture (the cropper stayed black on
+// phones), while reading its bytes works. A copy in memory always loads, so the cropper and the cut work on one.
+export async function inMemory(file) {
+  if (!file || file.__inMemory) return file;
+  const copy = new File([await file.arrayBuffer()], file.name || 'image', { type: file.type, lastModified: file.lastModified });
+  Object.defineProperty(copy, '__inMemory', { value: true });
+  return copy;
+}
+
+export async function cropToFile(file, box, maxW, maxH) {
+  file = await inMemory(file);
   return new Promise((resolve, reject) => {
     const src = URL.createObjectURL(file);
     const img = new Image();

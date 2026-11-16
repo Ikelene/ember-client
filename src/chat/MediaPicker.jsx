@@ -8,6 +8,7 @@ import { apiFetch } from '../api.js';
 import { useChat, getState, toast, errorText, ask, loadMedia, saveGif, unsaveGif, deleteMedia, saveFilesToMedia, getUploadLimits } from './store.js';
 import { useMyClips, liveClips, glintMediaMatcher, glintLink, loadMyClips, GlintMark, NewTag, openOutside, GLINT_BROWSE } from './glint.jsx';
 import { fmtTime } from './MediaPlayer.jsx';
+import { pictureAccept } from './accept.js';
 
 export function GifBadge() { return <span className="vc-gif-badge">GIF</span>; }
 
@@ -139,7 +140,7 @@ function Saved({ onPick, add, uploading, clips }) {
         {[['all', 'All'], ['image', 'Pictures + GIFs'], ['video', 'Videos'], ['audio', 'Audio']].map(([k, l]) => <button type="button" key={k} className={filter === k ? 'on' : ''} onClick={() => setFilter(k)}>{l}</button>)}
         <span className="grow" />
         <button type="button" className="vc-picker-up" onClick={() => file.current?.click()}>{uploading ? <Loader2 size={14} className="vc-spin" /> : <Upload size={14} />} Save a file</button>
-        <input ref={file} type="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm,video/quicktime,audio/*" onChange={e => { add(e.target.files); e.target.value = ''; }} />
+        <input ref={file} type="file" multiple hidden accept={pictureAccept('image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm,video/quicktime,audio/*')} onChange={e => { add(e.target.files); e.target.value = ''; }} />
       </div>
       <div className="vc-picker-scroll">
         {items === null && <div className="vc-loading"><i /><i /><i /></div>}

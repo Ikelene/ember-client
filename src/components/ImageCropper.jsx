@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ZoomIn, ZoomOut, X } from 'lucide-react';
+import { inMemory } from '../chat/cropImage.js';
 
 // Crop a picture before it's uploaded: drag it around inside the frame, zoom with the
 // slider or the mouse wheel. Gives back the box in the picture's own pixels
@@ -14,7 +15,10 @@ export default function ImageCropper({ file, aspect = 1, round = false, title, o
   const leave = fn => { if (closing) return; setClosing(true); setTimeout(fn, 190); };
   const onCancel = () => leave(cancelNow);
   const onDone = box => leave(() => doneNow(box));
-  const [url] = useState(() => URL.createObjectURL(file));
+  // the picture's address. On phones the first load can fail right as the browser comes back from the photo picker
+  // (the picture is fine - the same file opens a moment later), so a failed load makes a fresh address and tries again
+  const [load, setLoad] = useState({ url: null, tries: 0, failed: false });
+  const url = load.url;
   const [nat, setNat] = useState(null);       // { w, h } of the picture
   const [zoom, setZoom] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 }); // picture's top-left inside the frame, in frame px
@@ -24,7 +28,26 @@ export default function ImageCropper({ file, aspect = 1, round = false, title, o
   const frameRef = useRef(null);
   const wheelRef = useRef(null);
 
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  // the picture is shown from a copy in memory (cropImage.js inMemory: a picked phone photo's own address may not load)
+  const mem = useRef(null);
+  useEffect(() => {
+    let live = true;
+    setNat(null);
+    setLoad({ url: null, tries: 0, failed: false });
+    inMemory(file).then(m => {
+      if (!live) return;
+      mem.current = m;
+      setLoad({ url: URL.createObjectURL(m), tries: 0, failed: false });
+    }).catch(() => { if (live) setLoad({ url: null, tries: 0, failed: true }); });
+    return () => { live = false; };
+  }, [file]);
+  useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
+  const retryTimer = useRef(null);
+  useEffect(() => () => clearTimeout(retryTimer.current), []);
+  function onError() {
+    if (load.tries >= 4) { setLoad(l => ({ ...l, failed: true })); return; }
+    retryTimer.current = setTimeout(() => setLoad(l => ({ url: URL.createObjectURL(mem.current || file), tries: l.tries + 1, failed: false })), 250 * (load.tries + 1));
+  }
   useEffect(() => {
     const onResize = () => setFrameW(Math.min(aspect >= 2 ? 600 : 380, window.innerWidth - 72));
     const onKey = e => { if (e.key === 'Escape') onCancel(); };
@@ -45,6 +68,7 @@ export default function ImageCropper({ file, aspect = 1, round = false, title, o
 
   function onLoad(e) {
     const w = e.currentTarget.naturalWidth, h = e.currentTarget.naturalHeight;
+    if (!w || !h) { onError(); return; } // "loaded" but nothing to show: try again like a failed load
     const b = Math.max(frameW / w, frameH / h);
     setNat({ w, h });
     setPos({ x: (frameW - w * b) / 2, y: (frameH - h * b) / 2 });
@@ -103,13 +127,16 @@ export default function ImageCropper({ file, aspect = 1, round = false, title, o
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
         >
-          <img
+          {url && <img
+            key={url}
             src={url}
             alt=""
             draggable={false}
             onLoad={onLoad}
+            onError={onError}
             style={nat ? { width: nat.w * scale, height: nat.h * scale, transform: `translate(${pos.x}px, ${pos.y}px)` } : { opacity: 0 }}
-          />
+          />}
+          {load.failed && <div className="crop-failed">Couldn't open that picture. Try another one, or save it as a PNG or JPG first.</div>}
           <div className="crop-mask" />
         </div>
         <div className="crop-zoom">

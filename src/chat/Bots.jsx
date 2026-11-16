@@ -13,6 +13,7 @@ import { P, has } from './roles.jsx';
 import { BotGallerySection } from './BotGalleryDev.jsx';
 import { usePlan, PlanGate, PlanNotice, PlanUsage } from './PlanGate.jsx';
 import './Bots.css';
+import { pictureAccept } from './accept.js';
 
 export function BotTag({ small, verified }) {
   const z = small ? 13 : 15;
@@ -291,7 +292,7 @@ export function BotsManager({ inst, sid }) {
               <label className="bm-av" title="Change picture">
                 {b.pfp ? <img src={b.pfp} alt="" /> : <Bot size={22} />}
                 <span><Upload size={13} /></span>
-                <input type="file" hidden accept="image/*" onChange={e => avatar(b, e.target.files[0])} />
+                <input type="file" hidden accept={pictureAccept('image/*')} onChange={e => avatar(b, e.target.files[0])} />
               </label>
               <div className="bm-main">
                 <div className="bm-name"><b>{b.username}</b> <BotTag small verified={!!b.verified} />{inst && <small>{b.servers ? 'In the server' : 'Not in the server yet'}</small>}</div>

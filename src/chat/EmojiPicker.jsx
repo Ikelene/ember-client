@@ -12,6 +12,7 @@ import { emojiMenuItems } from './cloneEmoji.js';
 import { loadPersonalEmojis, loadStickers, loadPersonalStickers } from './personal.js';
 import { openMenu } from './Menu.jsx';
 import { CloneSetting } from './PersonalPages.jsx';
+import { pictureAccept } from './accept.js';
 
 const GROUPS = [
   [0, 'Smileys', Smile], [1, 'People', Users], [3, 'Animals and nature', Cat], [4, 'Food and drink', Apple],
@@ -217,7 +218,7 @@ export function EmojiManager({ sid }) {
       <p className="vc-dialog-sub">{imgHint('emoji', isInst(sid))} Everyone in Ember can use your server's emojis anywhere. {list ? `${list.length} / ${max} used.` : ''}</p>
       <CloneSetting sid={sid} />
       <button type="button" className="btn btn-primary" disabled={busy > 0 || !!plan.full || !!plan.gate || (list && list.length >= max)} onClick={() => file.current?.click()}><Upload size={14} /> {busy ? 'Uploading...' : 'Upload emoji'}</button>
-      <input ref={file} type="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp" onChange={e => { add(e.target.files); e.target.value = ''; }} />
+      <input ref={file} type="file" multiple hidden accept={pictureAccept('image/png,image/jpeg,image/gif,image/webp')} onChange={e => { add(e.target.files); e.target.value = ''; }} />
       <div className="vc-emoji-list" data-drop-own onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); add(e.dataTransfer.files); }}>
         {list === null && <div className="vc-loading"><i /><i /><i /></div>}
         {list?.map((e, i) => (

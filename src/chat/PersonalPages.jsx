@@ -9,6 +9,7 @@ import { isInst } from './ids.js';
 import { Toggle } from './roles.jsx';
 import { imgHint, warnImage } from './imgHints.js';
 import { loadPersonalEmojis, addPersonalEmoji, renamePersonalEmoji, deletePersonalEmoji, loadStickers, addSticker, renameSticker, deleteSticker, loadPersonalStickers, addPersonalSticker, renamePersonalSticker, deletePersonalSticker } from './personal.js';
+import { pictureAccept } from './accept.js';
 
 function ItemRow({ url, name, animated, onRename, onDelete, big }) {
   return (
@@ -38,7 +39,7 @@ function PersonalEmojis() {
       <h3 className="vc-expr-h"><SmilePlus size={16} /> Emojis</h3>
       <p className="vc-dialog-sub">Your personal emojis live on your Nookara account, so you can use them on any Ember server, in DMs and in group chats, from any app signed in as you. Only you have them in your picker; anyone can clone one to their own server or personal emojis unless you lock them. {imgHint('personalEmoji')} {list ? `${list.length} / ${box.max} used${box.max < box.pro_max ? ` (${box.pro_max} with Pro)` : ''}.` : ''}</p>
       <button type="button" className="btn btn-primary" disabled={busy > 0 || full || !list} onClick={() => file.current?.click()}><Upload size={14} /> {busy ? 'Uploading...' : 'Add emoji'}</button>
-      <input ref={file} type="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp" onChange={e => { add(e.target.files); e.target.value = ''; }} />
+      <input ref={file} type="file" multiple hidden accept={pictureAccept('image/png,image/jpeg,image/gif,image/webp')} onChange={e => { add(e.target.files); e.target.value = ''; }} />
       <div className="vc-emoji-list" data-drop-own onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); add(e.dataTransfer.files); }}>
         {!list && <div className="vc-loading"><i /><i /><i /></div>}
         {list && !list.length && <div className="vc-empty-note">No personal emojis yet. Add one here, or right-click any custom emoji and pick Add to personal emojis.</div>}
@@ -63,7 +64,7 @@ function PersonalStickers() {
       <h3 className="vc-expr-h"><Sticker size={16} /> Stickers</h3>
       <p className="vc-dialog-sub">Your personal stickers live on your Nookara account, so you can send them anywhere: Ember servers, DMs and group chats, from the Stickers tab of the emoji picker. A sticker is sent as its picture link, so other apps show it as a picture. Anyone can save one you sent to their own stickers unless you lock them. {imgHint('personalSticker')} {list ? `${list.length} / ${box.max} used${box.max < box.pro_max ? ` (${box.pro_max} with Pro)` : ''}.` : ''}</p>
       <button type="button" className="btn btn-primary" disabled={busy > 0 || full || !list} onClick={() => file.current?.click()}><Upload size={14} /> {busy ? 'Uploading...' : 'Add sticker'}</button>
-      <input ref={file} type="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp" onChange={e => { add(e.target.files); e.target.value = ''; }} />
+      <input ref={file} type="file" multiple hidden accept={pictureAccept('image/png,image/jpeg,image/gif,image/webp')} onChange={e => { add(e.target.files); e.target.value = ''; }} />
       <div className="vc-emoji-list" data-drop-own onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); add(e.dataTransfer.files); }}>
         {!list && <div className="vc-loading"><i /><i /><i /></div>}
         {list && !list.length && <div className="vc-empty-note">No personal stickers yet. Add one here, or right-click any sticker in a chat and pick Save to my stickers.</div>}
@@ -130,7 +131,7 @@ export function StickerManager({ sid }) {
       <p className="vc-dialog-sub">Stickers are big pictures people can send on their own from the Stickers tab of the emoji picker. {imgHint('sticker', true)} They show at about 160 px. {list ? `${list.length} / ${max} used.` : ''}</p>
       <CloneSetting sid={sid} />
       <button type="button" className="btn btn-primary" disabled={busy > 0 || !list || list.length >= max} onClick={() => file.current?.click()}><Upload size={14} /> {busy ? 'Uploading...' : 'Upload sticker'}</button>
-      <input ref={file} type="file" multiple hidden accept="image/png,image/gif,image/webp" onChange={e => { add(e.target.files); e.target.value = ''; }} />
+      <input ref={file} type="file" multiple hidden accept={pictureAccept('image/png,image/gif,image/webp')} onChange={e => { add(e.target.files); e.target.value = ''; }} />
       <div className="vc-emoji-list" data-drop-own onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); add(e.dataTransfer.files); }}>
         {!list && <div className="vc-loading"><i /><i /><i /></div>}
         {list && !list.length && <div className="vc-empty-note">No stickers yet.</div>}

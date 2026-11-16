@@ -17,6 +17,7 @@ import { initials } from './Parts.jsx';
 import { P, has, CHANNEL_ICONS, ChannelIcon } from './roles.jsx';
 import { ChannelBridge } from './Bridge.jsx';
 import { ChannelPerms } from './ChannelPerms.jsx';
+import { pictureAccept } from './accept.js';
 
 export function Dialog({ title, sub, onClose, children, wide, className = '' }) {
   const [closing, setClosing] = useState(false);
@@ -250,7 +251,7 @@ export function ChannelEditor({ sid, channel, onClose }) {
               {editing && (
                 <label className={`vc-icon-up${/^https?:\/\//.test(icon) ? ' on' : ''}`} title="Upload a picture">
                   {/^https?:\/\//.test(icon) ? <img src={icon} alt="" /> : <Upload size={15} />}
-                  <input type="file" hidden accept="image/*" onChange={async e => { const f = e.target.files[0]; if (!f) return; warnImage(f, 'channelIcon', isInst(channel.cid)); try { const res = await uploadTo(`/chat/channels/${channel.cid}/icon`, f); setIcon(res.channel.icon); } catch (er) { toast(errorText(er.message)); } }} />
+                  <input type="file" hidden accept={pictureAccept('image/*')} onChange={async e => { const f = e.target.files[0]; if (!f) return; warnImage(f, 'channelIcon', isInst(channel.cid)); try { const res = await uploadTo(`/chat/channels/${channel.cid}/icon`, f); setIcon(res.channel.icon); } catch (er) { toast(errorText(er.message)); } }} />
                 </label>
               )}
             </div></div>

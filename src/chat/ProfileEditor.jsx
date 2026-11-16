@@ -8,10 +8,12 @@ import { ShieldAlert, LogIn } from 'lucide-react';
 import { api, uploadMedia } from '../api.js';
 import { applyAccentColor } from '../theme.js';
 import ImageCropper from '../components/ImageCropper.jsx';
+import { inMemory } from './cropImage.js';
 import { COUNTRIES, TIMEZONES } from '../profile-locales.js';
 import { useChat, useScopeStatus, loginAgain, ask, patchState, getState, remember, forgetProfile } from './store.js';
 import { imgHint, warnImage } from './imgHints.js';
 import { PopoutCard, localTimeFrom } from './ProfilePopout.jsx';
+import { pictureAccept } from './accept.js';
 
 const isHex = c => /^#[0-9a-f]{6}$/i.test(c || '');
 const UPLOAD_ERRORS = {
@@ -160,7 +162,8 @@ function Editor({ user, reload, presence, onDirty }) {
   const bannerInput = useRef(null);
   const [cropping, setCropping] = useState(null);
   const [mediaMsg, setMediaMsg] = useState(null);
-  const pick = (e, type) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) { setMediaMsg(null); warnImage(file, type === 'pfp' ? 'pfp' : 'banner', false, { cropped: true }); setCropping({ type, file }); } };
+  // (a copy in memory: a photo straight from a phone's picker may not load as a picture, see cropImage.js inMemory)
+  const pick = (e, type) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) { setMediaMsg(null); warnImage(file, type === 'pfp' ? 'pfp' : 'banner', false, { cropped: true }); inMemory(file).catch(() => file).then(f => setCropping({ type, file: f })); } };
   const dropMedia = type => setMedia(x => { if (x[type]?.url) URL.revokeObjectURL(x[type].url); const n = { ...x }; delete n[type]; return n; });
   async function stage(type, file, crop) {
     setCropping(null); setMediaMsg(null);
@@ -247,7 +250,7 @@ function Editor({ user, reload, presence, onDirty }) {
               {shown('pfp') && <button type="button" className="btn btn-surface btn-sm" disabled={saving} onClick={() => remove('pfp')}>Remove avatar</button>}
               {media.pfp && <button type="button" className="btn btn-surface btn-sm" disabled={saving} onClick={() => dropMedia('pfp')}>Undo</button>}
             </div>
-            <input ref={pfpInput} type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden onChange={e => pick(e, 'pfp')} />
+            <input ref={pfpInput} type="file" accept={pictureAccept('image/jpeg,image/png,image/gif,image/webp')} hidden onChange={e => pick(e, 'pfp')} />
             <small className="vc-hint vc-img-hint">{imgHint('pfp', false)}</small>
           </div>
 
@@ -258,7 +261,7 @@ function Editor({ user, reload, presence, onDirty }) {
               {shown('banner') && <button type="button" className="btn btn-surface btn-sm" disabled={saving} onClick={() => remove('banner')}>Remove banner</button>}
               {media.banner && <button type="button" className="btn btn-surface btn-sm" disabled={saving} onClick={() => dropMedia('banner')}>Undo</button>}
             </div>
-            <input ref={bannerInput} type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden onChange={e => pick(e, 'banner')} />
+            <input ref={bannerInput} type="file" accept={pictureAccept('image/jpeg,image/png,image/gif,image/webp')} hidden onChange={e => pick(e, 'banner')} />
             <small className="vc-hint vc-img-hint">{imgHint('banner', false)}</small>
             {mediaMsg && <div className={`inline-msg ${mediaMsg.type}`}>{mediaMsg.text}</div>}
           </div>

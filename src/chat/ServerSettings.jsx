@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ImageCropper from '../components/ImageCropper.jsx';
-import { cropToFile, keepsAnimation } from './cropImage.js';
+import { cropToFile, keepsAnimation, inMemory } from './cropImage.js';
 import {
   Search, LayoutGrid, Shield, Smile, Volume2, Upload, Users, DoorOpen, Bot, ArrowLeftRight, Gamepad2,
   KeyRound, Mic, Globe, UserCog, TriangleAlert, Trash2, RefreshCw, Check, Ban, UserMinus, Compass, Download, Rocket, Archive, Info, Copy, CircleArrowUp,
@@ -41,6 +41,7 @@ import './SettingsDialog.css';
 import QRCode from 'qrcode';
 import { linkFor } from './store.js';
 import { OperatorTermsNotice } from './OperatorTerms.jsx';
+import { pictureAccept } from './accept.js';
 
 // [id, label, icon, words the search box answers to]
 function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, owner, legacyDefault, hosted }) {
@@ -178,10 +179,11 @@ function Overview({ sid, origin, instAdmin, onDirty, goTo }) {
   }
   const specOf = kind => imgSpec(kind === 'icon' ? 'serverIcon' : 'serverBanner', isInst(sid));
   // pick -> crop (square icon, banner at its own shape) -> upload. A GIF on an Ember server goes up as it is, so it stays animated.
-  function pick(kind, e) {
-    const file = e.target.files?.[0];
+  async function pick(kind, e) {
+    const picked = e.target.files?.[0];
     e.target.value = ''; // (the same file can be picked again)
-    if (!file) return;
+    if (!picked) return;
+    const file = await inMemory(picked).catch(() => picked); // (a phone picker's file may not load as a picture: cropImage.js)
     if (keepsAnimation(file, isInst(sid))) { toast('GIFs go up uncropped, so they stay animated.', true); img(kind, file); return; }
     setCropping({ kind, file });
   }
@@ -234,11 +236,11 @@ function Overview({ sid, origin, instAdmin, onDirty, goTo }) {
         <div className="vc-settings-imgs">
           <div className="vc-field"><span>Icon</span>
             <div className="vc-img-row"><span className="vc-srv-ico lg">{srv.icon ? <img src={srv.icon} alt="" /> : initials(srv.name)}</span>
-              <label className="btn btn-surface"><Upload size={14} /> {busy === 'icon' ? 'Uploading...' : 'Upload'}<input type="file" hidden accept="image/*" onChange={e => pick('icon', e)} /></label>
+              <label className="btn btn-surface"><Upload size={14} /> {busy === 'icon' ? 'Uploading...' : 'Upload'}<input type="file" hidden accept={pictureAccept('image/*')} onChange={e => pick('icon', e)} /></label>
               {srv.icon && <button type="button" className="btn btn-surface" onClick={() => clearImg('icon')}>Remove</button>}</div><small className="vc-hint vc-img-hint">{imgHint('serverIcon', isInst(sid))}</small></div>
           <div className="vc-field"><span>Banner</span>
             <div className="vc-img-row"><span className="vc-banner-prev">{srv.banner && <img src={srv.banner} alt="" />}</span>
-              <label className="btn btn-surface"><Upload size={14} /> {busy === 'banner' ? 'Uploading...' : 'Upload'}<input type="file" hidden accept="image/*" onChange={e => pick('banner', e)} /></label>
+              <label className="btn btn-surface"><Upload size={14} /> {busy === 'banner' ? 'Uploading...' : 'Upload'}<input type="file" hidden accept={pictureAccept('image/*')} onChange={e => pick('banner', e)} /></label>
               {srv.banner && <button type="button" className="btn btn-surface" onClick={() => clearImg('banner')}>Remove</button>}</div><small className="vc-hint vc-img-hint">{imgHint('serverBanner', isInst(sid))}</small></div>
         </div>
         <label className="vc-field"><span>Name</span><input className="form-input" maxLength={60} value={name} onChange={e => setName(e.target.value)} /></label>

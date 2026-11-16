@@ -78,6 +78,7 @@ import { useScope, mentionsMe as isMention, useFace, wantVeloraFaces, useBlocked
 import { useNameStyle, colorFrom, NameDecor, P, has } from './roles.jsx';
 import { suggestQuery, useSuggestItems, MentionPicker, encodeRoleMentions } from './Mentions.jsx';
 import { serialize, fill, caretToEnd, caretText, replaceBeforeCaret, insertAt, resolveWord, markdownShortcut, styleMarkdown } from './richInput.js';
+import { pictureAccept } from './accept.js';
 
 const GROUP_MS = 7 * 60 * 1000;
 
@@ -1405,7 +1406,7 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
         {cpicker && <CommandPicker items={citems} sel={csel} setSel={setCsel} onPick={startCommand} bots={cbots} bot={cbotOn} onBot={pickBot} />}
         {cmd && <CommandBar key={cmd.key} view={view} entry={cmd} submitRef={cmdSubmit} onReady={setCmdMissing} onCancel={() => { setCmd(null); setTimeout(() => ta.current?.focus(), 0); }} onSent={() => { setCmd(null); setReplyTo?.(null); setTimeout(() => ta.current?.focus(), 0); }} />}
         <input ref={file} type="file" multiple hidden onChange={e => { const once = destOnce.current; destOnce.current = null; addFiles(e.target.files, once); e.target.value = ''; }} />
-        <input ref={saveFile} type="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm,video/quicktime,audio/*" onChange={e => { addSavedFiles(e.target.files); e.target.value = ''; }} />
+        <input ref={saveFile} type="file" multiple hidden accept={pictureAccept('image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm,video/quicktime,audio/*')} onChange={e => { addSavedFiles(e.target.files); e.target.value = ''; }} />
         <div
           ref={ta} className="vc-input" style={cmd || voice.active ? { display: 'none' } : undefined} contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true"
           data-placeholder={placeholder} spellCheck autoCorrect="on" autoCapitalize="sentences" inputMode="text"

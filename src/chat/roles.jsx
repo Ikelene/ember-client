@@ -12,6 +12,7 @@ import { useChat, getState, toast, errorText, ask, refreshServer, memberRef, loa
 import { isInst, instOf } from './ids.js';
 import { imgHint, warnImage } from './imgHints.js';
 import { userScrolled } from './userscroll.js';
+import { pictureAccept } from './accept.js';
 
 export const P = {
   SEND: 1, MANAGE_CHANNELS: 2, MANAGE_SERVER: 4, MANAGE_ROLES: 8, KICK: 16, BAN: 32,
@@ -348,7 +349,7 @@ export function RolesEditor({ sid }) {
                 <div className="vc-field"><span>Role icon</span>
                   <div className="vc-img-row">
                     <span className="vc-role-ico-prev">{r.icon ? <img src={r.icon} alt="" /> : <Shield size={16} />}</span>
-                    <label className={`btn btn-surface${editable ? '' : ' disabled'}`}><Upload size={14} /> Upload<input type="file" hidden accept="image/*" disabled={!editable} onChange={e => icon(e.target.files[0])} /></label>
+                    <label className={`btn btn-surface${editable ? '' : ' disabled'}`}><Upload size={14} /> Upload<input type="file" hidden accept={pictureAccept('image/*')} disabled={!editable} onChange={e => icon(e.target.files[0])} /></label>
                     {r.icon && editable && <button type="button" className="btn btn-surface" onClick={() => apiFetch(`/chat/servers/${sid}/roles/${r.rid}/icon`, { method: 'DELETE' }).catch(e => toast(errorText(e.message)))}>Remove</button>}
                   </div><small className="vc-hint">Shows next to the names of people with this role. {imgHint('roleIcon', isInst(sid))}</small></div>
                 <Toggle label="Show separately in the member list" hint="People with this role get their own group." on={r.hoist} disabled={!editable} onChange={v => save({ hoist: v })} />
