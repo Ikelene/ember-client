@@ -624,7 +624,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
         {tr && <Translation tr={tr} ctx={ctx} onHide={() => setTr(null)} />}
         <GameInvites invites={invites} />
         <Embeds list={m.embeds} ctx={ctx} />
-        {!m.embeds?.length && !m.pending && (linkPreviews ? <LinkEmbeds urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group'} /> : <PreviewOnAsk urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group'} />)}
+        {!m.embeds?.length && !m.pending && (linkPreviews ? <LinkEmbeds urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group' || view.kind === 'notes'} /> : <PreviewOnAsk urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group' || view.kind === 'notes'} />)}
         <E2eeMessageNote m={m} view={view} />
         {(m.sticker || pSticker) && <StickerView s={m.sticker || pSticker} sid={m.sticker ? view.sid : null} />}
         <OpenedAttachments list={[...(m.attachments || []), ...media]} extra={images} m={m} Attachments={Attachments} />
@@ -802,7 +802,7 @@ export function MessageList({ view, onUser, onReply, canPost, canMod, channels, 
     // Up arrow in an empty composer edits your last message
     const onEditLast = () => {
       const last = [...list].reverse().find(m => m.author?.username === me && !m.pending && !m.system);
-      if (last && (view.kind === 'channel' || (view.kind === 'dm' && last.imId))) setEditing(last.id);
+      if (last && (view.kind === 'channel' || (view.kind === 'dm' && last.imId) || (view.kind === 'notes' && last.noteId))) setEditing(last.id);
     };
     addEventListener('vc-edit-last', onEditLast);
     return () => removeEventListener('vc-edit-last', onEditLast);

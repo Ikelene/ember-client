@@ -13,7 +13,7 @@ import { Starboard } from '../chat/Starboard.jsx';
 import { GameChannel, GameChatStrip, GameOfflineNote } from '../chat/GameServer.jsx';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { initSheets } from '../chat/sheets.js';
-import { Hash, Lock, Users, Menu, ChevronLeft, Search, X, AtSign, UsersRound, LogOut, Megaphone, PanelRight, ExternalLink, ShieldCheck, ShieldAlert, Bell, Ban, Flag } from 'lucide-react';
+import { Hash, Lock, Users, Menu, ChevronLeft, Search, X, AtSign, UsersRound, LogOut, Megaphone, PanelRight, ExternalLink, ShieldCheck, ShieldAlert, Bell, Ban, Flag, NotebookPen } from 'lucide-react';
 import { reportDmUser } from '../chat/report.js';
 import { api, getToken, cachedMe, apiFetch, isWebBonfire } from '../api.js';
 import { applyAccentColor } from '../theme.js';
@@ -91,6 +91,7 @@ function DesktopTitle() {
     : view.kind === 'dm' ? (view.username === 'System' ? 'Nookara' : `@${view.username}`)
       : view.kind === 'group' ? group || 'Group chat'
         : view.kind === 'modmail' ? 'Nookara Moderator Chat'
+          : view.kind === 'notes' ? 'Personal Notes'
           : view.kind === 'home' ? 'Home' : '';
   const raw = view.kind === 'channel' || view.kind === 'server' ? srvIcon : view.kind === 'dm' ? (view.username === 'System' ? '/assets/bonfire/logo-256.png' : pfp) : view.kind === 'modmail' ? '/assets/bonfire/logo-256.png' : null;
   const icon = raw ? new URL(raw, location.origin).href : '';
@@ -484,7 +485,7 @@ function ChatPage() {
   const dmIsBot = useBotPeer(view.kind === 'dm' ? view.username : null);
   const unreadCount = useTabBadge();
   const gateName = useChat(s => (view.kind === 'instance' ? s.instances.find(i => i.origin === view.inst)?.name : null));
-  useEffect(() => { document.title = `${unreadCount ? `(${unreadCount > 999 ? '999+' : unreadCount}) ` : ''}${channel ? `#${channel.name} - ${detail.server.name}` : view.kind === 'instance' ? gateName || 'Server' : view.kind === 'dm' ? `@${view.username}` : group ? group.name : 'Home'} | Ember`; }, [unreadCount, channel, detail, view, group, gateName]);
+  useEffect(() => { document.title = `${unreadCount ? `(${unreadCount > 999 ? '999+' : unreadCount}) ` : ''}${channel ? `#${channel.name} - ${detail.server.name}` : view.kind === 'instance' ? gateName || 'Server' : view.kind === 'dm' ? `@${view.username}` : view.kind === 'notes' ? 'Personal Notes' : group ? group.name : 'Home'} | Ember`; }, [unreadCount, channel, detail, view, group, gateName]);
   const signedIn = useChat(s => s.signedIn);
   const locked = useChat(s => s.locked); // staff switched Ember and DMs off for the account (store.js lockAccount)
 
@@ -494,6 +495,7 @@ function ChatPage() {
   const isServer = view.kind === 'channel';
   const sysDM = view.kind === 'dm' && view.username === 'System';
   const modView = view.kind === 'modmail';
+  const notesView = view.kind === 'notes';
   const canMod = ((detail?.server.perms || 0) & 64) === 64; // Manage messages
   const canPost = channel ? channel.can_post !== false && !detail?.server?.read_only : true; // the server works it out per channel type (a read-only server: nobody)
 
@@ -513,6 +515,8 @@ function ChatPage() {
     ? { icon: <ChIcon size={34} />, big: `Welcome to #${channel?.name || ''}`, sub: channel?.topic || `This is the start of the #${channel?.name} channel.` }
     : modView
       ? { icon: <ShieldCheck size={34} />, big: view.username ? `Moderator chat with ${view.username}` : 'Nookara Moderator Chat', sub: view.username ? `They see these as "Nookara Administrator" - never who sent them. Only Nookara staff see the names.` : "Messages from Nookara's admins. You can't reply here - if you need to answer, use nookara.cc/support." }
+    : notesView
+      ? { icon: <NotebookPen size={34} />, big: 'Personal Notes', sub: 'A chat with yourself. Drop anything in here and it shows up on your other devices too. Only you can see these.' }
     : view.kind === 'dm'
       ? (sysDM ? { icon: <AtSign size={34} />, big: 'Nookara', sub: 'Notices about your account: credits, reports and more.' } : { icon: <AtSign size={34} />, big: view.username, sub: `This is the start of your conversation with ${view.username}.` })
       : { icon: <UsersRound size={34} />, big: group?.name || 'Group chat', sub: 'This is the start of the group chat.' };
@@ -590,6 +594,7 @@ function ChatPage() {
                   {subtitle(dmPresence) && <span className="vc-head-topic">{subtitle(dmPresence)}</span>}
                 </>
               )}
+              {notesView && <><NotebookPen size={20} className="vc-head-ico" /><b className="vc-head-name">Personal Notes</b><span className="vc-head-topic">Only you can see these</span></>}
               {view.kind === 'group' && <><UsersRound size={20} className="vc-head-ico" /><b className="vc-head-name">{group?.name || 'Group chat'}</b><E2eeHeadLock view={view} /><span className="vc-head-topic">{group ? `${group.members.length} members` : ''}</span></>}
               <span className="grow" />
               {view.kind === 'dm' && !sysDM && staff && <button type="button" className="vc-ico-btn" title="Message them as Nookara Administrator (Nookara Moderator Chat)" onClick={() => go({ kind: 'modmail', username: view.username })}><ShieldCheck size={19} /></button>}
@@ -613,7 +618,7 @@ function ChatPage() {
                 {channel?.type === 'game' && <GameOfflineNote channel={channel} />}
                 <Composer view={view} locked={(isServer && !canPost) || sysDM || (modView && !view.username)} lockedText={sysDM ? "These are Nookara's own notices - there's no one to reply to here." : modView ? "This is a message from Nookara's admins - you can't reply here." : detail?.server?.read_only ? 'This server is read-only.' : lockedTextFor(channel)}
  replyTo={replyTo} setReplyTo={setReplyTo}
-                  placeholder={modView ? `Message ${view.username} as Nookara Administrator` : isServer ? `Message #${channel?.name || ''}${channel?.type === 'game' ? ' (also shows in Minecraft)' : ''}` : view.kind === 'dm' ? `Message @${view.username}` : `Message ${group?.name || 'the group'}`} /></>}
+                  placeholder={modView ? `Message ${view.username} as Nookara Administrator` : notesView ? 'Write a note to yourself' : isServer ? `Message #${channel?.name || ''}${channel?.type === 'game' ? ' (also shows in Minecraft)' : ''}` : view.kind === 'dm' ? `Message @${view.username}` : `Message ${group?.name || 'the group'}`} /></>}
               </div>
             </div>
             </div>

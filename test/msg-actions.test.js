@@ -75,3 +75,11 @@ test('a message names itself to the reaction and pin routes', () => {
   assert.equal(pinPath(grp, inGroup), '/groups/grp_abc/messages/a1b2/pin');
   assert.equal(pinPath(chan, inChan), '/chat/messages/77/pin');
 });
+
+test('personal notes: edit, delete and forward my own, nothing aimed at other people', () => {
+  const caps = messageCaps({ kind: 'notes' }, { id: 'note5', noteId: '5', body: 'milk' }, { mine: true });
+  assert.deepEqual(caps, { reply: false, react: false, forward: true, edit: true, del: true, pin: false, copyLink: false });
+  const sending = messageCaps({ kind: 'notes' }, { id: 'n1', pending: true, body: 'milk' }, { mine: true });
+  assert.equal(sending.edit, false);
+  assert.equal(sending.del, false);
+});

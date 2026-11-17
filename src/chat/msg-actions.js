@@ -19,12 +19,13 @@ export function messageCaps(view, m, { mine = false, canMod = false, canPost = t
   const dm = view.kind === 'dm' && view.username !== 'System' && !!m.imId;
   const row = channel && /^\d+$/.test(String(m.id));
   const saved_group = group && !!m.gid; // (very old group messages have no id to act on)
+  const note = view.kind === 'notes' && !!m.noteId; // Personal Notes: all mine, nobody to reply to or react for
   return {
     reply: live && (channel ? !!canPost : group ? !!m.gid : dm),
     react: saved && (row || dm || saved_group),
     forward: saved,
-    edit: !!mine && (channel || dm || saved_group),
-    del: channel ? !!(mine || canMod) : !!mine && (dm || saved_group),
+    edit: !!mine && (channel || dm || saved_group || note),
+    del: channel ? !!(mine || canMod) : !!mine && (dm || saved_group || note),
     pin: saved && (channel ? row && !!canMod : dm || saved_group),
     copyLink: channel || group,
   };

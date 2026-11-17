@@ -8,7 +8,7 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyn
 import { createPortal } from 'react-dom';
 import {
   Share2, Hash, Lock, Plus, Compass, ChevronDown, Settings, UserPlus, LogOut, House, MessageCircle, Home,
-  Pencil, Trash2, Check, X, Circle, Moon, MinusCircle, EyeOff, Smile, UsersRound, Megaphone, FolderPlus, ShieldCheck, Download, Server, UserRound, Volume2, CircleArrowUp } from 'lucide-react';
+  Pencil, Trash2, Check, X, Circle, Moon, MinusCircle, EyeOff, Smile, UsersRound, Megaphone, FolderPlus, ShieldCheck, Download, Server, UserRound, Volume2, CircleArrowUp, NotebookPen } from 'lucide-react';
 
 import { RetryIn } from './Gate.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
@@ -73,7 +73,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
   const dms = useChat(s => s.dms);
   const homeRequests = useChat(s => s.homeRequests || 0); // friend + message requests waiting (a red count, like a mention)
   const homeUnread = dms.some(c => c.unread) || Object.entries(unread).some(([k, v]) => v && (k.startsWith('d:') || k.startsWith('g:')));
-  const home = view.kind === 'home' || view.kind === 'dm' || view.kind === 'group' || view.kind === 'modmail';
+  const home = view.kind === 'home' || view.kind === 'dm' || view.kind === 'group' || view.kind === 'modmail' || view.kind === 'notes';
   const people = useChat(s => s.people);
   const srvMentions = useChat(s => s.srvMentions);
   // a server lights up only for unread channels I haven't muted (its own unread flag can't know my channel mutes)
@@ -616,6 +616,7 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
       <UnreadPills listRef={listRef} />
       <div className="vc-side-list" ref={listRef}>
         <button type="button" className={`vc-ch vc-home-link${view.kind === 'home' ? ' on' : ''}`} onClick={() => go({ kind: 'home' })}><House size={18} /> <span>Home</span></button>
+        <button type="button" className={`vc-ch vc-home-link${view.kind === 'notes' ? ' on' : ''}`} onClick={() => go({ kind: 'notes' })}><NotebookPen size={18} /> <span>Personal Notes</span></button>
         <VeloraConnNote />
         {modmail.messages.length > 0 && (
           <button type="button" className={`vc-dm vc-dm-mod${keyOf(view) === 'mm:' ? ' on' : ''}${keyOf(view) !== 'mm:' && modmail.unread ? ' unread' : ''}`} onClick={() => go({ kind: 'modmail' })}>

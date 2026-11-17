@@ -134,7 +134,7 @@ export function useChat(sel = s => s) {
 }
 
 // ── keys for a conversation ──
-export const keyOf = v => (v.kind === 'channel' ? `c:${v.cid}` : v.kind === 'dm' ? `d:${String(v.username).toLowerCase()}` : v.kind === 'group' ? `g:${v.room}` : v.kind === 'modmail' ? `mm:${String(v.username || '').toLowerCase()}` : '');
+export const keyOf = v => (v.kind === 'channel' ? `c:${v.cid}` : v.kind === 'dm' ? `d:${String(v.username).toLowerCase()}` : v.kind === 'group' ? `g:${v.room}` : v.kind === 'modmail' ? `mm:${String(v.username || '').toLowerCase()}` : v.kind === 'notes' ? 'n:' : '');
 const upd = (obj, k, fn) => ({ ...obj, [k]: fn(obj[k]) });
 
 // timeouts on an instance (Server settings > AutoMod, or a moderator): no posting, reacting, voice or sounds until then
@@ -688,6 +688,18 @@ function onEvent(m, inst = VELORA) {
       if (key) set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === m.nonce ? { ...x, failed: m.request_sent ? 'dm_request_sent' : m.error } : x)) }) }));
       break;
     }
+    case 'note': { // a personal note, from this device or another one
+      const msg = noteToMsg(m.note);
+      if (m.nonce) msg.nonce = m.nonce;
+      addMessage('n:', msg);
+      break;
+    }
+    case 'note_edited':
+      set(s => ({ msgs: upd(s.msgs, 'n:', b => b && { ...b, list: b.list.map(x => (x.noteId === m.note.id ? { ...x, body: m.note.body, edited_at: m.note.edited_at } : x)) }) }));
+      break;
+    case 'note_deleted':
+      dropNote(m.id);
+      break;
     case 'roomMessage':
       if (String(m.room || '').startsWith('grp_')) { addMessage(`g:${m.room}`, groupToMsg(m)); loadGroups(); }
       break;
@@ -956,6 +968,8 @@ function ordered(list) {
 }
 const ADMIN_AUTHOR = { username: 'Nookara Administrator', pfp: '/assets/icon.png', webhook: true, staff: true };
 const mmToMsg = m => ({ id: `mm${m.id}`, mmId: m.id, author: ADMIN_AUTHOR, body: m.body, attachments: [], created_at: m.created_at, staffBy: m.admin || undefined });
+// Personal Notes (a chat with yourself, /chat/notes on Nookara): plain text, attachments are links in it like group chats
+export const noteToMsg = n => ({ id: `note${n.id}`, noteId: n.id, body: n.body, attachments: [], system: false, author: { username: state.me?.username, pfp: state.me?.pfp, color: state.me?.color, rank: state.me?.rank }, created_at: n.created_at, edited_at: n.edited_at || null });
 export async function loadModmail() {
   const d = await apiFetch('/chat/modmail').catch(() => null);
   if (d) set(s => ({ modmail: { messages: d.messages, unread: keyOf(s.view) === 'mm:' ? 0 : d.unread } }));
@@ -976,6 +990,9 @@ export async function loadMessages(v, { older = false } = {}) {
       if (!older) checkBotPeer(v.username);
       const d = await apiFetch(`/im/with/${encodeURIComponent(v.username)}?limit=50${first ? `&before=${first.imId}` : ''}`);
       list = (await Promise.all(d.messages.map(E2EE.openMessage))).map(imToMsg); hasMore = d.has_more;
+    } else if (v.kind === 'notes') {
+      const d = await apiFetch(`/chat/notes?limit=50${first ? `&before=${first.noteId}` : ''}`);
+      list = d.notes.map(noteToMsg); hasMore = d.has_more;
     } else if (v.kind === 'modmail') {
       const d = await apiFetch(v.username ? `/chat/modmail/with/${encodeURIComponent(v.username)}` : '/chat/modmail');
       list = d.messages.map(mmToMsg);
@@ -1053,7 +1070,7 @@ export function sendMessage(v, text, { replyTo, attachments, uploads, noStatusRe
   // the picture and name colour resolve exactly the same way before and after the ack (no flash)
   seedMyFace(instUser);
   const temp = {
-    id: n, nonce: n, pending: true, body: text, wire: v.kind === 'dm' ? wireText(text, attachments) : undefined, attachments: attachments || [], system: false,
+    id: n, nonce: n, pending: true, body: text, wire: v.kind === 'dm' || v.kind === 'notes' ? wireText(text, attachments) : undefined, attachments: attachments || [], system: false,
     ...(instUser ? { inst: instOf(v.cid), unsigned: !!instUser.velora_id && !signingInfo(v.sid).can } : {}),
     author: instUser ? { id: instUser.id, username: me.username, pfp: me.pfp, color: instUser.velora_id ? (state.me?.color || me.color) : me.color, rank: me.rank, kind: instUser.kind || (instUser.velora_id ? 'velora' : 'local'), velora_id: instUser.velora_id } : { username: me.username, pfp: me.pfp, color: me.color, rank: me.rank }, created_at: Date.now(),
     reply: replyTo ? { id: replyTo.id, author: replyTo.author, alias: replyTo.alias || null, body: String(replyTo.body || '').slice(0, 200) } : null,
@@ -1067,6 +1084,12 @@ export function sendMessage(v, text, { replyTo, attachments, uploads, noStatusRe
   const sr = !noStatusReply && v.kind === 'dm' && state.statusReplyDraft && state.statusReplyDraft.username.toLowerCase() === String(v.username).toLowerCase() ? state.statusReplyDraft : null;
   if (sr) { temp.statusReply = sr.text; set({ statusReplyDraft: null }); }
   let ok;
+  if (v.kind === 'notes') {
+    apiFetch('/chat/notes', { method: 'POST', body: JSON.stringify({ body: wireText(text, attachments), nonce: n }) })
+      .then(d => set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: ordered(settle(b.list, n, noteToMsg(d.note))) }) })))
+      .catch(e => set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? { ...x, failed: e.message } : x)) }) })));
+    return n;
+  }
   if (v.kind === 'modmail') { // staff writing as Velora Administrator
     apiFetch(`/chat/modmail/with/${encodeURIComponent(v.username)}`, { method: 'POST', body: JSON.stringify({ body: text }) })
       .then(d => set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: ordered(b.list.map(x => (x.nonce === n ? mmToMsg(d.message) : x))) }) })))
@@ -1273,6 +1296,7 @@ export function signingInfo(sid) {
 // a conversation's pin list changed: an open panel loads it again (a channel by its cid, a DM by d:<name>, a group by g:<room>)
 function bumpPins(key) { set(s => ({ pinsVersion: { ...s.pinsVersion, [key]: (s.pinsVersion[key] || 0) + 1 } })); }
 export async function editMessage(id, text, m) {
+  if (m?.noteId) { await apiFetch(`/chat/notes/${m.noteId}`, { method: 'PATCH', body: JSON.stringify({ body: text }) }); return; } // (every device gets note_edited)
   // a group message: everyone gets room_message_edited
   if (m?.gid && m?.room) { await apiFetch(`/groups/${encodeURIComponent(m.room)}/messages/${encodeURIComponent(m.gid)}`, { method: 'PATCH', body: JSON.stringify({ message: text }) }); return; }
   // a DM (im<id>): its own route; both people get im_edited
@@ -1309,10 +1333,17 @@ export async function deleteMessage(v, m) {
   else if (v.kind === 'dm') {
     await apiFetch(`/im/${m.imId}`, { method: 'DELETE' });
     set(s => ({ msgs: upd(s.msgs, keyOf(v), b => b && { ...b, list: b.list.filter(x => x.id !== m.id) }) }));
+  } else if (v.kind === 'notes' && m.noteId) {
+    await apiFetch(`/chat/notes/${m.noteId}`, { method: 'DELETE' });
+    dropNote(m.noteId);
   } else if (v.kind === 'group' && m.gid) {
     await apiFetch(`/groups/${encodeURIComponent(v.room)}/messages/${encodeURIComponent(m.gid)}`, { method: 'DELETE' }); // everyone gets room_message_deleted
     dropGroupMessage(v.room, m.gid);
   }
+}
+function dropNote(noteId) {
+  const id = `note${noteId}`;
+  set(s => ({ msgs: upd(s.msgs, 'n:', b => b && { ...b, list: b.list.filter(x => x.id !== id) }) }));
 }
 function dropGroupMessage(room, gid) {
   const id = `g${gid}`;
@@ -1715,6 +1746,7 @@ export function hashFor(v) {
   if (v.kind === 'invite') return v.inst && v.inst !== VELORA ? `#/i/${encodeURIComponent(v.inst)}/invite/${v.code}` : `#/invite/${v.code}`;
   if (v.kind === 'dm') return `#/dm/${encodeURIComponent(v.username)}`;
   if (v.kind === 'group') return `#/g/${v.room}`;
+  if (v.kind === 'notes') return '#/notes';
   if (v.kind === 'modmail') return `#/modmail${v.username ? `/${encodeURIComponent(v.username)}` : ''}`;
   return '#/home';
 }
@@ -1742,6 +1774,7 @@ export function readHash() {
   if (a === 'dm' && b) return { kind: 'dm', username: decodeURIComponent(b) };
   if (a === 'g' && b) return { kind: 'group', room: b };
   if (a === 'invite' && b) return { kind: 'invite', code: b };
+  if (a === 'notes') return { kind: 'notes' };
   if (a === 'modmail') return b ? { kind: 'modmail', username: decodeURIComponent(b) } : { kind: 'modmail' };
   return { kind: 'home' };
 }
@@ -1778,7 +1811,7 @@ export async function open(v) {
   // a message link: open its channel and scroll to the message
   if (v.kind === 'channel' && v.mid) { const { mid, ...at } = v; return jumpToMessage(at, mid); }
   // Velora-only places (DMs, groups, modmail, Velora's own servers) need the Velora sign-in
-  if (!state.signedIn && (['dm', 'group', 'modmail'].includes(v.kind) || ((v.kind === 'server' || v.kind === 'channel') && !isInst(v.sid)))) { set({ view: { kind: 'home' } }); return; }
+  if (!state.signedIn && (['dm', 'group', 'modmail', 'notes'].includes(v.kind) || ((v.kind === 'server' || v.kind === 'channel') && !isInst(v.sid)))) { set({ view: { kind: 'home' } }); return; }
   const io = (v.kind === 'server' || v.kind === 'channel') && isInst(v.sid) ? instOf(v.sid) : v.kind === 'instance' ? v.inst : null;
   if (io) {
     const c = connections.get(io);
@@ -1833,7 +1866,7 @@ export async function open(v) {
     await loadMessages(v);
     apiFetch(`/im/with/${encodeURIComponent(v.username)}/read`, { method: 'POST' }).catch(() => {});
     set(s => ({ dms: s.dms.map(c => (c.username.toLowerCase() === v.username.toLowerCase() ? { ...c, unread: 0 } : c)) }));
-  } else if (v.kind === 'group') {
+  } else if (v.kind === 'group' || v.kind === 'notes') {
     await loadMessages(v);
   } else if (v.kind === 'modmail') {
     await loadMessages(v);
