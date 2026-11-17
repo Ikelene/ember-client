@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import {
   Hash, Megaphone, Lock, MessageCircle, Gamepad2, Music, Image, Code, Bug, Lightbulb, HelpCircle, Star, Heart, BookOpen,
   Coffee, Sparkles, Trophy, Video, Palette, Terminal, Globe, Bell, Shield, Rocket, ScrollText, Smile, Flame, Zap, Gift, Pin,
-  Plus, Trash2, GripVertical, Upload, X, Check, BadgeCheck, DoorOpen, ExternalLink, Volume2, EyeOff, UserMinus, Ban, Clock } from 'lucide-react';
+  Plus, Trash2, GripVertical, Upload, X, Check, BadgeCheck, DoorOpen, ExternalLink, Volume2, EyeOff, UserMinus, Ban, Clock, PenLine } from 'lucide-react';
 const TYPE_ICONS = { logs: ScrollText, roles: BadgeCheck, welcome: DoorOpen, link: ExternalLink, voice: Volume2, game: Gamepad2, starboard: Star };
 import { apiFetch, uploadFetch } from '../api.js';
 import { useChat, getState, toast, errorText, ask, refreshServer, memberRef, loadMembers, untilText } from './store.js';
@@ -24,7 +24,7 @@ export const PERM_LIST = [
   ['ADMIN', 'Administrator', 'Every permission, and can do anything in the server. Be careful who gets this.'],
   ['MANAGE_SERVER', 'Manage server', 'Change the name, description, icon, banner and server settings.'],
   ['MANAGE_ROLES', 'Manage roles', 'Create and edit roles below their own, and give them to people.'],
-  ['MANAGE_USERS', 'Manage users', 'See who is really online (invisible people show with a hollow dot), which client and device people use, and when they last logged in. Also shows a client tag next to their messages.', "Shows when people last logged in and which page each message was sent from. Invisible status and devices only show in Nookara's own servers: this server doesn't see people's presence."],
+  ['MANAGE_USERS', 'Manage users', 'See who is really online (invisible people show with a hollow dot), which client and device people use, and when they last logged in. Also shows a client tag next to their messages.', "Shows when people last logged in and which page each message was sent from. Invisible status and devices only show in Nookara's own servers: this server doesn't see people's presence. Also lets you change the server nickname of people below you."],
   ['MANAGE_CHANNELS', 'Manage channels', 'Create, edit, delete and rearrange channels and categories.'],
   ['KICK', 'Kick members', 'Remove people from the server (they can come back with an invite).'],
   ['BAN', 'Ban members', 'Remove people for good.'],
@@ -206,6 +206,34 @@ export function modMenuItems(sid, username) {
     r.kick && { label: `Remove ${username}`, icon: UserMinus, danger: true, disabled: !r.below, hint, onClick: () => moderate(sid, username, 'kick') },
     r.ban && { label: `Ban ${username}`, icon: Ban, danger: true, disabled: !r.below, hint, onClick: () => moderate(sid, username, 'ban') },
   ];
+}
+
+// Server nickname (Ember servers only): shown on that server instead of the person's name. Your own always; someone else's
+// with Manage users when their role is below yours (the server checks too)
+export function nickMenuItems(sid, username) {
+  if (!sid || !isInst(sid)) return [];
+  const st = getState();
+  const srv = st.detail[sid]?.server;
+  const m = st.members[sid]?.find(x => x.username === username);
+  const meU = st.instances.find(i => i.origin === instOf(sid))?.user;
+  if (!srv || !m || !meU) return [];
+  const isMe = m.id === meU.id;
+  if (!isMe && !has(srv.perms, P.MANAGE_USERS)) return [];
+  const r = isMe ? { below: true } : modRights(sid, username, st);
+  const below = isMe || (m.role !== 'owner' && (srv.role === 'owner' || r.below));
+  return [{ label: isMe ? 'Change nickname' : `Change ${username}'s nickname`, icon: PenLine, disabled: !below, hint: below ? '' : 'Their role is as high as yours', onClick: () => changeNick(sid, m, isMe) }];
+}
+export async function changeNick(sid, m, isMe) {
+  const a = await ask({
+    title: isMe ? 'Change nickname' : `Change ${m.username}'s nickname`, compact: true,
+    text: `${isMe ? 'Your' : 'Their'} nickname only shows on ${getState().detail[sid]?.server?.name || 'this server'}. Leave it empty to go back to ${isMe ? 'your' : 'their'} normal name.`,
+    input: { placeholder: m.global_display_name || m.display_name || m.username, value: m.nick || '', optional: true, max: 32 }, confirm: 'Save',
+  });
+  if (!a) return false;
+  try {
+    const r = await apiFetch(`/chat/servers/${sid}/members/${isMe ? '@me' : encodeURIComponent(m.id)}`, { method: 'PATCH', body: JSON.stringify({ nick: a.text || null }) });
+    toast(r.nick ? `Nickname set to ${r.nick}.` : 'Nickname removed.', true); loadMembers(sid); return true;
+  } catch (e) { toast(e.message === 'not_found' || e.message === 'method_not_allowed' ? "This server doesn't support nicknames yet (it needs an update)." : errorText(e.message)); return false; }
 }
 
 // timeouts (instances): no posting, reacting or voice until it ends. Kick or Ban; the server checks the role order too

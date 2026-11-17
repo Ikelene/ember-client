@@ -12,7 +12,7 @@ import * as E2EE from './e2ee/session.js';
 import { fileKindOfMime } from './e2ee/files.js';
 import { rememberedDest, TEMP_LINK, tempId } from './upload-dest.js';
 import { callLinePlain } from './callText.js';
-import { applyIdentity } from './identity.js';
+import { applyIdentity, applyNick } from './identity.js';
 import { applyUserUpdate, instancesWithAccount } from './userUpdate.js';
 import { findPending, dropSettled, wireText, settle } from './pending.js';
 import { VELORA, K, parseK, instOf, bare, isInst, normOrigin, acctKey } from './ids.js';
@@ -647,6 +647,7 @@ function onEvent(m, inst = VELORA) {
           return m.change === 'joined' || m.change === 'role' ? [...rest, nu] : rest;
         }),
       }));
+      if (m.member && inst !== VELORA && 'nick' in m.member) set(s => applyNick(s, m.member, (s.detail[m.server]?.channels || []).map(c => c.cid))); // (a server nickname: the names on loaded messages too)
       if (m.member && inst === VELORA) remember([m.member]);
       else if (m.member) wantVeloraFaces([m.member]);
       break;

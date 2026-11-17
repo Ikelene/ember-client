@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { StarboardSettings } from './Starboard.jsx';
 import { GameTypeSettings } from './GameServer.jsx';
-import { Hash, ScrollText, BadgeCheck, DoorOpen, ExternalLink, Volume2, Star, Gamepad2, Webhook, Copy, RefreshCw, Trash2, Plus, Coins, Check, X, Upload, Cloud, Users } from 'lucide-react';
+import { Hash, ScrollText, BadgeCheck, DoorOpen, ExternalLink, Volume2, Star, Gamepad2, Webhook, Copy, RefreshCw, Trash2, Plus, Coins, Check, X, Upload, Cloud, Users, GripVertical, FolderPlus, LayoutGrid, Rows3, RotateCcw } from 'lucide-react';
 import { apiFetch, uploadFetch } from '../api.js';
 import { useChat, useScopeStatus, scopeTip, scopeBlocked, toast, errorText, ask } from './store.js';
 import { renderBody } from './text.jsx';
@@ -182,35 +182,113 @@ function WelcomeSettings({ config, setConfig }) {
     </>
   );
 }
+// The shop editor: roles in categories (each drawn as big cards or as small toggle buttons), dragged into order and between
+// categories, each with an optional colour that only this shop uses. Roles with no category come first, as cards.
+const SHOP_STYLES = [['cards', 'Cards', LayoutGrid], ['buttons', 'Buttons', Rows3]];
+const newCatId = () => Math.random().toString(36).slice(2, 8) || 'c1';
 function ShopSettings({ config, setConfig, sid }) {
   const detail = useChat(s => s.detail[sid]);
   const canRoles = has(detail?.server.perms, P.MANAGE_ROLES);
   const items = config.items || [];
+  const cats = config.categories || [];
+  const grouping = isInst(sid); // (Nookara's own servers keep the plain list: only Ember servers store categories and colours)
   const roles = (detail?.roles || []).filter(r => !r.is_default && !(r.permissions & P.ADMIN)).sort((a, b) => b.position - a.position);
   const free = roles.filter(r => !items.some(i => i.rid === r.rid));
-  const set = (i, patch) => setConfig({ ...config, items: items.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+  const drag = useRef(null); // { item: rid } | { cat: id }
+  const [dragging, setDragging] = useState(null);
+  const [overKey, setOverKey] = useState(null);
+  const put = patch => setConfig({ ...config, ...patch });
+  const setItem = (rid, patch) => put({ items: items.map(x => (x.rid === rid ? { ...x, ...patch } : x)) });
+  const setCat = (id, patch) => put({ categories: cats.map(k => (k.id === id ? { ...k, ...patch } : k)) });
+  const catOf = it => (cats.some(k => k.id === it.cat) ? it.cat : '');
+  // an item dropped before another item (it joins that item's category), or at the end of a category
+  function moveItem(rid, { before = null, cat = '' }) {
+    const it = items.find(x => x.rid === rid);
+    if (!it || rid === before) return;
+    const rest = items.filter(x => x.rid !== rid);
+    const moved = { ...it, cat: cat || undefined };
+    let at = before ? rest.findIndex(x => x.rid === before) : -1;
+    if (at < 0) { const last = rest.map(catOf).lastIndexOf(cat); at = last + 1 || rest.length; if (!cat && last < 0) at = 0; }
+    put({ items: [...rest.slice(0, at), moved, ...rest.slice(at)] });
+  }
+  function moveCat(id, before) {
+    if (id === before) return;
+    const k = cats.find(x => x.id === id), rest = cats.filter(x => x.id !== id);
+    const at = before ? rest.findIndex(x => x.id === before) : rest.length;
+    put({ categories: [...rest.slice(0, at < 0 ? rest.length : at), k, ...rest.slice(at < 0 ? rest.length : at)] });
+  }
+  const start = (e, what) => { e.stopPropagation(); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', what.item || what.cat); drag.current = what; setTimeout(() => setDragging(what), 0); };
+  const end = () => { drag.current = null; setDragging(null); setOverKey(null); };
+  // drop targets: an item row (key 'i:rid'), a category's header or its empty space (key 'k:id', '' = no category)
+  const overProps = (key, onDrop, accepts = 'item') => ({
+    onDragOver: e => { const d = drag.current; if (!d || (accepts === 'item' ? !d.item : !(d.item || d.cat))) return; e.preventDefault(); e.stopPropagation(); setOverKey(key); },
+    onDrop: e => { e.preventDefault(); e.stopPropagation(); const d = drag.current; if (d) onDrop(d); end(); },
+  });
+  function addCat() {
+    if (cats.length >= 10) return;
+    put({ categories: [...cats, { id: newCatId(), name: `Category ${cats.length + 1}`, style: 'cards' }] });
+  }
+  async function removeCat(k) {
+    const n = items.filter(x => catOf(x) === k.id).length;
+    if (n && !(await ask({ title: `Remove ${k.name}?`, text: `Its ${n === 1 ? 'role stays' : `${n} roles stay`} in the shop, with no category.`, confirm: 'Remove category' }))) return;
+    put({ categories: cats.filter(x => x.id !== k.id), items: items.map(x => (x.cat === k.id ? { ...x, cat: undefined } : x)) });
+  }
   if (!canRoles) return <p className="vc-dialog-sub">You need the Manage roles permission to choose what's in the shop.</p>;
+  const row = it => {
+    const r = roles.find(x => x.rid === it.rid);
+    if (!r) return null;
+    const color = it.color || r.color || null;
+    return (
+      <div key={it.rid} className={`vc-shop-row${grouping ? ' grip' : ''}${dragging?.item === it.rid ? ' dragging' : ''}${overKey === `i:${it.rid}` ? ' over' : ''}`}
+        draggable={grouping} onDragStart={e => start(e, { item: it.rid })} onDragEnd={end}
+        {...(grouping ? overProps(`i:${it.rid}`, d => d.item && moveItem(d.item, { before: it.rid, cat: catOf(it) })) : {})}>
+        {grouping && <GripVertical size={14} className="vc-grip" />}
+        <b style={{ color: color || undefined }}>{r.name}</b>
+        {grouping && (
+          <span className="vc-shop-color" data-tip={it.color ? 'Colour in this shop (the role keeps its own)' : 'Pick a colour for this shop only'}>
+            <input type="color" aria-label={`${r.name} colour in this shop`} value={color || '#9d8ad1'} onChange={e => setItem(it.rid, { color: e.target.value })} />
+            {it.color && <button type="button" className="vc-ico-btn" title="Use the role's own colour" onClick={() => setItem(it.rid, { color: undefined })}><RotateCcw size={12} /></button>}
+          </span>
+        )}
+        <input className="form-input" maxLength={200} placeholder="What's it for? (optional)" value={it.desc || ''} onChange={e => setItem(it.rid, { desc: e.target.value })} />
+        <label className="vc-price"><Coins size={13} /><input className="form-input" type="number" min={0} max={1000000} value={it.price || 0} onChange={e => setItem(it.rid, { price: Math.max(0, Math.trunc(Number(e.target.value) || 0)) })} /></label>
+        <button type="button" className="vc-ico-btn" title="Take out of the shop" onClick={() => put({ items: items.filter(x => x.rid !== it.rid) })}><X size={15} /></button>
+      </div>
+    );
+  };
+  const loose = items.filter(it => !catOf(it));
   return (
     <div className="vc-field"><span>Roles for sale</span>
-      <p className="vc-dialog-sub">Free roles anyone can take or drop. Paid roles cost Nookara credits, which go to the server owner - once bought, people can take them off and back on for free. Roles with Administrator can't be sold.</p>
+      <p className="vc-dialog-sub">Free roles anyone can take or drop. Paid roles cost Nookara credits, which go to the server owner - once bought, people can take them off and back on for free. Roles with Administrator can't be sold.{grouping ? ' Drag roles and categories to put them in order.' : ''}</p>
       <div className="vc-shop-edit">
-        {items.map((it, i) => {
-          const r = roles.find(x => x.rid === it.rid);
-          if (!r) return null;
+        <div className={`vc-shop-group loose${overKey === 'k:' ? ' over' : ''}`} {...(grouping ? overProps('k:', d => d.item && moveItem(d.item, { cat: '' })) : {})}>
+          {loose.map(row)}
+          {!items.length && <div className="vc-empty-note">Nothing for sale yet.</div>}
+          {grouping && !!items.length && !loose.length && cats.length > 0 && <div className="vc-shop-drop">Drop a role here to take it out of its category</div>}
+        </div>
+        {grouping && cats.map(k => {
+          const list = items.filter(it => catOf(it) === k.id);
           return (
-            <div key={it.rid} className="vc-shop-row">
-              <b style={{ color: r.color || undefined }}>{r.name}</b>
-              <input className="form-input" maxLength={200} placeholder="What's it for? (optional)" value={it.desc || ''} onChange={e => set(i, { desc: e.target.value })} />
-              <label className="vc-price"><Coins size={13} /><input className="form-input" type="number" min={0} max={1000000} value={it.price || 0} onChange={e => set(i, { price: Math.max(0, Math.trunc(Number(e.target.value) || 0)) })} /></label>
-              <button type="button" className="vc-ico-btn" title="Take out of the shop" onClick={() => setConfig({ ...config, items: items.filter((_, j) => j !== i) })}><X size={15} /></button>
+            <div key={k.id} className={`vc-shop-group${dragging?.cat === k.id ? ' dragging' : ''}${overKey === `k:${k.id}` ? ' over' : ''}`}
+              {...overProps(`k:${k.id}`, d => (d.item ? moveItem(d.item, { cat: k.id }) : moveCat(d.cat, k.id)), 'any')}>
+              <div className="vc-shop-cat" draggable onDragStart={e => start(e, { cat: k.id })} onDragEnd={end}>
+                <GripVertical size={14} className="vc-grip" />
+                <input className="form-input" maxLength={40} value={k.name} aria-label="Category name" onChange={e => setCat(k.id, { name: e.target.value })} />
+                <span className="vc-shop-style" role="radiogroup" aria-label="How the roles look">
+                  {SHOP_STYLES.map(([v, label, Icon]) => <button type="button" key={v} role="radio" aria-checked={k.style === v} className={k.style === v ? 'on' : ''} onClick={() => setCat(k.id, { style: v })}><Icon size={13} /> {label}</button>)}
+                </span>
+                <button type="button" className="vc-ico-btn danger" title="Remove category" onClick={() => removeCat(k)}><Trash2 size={14} /></button>
+              </div>
+              {list.map(row)}
+              {!list.length && <div className="vc-shop-drop">Drag roles here</div>}
             </div>
           );
         })}
-        {!items.length && <div className="vc-empty-note">Nothing for sale yet.</div>}
       </div>
+      {grouping && cats.length < 10 && <button type="button" className="btn btn-surface btn-sm vc-shop-addcat" onClick={addCat}><FolderPlus size={14} /> Add category</button>}
       {free.length > 0 && items.length < 25 && (
         <div className="vc-shop-add">
-          {free.slice(0, 30).map(r => <button type="button" key={r.rid} className="vc-chip-btn" onClick={() => setConfig({ ...config, items: [...items, { rid: r.rid, price: 0, desc: '' }] })}><Plus size={12} /> <span style={{ color: r.color || undefined }}>{r.name}</span></button>)}
+          {free.slice(0, 30).map(r => <button type="button" key={r.rid} className="vc-chip-btn" onClick={() => put({ items: [...items, { rid: r.rid, price: 0, desc: '' }] })}><Plus size={12} /> <span style={{ color: r.color || undefined }}>{r.name}</span></button>)}
         </div>
       )}
     </div>
@@ -266,6 +344,15 @@ function WebhookManager({ cid, logs }) {
 // ── the roles shop (shown instead of messages) ──
 // An instance's paid roles are paid in Velora credits: buying one makes a Velora pay request, which you approve here (signed in
 // with Velora) or on Velora's payment page; the instance hands out the role once Velora says it's paid (chat_shop_update).
+// the shop's items in sections: roles with no category first (cards, no heading), then each category in order; empty ones are left out
+export function shopGroups(d) {
+  const cats = Array.isArray(d?.categories) ? d.categories : [];
+  const known = new Set(cats.map(k => k.id));
+  const items = d?.items || [];
+  const out = [{ id: '', name: '', style: 'cards', items: items.filter(it => !known.has(it.cat)) }];
+  for (const k of cats) out.push({ id: k.id, name: k.name, style: k.style === 'buttons' ? 'buttons' : 'cards', items: items.filter(it => it.cat === k.id) });
+  return out.filter(g => g.items.length);
+}
 export function RoleShop({ channel }) {
   const onInst = isInst(channel.cid);
   const signedIn = useChat(s => s.signedIn);
@@ -311,27 +398,50 @@ export function RoleShop({ channel }) {
       {paidOff && d.items.some(it => it.price > 0 && !it.owned) && <p className="vc-warn-note">{d.payments === 'velora_required' ? 'Paid roles need a Nookara account - yours only exists on this server. Free roles work as usual.' : "This server can't take credit payments right now, so only free roles work."}</p>}
       {!d && <div className="vc-loading"><i /><i /><i /></div>}
       {d && !d.items.length && <div className="vc-empty-note">Nothing in this shop yet.</div>}
-      <div className="vc-shop-grid">
-        {d?.items.map((it, i) => {
-          const locked = !it.has && (onInst ? paidOff && it.price > 0 && !it.owned : !!payLack);
-          return (
-            <div key={it.role.rid} className={`vc-shop-card vl-rise${it.has ? ' has' : ''}`} style={{ '--i': Math.min(i, 12), '--rc': it.role.color || 'var(--accent)' }}>
-              <div className="vc-shop-name">
-                {it.role.icon ? <img src={it.role.icon} alt="" /> : <span className="vc-shop-dot" />}
-                <b>{it.role.name}</b>
-                {it.has && <Check size={15} className="vc-shop-tick" />}
-              </div>
-              {it.desc && <p>{it.desc}</p>}
-              <div className="vc-shop-foot">
-                <span className="vc-shop-price">{it.price > 0 ? (it.owned ? 'Bought' : <><Coins size={13} /> {it.price.toLocaleString()}</>) : 'Free'}</span>
-                <button type="button" className={`btn btn-sm ${it.has ? 'btn-surface' : 'btn-primary'}${locked ? ' vc-scope-locked' : ''}`} aria-disabled={locked ? 'true' : undefined} data-tip={!it.has && !onInst ? scopeTip(payLack, 'Getting a role') : undefined} disabled={busy === it.role.rid} onClick={() => toggle(it)}>
-                  {it.has ? 'Take off' : it.pending ? 'Finish paying' : !it.price ? 'Get role' : it.owned ? 'Put on' : 'Buy'}
-                </button>
-              </div>
+      {d && shopGroups(d).map(g => (
+        <section key={g.id || '-'} className="vc-shop-sec">
+          {g.name && <h3 className="vc-shop-sec-h">{g.name}</h3>}
+          {g.style === 'buttons' ? (
+            <div className="vc-shop-btns">
+              {g.items.map(it => {
+                const locked = !it.has && (onInst ? paidOff && it.price > 0 && !it.owned : !!payLack);
+                const tip = [it.desc, it.price > 0 && !it.owned ? `${it.price.toLocaleString()} credits` : '', !it.has && !onInst ? scopeTip(payLack, 'Getting a role') : ''].filter(Boolean).join(' - ');
+                return (
+                  <button type="button" key={it.role.rid} className={`vc-shop-btn${it.has ? ' on' : ''}${locked ? ' vc-scope-locked' : ''}`} style={{ '--rc': it.color || it.role.color || 'var(--accent)' }}
+                    aria-pressed={it.has} aria-disabled={locked ? 'true' : undefined} data-tip={tip || undefined} disabled={busy === it.role.rid} onClick={() => toggle(it)}>
+                    {it.role.icon ? <img src={it.role.icon} alt="" /> : <span className="vc-shop-dot" />}
+                    <span>{it.role.name}</span>
+                    {it.price > 0 && !it.owned && !it.has && <small><Coins size={11} /> {it.price.toLocaleString()}</small>}
+                    {it.pending && <small>Finish paying</small>}
+                  </button>
+                );
+              })}
             </div>
-          );
-        })}
-      </div>
+          ) : (
+            <div className="vc-shop-grid">
+              {g.items.map((it, i) => {
+                const locked = !it.has && (onInst ? paidOff && it.price > 0 && !it.owned : !!payLack);
+                return (
+                  <div key={it.role.rid} className={`vc-shop-card vl-rise${it.has ? ' has' : ''}${it.role.icon ? ' icon' : ''}`} style={{ '--i': Math.min(i, 12), '--rc': it.color || it.role.color || 'var(--accent)' }}>
+                    <div className="vc-shop-name">
+                      {it.role.icon ? <img src={it.role.icon} alt="" /> : <span className="vc-shop-dot" />}
+                      <b>{it.role.name}</b>
+                      {it.has && <Check size={15} className="vc-shop-tick" />}
+                    </div>
+                    {it.desc && <p>{it.desc}</p>}
+                    <div className="vc-shop-foot">
+                      <span className="vc-shop-price">{it.price > 0 ? (it.owned ? 'Bought' : <><Coins size={13} /> {it.price.toLocaleString()}</>) : 'Free'}</span>
+                      <button type="button" className={`btn btn-sm ${it.has ? 'btn-surface' : 'btn-primary'}${locked ? ' vc-scope-locked' : ''}`} aria-disabled={locked ? 'true' : undefined} data-tip={!it.has && !onInst ? scopeTip(payLack, 'Getting a role') : undefined} disabled={busy === it.role.rid} onClick={() => toggle(it)}>
+                        {it.has ? 'Take off' : it.pending ? 'Finish paying' : !it.price ? 'Get role' : it.owned ? 'Put on' : 'Buy'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      ))}
       {pay && <PayRequest channel={channel} it={pay.it} req={pay.req} onDone={r => { if (r) setD(r); setPay(null); }} />}
     </div>
   );

@@ -20,7 +20,7 @@ import { canReportDm } from './dm-report.js';
 import { reactionId } from './msg-actions.js';
 import { myReactions } from './msg-actions.js';
 import { setInstancePrefs } from './instances.js';
-import { roleMenuItems, modMenuItems, P, has } from './roles.jsx';
+import { roleMenuItems, modMenuItems, nickMenuItems, changeNick, P, has } from './roles.jsx';
 import { viewPicture, copyImage, downloadImage } from './MediaViewer.jsx';
 import { saveToMedia } from './store.js';
 import { QuickReactions } from './Reactions.jsx';
@@ -202,6 +202,7 @@ export function instanceMenu(e, inst, srv, { onInvite, onSettings, onLeave, onLo
     ] },
     (srv || (getState().signedIn && inst.prefs)) && 'sep',
     here && { label: 'Invite people', icon: UserPlus, onClick: onInvite },
+    here && inst.user && { label: 'Change nickname', icon: Pencil, onClick: () => changeNick(srv.sid, getState().members[srv.sid]?.find(x => x.id === inst.user.id) || { ...inst.user, nick: null }, true) },
     admin && { label: 'Server settings', icon: Settings, onClick: onSettings },
     { label: 'Copy URL', icon: Link2, onClick: () => copy(inst.origin, 'Server URL copied') },
     inst.status !== 'connecting' && { label: 'Reconnect', icon: RefreshCw, onClick: onReconnect },
@@ -299,6 +300,7 @@ export function userMenu(e, username, { onProfile, sid, extra = [] } = {}) {
     !isMe && !friend && !local && { label: 'Add friend', icon: UserPlus, onClick: () => apiFetch('/friends/request', { method: 'POST', body: JSON.stringify({ username }) }).then(d => toast(d.status === 'accepted' ? `You and ${username} are friends now!` : `Friend request sent to ${username}.`, true)).catch(er => toast(er.message === 'already_friends' ? "You're already friends." : "Couldn't send that request.")) },
     { label: 'Copy username', icon: Copy, onClick: () => copy(username, 'Username copied') },
     sid && !isMe && getState().view?.kind === 'channel' && member && appsItems({ sid, cid: getState().view.cid, type: 2, target: member.id }),
+    ...nickMenuItems(sid, username),
     ...roleMenuItems(sid, username),
     ...modMenuItems(sid, username),
     sid && isInst(sid) && !isMe && member && !member.bot && { label: 'Report', icon: Flag, danger: true, onClick: () => reportTo(sid, { user_id: member.id }, `@${username}`, { target: member }) },

@@ -205,6 +205,9 @@ html.vc-rounded.vc-light .vc-shop-card { background: linear-gradient(180deg, #f1
 html.vc-rounded.vc-light .vc-shop-card.has { background: linear-gradient(180deg, color-mix(in srgb, var(--rc) 10%, #f1f1f4), #f4f4f7); }
 html.vc-rounded.vc-light .vc-shop-tick { color: #407853; }
 html.vc-rounded.vc-light .vc-shop-price { color: #8b7343; }
+html.vc-rounded.vc-light .vc-shop-btn { background: #f1f1f4; }
+html.vc-rounded.vc-light .vc-shop-btn.on { background: color-mix(in srgb, var(--rc) 18%, #f1f1f4); }
+html.vc-rounded.vc-light .vc-shop-btn small { color: #8b7343; }
 html.vc-rounded.vc-light .vc-vuser svg { color: #824747; }
 html.vc-rounded.vc-light .vc-vuser.clickable:hover, html.vc-rounded.vc-light .vc-vuser.clickable:focus-visible { background: var(--hover, rgba(0, 0, 0, 0.072)); }
 html.vc-rounded.vc-light .vc-vpanel { background: #f6f6f9; }

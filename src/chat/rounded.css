@@ -246,6 +246,8 @@ html.vc-rounded .vc-game-chosen,
 html.vc-rounded .vc-vtile-sound,
 html.vc-rounded .vc-sb-prev,
 html.vc-rounded .vc-shop-dot { border-radius: var(--r-sm); }
+html.vc-rounded .vc-shop-btn { border-radius: 999px; }
+html.vc-rounded .vc-shop-group:not(.loose), html.vc-rounded .vc-shop-style { border-radius: var(--r-md); overflow: hidden; }
 html.vc-rounded .bf-pe-lock,
 html.vc-rounded .bf-pg-use,
 html.vc-rounded .bf-sr-automod,

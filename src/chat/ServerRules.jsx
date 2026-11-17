@@ -392,7 +392,7 @@ export function AutoModPage({ sid, onDirty }) {
 // ───────────────────────────── Audit log ─────────────────────────────
 const CAT_LABEL = { user_moderation: 'User moderation', role_management: 'Roles', channel_management: 'Channels', message_moderation: 'Message moderation', server_management: 'Server management' };
 const ACTION_TEXT = {
-  member_kick: 'removed', member_ban: 'banned', member_unban: 'unbanned', member_timeout: 'timed out', timeout_remove: 'lifted the timeout of',
+  member_kick: 'removed', member_ban: 'banned', member_unban: 'unbanned', member_timeout: 'timed out', timeout_remove: 'lifted the timeout of', member_nick: 'changed the nickname of',
   join_accept: 'let in', join_deny: 'turned away', role_create: 'created the role', role_update: 'changed the role', role_delete: 'deleted the role',
   role_order: 'reordered the roles', member_role_add: 'gave a role to', member_role_remove: 'took a role from', channel_create: 'created',
   channel_update: 'changed', channel_delete: 'deleted', channel_perms: 'changed the permissions of', channel_layout: 'rearranged the channels',
