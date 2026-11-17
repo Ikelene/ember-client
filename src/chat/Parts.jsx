@@ -14,7 +14,7 @@ import { RetryIn } from './Gate.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
 import { linkFor } from './store.js';
 import { useName, NameText, personName, displayNameOf, useDisplayNamesVersion, wantDisplayNames, serverOwnName } from './displayNames.js';
-import { useChat, retryNow, go, keyOf, setStatus, setCustom, isMuted, effectiveNotify, ask, refreshServer, toast, errorText, setDetailLayout, patchState, saveSettings, getState, statusOf, presenceFor, useFace, isBlockedPerson, isBlockedName, blockedFace, BLOCKED_NAME, loadMoreMembers } from './store.js';
+import { useChat, retryNow, go, keyOf, setStatus, setCustom, isMuted, effectiveNotify, ask, refreshServer, toast, errorText, setDetailLayout, patchState, saveSettings, getState, statusOf, presenceFor, useFace, isBlockedPerson, isBlockedName, blockedFace, BLOCKED_NAME, loadMoreMembers, lastHomeView } from './store.js';
 import { P, has, ChannelIcon, useNameStyle, colorFrom, NameDecor } from './roles.jsx';
 import { serverMenu, instanceMenu, channelMenu, userMenu, openMenu, copy } from './Menu.jsx';
 import { apiFetch, getToken } from '../api.js';
@@ -246,7 +246,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
   };
   return (
     <nav className="vc-rail" aria-label="Servers">
-      <RailItem active={home && !discoverOn} unread={(homeUnread || homeRequests > 0) && !home} badge={homeRequests} title={homeRequests ? `Home - ${homeRequests} request${homeRequests === 1 ? '' : 's'} waiting` : 'Home - friends and direct messages'} onClick={() => go({ kind: 'home' })}>
+      <RailItem active={home && !discoverOn} unread={(homeUnread || homeRequests > 0) && !home} badge={homeRequests} title={homeRequests ? `Home - ${homeRequests} request${homeRequests === 1 ? '' : 's'} waiting` : 'Home - friends and direct messages'} onClick={() => go(home && !discoverOn ? { kind: 'home' } : lastHomeView())}>
         <span className="vc-srv-ico vc-rail-dm"><MessageCircle size={24} /></span>
       </RailItem>
       {newDMs.map(c => (
@@ -277,11 +277,11 @@ export const dialog = (kind, sid, extra) => dispatchEvent(new CustomEvent('vc-di
 function RailItem({ active, unread, title, onClick, children, style, badge, onContextMenu, server, dnd, status }) {
   const { cls = '', ...drag } = dnd || {};
   return (
-    <div className={`vc-rail-item${active ? ' active' : ''}${unread ? ' unread' : ''}${cls}`} style={style} onContextMenu={onContextMenu} {...drag}>
+    <div className={`vc-rail-item${active ? ' active' : ''}${unread ? ' unread' : ''}${status ? (status === 'connecting' ? ' inst-connecting' : ' inst-off') : ''}${cls}`} style={style} onContextMenu={onContextMenu} {...drag}>
       <i className="vc-pill" />
       <button type="button" onClick={onClick} data-tip={server ? undefined : title} data-tip-server={server} data-tip-side="right" aria-label={title}>{children}</button>
       {badge > 0 && <span className="vc-rail-badge" key={badge}>{badge > 99 ? '99+' : badge}</span>}
-      {status && <i className={`vc-inst-dot ${status}`} />}
+      {status === 'connecting' && <i className="vc-ring vc-rail-ring" aria-hidden="true" />}
     </div>
   );
 }

@@ -7,7 +7,6 @@ import { initials } from './Parts.jsx';
 import { reconnect, joinCommunity, removeInstance } from './instances.js';
 import { joinLabel, joinHint } from './Community.jsx';
 import { startSignIn } from './session.js';
-import { BootMark } from './Boot.jsx';
 import { signOut, savedAccounts, switchTo } from './ProfilePopout.jsx';
 import { siteHref } from './hosts.js';
 
@@ -40,7 +39,7 @@ function Box({ icon, spin, title, children }) {
   return (
     <div className="vc-gate" role="status">
       <div className="vc-gate-box vl-rise">
-        {spin ? <BootMark size={52} /> : icon}
+        {spin ? <i className="vc-ring vc-gate-ring" aria-hidden="true" /> : icon}
         <h2>{title}</h2>
         {children}
       </div>
@@ -111,7 +110,7 @@ export function InstanceGate({ origin }) {
   const retry = <button type="button" className="btn btn-surface" onClick={() => reconnect(origin)}><RefreshCw size={15} /> Retry</button>;
   const remove = <button type="button" className="btn btn-surface" onClick={async () => { if (await ask({ title: `Remove ${name}?`, text: `${host} leaves your server list. Your account there stays as it is - you can add it again any time.`, confirm: 'Remove from list', danger: true })) removeInstance(origin); }}><Trash2 size={15} /> Remove from list</button>;
 
-  if ((status === 'connecting' && !inst.failed) || (srv && status === 'open')) return <Box spin title={`Connecting to ${name || host}`}><small className="vc-gate-host"><Globe size={12} /> {host}</small></Box>;
+  if ((status === 'connecting' && !inst.failed) || (srv && status === 'open')) return <Box spin title={`Connecting to ${name || host}`}><p>Establishing connection to chat server</p><small className="vc-gate-host"><Globe size={12} /> {host}</small></Box>;
   if (status === 'login') {
     return (
       <Box icon={<KeyRound size={34} />} title={`Signed out of ${host}`}>

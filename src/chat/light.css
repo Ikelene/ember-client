@@ -457,7 +457,7 @@ html.vc-rounded.vc-light .vc-edit-btns button { background: #f3f3f6; }
   html.vc-rounded.vc-light .bf-pp-flyout[data-sheet] { background: #f1f1f4; }
   html.vc-rounded.vc-light .bf-pp-flyout[data-sheet]::before { background-color: #f1f1f4; }
 }
-html.vc-rounded.vc-light .vc-inst-dot { border: 2px solid #d6d6de; }
+html.vc-light .vc-gate-ring { border-color: rgba(0, 0, 0, .14); border-top-color: var(--accent); }
 html.vc-rounded.vc-light .vc-err { color: #8b6060; }
 html.vc-rounded.vc-light .vc-note { background: #f5f5f8; }
 html.vc-rounded.vc-light .vc-note.ok { color: #53795c; }

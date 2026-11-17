@@ -1807,6 +1807,10 @@ export function resumeInstanceView(origin) {
   const srv = state.servers.find(x => x.inst === origin);
   if (srv && connections.get(origin)?.status === 'open') open(v.then && instOf(v.then.sid || '') === origin ? v.then : { kind: 'server', sid: srv.sid });
 }
+// the Home button in the rail goes back to what was last open under Home (a DM, a group, Personal Notes or Home itself), until a reload
+const HOME_KINDS = new Set(['home', 'dm', 'group', 'notes', 'modmail']);
+let lastHome = { kind: 'home' };
+export const lastHomeView = () => lastHome;
 export async function open(v) {
   // a message link: open its channel and scroll to the message
   if (v.kind === 'channel' && v.mid) { const { mid, ...at } = v; return jumpToMessage(at, mid); }
@@ -1844,6 +1848,7 @@ export async function open(v) {
     if (cid) go({ kind: 'channel', sid: v.sid, cid }, { replace: true });
     return;
   }
+  if (HOME_KINDS.has(v.kind)) lastHome = v;
   set(s => ({ view: v, unread: { ...s.unread, [keyOf(v)]: false }, lastCid: v.kind === 'channel' ? { ...s.lastCid, [v.sid]: v.cid } : s.lastCid }));
   try { localStorage.setItem('velora_chat_last', location.hash); } catch { /* fine */ }
   if (v.kind === 'channel') {

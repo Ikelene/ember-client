@@ -15,8 +15,26 @@ const LIST_CACHE = () => acctKey('bonfire_instance_list'); // (per account: an a
 
 const rawOrigin = u => { try { const x = new URL(String(u)); return /^https?:$/.test(x.protocol) ? x.origin : null; } catch { return null; } };
 export const hostOf = o => { try { return new URL(o).host; } catch { return String(o).replace(/^https?:\/\//, ''); } };
+// each server's name + icon from the last time it answered (kept here and on Nookara, so "Connecting to <name>" before it does)
+const NAMES = () => `${LIST_CACHE()}:names`;
+let namesAt = null, namesVal = {};
+function savedLabels() {
+  const k = NAMES();
+  if (k !== namesAt) { namesAt = k; try { const v = JSON.parse(localStorage.getItem(k) || '{}'); namesVal = v && typeof v === 'object' ? v : {}; } catch { namesVal = {}; } }
+  return namesVal;
+}
+const writeLabels = all => { namesVal = all; try { localStorage.setItem(NAMES(), JSON.stringify(all)); } catch { /* fine */ } };
+function rememberLabel(c) {
+  const name = String(c.info?.community?.name || c.info?.name || '').trim().slice(0, 100);
+  if (!name) return;
+  const icon = c.info?.community?.icon_url || c.info?.icon_url || null;
+  const all = savedLabels(), old = all[c.origin];
+  if (old?.name === name && (old.icon || null) === icon) return;
+  writeLabels({ ...all, [c.origin]: { name, icon } });
+  if (getToken()) apiFetch('/bonfire/instances/prefs', { method: 'PATCH', body: JSON.stringify({ url: c.origin, name, icon: /^https?:\/\//i.test(icon || '') ? icon : null }) }).catch(() => {});
+}
 export const instView = c => ({
-  origin: c.origin, host: hostOf(c.origin), name: c.info?.name || hostOf(c.origin), icon: c.info?.icon_url || null, description: c.info?.description || '',
+  origin: c.origin, host: hostOf(c.origin), name: c.info?.name || savedLabels()[c.origin]?.name || hostOf(c.origin), icon: c.info?.icon_url || savedLabels()[c.origin]?.icon || null, description: c.info?.description || '',
   community: c.info?.community || null, mode: c.info?.accounts_mode || null, status: c.status, claimed: c.info?.claimed !== false, features: c.info?.features || {},
   registration: c.info?.registration || 'closed', isAdmin: !!c.isAdmin, isOwner: !!c.isOwner, user: c.user || null, error: c.error || null, restricted: c.restricted || null,
   needsVelora: c.info?.accounts_mode === 'velora' && !getToken(), pending: !!c.pending, failed: !!c.failed,
@@ -254,6 +272,7 @@ function onFrame(c, m) {
       c.restricted = null;
       c.retry = 0; c.failed = false; c.retryAt = 0;
       setStatus(c, 'open');
+      rememberLabel(c);
       voiceSocketReady(c.origin);
       rewatchInstClients(c.origin); // (open profile cards: the new socket doesn't know what the old one watched)
       loadInstanceData(c.origin).then(() => { catchUp(c.origin); if (autoJoin.has(c.origin)) joinOnce(c); });
@@ -267,6 +286,7 @@ function onFrame(c, m) {
     case 'instance_update':
       c.info = { ...c.info, ...fromInstance(c.origin, m.settings || {}, '/instance') };
       if (m.voice_quota !== undefined) c.voiceQuota = m.voice_quota;
+      rememberLabel(c);
 
       mirror();
       return;
@@ -415,7 +435,13 @@ function followMoves(d) {
   for (const [from, to] of Object.entries(d?.moved || {})) { const f = normOrigin(from), t = normOrigin(to); if (f && t && connections.has(f)) moveInstance(f, t); }
 }
 function applyPrefs(d) {
-  for (const i of d?.instances || []) { const c = connections.get(normOrigin(i.url)); if (c) c.prefs = { muted: !!i.muted, push: i.push !== false }; }
+  const labels = { ...savedLabels() };
+  for (const i of d?.instances || []) {
+    const o = normOrigin(i.url), c = connections.get(o);
+    if (c) c.prefs = { muted: !!i.muted, push: i.push !== false };
+    if (o && i.name && !c?.info) labels[o] = { name: i.name, icon: i.icon || null }; // (one that already answered keeps what it said)
+  }
+  writeLabels(labels);
   mirror();
 }
 // signed in: Velora's list and this device's, together (Velora's order first); whatever only this device had goes back to Velora
