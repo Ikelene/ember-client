@@ -41,5 +41,5 @@ export function dropSettled(live, fetched, isMine, slack = 120000) {
 // my message came back (the ack): drop the greyed-out copy (the real one may have arrived first)
 export function settle(list, n, real) {
   const has = list.some(x => x.id === real.id);
-  return has ? list.filter(x => x.nonce !== n) : list.map(x => (x.nonce === n ? real : x));
+  return has ? list.filter(x => x.nonce !== n || x.id === real.id) : list.map(x => (x.nonce === n ? real : x)); // (the real one can carry the nonce too)
 }

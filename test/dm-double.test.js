@@ -126,3 +126,11 @@ test('a picture taken whole from its own line is never counted again by the link
   assert.equal(linkBase(whole), UP);
   assert.equal(linkBase(undefined), '');
 });
+
+test('the real message arrived first carrying the nonce: settle keeps it', () => {
+  let list = [pendingFor('n1', 'milk', [])];
+  list = addMessage(list, real(10, 'milk', { nonce: 'n1' }));
+  list = settle(list, 'n1', real(10, 'milk'));
+  assert.equal(list.length, 1);
+  assert.equal(list[0].id, 'im10');
+});
