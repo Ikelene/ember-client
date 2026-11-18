@@ -72,10 +72,12 @@ export function OpenedAttachments({ list, extra, m, Attachments }) {
     else if (g && g !== 'wait' && g !== 'failed') shown.push({ ...a, url: g, sealed: false, opened: true });
     else waiting.push({ ...a, state: g });
   }
+  // the expiry footer goes by the real links (an opened one shows from a blob: address, a waiting one isn't in `shown` at all)
+  const temps = list.filter(a => a.sealed).map(a => String(a.url).split('#')[0]);
   return (
     <>
       {waiting.map(a => <Waiting key={a.url} a={a} open={open} />)}
-      <Attachments list={shown} extra={extra} m={m} />
+      <Attachments list={shown} extra={extra} m={m} temps={temps} />
     </>
   );
 }

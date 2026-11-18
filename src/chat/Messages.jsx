@@ -181,7 +181,8 @@ export function FileCard({ a, live = true }) {
     </div>
   );
 }
-function Attachments({ list: all, extra = [], m }) {
+// temps: more temporary-storage links that count for the expiry footer (encrypted DM files: they show from a local copy, opened or not)
+function Attachments({ list: all, extra = [], m, temps = [] }) {
   // an Ember server deletes uploads after the time its settings keep them; the message keeps a note
   const gone = all.filter(a => a.expired), list = all.filter(a => !a.expired);
   // spoilered files stay covered until clicked (once per file)
@@ -195,7 +196,7 @@ function Attachments({ list: all, extra = [], m }) {
   const pics = [...list.filter(a => a.type === 'image' || a.type === 'gif'), ...extra.map(u => ({ url: u, name: nameInLink(u) || undefined, type: KLIPY.test(u) || /\.gif(\?|$)/i.test(u) ? 'gif' : 'image' }))];
   const others = list.filter(a => a.type !== 'image' && a.type !== 'gif');
   // the message's temporary-storage files: asked about once it scrolls into view (their date is fixed, so once is enough)
-  const tempUrls = [...new Set([...pics, ...others].map(a => a.url).filter(u => TEMP_LINK.test(u)))];
+  const tempUrls = [...new Set([...[...pics, ...others].map(a => a.url), ...temps].filter(u => TEMP_LINK.test(u)))];
   const wrap = useRef(null);
   const [seen, setSeen] = useState(false);
   const hasTemp = tempUrls.length > 0;
@@ -208,7 +209,7 @@ function Attachments({ list: all, extra = [], m }) {
     return () => io.disconnect();
   }, [hasTemp, seen]);
   const expiry = useExpiryLabel(tempUrls, seen);
-  if (!pics.length && !others.length && !gone.length) return null;
+  if (!pics.length && !others.length && !gone.length && !hasTemp) return null; // (kept for temp links: the box is what notices it scrolled into view)
   const cover = a => hidden(a) && (
     <button type="button" className="vc-att-spoiler-cover" onClick={e => { e.preventDefault(); e.stopPropagation(); reveal(a); }}>Spoiler</button>
   );
