@@ -626,10 +626,10 @@ function onEvent(m, inst = VELORA) {
     case 'chat_members_stale':
       loadMembers(m.server);
       break;
-    case 'chat_presence': // an instance bot went online / offline (only instances send this; Velora's own is a request). Matched by server (instance-namespaced) + principal id
+    case 'chat_presence': // someone on an Ember server (a bot, or a person on servers with member_presence) connected / left it. Matched by server (instance-namespaced) + principal id
       if (inst === VELORA || (m.presence !== 'online' && m.presence !== 'offline') || m.user_id == null) break;
       set(s => ({
-        members: upd(s.members, m.server, list => (list ? list.map(x => (x.kind === 'bot' && String(x.id) === String(m.user_id) ? { ...x, presence: m.presence } : x)) : list)),
+        members: upd(s.members, m.server, list => (list ? list.map(x => (String(x.id) === String(m.user_id) ? { ...x, presence: m.presence } : x)) : list)),
         commands: s.commands[m.server] ? { ...s.commands, [m.server]: { ...s.commands[m.server], bots: s.commands[m.server].bots.map(b => (String(b.id) === String(m.user_id) ? { ...b, online: m.presence === 'online' } : b)) } } : s.commands,
       }));
       break;
@@ -1841,13 +1841,28 @@ export const closeInteractionModal = () => set({ interactionModal: null });
 // online / idle / dnd / offline for a member list row; null = this account has no presence (an instance's own accounts and bots, or signed out of Velora)
 // an instance bot's presence ('online' | 'offline', set by the instance from its bot gateway connections); null when the instance doesn't say
 export const botPresenceOf = m => (m?.kind === 'bot' && (m.presence === 'online' || m.presence === 'offline') ? m.presence : null);
+// on an Ember server that says who is connected to it (member `presence` 'online' / 'offline' for people, features.member_presence):
+// online only while they're connected there. A Nookara account then shows its Nookara status (idle, dnd, invisible = offline)
+const hereConnected = m => (m.presence === 'online' ? true : m.presence === 'offline' ? false : null);
 export function statusOf(sid, m, s = state) {
   if (!isInst(sid)) return s.presence[m.username]?.status || m.presence?.status || 'offline';
   if (m.kind === 'bot') return botPresenceOf(m);
-  if (m.kind !== 'velora' || !s.signedIn) return null;
-  return s.presence[s.veloraNames[m.velora_id] || m.username]?.status || 'offline';
+  const here = hereConnected(m);
+  if (here === false) return 'offline';
+  if (m.kind !== 'velora' || !s.signedIn) return here ? 'online' : null;
+  const p = s.presence[s.veloraNames[m.velora_id] || m.username];
+  if (here) return p && p.status !== 'offline' ? p.status : p ? 'offline' : 'online'; // (offline on Nookara while connected here = invisible)
+  return p?.status || 'offline';
 }
-export const presenceFor = (sid, m, s = state) => (isInst(sid) ? (m.kind === 'bot' ? (botPresenceOf(m) ? { status: botPresenceOf(m) } : null) : m.kind === 'velora' && s.signedIn ? s.presence[s.veloraNames[m.velora_id] || m.username] : null) : s.presence[m.username] || m.presence);
+export const presenceFor = (sid, m, s = state) => {
+  if (!isInst(sid)) return s.presence[m.username] || m.presence;
+  if (m.kind === 'bot') return botPresenceOf(m) ? { status: botPresenceOf(m) } : null;
+  const here = hereConnected(m);
+  if (here === false) return { status: 'offline' };
+  const p = m.kind === 'velora' && s.signedIn ? s.presence[s.veloraNames[m.velora_id] || m.username] : null;
+  if (here && (!p || p.status === 'offline')) return p ? { status: 'offline' } : { status: 'online' };
+  return p || null;
+};
 function loadMembersOf(inst) { Object.keys(state.members).filter(k => instOf(k) === inst).forEach(loadMembers); }
 // the id a member route wants: an instance names people by their principal (v:2), Velora by username
 export function memberRef(sid, username) {
