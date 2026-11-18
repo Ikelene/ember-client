@@ -2,16 +2,16 @@
 
 The web client for **Ember**, a chat system made of servers, channels, direct messages, friends and voice. It is a React + Vite single-page app that builds to a static bundle.
 
-**Ember is an open protocol.** Anyone can write their own Ember client and talk to Ember servers; this app is just the one the Velora ecosystem uses. Nothing in here is required to take part.
+**Ember is an open protocol.** Anyone can write their own Ember client and talk to Ember servers; this app is just the one the Nookara ecosystem uses. Nothing in here is required to take part.
 
 ## Where it runs
 
-[Velora](https://nookara.cc/) hosts the built bundle. Its source lives here. Velora serves:
+[Nookara](https://nookara.cc/) hosts the built bundle. Its source lives here. Nookara serves:
 
 - `index.html` at `/chat`
 - everything else from this build (`assets/*`, `version.json`) under `/ember/`
 
-The bundle expects the host to provide, at the site root, the API (`/chat/...`, `/api/v1/...`, `/bonfire/...`, `/ws`, ...) and the shared static files under `/assets/` (sounds in `/assets/sounds/chat`, emoji, flags, the Ember logos in `/assets/bonfire`). Those stay with Velora.
+The bundle expects the host to provide, at the site root, the API (`/chat/...`, `/api/v1/...`, `/bonfire/...`, `/ws`, ...) and the shared static files under `/assets/` (sounds in `/assets/sounds/chat`, emoji, flags, the Ember logos in `/assets/bonfire`). Those stay with Nookara.
 
 ## Develop
 
@@ -22,7 +22,7 @@ npm run build   # static bundle in dist/
 npm test
 ```
 
-`npm run dev` proxies the API and `/assets` to a running Velora (`VELORA_ORIGIN`, default `http://localhost:3100`; Velora's `scripts/dev-stack.sh` starts one).
+`npm run dev` proxies the API and `/assets` to a running Nookara (`VELORA_ORIGIN`, default `http://localhost:3100`; Nookara's `scripts/dev-stack.sh` starts one).
 
 ## Versions and updates
 
@@ -35,9 +35,9 @@ Updating works in two steps. The app watches GitHub for a newer commit on `main`
 
 Set `EMBER_COMMIT=<sha>` to build outside a git checkout and `EMBER_BASE` to serve the bundle from somewhere other than `/ember/`.
 
-## Getting a build onto Velora
+## Getting a build onto Nookara
 
-Velora pins the commit it ships in `ember-client.lock` and builds it with `scripts/sync-ember-client.sh` (see Velora's `README-dev.md`). Pushing to `main` here is therefore not enough: Velora has to be updated to the new commit before anyone is asked to reload.
+Nookara pins the commit it ships in `ember-client.lock` and builds it with `scripts/sync-ember-client.sh` (see Nookara's `README-dev.md`). Pushing to `main` here is therefore not enough: Nookara has to be updated to the new commit before anyone is asked to reload.
 
 ## Credits
 
