@@ -13,7 +13,7 @@ import { holdOutcome, isVoiceAtt, isVoiceLink } from './voice-note.js';
 import { viewMedia } from './MediaViewer.jsx';
 import { Fragment, createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
-import { AudioLines, Eye, EyeOff, Reply, Pencil, Trash2, Copy, Plus, X, SmilePlus, Lock, SendHorizontal, AlertCircle, ImageIcon, CornerUpRight, Music, Film, ArrowRight, ArrowLeft, Webhook, Phone, Pin, ChevronUp, Star, Upload, CloudUpload } from 'lucide-react';
+import { AudioLines, Eye, EyeOff, Reply, Pencil, Trash2, Copy, Plus, X, SmilePlus, Lock, SendHorizontal, AlertCircle, ImageIcon, CornerUpRight, Music, Film, ArrowRight, ArrowLeft, Webhook, Phone, Pin, ChevronUp, Star, Upload, CloudUpload, RotateCw } from 'lucide-react';
 import { Embeds } from './ChannelTypes.jsx';
 import { LinkEmbeds } from './LinkEmbeds.jsx';
 import { E2eeMessageNote, OpenedAttachments, PreviewOnAsk, E2eeComposerNotes, E2eeLockedPanel } from './E2eeMessage.jsx';
@@ -66,7 +66,7 @@ import { takeJump, fileKind, uploadMedia, saveToMedia, isMineMsg, loadUploadLimi
 import { useStarboardFor, starredByMe, STAR } from './Starboard.jsx';
 import { CALL_LINE, callLineText } from './callText.js';
 import { setReaction } from './Reactions.jsx';
-import { getState, useChat, keyOf, loadMessages, sendMessage, setTyping, editMessage, deleteMessage, dropFailed, toast, errorText, dmErrorText, go, openLink, ask, askStripTracking } from './store.js';
+import { getState, useChat, keyOf, loadMessages, sendMessage, setTyping, editMessage, deleteMessage, dropFailed, retryQueued, toast, errorText, dmErrorText, go, openLink, ask, askStripTracking } from './store.js';
 import { cleanText, hasTracking } from './cleanLinks.js';
 import { isSpoiler, spoilerName, shownName, nameInLink } from './spoiler.js';
 import { renderBody, timeOf, stampOf, dayOf } from './text.jsx';
@@ -636,11 +636,17 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
         {m.ephemeral && <EphemeralNote m={m} view={view} />}
         {m.failed && (
           <div className="vc-fail"><AlertCircle size={13} /> {view.kind === 'dm' ? dmErrorText(m.failed) : errorText(m.failed)}
-            <button type="button" onClick={() => { dropFailed(view, m.nonce); sendMessage(view, m.body, m.uploads ? { replyTo: m.replyTo, attachments: m.ready, uploads: m.uploads } : { replyTo: m.reply, attachments: m.attachments }); }}>Try again</button>
+            <button type="button" onClick={() => retryFailed(view, m)}>Try again</button>
             <button type="button" onClick={() => dropFailed(view, m.nonce)}>Remove</button>
           </div>
         )}
+        {m.queued && !m.failed && <div className="vc-queued"><span className="vc-ring" aria-hidden="true" /> {m.inflight ? 'Sending...' : "Waiting to send - it goes as soon as you're back online"}</div>}
       </div>
+      {hovered && toolsEl && (m.failed || (m.queued && !m.inflight)) && !m.uploads && createPortal(
+        <div className="vc-tools vc-tools-quick" key={`${m.id}-out`}>
+          <button type="button" title={m.failed ? 'Try sending it again' : 'Try sending it now'} onClick={() => retryFailed(view, m)}><RotateCw size={16} /><span>Retry</span></button>
+          <button type="button" className="danger" title="Delete it (it was never sent)" onClick={() => dropFailed(view, m.nonce)}><Trash2 size={16} /><span>Delete</span></button>
+        </div>, toolsEl)}
       {hovered && toolsEl && !m.pending && !m.failed && !editing && !m.ephemeral && createPortal(
         shift && (caps.edit || caps.del) ? (
           <div className="vc-tools vc-tools-quick" key={`${m.id}-quick`}>
@@ -656,6 +662,13 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
         </div>, toolsEl)}
     </div>
   );
+}
+
+// a message that didn't go: from the outbox when it's there (it keeps its reply and files), else sent again as it was
+function retryFailed(view, m) {
+  if (retryQueued(m.nonce)) return;
+  dropFailed(view, m.nonce);
+  sendMessage(view, m.body, m.uploads ? { replyTo: m.replyTo, attachments: m.ready, uploads: m.uploads } : { replyTo: m.reply, attachments: m.attachments });
 }
 
 function Translation({ tr, ctx, onHide }) {
@@ -705,7 +718,7 @@ export function MessageList({ view, onUser, onReply, canPost, canMod, channels, 
   };
   useEffect(() => () => { clearTimeout(hideTimer.current); setHovered(null); }, [key]);
   // a message that is still sending stays out of sight until the server has it (then it appears and animates in once); failed ones and uploads with progress show
-  const list = useMemo(() => (box?.list || []).filter(m => !m.pending || m.failed || m.uploading || m.uploads || m.waiting), [box?.list]);
+  const list = useMemo(() => (box?.list || []).filter(m => !m.pending || m.failed || m.uploading || m.uploads || m.waiting || m.queued), [box?.list]);
   const linkImages = useChat(s => s.settings.link_images);
   const roles = useChat(s => (view.sid ? s.detail[view.sid]?.roles : null));
   const blocks = useChat(s => s.blocks);
@@ -940,7 +953,8 @@ function StickerView({ s, sid }) {
   );
 }
 
-function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo, setReplyTo }) {
+// sendOff: the server is still connecting (its kept channel list is showing): typing works, sending waits until it's up
+function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo, setReplyTo, sendOff = false }) {
   const timedOut = useTimedOut(view.kind === 'channel' ? view.sid : null); // (on an instance: a timeout hides the box until it ends)
   const locked = lockedBy || !!timedOut;
   const [text, setText] = useState('');
@@ -1106,6 +1120,7 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
     if (v.trim()) setTyping(view, true);
   }
   function submit(askedAlready) {
+    if (sendOff) return;
     let t = (ta.current ? serialize(ta.current) : text).trim();
     if ((!t && !atts.length) || busy) return;
     // tracking junk in a link: ask once (first time), then clean silently when the setting is on
@@ -1269,7 +1284,7 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
   }
   // Voice messages. An empty box turns the send button into the record button. The input decides how it works, not the screen size:
   // a finger holds (let go sends, slide left deletes), a mouse or keyboard clicks once to start and again to send.
-  const canVoice = !cmd && !text.trim() && !atts.length && !busy && !locked && view.kind !== 'modmail' && view.username !== 'System' && (view.kind !== 'channel' || canAttach) && (!onVelora || canUploadMedia);
+  const canVoice = !sendOff && !cmd && !text.trim() && !atts.length && !busy && !locked && view.kind !== 'modmail' && view.username !== 'System' && (view.kind !== 'channel' || canAttach) && (!onVelora || canUploadMedia);
   async function sendVoice() {
     const v = view, reply = replyTo, recorded = await voice.finish();
     if (!recorded) return;
@@ -1458,7 +1473,7 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
         {!voice.active && <button type="button" className={`vc-ico-btn vc-gif-btn${picker ? ' on' : ''}`} title="Media (GIFs, Saved Media, Game Clips)" onClick={() => { setPicker(p => (p ? false : 'saved')); setEmoji(false); }}><GifIcon /></button>}
         {!voice.active && <button type="button" className={`vc-ico-btn vc-emoji-btn${emoji ? ' on' : ''}`} title="Emoji" onClick={() => { setEmoji(x => !x); setPicker(false); }}><Smile size={19} /></button>}
         {!docked && emojiEl}
-        <button type="button" className={`vc-ico-btn send${canVoice || voice.active ? ' voice' : ''}${cmd && cmdMissing ? ' blocked' : ''}`} title={voice.active ? 'Send voice message' : canVoice ? 'Record a voice message' : cmd && cmdMissing ? `Fill in ${cmdMissing} first` : 'Send'} aria-label={voice.active ? 'Send voice message' : canVoice ? 'Record a voice message' : 'Send'} disabled={!voice.active && !canVoice && !cmd && !text.trim() && !atts.length}
+        <button type="button" className={`vc-ico-btn send${canVoice || voice.active ? ' voice' : ''}${cmd && cmdMissing ? ' blocked' : ''}`} title={sendOff ? 'Connecting - you can send once the server is connected' : voice.active ? 'Send voice message' : canVoice ? 'Record a voice message' : cmd && cmdMissing ? `Fill in ${cmdMissing} first` : 'Send'} aria-label={voice.active ? 'Send voice message' : canVoice ? 'Record a voice message' : 'Send'} disabled={(sendOff && !voice.active) || (!voice.active && !canVoice && !cmd && !text.trim() && !atts.length)}
           onPointerDown={e => { e.preventDefault(); voicePress(e); }} onPointerMove={voiceMove} onPointerUp={voiceRelease} onPointerCancel={voiceCancel} onContextMenu={e => { if (canVoice || voice.active) e.preventDefault(); }} onMouseDown={e => e.preventDefault()}
           onClick={() => {
             if (voiceTouch.current) { voiceTouch.current = false; return; } // (the click a browser adds after a touch: the press already did it)

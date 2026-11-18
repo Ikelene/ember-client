@@ -388,7 +388,7 @@ export function ServerSidebar({ sid, onInvite, onSettings, onChannel, onLeave, o
   ]);
 
   return (
-    <div className="vc-side" key={sid}>
+    <div className={`vc-side${d.cached ? ' vc-side-cached' : ''}`} key={sid} aria-busy={d.cached || undefined}>
       <div className={`vc-side-head${d.server.banner ? ' banner' : ''}`} ref={menuRef} onContextMenu={e => serverMenu(e, d.server, { onInvite, onSettings, onLeave, admin: canSettings })}>
         {d.server.banner && <img className="vc-side-banner" src={d.server.banner} alt="" />}
         <button type="button" className="vc-side-title" onClick={() => setMenu(m => !m)}>
@@ -670,6 +670,17 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
   );
 }
 
+// the member list while it loads: grey lines where people go
+function MemberSkeleton() {
+  const widths = [62, 48, 74, 55, 40, 68, 52, 60, 45, 70];
+  return (
+    <div className="vc-mem-skel" aria-hidden="true">
+      <i className="vc-mem-skel-head" />
+      {widths.map((w, i) => <div key={i} className="vc-mem-skel-row" style={{ '--d': `${i * 70}ms` }}><i className="vc-mem-skel-av" /><i className="vc-mem-skel-line" style={{ width: `${w}%` }} /></div>)}
+    </div>
+  );
+}
+
 // ── member list (grouped: owner / admins / online / offline) ────────────────
 export function MemberList({ sid, cid, onUser, embedded = false }) {
   const allMembers = useChat(s => s.members[sid]);
@@ -717,7 +728,7 @@ export function MemberList({ sid, cid, onUser, embedded = false }) {
     return out.filter(([, l]) => l.length);
   }, [members, presence, roles, names, signedIn, dnv]); // eslint-disable-line react-hooks/exhaustive-deps
   const cls = `vc-members${embedded ? ' embedded' : ''}`;
-  if (!members) return <aside className={cls}><div className="vc-loading"><i /><i /><i /></div></aside>;
+  if (!members) return <aside className={cls} aria-busy="true"><MemberSkeleton /></aside>;
   let n = 0;
   return (
     <aside className={cls} key={sid} onScroll={more != null ? e => { const el = e.currentTarget; if (el.scrollTop + el.clientHeight > el.scrollHeight - 400) loadMoreMembers(sid); } : undefined}>

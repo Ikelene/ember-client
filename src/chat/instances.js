@@ -8,7 +8,7 @@ import { apiFetch, getToken } from '../api.js';
 import { K, acctKey, registry, hooks, normOrigin, instOf, loadSessions, loadSessionTags, tokenTag, saveSession, fromInstance, parseK } from './ids.js';
 import { onInstClientsFrame, rewatchInstClients } from './instClients.js';
 import { SHORT } from '../version.js';
-import { getState, patchState, toast, handleEvent, RESTRICTED_TEXT, instanceVoiceClosed, voiceSocketReady, loadEmojis, go, catchUp, resumeInstanceView, backoff, instanceRestricted, instanceRestored } from './store.js';
+import { getState, patchState, toast, handleEvent, RESTRICTED_TEXT, instanceVoiceClosed, voiceSocketReady, loadEmojis, go, catchUp, resumeInstanceView, backoff, instanceRestricted, instanceRestored, forgetServerCache } from './store.js';
 
 export const connections = new Map();
 const LIST_CACHE = () => acctKey('bonfire_instance_list'); // (per account: an alt must not inherit the main's servers)
@@ -304,7 +304,7 @@ export async function loadInstanceData(origin) {
     c.loaded = true; mirror();
     patchState(s => ({ servers: [...s.servers.filter(x => x.inst !== origin), ...srv.servers], notify: { ...s.notify, ...(notify?.notify || {}) } }));
     loadEmojis();
-    for (const [key] of Object.entries(getState().detail)) if (parseK(key).inst === origin && !srv.servers.some(x => x.sid === key)) patchState(s => { const detail = { ...s.detail }; delete detail[key]; return { detail }; });
+    for (const [key] of Object.entries(getState().detail)) if (parseK(key).inst === origin && !srv.servers.some(x => x.sid === key)) { forgetServerCache(key); patchState(s => { const detail = { ...s.detail }; delete detail[key]; return { detail }; }); }
     if (srv.servers.length && c.pending) { c.pending = false; mirror(); }
     // in nothing there, nothing asked for, anyone could join (so no request is waiting) and not on screen: a server you left. Off the list
     if (!srv.servers.length && !c.pending && !autoJoin.has(origin) && c.info?.community?.join_policy === 'open' && !onScreen(origin)) { removeInstance(origin); return; }

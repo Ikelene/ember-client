@@ -6,7 +6,7 @@ import { loadPersonalEmojis, setStickers } from './personal.js';
 import { packActive, playPackSound } from './messageSounds.js';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import serverCreationPolicy from '../server-creation-policy.json';
-import { apiFetch, getToken, onScopeError, onAuthLost, isWebBonfire, uploadFetch } from '../api.js';
+import { apiFetch, getToken, onScopeError, onAuthLost, isWebBonfire, uploadFetch, uploadInPieces, PIECES_OVER } from '../api.js';
 import { endSession, startSignIn } from './session.js';
 import * as E2EE from './e2ee/session.js';
 import { fileKindOfMime } from './e2ee/files.js';
@@ -526,6 +526,7 @@ function onEvent(m, inst = VELORA) {
     // Ember Link (Minecraft): live card / console lines / links - components listen, nothing goes into state
     case 'game_status': case 'game_console': case 'game_linked': case 'game_unlinked': dispatchEvent(new CustomEvent('vc-game', { detail: m })); break;
     case 'chat_ack': {
+      sentOk(m.nonce);
       const key = pendingAcks.get(m.nonce);
       pendingAcks.delete(m.nonce);
       signedSends.delete(m.nonce);
@@ -631,6 +632,7 @@ function onEvent(m, inst = VELORA) {
       }));
       break;
     case 'chat_server_removed':
+      forgetServerCache(m.server);
       set(s => ({ servers: s.servers.filter(x => x.sid !== m.server), detail: Object.fromEntries(Object.entries(s.detail).filter(([k]) => k !== m.server)) }));
       if (state.view.sid === m.server) { go({ kind: 'home' }); toast(m.reason === 'deleted' ? 'That server was deleted.' : m.reason === 'left' ? 'You left the server.' : `You were ${m.reason === 'banned' ? 'banned' : 'removed'} from that server.`); }
       if (inst !== VELORA) forgetIfEmpty(inst); // (an Ember server you're no longer in leaves the list, so it doesn't come back on reconnect)
@@ -673,6 +675,7 @@ function onEvent(m, inst = VELORA) {
       break;
     }
     case 'im_ack': {
+      sentOk(m.nonce);
       const key = pendingAcks.get(m.nonce);
       pendingAcks.delete(m.nonce);
       dmSends.delete(m.nonce);
@@ -747,13 +750,14 @@ function addMessage(key, msg) {
   const b = state.msgs[key];
   const mine = isMine(msg);
   if (msg.signature) watchSignature(msg);
-  if (b?.loaded) {
+  let p = b && mine ? findPending(b.list, msg) : -1;
+  if (p >= 0 && outbox.has(b.list[p].nonce) && msg.nonce !== b.list[p].nonce && !deliveredIn([msg], outbox.get(b.list[p].nonce))) p = -1;
+  if (b?.loaded || p >= 0) { // (my own message: its copy is replaced even while the conversation is reloading)
     if (msg.id && b.list.some(x => x.id === msg.id)) return;
     // my own message over the socket before the ack: replace the pending copy with the same text
     let list = b.list;
     // (a DM with files went out as text + links, so it is matched on that, or on the nonce when the server echoes it)
-    const p = mine ? findPending(list, msg) : -1;
-    if (mine && p >= 0) list = list.map((x, i) => (i === p ? msg : x)); else list = [...list, msg];
+    if (p >= 0) { sentOk(list[p].nonce); list = list.map((x, i) => (i === p ? msg : x)); } else list = [...list, msg];
     set(s => ({ msgs: { ...s.msgs, [key]: { ...b, list: ordered(list) } } }));
   }
   if (msg.author) typingFrom(key, msg.author.username, false, msg.inst || VELORA);
@@ -977,6 +981,7 @@ export async function loadModmail() {
   apiFetch('/chat/modmail/staff').then(x => set(() => ({ staff: !!x.staff }))).catch(() => {});
 }
 export async function loadMessages(v, { older = false } = {}) {
+  restoreOutbox(); // (once: unsent messages from before a reload show even while offline)
   const key = keyOf(v);
   const b = state.msgs[key];
   if (b?.loading || (older && !b?.hasMore) || (!older && b?.loaded)) return;
@@ -1004,18 +1009,32 @@ export async function loadMessages(v, { older = false } = {}) {
       list = d.messages.map(groupToMsg);
     }
     if (v.kind === 'channel' && isInst(v.cid)) list.forEach(watchSignature); else remember(list.map(m => m.author).filter(Boolean));
+    const hadCopies = new Set((state.msgs[key]?.list || []).filter(x => x.pending).map(x => x.nonce));
     set(s => {
       const cur = s.msgs[key] || { list: [] };
       const ids = new Set(list.map(m => m.id));
       const live = dropSettled(cur.list.filter(m => !ids.has(m.id)), list, isMine);
       return { msgs: { ...s.msgs, [key]: { list: ordered(older ? [...list, ...cur.list] : [...list, ...live]), hasMore, loading: false, loaded: true } } };
     });
+    // my queued ones: a copy the reload matched to a real message went (dropSettled), one that wasn't on screen shows again
+    const now = state.msgs[key]?.list || [];
+    for (const it of [...outbox.values()]) {
+      if (keyOf(it.v) !== key || now.some(x => x.nonce === it.nonce)) continue;
+      if (hadCopies.has(it.nonce) && deliveredIn(now, it)) sentOk(it.nonce); else showQueued(it);
+    }
   } catch (e) {
-    set(s => ({ msgs: { ...s.msgs, [key]: { list: [], hasMore: false, loading: false, loaded: true, error: e.message } } }));
+    set(s => ({ msgs: { ...s.msgs, [key]: { list: (s.msgs[key]?.list || []).filter(m => m.pending), hasMore: false, loading: false, loaded: true, error: e.message } } })); // (my unsent ones stay)
   }
 }
 // after a reconnect: what came in while we were gone (inst: which socket it was)
 export async function catchUp(inst = VELORA) {
+  restoreOutbox(); // (once: the first socket that's up)
+  flushOutbox(inst);
+  // the open server was showing its kept channel list: the real one, and its members, now that it's connected
+  const cv = state.view;
+  if (cv.kind === 'channel' && (isInst(cv.sid) ? instOf(cv.sid) === inst : inst === VELORA) && state.detail[cv.sid]?.cached) {
+    wakeServer(cv.sid).then(d => { if (d && keyOf(state.view) === keyOf(cv)) open(state.view); });
+  }
   const mine = key => instOf(key.slice(2)) === inst;
   if (inst === VELORA) {
     // A rename may have happened while this socket was offline. Refresh the IDs
@@ -1035,6 +1054,7 @@ export async function catchUp(inst = VELORA) {
   }
   for (const [key, b] of Object.entries(state.msgs)) {
     if (!key.startsWith('c:')) { if (inst === VELORA && b.loaded) set(s => ({ msgs: { ...s.msgs, [key]: { ...b, loaded: false } } })); continue; }
+    if (b.error && mine(key)) { set(s => ({ msgs: { ...s.msgs, [key]: { ...b, loaded: false, error: undefined } } })); continue; } // (it couldn't load while offline: again now)
     if (!mine(key)) continue;
     if (!b.loaded) continue;
     const last = [...b.list].reverse().find(x => !x.pending && !x.failed);
@@ -1059,36 +1079,152 @@ function seedMyFace(instUser) {
   const fid = String(instUser.velora_id), f = state.veloraFaces[fid];
   if (!f || f.miss) set(s => ({ veloraFaces: { ...s.veloraFaces, [fid]: { id: fid, username: state.me.username, pfp: state.me.pfp || null, color: state.me.color || null, rank: state.me.rank } } }));
 }
+// ── messages sent while offline: they stay (greyed) and keep trying, then go red with Try again / Delete. Kept on this device
+// (per account) until they go, so a reload doesn't lose them. Files still uploading aren't kept: only ones already uploaded.
+const RETRY_GAPS = [2000, 4000, 8000, 15000, 30000, 30000, 60000, 60000]; // about 3.5 minutes of trying, then it goes red
+const OUTBOX = () => acctKey('ember_outbox');
+const sendInfo = new Map(); // nonce -> { v, text, replyTo, attachments, tries, at } for every send, so a failure can be queued
+const outbox = new Map(); // nonce -> the same + failed, while it hasn't gone
+const outboxTimers = new Map();
+const slimReply = r => (r ? { id: r.id, imId: r.imId, gid: r.gid, alias: r.alias || null, author: r.author ? { username: r.author.username, pfp: r.author.pfp || null } : null, body: String(r.body || '').slice(0, 200) } : null);
+function saveOutbox() {
+  try { if (outbox.size) localStorage.setItem(OUTBOX(), JSON.stringify([...outbox.values()])); else localStorage.removeItem(OUTBOX()); } catch { /* storage full / private mode */ }
+}
+const outboxInst = item => (item.v.kind === 'channel' ? instOf(item.v.cid) : VELORA);
+function showQueued(item) {
+  const key = keyOf(item.v);
+  const look = { pending: true, queued: !item.failed, inflight: !!item.sending, failed: item.failed ? 'offline' : undefined };
+  set(s => ({ msgs: upd(s.msgs, key, b => {
+    const list = b?.list || [];
+    if (list.some(x => x.nonce === item.nonce)) return { ...b, list: list.map(x => (x.nonce === item.nonce ? { ...x, ...look } : x)) };
+    const inst = outboxInst(item), me = inst === VELORA ? state.me : connections.get(inst)?.user || state.me;
+    const temp = { id: item.nonce, nonce: item.nonce, ...look, body: item.text, wire: item.v.kind !== 'channel' ? wireText(item.text, item.attachments) : undefined, attachments: item.attachments || [], system: false,
+      ...(inst !== VELORA ? { inst } : {}), author: { ...(me?.id ? { id: me.id } : {}), username: me?.username, pfp: me?.pfp, color: me?.color, rank: me?.rank, ...(me?.velora_id ? { kind: me.kind || 'velora', velora_id: me.velora_id } : {}) },
+      created_at: item.at, reply: item.replyTo };
+    return { list: [], hasMore: false, ...(b || {}), list: [...list, temp] };
+  }) }));
+}
+function scheduleQueued(n, ms) {
+  clearTimeout(outboxTimers.get(n));
+  outboxTimers.set(n, setTimeout(() => resendQueued(n), ms));
+}
+// a send that couldn't go because a socket / the network is down: keep it and try again later. false = it isn't one of mine to keep
+function queueOffline(n) {
+  const info = sendInfo.get(n) || outbox.get(n);
+  if (!info) return false;
+  const item = { nonce: n, v: info.v, text: info.text, replyTo: info.replyTo, attachments: info.attachments, tries: info.tries, at: info.at, failed: info.tries >= RETRY_GAPS.length, sending: false, lastSend: outbox.get(n)?.lastSend };
+  outbox.set(n, item);
+  saveOutbox();
+  showQueued(item);
+  if (item.failed) { clearTimeout(outboxTimers.get(n)); outboxTimers.delete(n); } else scheduleQueued(n, RETRY_GAPS[item.tries]);
+  return true;
+}
+// it went (the server's ack / echo, or a reload found it in the conversation): off the outbox
+function sentOk(n) {
+  if (!n || !outbox.delete(n)) return;
+  clearTimeout(outboxTimers.get(n)); outboxTimers.delete(n);
+  saveOutbox();
+}
+// a queued message goes again with the same nonce, and stays in the outbox (marked sending) until it's acknowledged, so a socket that
+// drops in between can't lose it and Retry can't send it twice. fresh: Try again on a red one (the tries start over)
+async function resendQueued(n, { fresh = false } = {}) {
+  const item = outbox.get(n);
+  if (!item || (!fresh && (item.failed || item.sending))) return false;
+  clearTimeout(outboxTimers.get(n)); outboxTimers.delete(n);
+  // encrypted DMs wait until this device's keys are open (just after a reload they still opening): no try counted
+  if (item.v.kind === 'dm' && state.e2eeStatus !== 'ready' && !isBotPeer(item.v.username)) {
+    if (state.e2eeStatus === 'loading') { scheduleQueued(n, 3000); return true; }
+    item.failed = true; saveOutbox(); showQueued(item); // (encryption locked / not set up on this device: Try again once it is)
+    return true;
+  }
+  // it was on its way when the page went away / the socket dropped: look in the conversation first, and only a load that worked counts
+  if (item.check) {
+    const key = keyOf(item.v);
+    set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, loaded: false, error: undefined }) }));
+    await loadMessages(item.v).catch(() => {});
+    if (!outbox.has(n)) return true;
+    const b = state.msgs[key];
+    if (!b?.loaded || b.error) { scheduleQueued(n, 15000); return true; }
+    item.check = false;
+    if (deliveredIn(b.list, item)) { sentOk(n); set(s => ({ msgs: upd(s.msgs, key, x => x && { ...x, list: x.list.filter(m => m.nonce !== n) }) })); return true; }
+  }
+  item.failed = false;
+  item.sending = true;
+  item.lastSend = Date.now();
+  saveOutbox();
+  sendMessage(item.v, item.text, { replyTo: item.replyTo, attachments: item.attachments, noStatusReply: true, retry: { nonce: n, tries: fresh ? 0 : item.tries + 1, at: item.at } });
+  return true;
+}
+// a real message of mine that is this queued one: the same text, and not older than the last time it went out (an earlier identical
+// message doesn't count). Never sent at all = it can't be there.
+function deliveredIn(list, item) {
+  if (!item.lastSend) return false;
+  const wire = item.v.kind === 'channel' ? item.text : wireText(item.text, item.attachments);
+  return (list || []).some(m => !m.pending && isMine(m) && (m.wire ?? m.body) === wire && Number(m.created_at) >= item.lastSend - 5000);
+}
+// Try again on a red one: false = it isn't in the outbox (an older kind of failure)
+export const retryQueued = n => { if (!outbox.has(n)) return false; resendQueued(n, { fresh: true }); return true; };
+// a socket came back: everything waiting for it goes now. Ones that were mid-send on the old socket are checked against the
+// conversation first, a moment later (catchUp is reloading it), so one that did arrive isn't sent twice
+function flushOutbox(inst) {
+  for (const item of [...outbox.values()]) {
+    if (item.failed || outboxInst(item) !== inst) continue;
+    if (item.sending) { item.sending = false; item.check = true; scheduleQueued(item.nonce, 4000); } else resendQueued(item.nonce);
+  }
+}
+let outboxRestored = false;
+function restoreOutbox() {
+  if (outboxRestored) return;
+  outboxRestored = true;
+  let list = [];
+  try { list = JSON.parse(localStorage.getItem(OUTBOX()) || '[]'); } catch { /* broken: nothing to restore */ }
+  for (const item of Array.isArray(list) ? list : []) {
+    if (!item?.nonce || !item.v?.kind || typeof item.text !== 'string') continue;
+    if (item.sending) { item.sending = false; item.check = true; } // (it was going when the page closed: maybe it got there)
+    outbox.set(item.nonce, item);
+    showQueued(item);
+    if (!item.failed) scheduleQueued(item.nonce, item.check ? 6000 : RETRY_GAPS[Math.min(item.tries, RETRY_GAPS.length - 1)]);
+  }
+}
+const isNetworkError = e => !e?.status && (e instanceof TypeError || ['offline', 'request_failed', 'instance_unreachable', 'instance_not_connected'].includes(e?.message));
+
 // -> the pending copy's nonce (a forward watches it for the server's refusal). noStatusReply: a forward isn't the status reply being drafted
-export function sendMessage(v, text, { replyTo, attachments, uploads, noStatusReply } = {}) {
+// retry (outbox only): { tries, at } of a queued message going again
+export function sendMessage(v, text, { replyTo, attachments, uploads, noStatusReply, retry } = {}) {
   if (uploads?.length) { sendAfterUpload(v, text, { replyTo, attachments, uploads }); return undefined; }
-  setTimeout(() => dispatchEvent(new CustomEvent('vc-sent', { detail: keyOf(v) })), 0); // the open conversation jumps to the bottom
+  if (!retry) setTimeout(() => dispatchEvent(new CustomEvent('vc-sent', { detail: keyOf(v) })), 0); // the open conversation jumps to the bottom
   const key = keyOf(v);
-  const n = `n${Date.now()}_${nonce++}`;
+  const n = retry?.nonce || `n${Date.now()}_${nonce++}`;
+  if (v.kind !== 'modmail') {
+    sendInfo.set(n, { v: { ...v }, text, replyTo: slimReply(replyTo), attachments: (attachments || []).filter(a => !a.local), tries: retry?.tries || 0, at: retry?.at || Date.now() });
+    if (sendInfo.size > 300) sendInfo.delete(sendInfo.keys().next().value);
+  }
   const instUser = v.kind === 'channel' && isInst(v.cid) ? connections.get(instOf(v.cid))?.user : null;
   const me = instUser || state.me; // an instance knows me by its own account
   // on an instance the pending copy carries the same author data (id / kind / velora_id) and inst as the real message will, so
   // the picture and name colour resolve exactly the same way before and after the ack (no flash)
   seedMyFace(instUser);
   const temp = {
-    id: n, nonce: n, pending: true, body: text, wire: v.kind === 'dm' || v.kind === 'notes' ? wireText(text, attachments) : undefined, attachments: attachments || [], system: false,
+    id: n, nonce: n, pending: true, body: text, wire: v.kind !== 'channel' ? wireText(text, attachments) : undefined, attachments: attachments || [], system: false,
     ...(instUser ? { inst: instOf(v.cid), unsigned: !!instUser.velora_id && !signingInfo(v.sid).can } : {}),
-    author: instUser ? { id: instUser.id, username: me.username, pfp: me.pfp, color: instUser.velora_id ? (state.me?.color || me.color) : me.color, rank: me.rank, kind: instUser.kind || (instUser.velora_id ? 'velora' : 'local'), velora_id: instUser.velora_id } : { username: me.username, pfp: me.pfp, color: me.color, rank: me.rank }, created_at: Date.now(),
+    author: instUser ? { id: instUser.id, username: me.username, pfp: me.pfp, color: instUser.velora_id ? (state.me?.color || me.color) : me.color, rank: me.rank, kind: instUser.kind || (instUser.velora_id ? 'velora' : 'local'), velora_id: instUser.velora_id } : { username: me.username, pfp: me.pfp, color: me.color, rank: me.rank }, created_at: retry?.at || Date.now(),
     reply: replyTo ? { id: replyTo.id, author: replyTo.author, alias: replyTo.alias || null, body: String(replyTo.body || '').slice(0, 200) } : null,
+    ...(retry ? { queued: true, inflight: true } : {}), // (going again: it stays on screen, greyed, until it's in)
   };
-  if (v.kind !== 'group') {
+  if (v.kind !== 'group' || retry) { // (a group message shows no copy while it goes, except one going again from the outbox)
     // (not marked loaded: a forward into a conversation that was never opened must still fetch its history when it opens)
-    set(s => ({ msgs: upd(s.msgs, key, b => ({ list: [], hasMore: false, ...(b || {}), list: [...(b?.list || []), temp] })) }));
-    pendingAcks.set(n, key);
+    // (going again: its copy is already there, it keeps its place)
+    set(s => ({ msgs: upd(s.msgs, key, b => ({ list: [], hasMore: false, ...(b || {}), list: (b?.list || []).some(x => x.nonce === n) ? b.list.map(x => (x.nonce === n ? { ...x, ...temp, failed: undefined } : x)) : [...(b?.list || []), temp] })) }));
+    if (v.kind !== 'group') pendingAcks.set(n, key); // (groups get no ack: their echo settles it)
   }
-  if (state.settings.sounds) playPackSound('send'); // (only when a message sound pack is on)
+  if (state.settings.sounds && !retry) playPackSound('send'); // (only when a message sound pack is on)
   const sr = !noStatusReply && v.kind === 'dm' && state.statusReplyDraft && state.statusReplyDraft.username.toLowerCase() === String(v.username).toLowerCase() ? state.statusReplyDraft : null;
   if (sr) { temp.statusReply = sr.text; set({ statusReplyDraft: null }); }
   let ok;
   if (v.kind === 'notes') {
     apiFetch('/chat/notes', { method: 'POST', body: JSON.stringify({ body: wireText(text, attachments), nonce: n }) })
-      .then(d => set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: ordered(settle(b.list, n, noteToMsg(d.note))) }) })))
-      .catch(e => set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? { ...x, failed: e.message } : x)) }) })));
+      .then(d => { sentOk(n); set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: ordered(settle(b.list, n, noteToMsg(d.note))) }) })); })
+      .catch(e => { if (isNetworkError(e) && queueOffline(n)) return; set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? { ...x, failed: e.message } : x)) }) })); });
     return n;
   }
   if (v.kind === 'modmail') { // staff writing as Velora Administrator
@@ -1115,6 +1251,7 @@ export function sendMessage(v, text, { replyTo, attachments, uploads, noStatusRe
       })().catch(e => {
         pendingAcks.delete(n);
         signedSends.delete(n);
+        if (isNetworkError(e) && queueOffline(n)) return;
         if (e.message !== 'sign_failed') toast(errorText(e.message)); // (they just said no: the message's own line says it)
         set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? { ...x, failed: e.message } : x)) }) }));
       });
@@ -1122,8 +1259,11 @@ export function sendMessage(v, text, { replyTo, attachments, uploads, noStatusRe
   } else if (v.kind === 'dm') { // encrypted first, so it goes when that's done: failures come back the same way the server's would
     ok = true;
     sendDm({ nonce: n, to: v.username, key, wire: wireText(text, attachments), reply_to: replyTo?.imId, quote: replyTo ? { from: replyTo.author?.username || '', s: String(replyTo.body || '').slice(0, 200) } : null, status_reply: sr ? { text: sr.text } : undefined });
-  } else ok = send({ type: 'roomMessage', room: v.room, message: wireText(text, attachments), reply_to: replyTo?.gid });
-  if (!ok) set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? { ...x, failed: 'offline' } : x)) }) }));
+  } else {
+    ok = send({ type: 'roomMessage', room: v.room, message: wireText(text, attachments), reply_to: replyTo?.gid });
+    if (ok && retry) { sentOk(n); set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.filter(x => x.nonce !== n) }) })); } // (no ack for groups: its echo shows it)
+  }
+  if (!ok) { pendingAcks.delete(n); if (!queueOffline(n)) set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? { ...x, failed: 'offline' } : x)) }) })); }
   setTyping(v, false);
   return n;
 }
@@ -1149,7 +1289,7 @@ async function sendDm(d) {
   dmSends.set(d.nonce, d);
   const patch = f => set(s => ({ msgs: upd(s.msgs, d.key, b => b && { ...b, list: b.list.map(x => (x.nonce === d.nonce ? f(x) : x)) }) }));
   if (isBotPeer(d.to)) { // a bot: plain text straight away, whatever this device's encryption state is
-    if (!send({ type: 'im_send', to: d.to, message: d.wire, reply_to: d.reply_to, nonce: d.nonce })) { dmSends.delete(d.nonce); patch(x => ({ ...x, failed: 'offline' })); return; }
+    if (!send({ type: 'im_send', to: d.to, message: d.wire, reply_to: d.reply_to, nonce: d.nonce })) { dmSends.delete(d.nonce); if (!queueOffline(d.nonce)) patch(x => ({ ...x, failed: 'offline' })); return; }
     pendingAcks.set(d.nonce, d.key);
     return;
   }
@@ -1165,13 +1305,14 @@ async function sendDm(d) {
       // (a file that was encrypted for this message would put its key in plain text: those only go once they have keys)
       if (/#nke=/.test(d.wire)) { pendingAcks.delete(d.nonce); patch(x => ({ ...x, failed: 'plain_files' })); return; }
       dmSends.set(d.nonce, d);
-      if (!send({ type: 'im_send', to: d.to, message: d.wire, reply_to: d.reply_to, status_reply: d.status_reply, nonce: d.nonce })) { dmSends.delete(d.nonce); pendingAcks.delete(d.nonce); patch(x => ({ ...x, failed: 'offline' })); return; }
+      if (!send({ type: 'im_send', to: d.to, message: d.wire, reply_to: d.reply_to, status_reply: d.status_reply, nonce: d.nonce })) { dmSends.delete(d.nonce); pendingAcks.delete(d.nonce); if (!queueOffline(d.nonce)) patch(x => ({ ...x, failed: 'offline' })); return; }
       pendingAcks.set(d.nonce, d.key);
       patch(x => (x.waiting ? { ...x, waiting: false } : x));
       E2EE.release(d.nonce);
       return;
     }
     pendingAcks.delete(d.nonce);
+    if (isNetworkError(e) && queueOffline(d.nonce)) return;
     patch(x => ({ ...x, failed: e.message }));
   }
 }
@@ -1195,6 +1336,7 @@ E2EE.onChange(st => {
     if (state.view?.kind === 'dm') loadMessages(state.view);
     loadDMs();
     showHeld();
+    flushOutbox(VELORA); // (queued DMs waited for the keys)
   }
   if (st === 'none' || st === 'locked') { // says so once a visit, and "Later" is always there
     let seen = true; try { seen = !!sessionStorage.getItem('ember.e2eeAsked'); sessionStorage.setItem('ember.e2eeAsked', '1'); } catch { /* private mode: ask each load */ seen = false; }
@@ -1208,6 +1350,7 @@ export const dismissKeyChange = username => set(s => { const k = { ...s.e2eeKeyC
 const SIGN_REFUSED = new Set(['bad_signature', 'signing_unavailable']);
 const signedSends = new Map(); // nonce -> send it again without a signature (until the instance has answered)
 export function dropFailed(v, n) {
+  if (outbox.delete(n)) { clearTimeout(outboxTimers.get(n)); outboxTimers.delete(n); saveOutbox(); }
   const m = state.msgs[keyOf(v)]?.list.find(x => x.nonce === n);
   if (m?.waiting) E2EE.release(n);
   if (m?.uploads) { uploadAborts.get(n)?.abort(); uploadAborts.delete(n); m.attachments.forEach(a => a.local && URL.revokeObjectURL(a.url)); }
@@ -1352,6 +1495,7 @@ function dropGroupMessage(room, gid) {
 }
 // a picture / video / audio file -> your Velora storage (it shows up in Saved Media too)
 export async function uploadMedia(file) {
+  if (file.size > PIECES_OVER) { const d = await uploadInPieces('account', file); if (state.savedMedia) loadMedia(); return d.attachment; } // (same storage: Saved Media)
   const fd = new FormData();
   fd.append('file', file);
   const d = await uploadFetch('/chat/media/upload', fd);
@@ -1360,7 +1504,7 @@ export async function uploadMedia(file) {
 }
 export const upload = uploadMedia;
 // the real upload limits (MB), asked from Velora once: a file sent in a conversation / a file kept on your Velora account
-let uploadLimits = { server_mb: 95, saved_mb: 60 };
+let uploadLimits = { server_mb: 200, saved_mb: 100 };
 let limitsAsked = null;
 export const getUploadLimits = () => uploadLimits;
 export function loadUploadLimits() {
@@ -1400,6 +1544,7 @@ export async function saveToMedia(url, name) {
 // opts.expires: a picked expiry (days, or 'max') - Velora Pro only, the server refuses it otherwise (pro_required).
 // Every file's date is fixed when it is sent and opening it never moves it. Left out = the normal lifetime for the file.
 export async function uploadTemp(file, opts = {}) {
+  if (file.size > PIECES_OVER) return (await uploadInPieces('temp', file, opts)).attachment; // (too big for one request through Cloudflare)
   const fd = new FormData();
   if (opts.expires != null && opts.expires !== 'default') fd.append('expires_in_days', String(opts.expires));
   fd.append('file', file);
@@ -1409,7 +1554,7 @@ export async function uploadTemp(file, opts = {}) {
 export async function uploadAccount(file, opts = {}) {
   const fd = new FormData();
   fd.append('file', file);
-  const d = await uploadFetch('/chat/media/account', fd, opts);
+  const d = file.size > PIECES_OVER ? await uploadInPieces('account', file, opts) : await uploadFetch('/chat/media/account', fd, opts);
   if (state.savedMedia && /^(image|gif|video|audio)$/.test(d.attachment?.type)) loadMedia();
   return d.attachment;
 }
@@ -1557,8 +1702,63 @@ export async function loadServers() {
 }
 // my communities on one instance (or everywhere): after joining / creating one
 export async function loadServersOf(sid) { if (isInst(sid)) await loadInstanceData(instOf(sid)); else await loadServers(); }
+// ── each server's channel list (server, categories, channels) kept on this device, so a server opens straight away while it's still
+// connecting: greyed out, with a loader where the messages go, until the real one comes in (refreshServer). `cached: true` marks it.
+const SERVER_CACHE = () => acctKey('ember_server_cache');
+let serverCache = null, serverCacheAt = null;
+function readServerCache() {
+  const k = SERVER_CACHE();
+  if (k !== serverCacheAt) { serverCacheAt = k; try { const v = JSON.parse(localStorage.getItem(k) || '{}'); serverCache = v && typeof v === 'object' ? v : {}; } catch { serverCache = {}; } }
+  return serverCache;
+}
+let serverCacheT = null, serverCacheSeen = null;
+function saveServerCache() {
+  const all = { ...readServerCache() };
+  for (const [sid, d] of Object.entries(state.detail)) if (d && !d.cached && d.server) all[sid] = { server: d.server, categories: d.categories || [], channels: d.channels || [], at: Date.now() };
+  const keys = Object.keys(all).sort((a, b) => (all[b].at || 0) - (all[a].at || 0));
+  for (const k of keys.slice(80)) delete all[k];
+  serverCache = all;
+  try { localStorage.setItem(SERVER_CACHE(), JSON.stringify(all)); } catch { /* full: the next save tries again */ }
+}
+subscribe(() => {
+  if (state.detail === serverCacheSeen) return;
+  serverCacheSeen = state.detail;
+  clearTimeout(serverCacheT);
+  serverCacheT = setTimeout(saveServerCache, 2500);
+});
+// a server's details: the real ones, else the kept copy (put in the store, marked cached), else null
+function detailOrCached(sid) {
+  if (state.detail[sid]) return state.detail[sid];
+  const c = readServerCache()[sid];
+  if (!c?.server || !Array.isArray(c.channels)) return null;
+  const d = { server: c.server, categories: c.categories || [], channels: c.channels, cached: true };
+  set(s => ({ detail: { ...s.detail, [sid]: d } }));
+  return d;
+}
+// is the socket this server lives on up?
+export const serverLive = sid => (isInst(sid) ? connections.get(instOf(sid))?.status === 'open' : !!sock && sock.readyState === 1);
+// a server's kept copy is no good any more (left / kicked / deleted): off this device and out of the store
+export function forgetServerCache(sid) {
+  const all = { ...readServerCache() };
+  if (all[sid]) { delete all[sid]; serverCache = all; try { localStorage.setItem(SERVER_CACHE(), JSON.stringify(all)); } catch { /* fine */ } }
+  if (state.detail[sid]?.cached) set(s => { const detail = { ...s.detail }; delete detail[sid]; return { detail }; });
+}
+const refreshFail = new Map(); // sid -> the HTTP status of its last failed refreshServer (0 = no answer)
+// the real details for a server showing its kept copy: in, gone (403 / 404: not in it any more, or deleted -> home), or a blip (again soon)
+async function wakeServer(sid, tries = 0) {
+  const d = await refreshServer(sid);
+  if (d) return d;
+  const st = refreshFail.get(sid) || 0;
+  if (st === 403 || st === 404) {
+    forgetServerCache(sid);
+    if (state.view.sid === sid) { go({ kind: 'home' }, { replace: true }); toast("You're not in that server any more."); }
+    return null;
+  }
+  setTimeout(() => { if (state.detail[sid]?.cached && serverLive(sid)) wakeServer(sid, tries + 1).then(x => { if (x && state.view.sid === sid) open(state.view); }); }, Math.min(30000, 3000 * (tries + 1)));
+  return null;
+}
 export async function refreshServer(sid) {
-  const d = await apiFetch(`/chat/servers/${sid}`).catch(() => null);
+  const d = await apiFetch(`/chat/servers/${sid}`).catch(e => { refreshFail.set(sid, e?.status || 0); return null; });
   if (d) set(s => ({ detail: { ...s.detail, [sid]: d }, voiceStates: { ...s.voiceStates, ...(d.voice || {}) }, unreadN: Object.fromEntries(Object.entries(s.unreadN).filter(([, u]) => u.sid !== sid)) }));
   return d;
 }
@@ -1813,6 +2013,7 @@ const HOME_KINDS = new Set(['home', 'dm', 'group', 'notes', 'modmail']);
 let lastHome = { kind: 'home' };
 export const lastHomeView = () => lastHome;
 export async function open(v) {
+  if (state.signedIn || connections.size) restoreOutbox(); // (unsent messages from before a reload, even while nothing is connected)
   // a message link: open its channel and scroll to the message
   if (v.kind === 'channel' && v.mid) { const { mid, ...at } = v; return jumpToMessage(at, mid); }
   // Velora-only places (DMs, groups, modmail, Velora's own servers) need the Velora sign-in
@@ -1826,8 +2027,14 @@ export async function open(v) {
       if (v.kind === 'instance') dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'add-instance', url: io } }));
       return;
     }
+    // still connecting (or reconnecting) and its channel list is kept on this device: open that, greyed, until it's up
+    const passing = ['connecting', 'closed'].includes(c.status) && !['insufficient_scope', 'unauthorized', 'invalid_session'].includes(c.error); // (not signed out / banned / refused)
+    if (v.kind === 'instance' && !v.then && passing) {
+      const sid = Object.keys(readServerCache()).find(k => isInst(k) && instOf(k) === io);
+      if (sid && detailOrCached(sid)) { go({ kind: 'server', sid }, { replace: true }); return; }
+    }
     // not connected (yet): the sidebar and channels stay out of it until the instance's socket is up and signed in
-    if (v.kind === 'instance' || (c.status !== 'open' && !state.detail[v.sid])) {
+    if (v.kind === 'instance' || (c.status !== 'open' && !(passing && detailOrCached(v.sid)))) {
       set({ view: v.kind === 'instance' ? v : { kind: 'instance', inst: io, then: v } });
       try { localStorage.setItem('velora_chat_last', location.hash); } catch { /* fine */ }
       resumeInstanceView(io);
@@ -1843,7 +2050,7 @@ export async function open(v) {
     return;
   }
   if (v.kind === 'server') {
-    let d = state.detail[v.sid] || await refreshServer(v.sid);
+    let d = detailOrCached(v.sid) || await refreshServer(v.sid);
     if (!d) { go({ kind: 'home' }, { replace: true }); return; }
     const cid = state.lastCid[v.sid] && d.channels.some(c => c.cid === state.lastCid[v.sid]) ? state.lastCid[v.sid] : (d.channels.find(c => c.name === 'general') || d.channels[0])?.cid;
     if (cid) go({ kind: 'channel', sid: v.sid, cid }, { replace: true });
@@ -1853,7 +2060,10 @@ export async function open(v) {
   set(s => ({ view: v, unread: { ...s.unread, [keyOf(v)]: false }, lastCid: v.kind === 'channel' ? { ...s.lastCid, [v.sid]: v.cid } : s.lastCid }));
   try { localStorage.setItem('velora_chat_last', location.hash); } catch { /* fine */ }
   if (v.kind === 'channel') {
-    if (!state.detail[v.sid]) await refreshServer(v.sid);
+    const have = detailOrCached(v.sid);
+    if (!have) await refreshServer(v.sid);
+    else if (have.cached && serverLive(v.sid) && !(await wakeServer(v.sid))) return;
+    if (state.detail[v.sid]?.cached) return; // not connected yet: the kept list shows, catchUp() loads the rest once it is
     const ch = state.detail[v.sid]?.channels.find(c => c.cid === v.cid);
     if (ch && (ch.unread || ch.mentions) && ch.last_read_id) jumpPoints.set(keyOf(v), { after: ch.last_read_id });
     clearMentions(v.sid, [v.cid]);
@@ -1943,7 +2153,7 @@ export function errorText(code) {
     storage_limit_exceeded: 'Your Nookara storage is full.', images_only: 'Only pictures (PNG, JPG, GIF, WebP) can be attached.', upload_suspended: 'Uploads are suspended on your account.',
     media_import_failed: "Couldn't download that media. Try downloading it and attaching the file.", invalid_media_url: 'Media links must use HTTPS without login credentials.', upload_failed: "Couldn't upload that file. Please try again.", external_upload_failed: "The file host didn't take that file. Please try again.", file_type_blocked: "That kind of file can't be uploaded.", temp_daily_quota: "You've sent as much to temporary storage as you can today - try again tomorrow, or use your account storage.", temp_storage_full: "Nookara's temporary storage is full right now - try again later, or use your account storage.", pro_required: 'Picking when a temporary file expires comes with Nookara Pro.', invalid_expiry: "That expiry doesn't work - pick another one.", uploads_disabled: 'File uploads are disabled in this server.',
     file_too_large: 'That file exceeds the upload size limit.', dms_friends_only: 'They only take messages from friends.', status_changed: 'Their status changed - take another look.', cannot_reply_own_status: "That's your own status.", cannot_dm_bot: "Bots can't be messaged.", unsupported_file: 'Only pictures, videos (MP4, WebM, MOV) and audio files can be saved.', gifs_not_configured: "GIF search isn't set up yet.", too_many_saved: 'Saved Media is full (500 GIFs).', too_many_emojis: 'This server has as many emojis as it can have (50).', bad_gif: "That GIF can't be saved.", no_send_permission: "You don't have permission to send messages here.", no_attach_permission: "You can't attach files here.", role_too_high: "That role is above your own highest role.", role_not_found: "That role doesn't exist any more.", too_many_roles: 'A server can have up to 100 roles.', user_not_found: "That person doesn't exist.", mailbox_full: 'Their inbox is full.', message_too_long: 'That message is too long.',
-    last_channel: "A server needs at least one channel.", not_allowed: "You can't do that here.", owner_only: 'Only the owner can do that.', offline: "You're offline - it wasn't sent.",
+    last_channel: "A server needs at least one channel.", not_allowed: "You can't do that here.", owner_only: 'Only the owner can do that.', offline: "Couldn't send it - you were offline.",
     scope_disabled: 'An admin has turned this off for your account.', account_restricted: RESTRICTED_TEXT, insufficient_scope: SCOPE_TEXT, name_required: 'It needs a name.',
     instance_not_linked: "That Minecraft server isn't linked to this Ember server.", already_linked: 'That Minecraft server is already linked.', too_many_instances: 'An Ember server can link up to 10 Minecraft servers.',
     cl_bad_url: 'That CloudLink address needs to start with wss:// (or ws://).', cl_bad_port: 'CloudLink bridges can only use the normal ports (80 / 443).', cl_private_address: "That address is on a private network - Ember can't connect to it.", too_many_cloudlink_bridges: 'A server can have up to 3 CloudLink bridges.', not_a_cloudlink_bridge: "That channel isn't a CloudLink bridge.",

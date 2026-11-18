@@ -97,7 +97,7 @@ export async function verifyMessage(enc, sigPub, { from, to, editOf = 0 }) {
 }
 
 // ── files ──
-// -> { data: encrypted bytes, key, iv }. The key travels inside the (encrypted) message. Whole files, the biggest upload is 95 MB.
+// -> { data: encrypted bytes, key, iv }. The key travels inside the (encrypted) message. Whole files, the biggest upload is 200 MB.
 export async function encryptFile(bytes) {
   const k = random(32), iv = random(12);
   const key = await subtle.importKey('raw', k, 'AES-GCM', false, ['encrypt']);

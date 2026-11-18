@@ -133,6 +133,45 @@ export async function uploadFetch(path, form, options = {}) {
   return data;
 }
 
+// a big file to Nookara's temporary (dest 'temp') or account ('account') storage in pieces: Cloudflare refuses any request over 100 MB.
+// Answers like uploadFetch to /chat/media/temp or /chat/media/account. options: { expires, onProgress(sent, total), signal }
+export const PIECES_OVER = 90 * 1024 * 1024; // (smaller files go in one request)
+export async function uploadInPieces(dest, file, { expires, onProgress, signal } = {}) {
+  const auth = () => ({ Authorization: `Bearer ${getToken()}`, 'X-Device-Fingerprint': getFingerprint() });
+  const fail = async (res, fallback) => {
+    const data = await res.json().catch(() => ({}));
+    const err = Object.assign(new Error(data.error || (res.status === 413 ? 'file_too_large' : fallback)), { status: res.status }, data);
+    keepPlanCode(err);
+    if (res.status === 403 && data.error === 'insufficient_scope') reportScopeError(data);
+    return err;
+  };
+  const start = await apiFetch('/chat/media/uploads', { method: 'POST', signal, body: JSON.stringify({ dest, name: file.name, type: file.type || 'application/octet-stream', size: file.size, ...(expires != null && expires !== 'default' ? { expires_in_days: String(expires) } : {}) }) });
+  const { id, chunk_size: size, parts } = start;
+  try {
+    let done = 0;
+    for (let n = 0; n < parts; n++) {
+      const piece = file.slice(n * size, Math.min(file.size, (n + 1) * size));
+      let res;
+      for (let attempt = 0; ; attempt++) { // a piece that didn't make it goes again (a few times) before the whole upload fails
+        try {
+          res = await xhrFetch(routePath(`/chat/media/uploads/${id}/${n}`).path, { method: 'PUT', headers: { ...auth(), 'Content-Type': 'application/octet-stream' }, body: piece, signal, onProgress: sent => onProgress?.(done + sent, file.size) });
+          if (res.ok || res.status < 500 || attempt >= 3) break;
+        } catch (e) { if (e.name === 'AbortError' || attempt >= 3) throw e.name === 'AbortError' ? e : Object.assign(new Error('upload_failed'), { status: 0 }); }
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+      }
+      if (!res.ok) throw await fail(res, 'upload_failed');
+      done += piece.size;
+      onProgress?.(done, file.size);
+    }
+    const res = await fetch(routePath(`/chat/media/uploads/${id}/finish`).path, { method: 'POST', headers: auth(), signal });
+    if (!res.ok) throw await fail(res, 'upload_failed');
+    return await res.json();
+  } catch (e) {
+    fetch(routePath(`/chat/media/uploads/${id}`).path, { method: 'DELETE', headers: auth() }).catch(() => {});
+    throw e;
+  }
+}
+
 // a download that needs the Authorization header (exports): { blob, filename }
 export async function downloadFetch(path, options = {}) {
   const r = routePath(path, options.inst);

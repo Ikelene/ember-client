@@ -278,6 +278,8 @@ body:has(.vc-sign-banner) .vc-notify-banner { top: 52px; } /* (the notifications
 .vc-input b, .vc-input i, .vc-input u, .vc-input s, .vc-input code { pointer-events: none; }
 .vc-input .vc-md-link { color: #8ab4f8; text-decoration: underline; text-underline-offset: 2px; }
 .vc-input .vc-md-quote { display: block; padding-left: 8px; border-left: 3px solid var(--accent); color: var(--dim); }
+.vc-queued { display: flex; align-items: center; gap: 7px; margin-top: 2px; font-size: 12px; color: var(--muted); }
+.vc-queued .vc-ring { width: 11px; height: 11px; border-width: 2px; border-color: currentColor; border-top-color: transparent; opacity: .8; }
 .vc-fail { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 2px; font-size: 12px; color: #e08a8a; }
 .vc-fail button { padding: 0; background: none; border: 0; color: var(--accent); font-size: 12px; cursor: pointer; text-decoration: underline; }
 
@@ -2074,6 +2076,17 @@ a.vc-appdl-opt { text-decoration: none; }
 .vc-rail-ring { position: absolute; left: 50%; top: 50%; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-width: 2.5px; z-index: 2; pointer-events: none; }
 .vc-gate-ring { width: 46px; height: 46px; margin: 0 auto; }
 @keyframes vc-ring-spin { to { transform: rotate(360deg); } }
+/* a server still connecting, shown from its kept channel list: greyed list, a loader where the messages go, grey lines for members */
+.vc-side-cached > * { opacity: .5; filter: grayscale(1); transition: opacity .3s, filter .3s; }
+.vc-convo-wait { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; color: var(--muted); font-size: 13.5px; text-align: center; }
+.vc-mem-skel { display: flex; flex-direction: column; gap: 14px; padding: 18px 8px; }
+.vc-mem-skel i { display: block; border-radius: 6px; background: var(--border-2); animation: vc-skel 1.4s ease-in-out infinite; animation-delay: var(--d, 0ms); }
+.vc-mem-skel-head { width: 42%; height: 10px; margin-bottom: 2px; }
+.vc-mem-skel-row { display: flex; align-items: center; gap: 10px; --d: 0ms; }
+.vc-mem-skel-row i { animation-delay: var(--d); }
+.vc-mem-skel-av { flex: none; width: 32px; height: 32px; border-radius: 50% !important; }
+.vc-mem-skel-line { height: 10px; }
+@keyframes vc-skel { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
 .vc.still .vc-ring, .vc .vc-ring { animation: vc-ring-spin .8s linear infinite !important; } /* (a loader that stops looks broken: it keeps going with animations off) */
 .vc-inst-card { margin-bottom: 12px; }
 .vc-inst-card small { display: flex; align-items: center; gap: 5px; }

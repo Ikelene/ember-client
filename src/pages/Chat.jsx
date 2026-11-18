@@ -488,11 +488,14 @@ function ChatPage() {
   useEffect(() => { document.title = `${unreadCount ? `(${unreadCount > 999 ? '999+' : unreadCount}) ` : ''}${channel ? `#${channel.name} - ${detail.server.name}` : view.kind === 'instance' ? gateName || 'Server' : view.kind === 'dm' ? `@${view.username}` : view.kind === 'notes' ? 'Personal Notes' : group ? group.name : 'Home'} | Ember`; }, [unreadCount, channel, detail, view, group, gateName]);
   const signedIn = useChat(s => s.signedIn);
   const locked = useChat(s => s.locked); // staff switched Ember and DMs off for the account (store.js lockAccount)
+  const waking = view.kind === 'channel' && !!detail?.cached; // its kept channel list: still connecting
+  const wakeStatus = useChat(s => { if (!waking || !isInst(view.sid)) return null; const i = s.instances.find(x => x.origin === instOf(view.sid)); return i && ['insufficient_scope', 'unauthorized', 'invalid_session'].includes(i.error) ? 'error' : i?.status; });
 
   if (!ready) return <BootScreen />;
   if (locked) return <div className="vc"><LockedScreen /></div>; // (no rail, lists, dialogs or toasts: just the notice)
 
   const isServer = view.kind === 'channel';
+  const wakeGate = waking && !!wakeStatus && !['connecting', 'closed', 'open'].includes(wakeStatus); // signed out / banned / refused: its own screen
   const sysDM = view.kind === 'dm' && view.username === 'System';
   const modView = view.kind === 'modmail';
   const notesView = view.kind === 'notes';
@@ -605,7 +608,10 @@ function ChatPage() {
             <div className="vc-body">
               <div className="vc-convo" key={keyOf(view)}>
                 {view.kind === 'dm' && !sysDM && <DmCallBar username={view.username} />}
-                {channel?.type === 'game' && !(channel.config?.setup && channel.config?.purpose === 'chat') ? <GameChannel channel={channel} sid={view.sid} /> : channel?.type === 'voice' ? <VoiceView channel={channel} sid={view.sid} /> : channel?.type === 'roles' ? <RoleShop channel={channel} /> : channel?.type === 'starboard' ? <Starboard channel={channel} sid={view.sid} /> : channel?.type === 'link' ? (
+                {wakeGate ? <InstanceGate origin={instOf(view.sid)} /> : waking ? <>
+                  <div className="vc-convo-wait" role="status"><i className="vc-ring vc-gate-ring" aria-hidden="true" /><span>Establishing connection to chat server</span></div>
+                  <Composer view={view} replyTo={replyTo} setReplyTo={setReplyTo} sendOff placeholder={`Message #${channel?.name || ''}`} />
+                </> : channel?.type === 'game' && !(channel.config?.setup && channel.config?.purpose === 'chat') ? <GameChannel channel={channel} sid={view.sid} /> : channel?.type === 'voice' ? <VoiceView channel={channel} sid={view.sid} /> : channel?.type === 'roles' ? <RoleShop channel={channel} /> : channel?.type === 'starboard' ? <Starboard channel={channel} sid={view.sid} /> : channel?.type === 'link' ? (
                   <div className="vc-linkch">
                     <ExternalLink size={34} />
                     <h2>#{channel.name}</h2>
