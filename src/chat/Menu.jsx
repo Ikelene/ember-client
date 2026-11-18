@@ -20,7 +20,7 @@ import { canReportDm } from './dm-report.js';
 import { reactionId } from './msg-actions.js';
 import { myReactions } from './msg-actions.js';
 import { setInstancePrefs } from './instances.js';
-import { roleMenuItems, modMenuItems, nickMenuItems, changeNick, P, has } from './roles.jsx';
+import { roleMenuItems, modMenuItems, nickMenuItems, changeNick, canNick, P, has } from './roles.jsx';
 import { viewPicture, copyImage, downloadImage } from './MediaViewer.jsx';
 import { saveToMedia } from './store.js';
 import { QuickReactions } from './Reactions.jsx';
@@ -202,7 +202,7 @@ export function instanceMenu(e, inst, srv, { onInvite, onSettings, onLeave, onLo
     ] },
     (srv || (getState().signedIn && inst.prefs)) && 'sep',
     here && { label: 'Invite people', icon: UserPlus, onClick: onInvite },
-    here && inst.user && { label: 'Change nickname', icon: Pencil, onClick: () => changeNick(srv.sid, getState().members[srv.sid]?.find(x => x.id === inst.user.id) || { ...inst.user, nick: null }, true) },
+    here && inst.user && canNick(srv.sid, true) && { label: 'Change nickname', icon: Pencil, onClick: () => changeNick(srv.sid, getState().members[srv.sid]?.find(x => x.id === inst.user.id) || { ...inst.user, nick: null }, true) },
     admin && { label: 'Server settings', icon: Settings, onClick: onSettings },
     { label: 'Copy URL', icon: Link2, onClick: () => copy(inst.origin, 'Server URL copied') },
     inst.status !== 'connecting' && { label: 'Reconnect', icon: RefreshCw, onClick: onReconnect },

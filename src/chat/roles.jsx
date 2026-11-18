@@ -18,13 +18,15 @@ export const P = {
   SEND: 1, MANAGE_CHANNELS: 2, MANAGE_SERVER: 4, MANAGE_ROLES: 8, KICK: 16, BAN: 32,
   MANAGE_MESSAGES: 64, MENTION_EVERYONE: 128, ATTACH: 256, ADMIN: 512, MANAGE_USERS: 2048,
   UNMARKED_ALIASES: 4096, // instances only: a bot's alias messages show unmarked while the server's Danger zone allows it
+  CHANGE_NICKNAME: 8192, MANAGE_NICKNAMES: 16384, // instances only: your own server nickname / anyone's below you
 };
-const INST_ONLY_PERMS = new Set(['UNMARKED_ALIASES']); // Velora's own servers don't have these
+const INST_ONLY_PERMS = new Set(['UNMARKED_ALIASES', 'CHANGE_NICKNAME', 'MANAGE_NICKNAMES']); // Velora's own servers don't have these
 export const PERM_LIST = [
   ['ADMIN', 'Administrator', 'Every permission, and can do anything in the server. Be careful who gets this.'],
   ['MANAGE_SERVER', 'Manage server', 'Change the name, description, icon, banner and server settings.'],
   ['MANAGE_ROLES', 'Manage roles', 'Create and edit roles below their own, and give them to people.'],
-  ['MANAGE_USERS', 'Manage users', 'See who is really online (invisible people show with a hollow dot), which client and device people use, and when they last logged in. Also shows a client tag next to their messages.', "Shows when people last logged in and which page each message was sent from. Invisible status and devices only show in Nookara's own servers: this server doesn't see people's presence. Also lets you change the server nickname of people below you."],
+  ['MANAGE_USERS', 'Manage users', 'See who is really online (invisible people show with a hollow dot), which client and device people use, and when they last logged in. Also shows a client tag next to their messages.', "Shows when people last logged in and which page each message was sent from. Invisible status and devices only show in Nookara's own servers: this server doesn't see people's presence."],
+  ['MANAGE_NICKNAMES', 'Manage nicknames', "Change anyone's server nickname whose highest role is below theirs, and their own."],
   ['MANAGE_CHANNELS', 'Manage channels', 'Create, edit, delete and rearrange channels and categories.'],
   ['KICK', 'Kick members', 'Remove people from the server (they can come back with an invite).'],
   ['BAN', 'Ban members', 'Remove people for good.'],
@@ -32,6 +34,7 @@ export const PERM_LIST = [
   ['MENTION_EVERYONE', 'Mention @everyone, @here and all roles', 'Ping the whole server, or roles that are not mentionable.'],
   ['SEND', 'Send messages', 'Post in channels that let everyone send messages.'],
   ['ATTACH', 'Attach files', 'Send pictures with their messages.'],
+  ['CHANGE_NICKNAME', 'Change nickname', 'Set their own nickname on this server.'],
   ['UNMARKED_ALIASES', 'Use unmarked aliases', "For bots: while the server owner has turned on unmarked aliases (Server settings > Danger zone > Advanced), this bot's alias messages look exactly like a member's, with no alias mark. Only give it to bots you trust."],
 ];
 export const has = (perms, bit) => ((Number(perms) || 0) & bit) === bit;
@@ -208,8 +211,12 @@ export function modMenuItems(sid, username) {
   ];
 }
 
-// Server nickname (Ember servers only): shown on that server instead of the person's name. Your own always; someone else's
-// with Manage users when their role is below yours (the server checks too)
+// Server nickname (Ember servers only): shown on that server instead of the person's name. Your own with Change nickname
+// (or Manage nicknames); someone else's with Manage nicknames when their role is below yours (the server checks too)
+export const canNick = (sid, isMe) => {
+  const p = getState().detail[sid]?.server?.perms;
+  return has(p, P.MANAGE_NICKNAMES) || (isMe && has(p, P.CHANGE_NICKNAME));
+};
 export function nickMenuItems(sid, username) {
   if (!sid || !isInst(sid)) return [];
   const st = getState();
@@ -218,7 +225,7 @@ export function nickMenuItems(sid, username) {
   const meU = st.instances.find(i => i.origin === instOf(sid))?.user;
   if (!srv || !m || !meU) return [];
   const isMe = m.id === meU.id;
-  if (!isMe && !has(srv.perms, P.MANAGE_USERS)) return [];
+  if (!canNick(sid, isMe)) return [];
   const r = isMe ? { below: true } : modRights(sid, username, st);
   const below = isMe || (m.role !== 'owner' && (srv.role === 'owner' || r.below));
   return [{ label: isMe ? 'Change nickname' : `Change ${username}'s nickname`, icon: PenLine, disabled: !below, hint: below ? '' : 'Their role is as high as yours', onClick: () => changeNick(sid, m, isMe) }];
