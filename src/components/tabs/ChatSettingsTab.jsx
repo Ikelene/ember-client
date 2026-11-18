@@ -44,6 +44,7 @@ export const GROUPS = [
   ]],
   ['Advanced', [
     ['daily_notice', 'Daily credit messages', 'When your first message of the day earns your daily chat credits, Ember tells you (only you see it). Turn off to claim them quietly.'],
+    ['sleep_servers', 'Sleep mode for servers', "Servers nobody is chatting in that you haven't opened for 15 minutes disconnect (they show with a moon), and check for new messages every 10 minutes. Saves data and battery; you may hear about mentions there a little later. Opening one wakes it straight away."],
     ['developer_mode', 'Developer mode', 'Adds "Copy ID" options (accounts, servers, channels, messages) to right-click menus.'],
   ]],
 ];

@@ -34,8 +34,9 @@ function rememberLabel(c) {
   if (getToken()) apiFetch('/bonfire/instances/prefs', { method: 'PATCH', body: JSON.stringify({ url: c.origin, name, icon: /^https?:\/\//i.test(icon || '') ? icon : null }) }).catch(() => {});
 }
 export const instView = c => ({
+  sleep: c.sleep || (c.peeking ? 'idle' : null), // 'idle' (sleep mode) | 'manual' (disconnected by hand) | null
   origin: c.origin, host: hostOf(c.origin), name: c.info?.name || savedLabels()[c.origin]?.name || hostOf(c.origin), icon: c.info?.icon_url || savedLabels()[c.origin]?.icon || null, description: c.info?.description || '',
-  community: c.info?.community || null, mode: c.info?.accounts_mode || null, status: c.status, claimed: c.info?.claimed !== false, features: c.info?.features || {},
+  community: c.info?.community || null, mode: c.info?.accounts_mode || null, status: c.peeking && c.status !== 'open' ? 'asleep' : c.status, claimed: c.info?.claimed !== false, features: c.info?.features || {},
   registration: c.info?.registration || 'closed', isAdmin: !!c.isAdmin, isOwner: !!c.isOwner, user: c.user || null, error: c.error || null, restricted: c.restricted || null,
   needsVelora: c.info?.accounts_mode === 'velora' && !getToken(), pending: !!c.pending, failed: !!c.failed,
   loaded: !!c.loaded, // this account's communities on it have been fetched (so "not in it" is known)
@@ -52,6 +53,7 @@ export const instView = c => ({
 });
 const mirror = () => patchState({ instances: [...connections.values()].map(instView) });
 function setStatus(c, status, error = null) {
+  if (c.peeking && ['login', 'banned', 'restricted', 'error'].includes(status)) c.peeking = false; // (a look that found a real problem: show it, not a moon)
   if (c.restricted && ['connecting', 'closed', 'error'].includes(status)) return mirror(); // Ember is switched off for this account: the notice stays until the server says otherwise
   c.status = status; c.error = error; mirror();
 }
@@ -187,6 +189,7 @@ async function ensureSession(c) {
 // ── the gateway ──
 function openSocket(c) {
   if (c.ws && c.ws.readyState <= 1) return;
+  if (c.sleep) { mirror(); return; } // (disconnected while it was still connecting)
   setStatus(c, 'connecting');
   const ws = new WebSocket(`${c.origin.replace(/^http/, 'ws')}/gateway`);
   c.ws = ws;
@@ -206,6 +209,7 @@ function openSocket(c) {
       hooks.refresh(c.origin).then(ok => { if (ok) openSocket(c); });
       return;
     }
+    if (c.peeking) { sleepInstance(c, 'idle'); return; } // (a look for new messages that didn't work out: back to sleep, next look later)
     c.failed = true;
     setStatus(c, 'closed');
     scheduleRetry(c, c.restricted ? RESTRICTED_RETRY : ev.code === 4010 ? 3000 : 0);
@@ -234,6 +238,73 @@ export const sendTo = (origin, obj) => {
   return false;
 };
 setInterval(() => connections.forEach(c => { if (c.ws?.readyState === 1) c.ws.send('{"type":"ping"}'); }), 25000);
+
+// ── sleep mode (chat setting sleep_servers, on by default): a server nobody is chatting in and you haven't opened for a while is let go,
+// then looked at again now and then for new messages (connect, catch up, and if nothing came in, sleep again). Never the server you're
+// looking at or in voice on. Disconnect (right-click) does the same by hand and stays off, across reloads, until you open or reconnect it.
+const SLEEP_AFTER = 15 * 60e3, PEEK_EVERY = 10 * 60e3, PEEK_FOR = 60e3;
+const MANUAL = () => acctKey('ember_disconnected');
+function readManual() { try { const v = JSON.parse(localStorage.getItem(MANUAL()) || '[]'); return new Set(Array.isArray(v) ? v : []); } catch { return new Set(); } }
+function writeManual(origin, on) {
+  const all = readManual();
+  if (on) all.add(origin); else all.delete(origin);
+  try { if (all.size) localStorage.setItem(MANUAL(), JSON.stringify([...all])); else localStorage.removeItem(MANUAL()); } catch { /* fine */ }
+}
+const sleepOn = () => getState().settings?.sleep_servers !== false;
+const inVoiceOn = origin => { const v = getState().voice; return !!v && [v.room, v.info?.sid, v.info?.cid].some(k => k && instOf(String(k)) === origin); };
+const unreadSig = origin => JSON.stringify(getState().servers.filter(x => x.inst === origin).map(x => [x.sid, x.unread ? 1 : 0, x.mentions || 0]));
+function sleepInstance(c, why) {
+  clearTimeout(c.timer); clearTimeout(c.peekT);
+  c.retry = 0; c.retryAt = 0; c.failed = false; c.peeking = false;
+  c.sleep = why; c.sleepSig = unreadSig(c.origin);
+  const ws = c.ws; c.ws = null; try { ws?.close(1000, 'sleep'); } catch { /* gone */ }
+  instanceVoiceClosed(c.origin);
+  c.status = 'asleep'; c.error = null; mirror();
+  if (why === 'idle') c.peekT = setTimeout(() => peek(c), PEEK_EVERY);
+}
+function peek(c) {
+  if (connections.get(c.origin) !== c || c.sleep !== 'idle' || held) return;
+  c.sleep = null; c.peeking = true;
+  connect(c.origin);
+}
+function endPeek(c) {
+  if (!c.peeking) return;
+  c.peeking = false;
+  // something new while it slept, or you opened it meanwhile: it stays awake
+  if (unreadSig(c.origin) !== c.sleepSig || onScreen(c.origin) || inVoiceOn(c.origin) || !sleepOn()) { c.activeAt = Date.now(); mirror(); return; }
+  sleepInstance(c, 'idle');
+}
+// open / click / Reconnect: it connects again (and a hand-disconnected one is on again from now on)
+export function wakeInstance(origin) {
+  const c = connections.get(origin);
+  if (!c) return;
+  if (c.sleep === 'manual') writeManual(origin, false);
+  clearTimeout(c.peekT);
+  const was = c.sleep || c.peeking;
+  c.sleep = null; c.peeking = false; c.activeAt = Date.now();
+  if (was && c.status === 'asleep') { c.status = 'connecting'; mirror(); }
+  if (!c.ws || c.ws.readyState > 1) connect(origin);
+}
+// Disconnect (right-click): off until you open it again
+export function disconnectInstance(origin) {
+  const c = connections.get(origin);
+  if (!c) return;
+  writeManual(origin, true);
+  sleepInstance(c, 'manual');
+  const v = getState().view;
+  if (onScreen(origin) && v.kind !== 'instance') go({ kind: 'instance', inst: origin, then: v.sid ? { kind: 'server', sid: v.sid } : undefined }, { replace: true });
+}
+export const isAsleep = origin => !!connections.get(origin)?.sleep;
+setInterval(() => {
+  if (held) return;
+  const now = Date.now();
+  for (const c of connections.values()) {
+    if (c.sleep === 'idle' && !sleepOn()) { wakeInstance(c.origin); continue; } // (the setting was turned off)
+    if (c.sleep || c.peeking || c.status !== 'open' || !sleepOn()) continue;
+    if (onScreen(c.origin) || inVoiceOn(c.origin)) { c.activeAt = now; continue; }
+    if (now - (c.activeAt || now) > SLEEP_AFTER) sleepInstance(c, 'idle');
+  }
+}, 60e3);
 
 // the instance's build / stats / update status (admins only: the rest of the call is public build info); on connect and every ~10 min
 // (the server's own check is cached 10 min). refresh = Server info > Refresh: the server really asks Nookara again
@@ -275,7 +346,8 @@ function onFrame(c, m) {
       rememberLabel(c);
       voiceSocketReady(c.origin);
       rewatchInstClients(c.origin); // (open profile cards: the new socket doesn't know what the old one watched)
-      loadInstanceData(c.origin).then(() => { catchUp(c.origin); if (autoJoin.has(c.origin)) joinOnce(c); });
+      c.activeAt = Date.now();
+      loadInstanceData(c.origin).then(() => { catchUp(c.origin); if (autoJoin.has(c.origin)) joinOnce(c); if (c.peeking) { clearTimeout(c.peekT); c.peekT = setTimeout(() => endPeek(c), PEEK_FOR); } });
 
       if (c.isAdmin) loadServerInfo(c);
       if (c.isAdmin) apiFetch('/api/v1/instance/settings', { inst: c.origin }).then(d => { c.voiceQuota = d.velora?.voice || null; mirror(); }).catch(() => {});
@@ -292,6 +364,7 @@ function onFrame(c, m) {
       return;
     default: break;
   }
+  if (/^chat_message/.test(m.type)) c.activeAt = Date.now(); // (people chatting there keeps it awake)
   handleEvent(fromInstance(c.origin, m), c.origin);
 }
 
@@ -329,7 +402,7 @@ function addConnection(origin, info) {
 }
 export async function connect(origin) {
   const c = connections.get(origin);
-  if (!c || c.busy || held) return;
+  if (!c || c.busy || held || c.sleep) return; // (asleep / disconnected by hand: wakeInstance)
   c.busy = true;
   clearTimeout(c.timer); c.retryAt = 0;
   let movedTo = null;
@@ -344,6 +417,8 @@ export async function connect(origin) {
   } catch (e) {
     if (e.message === 'instance_moved' && e.moved_to) { movedTo = normOrigin(e.moved_to); return; } // Velora: that address moved
 
+    if (c.sleep) { c.status = 'asleep'; mirror(); return; } // (disconnected while this try was running)
+    if (c.peeking) { sleepInstance(c, 'idle'); return; }
     c.failed = true;
     setStatus(c, e.message === 'insufficient_scope' ? 'error' : 'closed', e.message);
     scheduleRetry(c, e.restricted ? RESTRICTED_RETRY : 0);
@@ -412,6 +487,7 @@ export function renewVeloraSession(origin) {
 export function reconnect(origin) {
   const c = connections.get(origin);
   if (!c) return;
+  if (c.sleep || c.peeking) { wakeInstance(origin); return; }
   clearTimeout(c.timer); c.retry = 0; c.failed = false; c.retryAt = 0;
   const ws = c.ws; c.ws = null; try { ws?.close(); } catch { /* gone */ }
   connect(origin);
@@ -475,6 +551,8 @@ async function joinOnce(c) {
 // on start: this device's list connects right away, then (signed in) Velora's list is merged in
 export function startInstances() {
   readList().forEach(o => { if (!connections.has(o)) connections.set(o, newConn(o)); }); // (not on the rail yet: see below)
+  const off = readManual();
+  for (const c of connections.values()) if (off.has(c.origin)) { c.sleep = 'manual'; c.status = 'asleep'; }
   const go_ = () => { mirror(); [...connections.keys()].forEach(o => connect(o)); }; // (connect skips one already connecting / open)
   if (!getToken()) { go_(); return; }
   // signed in: Nookara's list first (one quick request), so a server removed on another device isn't shown and dropped again;

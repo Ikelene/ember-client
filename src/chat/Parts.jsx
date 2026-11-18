@@ -8,7 +8,7 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyn
 import { createPortal } from 'react-dom';
 import {
   Share2, Hash, Lock, Plus, Compass, ChevronDown, Settings, UserPlus, LogOut, House, MessageCircle, Home,
-  Pencil, Trash2, Check, X, Circle, Moon, MinusCircle, EyeOff, Smile, UsersRound, Megaphone, FolderPlus, ShieldCheck, Download, Server, UserRound, Volume2, CircleArrowUp, NotebookPen } from 'lucide-react';
+  Pencil, Trash2, Check, X, Circle, Moon, MinusCircle, EyeOff, Smile, UsersRound, Megaphone, FolderPlus, ShieldCheck, Download, Server, UserRound, Volume2, CircleArrowUp, NotebookPen, Unplug } from 'lucide-react';
 
 import { RetryIn } from './Gate.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
@@ -21,7 +21,7 @@ import { apiFetch, getToken } from '../api.js';
 import { VELORA, instOf, isInst } from './ids.js';
 import { loudUnread } from './unread.js';
 import { getLook, subscribeLook } from './look.js';
-import { removeInstance, reorderInstances, reconnect as reconnectInstance } from './instances.js';
+import { removeInstance, reorderInstances, reconnect as reconnectInstance, disconnectInstance } from './instances.js';
 import { startSignIn } from './session.js';
 import { Avatar, subtitle, RoleChip, STATUS_LABEL, BlockedMark } from './Profile.jsx';
 import { MePopout } from './ProfilePopout.jsx';
@@ -233,11 +233,12 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
     const ask_ = async () => { if (await ask({ title: `Remove ${name}?`, text: `${inst.host} leaves your server list${getToken() ? ' on every device' : ''}. Your account there stays as it is - you can add it again any time.`, confirm: 'Remove from list', danger: true })) removeInstance(inst.origin); };
     return (
       <RailItem key={inst.origin} dnd={dnd(`i:${inst.origin}`)} active={active} unread={!active && !!s && loudUnreadOf(s)} title={`${name} · ${inst.host}`} server={s?.sid} style={{ '--i': legacy.length + i }}
-        status={inst.status !== 'open' ? inst.status : null} badge={s && !muted ? (s.mentions || 0) + (srvMentions[s.sid] || 0) : 0}
+        status={inst.status !== 'open' ? inst.status : null} sleep={inst.sleep} badge={s && !muted ? (s.mentions || 0) + (srvMentions[s.sid] || 0) : 0}
         onClick={() => go(s && inst.status === 'open' ? { kind: 'server', sid: s.sid } : { kind: 'instance', inst: inst.origin })}
         onContextMenu={e => instanceMenu(e, inst, s, {
           onInvite: () => dialog('invite', s.sid), onSettings: () => dialog('settings', s.sid), onLeave: () => dialog('leave', s.sid), onRemove: ask_,
           onReconnect: () => reconnectInstance(inst.origin),
+          onDisconnect: () => disconnectInstance(inst.origin),
           onLogin: () => (inst.needsVelora ? startSignIn() : dialog('add-instance', null, { url: inst.origin })),
         })}>
         <span className="vc-srv-ico"><ServerIcon src={icon} name={name} /></span>
@@ -274,7 +275,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
 }
 // open one of the page's dialogs from anywhere (Chat.jsx listens)
 export const dialog = (kind, sid, extra) => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind, sid, ...extra } }));
-function RailItem({ active, unread, title, onClick, children, style, badge, onContextMenu, server, dnd, status }) {
+function RailItem({ active, unread, title, onClick, children, style, badge, onContextMenu, server, dnd, status, sleep }) {
   const { cls = '', ...drag } = dnd || {};
   return (
     <div className={`vc-rail-item${active ? ' active' : ''}${unread ? ' unread' : ''}${status ? (status === 'connecting' ? ' inst-connecting' : ' inst-off') : ''}${cls}`} style={style} onContextMenu={onContextMenu} {...drag}>
@@ -282,6 +283,7 @@ function RailItem({ active, unread, title, onClick, children, style, badge, onCo
       <button type="button" onClick={onClick} data-tip={server ? undefined : title} data-tip-server={server} data-tip-side="right" aria-label={title}>{children}</button>
       {badge > 0 && <span className="vc-rail-badge" key={badge}>{badge > 99 ? '99+' : badge}</span>}
       {status === 'connecting' && <i className="vc-ring vc-rail-ring" aria-hidden="true" />}
+      {status === 'asleep' && <i className="vc-rail-sleep" aria-hidden="true">{sleep === 'manual' ? <Unplug size={18} /> : <Moon size={18} />}</i>}
     </div>
   );
 }

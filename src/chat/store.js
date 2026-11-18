@@ -17,7 +17,7 @@ import { applyUserUpdate, instancesWithAccount } from './userUpdate.js';
 import { findPending, dropSettled, wireText, settle } from './pending.js';
 import { VELORA, K, parseK, instOf, bare, isInst, normOrigin, acctKey } from './ids.js';
 import { myIdOn } from './tokens.js';
-import { connections, sendTo, startInstances, loadInstanceData, retryInstances, renewVeloraSession, holdInstances, forgetIfEmpty } from './instances.js';
+import { connections, sendTo, startInstances, loadInstanceData, retryInstances, renewVeloraSession, holdInstances, forgetIfEmpty, wakeInstance } from './instances.js';
 import { attachmentRefs } from './signing-payload.js';
 import { spoilerName } from './spoiler.js';
 import { prepareInstanceAttachments } from './attachment-preparation.js';
@@ -63,7 +63,7 @@ let state = {
   srvMentions: {},         // sid -> the same, per server
   notify: {},              // target (cid / sid) -> { level, muted_until, push }
   toastOk: false,
-  settings: { show_typing: true, share_typing: true, share_activity: true, sounds: true, notify_sound: 'short', notifications: 'mentions', dm_privacy: 'everyone', compact: false, animations: true, link_images: true, link_previews: true, developer_mode: false, allow_vc_calls: true, yt_mode: 'ask', dm_upload_dest: 'ask', radio_enabled: false, radio_url: 'https://www.clubfmserver.be/pink.mp3', strip_tracking: null, lock_emojis: false },
+  settings: { show_typing: true, share_typing: true, share_activity: true, sounds: true, notify_sound: 'short', notifications: 'mentions', dm_privacy: 'everyone', compact: false, animations: true, link_images: true, link_previews: true, developer_mode: false, allow_vc_calls: true, yt_mode: 'ask', dm_upload_dest: 'ask', sleep_servers: true, radio_enabled: false, radio_url: 'https://www.clubfmserver.be/pink.mp3', strip_tracking: null, lock_emojis: false },
   lastCid: {},             // sid -> cid
   error: null,
   voice: null,             // the voice channel / call I'm in: { room, info, status, users, muted, deafened, speaking, ringing }
@@ -265,6 +265,8 @@ function rewatchPresence() {
 // it must begin on this device when the presence payload arrives. Using the
 // server wall clock here makes even a small clock skew look like 5-second jumps.
 function localizePresence(presence) {
+  // online only on the website or in a game signed in with Nookara, not connected with Ember: offline here (Nookara sends `chat`)
+  if (presence && presence.chat === false && presence.status !== 'offline') return { ...presence, status: 'offline', auto_idle: false, mobile: false, console: false, custom: null, activities: [] };
   if (!presence?.activities?.length) return presence;
   const receivedAt = Date.now();
   return { ...presence, activities: presence.activities.map(a => (a?.app === 'Spotify' && Number.isFinite(Number(a.progress)) ? { ...a, progress_at: receivedAt } : a)) };
@@ -1737,6 +1739,28 @@ function detailOrCached(sid) {
 }
 // is the socket this server lives on up?
 export const serverLive = sid => (isInst(sid) ? connections.get(instOf(sid))?.status === 'open' : !!sock && sock.readyState === 1);
+// the channel a server opens on: the last one you had open there (kept on this device), else the top one in the list that you'd
+// read in (not a voice or link channel), in the sidebar's order: channels without a category first, then each category in order
+const LAST_CHANNEL = () => acctKey('ember_last_channel');
+let lastChannels = null, lastChannelsAt = null;
+function lastChannelsAll() {
+  const k = LAST_CHANNEL();
+  if (k !== lastChannelsAt) { lastChannelsAt = k; try { const v = JSON.parse(localStorage.getItem(k) || '{}'); lastChannels = v && typeof v === 'object' ? v : {}; } catch { lastChannels = {}; } }
+  return lastChannels;
+}
+const lastChannelOf = sid => state.lastCid[sid] || lastChannelsAll()[sid] || null;
+function rememberChannel(sid, cid) {
+  const all = lastChannelsAll();
+  if (all[sid] === cid) return;
+  lastChannels = { ...all, [sid]: cid };
+  try { localStorage.setItem(LAST_CHANNEL(), JSON.stringify(lastChannels)); } catch { /* fine */ }
+}
+export function topChannel(d) {
+  const cats = d?.categories || [];
+  const rank = c => { const i = cats.indexOf(c.category || ''); return c.category && i >= 0 ? i + 1 : 0; };
+  const ordered = (d?.channels || []).map((c, i) => [c, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([c]) => c);
+  return ordered.find(c => !['voice', 'link'].includes(c.type)) || ordered[0] || null;
+}
 // a server's kept copy is no good any more (left / kicked / deleted): off this device and out of the store
 export function forgetServerCache(sid) {
   const all = { ...readServerCache() };
@@ -2021,7 +2045,8 @@ export async function open(v) {
   const io = (v.kind === 'server' || v.kind === 'channel') && isInst(v.sid) ? instOf(v.sid) : v.kind === 'instance' ? v.inst : null;
   if (io) {
     const c = connections.get(io);
-    if (c) retryInstances(io); // opening a server that isn't connected tries again right away
+    if (c && (c.sleep || c.peeking)) wakeInstance(io); // asleep / disconnected by hand: opening it is waking it
+    else if (c) retryInstances(io); // opening a server that isn't connected tries again right away
     if (!c) { // not in my list: an address of one opens the add-a-server box, anything else goes home
       set({ view: { kind: 'home' } });
       if (v.kind === 'instance') dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'add-instance', url: io } }));
@@ -2052,12 +2077,14 @@ export async function open(v) {
   if (v.kind === 'server') {
     let d = detailOrCached(v.sid) || await refreshServer(v.sid);
     if (!d) { go({ kind: 'home' }, { replace: true }); return; }
-    const cid = state.lastCid[v.sid] && d.channels.some(c => c.cid === state.lastCid[v.sid]) ? state.lastCid[v.sid] : (d.channels.find(c => c.name === 'general') || d.channels[0])?.cid;
+    const last = lastChannelOf(v.sid);
+    const cid = last && d.channels.some(c => c.cid === last) ? last : topChannel(d)?.cid;
     if (cid) go({ kind: 'channel', sid: v.sid, cid }, { replace: true });
     return;
   }
   if (HOME_KINDS.has(v.kind)) lastHome = v;
   set(s => ({ view: v, unread: { ...s.unread, [keyOf(v)]: false }, lastCid: v.kind === 'channel' ? { ...s.lastCid, [v.sid]: v.cid } : s.lastCid }));
+  if (v.kind === 'channel') rememberChannel(v.sid, v.cid);
   try { localStorage.setItem('velora_chat_last', location.hash); } catch { /* fine */ }
   if (v.kind === 'channel') {
     const have = detailOrCached(v.sid);

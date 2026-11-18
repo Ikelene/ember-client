@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { pinMenuItems } from './DmPins.jsx';
 import { chanKey } from './dmPinsCore.js';
-import { ChevronRight, Check, Hash, Copy, Link2, BellOff, Bell, CheckCheck, UserPlus, Settings, LogOut, Pencil, Trash2, Reply, User, MessageCircle, ExternalLink, Image as ImageIcon, Code2, Forward, Pin, Download, SmilePlus, BookmarkPlus, Bookmark, BookmarkCheck, Languages, Ellipsis, RefreshCw, LogIn, ShieldCheck, BellRing, Flag, Ban, Info, Users } from 'lucide-react';
+import { ChevronRight, Check, Hash, Copy, Link2, BellOff, Bell, CheckCheck, UserPlus, Settings, LogOut, Pencil, Trash2, Reply, User, MessageCircle, ExternalLink, Image as ImageIcon, Code2, Forward, Pin, Download, SmilePlus, BookmarkPlus, Bookmark, BookmarkCheck, Languages, Ellipsis, RefreshCw, LogIn, ShieldCheck, BellRing, Flag, Ban, Info, Users, Unplug, Plug } from 'lucide-react';
 import { openReactionsView } from './ReactionsView.jsx';
 import { apiFetch } from '../api.js';
 import { plainText } from './tokens.js';
@@ -186,7 +186,7 @@ export function serverMenu(e, s, { onInvite, onSettings, onLeave, admin: isAdmin
   ]);
 }
 // right-click on a server of an instance (its icon on the rail). srv = the community once I'm in it, whatever state the connection is in.
-export function instanceMenu(e, inst, srv, { onInvite, onSettings, onLeave, onLogin, onRemove, onReconnect }) {
+export function instanceMenu(e, inst, srv, { onInvite, onSettings, onLeave, onLogin, onRemove, onReconnect, onDisconnect }) {
   const name = srv?.name || inst.community?.name || inst.name;
   const here = srv && inst.status === 'open';
   const admin = here && (has(srv.perms, P.MANAGE_SERVER) || has(srv.perms, P.MANAGE_ROLES) || inst.isAdmin);
@@ -205,7 +205,9 @@ export function instanceMenu(e, inst, srv, { onInvite, onSettings, onLeave, onLo
     here && inst.user && canNick(srv.sid, true) && { label: 'Change nickname', icon: Pencil, onClick: () => changeNick(srv.sid, getState().members[srv.sid]?.find(x => x.id === inst.user.id) || { ...inst.user, nick: null }, true) },
     admin && { label: 'Server settings', icon: Settings, onClick: onSettings },
     { label: 'Copy URL', icon: Link2, onClick: () => copy(inst.origin, 'Server URL copied') },
-    inst.status !== 'connecting' && { label: 'Reconnect', icon: RefreshCw, onClick: onReconnect },
+    inst.sleep ? { label: 'Connect', icon: Plug, hint: inst.sleep === 'manual' ? 'You disconnected it' : 'Asleep (sleep mode)', onClick: onReconnect }
+      : inst.status !== 'connecting' && { label: 'Reconnect', icon: RefreshCw, onClick: onReconnect },
+    !inst.sleep && onDisconnect && { label: 'Disconnect', icon: Unplug, hint: 'Stays off until you open it', onClick: onDisconnect },
     inst.status === 'login' && inst.needsVelora && { label: 'Sign in with Nookara', icon: ShieldCheck, onClick: onLogin },
     inst.status === 'login' && !inst.needsVelora && inst.mode === 'local' && { label: 'Log in', icon: LogIn, onClick: onLogin },
     'sep',

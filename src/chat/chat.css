@@ -2075,6 +2075,7 @@ a.vc-appdl-opt { text-decoration: none; }
 .vc-ring { display: block; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .22); border-top-color: #fff; box-sizing: border-box; animation: vc-ring-spin .8s linear infinite; }
 .vc-rail-ring { position: absolute; left: 50%; top: 50%; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-width: 2.5px; z-index: 2; pointer-events: none; }
 .vc-gate-ring { width: 46px; height: 46px; margin: 0 auto; }
+.vc-rail-sleep { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2; display: grid; place-items: center; color: #fff; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .6)); }
 @keyframes vc-ring-spin { to { transform: rotate(360deg); } }
 /* a server still connecting, shown from its kept channel list: greyed list, a loader where the messages go, grey lines for members */
 .vc-side-cached > * { opacity: .5; filter: grayscale(1); transition: opacity .3s, filter .3s; }

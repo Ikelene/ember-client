@@ -1,7 +1,7 @@
 // What shows where there's nothing to show yet: a server whose instance isn't connected / signed in (instead of its channels),
 // and Velora-only places (friends, DMs, groups) while you're signed out of Velora.
 import { useEffect, useState } from 'react';
-import { ShieldCheck, LogIn, RefreshCw, Users, Server, TriangleAlert, Trash2, KeyRound, Globe, Ban, LifeBuoy, LogOut, UserRound, Cake, ExternalLink } from 'lucide-react';
+import { ShieldCheck, LogIn, RefreshCw, Users, Server, TriangleAlert, Trash2, KeyRound, Globe, Ban, LifeBuoy, LogOut, UserRound, Cake, ExternalLink, Moon, Unplug } from 'lucide-react';
 import { useChat, go, toast, errorText, ask, RESTRICTED_TEXT } from './store.js';
 import { initials } from './Parts.jsx';
 import { reconnect, joinCommunity, removeInstance } from './instances.js';
@@ -111,6 +111,14 @@ export function InstanceGate({ origin }) {
   const remove = <button type="button" className="btn btn-surface" onClick={async () => { if (await ask({ title: `Remove ${name}?`, text: `${host} leaves your server list. Your account there stays as it is - you can add it again any time.`, confirm: 'Remove from list', danger: true })) removeInstance(origin); }}><Trash2 size={15} /> Remove from list</button>;
 
   if ((status === 'connecting' && !inst.failed) || (srv && status === 'open')) return <Box spin title={`Connecting to ${name || host}`}><p>Establishing connection to chat server</p><small className="vc-gate-host"><Globe size={12} /> {host}</small></Box>;
+  if (status === 'asleep') { // sleep mode let it go, or you disconnected it: opening it again is one click
+    return (
+      <Box icon={inst.sleep === 'manual' ? <Unplug size={34} /> : <Moon size={34} />} title={inst.sleep === 'manual' ? `You disconnected ${name || host}` : `${name || host} is asleep`}>
+        <p>{inst.sleep === 'manual' ? 'It stays off until you connect it again.' : "Nobody was chatting there, so Ember let it go to save data. It checks for new messages every few minutes."}</p>
+        <div className="vc-gate-btns"><button type="button" className="btn btn-primary" onClick={() => reconnect(origin)}><RefreshCw size={15} /> Connect</button></div>
+      </Box>
+    );
+  }
   if (status === 'login') {
     return (
       <Box icon={<KeyRound size={34} />} title={`Signed out of ${host}`}>
