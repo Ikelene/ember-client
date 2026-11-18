@@ -324,11 +324,13 @@ body:has(.vc-sign-banner) .vc-notify-banner { top: 52px; } /* (the notifications
 .vc-typing.on { opacity: 1; transform: none; }
 .vc-typing b { color: var(--text); }
 .vc-dots { display: inline-flex; gap: 3px; }
-.vc-dots i, .vc-loading i { display: block; width: 5px; height: 5px; background: var(--dim); animation: vc-dot 1.2s ease-in-out infinite; }
-.vc-dots i:nth-child(2), .vc-loading i:nth-child(2) { animation-delay: .15s; }
-.vc-dots i:nth-child(3), .vc-loading i:nth-child(3) { animation-delay: .3s; }
-.vc-loading { display: flex; justify-content: center; gap: 6px; padding: 20px; }
-.vc-loading i { width: 8px; height: 8px; background: var(--accent); }
+.vc-dots i { display: block; width: 5px; height: 5px; background: var(--dim); animation: vc-dot 1.2s ease-in-out infinite; }
+.vc-dots i:nth-child(2) { animation-delay: .15s; }
+.vc-dots i:nth-child(3) { animation-delay: .3s; }
+/* every loader is the ring (the bouncing dots are only for "is typing") */
+.vc-loading { display: flex; justify-content: center; padding: 20px; }
+.vc-loading i { display: none; }
+.vc-loading::before { content: ''; display: block; width: 26px; height: 26px; border-radius: 50%; border: 3px solid var(--border-2); border-top-color: var(--text); box-sizing: border-box; animation: vc-ring-spin .8s linear infinite; }
 
 /* ── member list + side panels ── */
 .vc-members, .vc-dm-side, .vc-results { flex: none; overflow-y: auto; border-left: 1px solid var(--border); animation: vc-slide-l .3s cubic-bezier(.2, .8, .2, 1); scrollbar-width: thin; scrollbar-color: #2a2a30 transparent; }
@@ -2079,6 +2081,12 @@ a.vc-appdl-opt { text-decoration: none; }
 @keyframes vc-ring-spin { to { transform: rotate(360deg); } }
 /* a server still connecting, shown from its kept channel list: greyed list, a loader where the messages go, grey lines for members */
 .vc-side-cached > * { opacity: .5; filter: grayscale(1); transition: opacity .3s, filter .3s; }
+.vc-waking { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+.vc-frozen { flex: 1; min-height: 0; display: flex; flex-direction: column; filter: grayscale(1); opacity: .4; pointer-events: none; user-select: none; }
+.vc-waking .vc-convo-wait { position: absolute; inset: 0; color: var(--text); }
+.vc-waking .vc-convo-wait span { padding: 4px 10px; border-radius: 8px; background: var(--panel); }
+.vc-composer.connecting .vc-input { cursor: not-allowed; opacity: .55; }
+.vc-composer.connecting button { pointer-events: none; opacity: .4; }
 .vc-convo-wait { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; color: var(--muted); font-size: 13.5px; text-align: center; }
 .vc-mem-skel { display: flex; flex-direction: column; gap: 14px; padding: 18px 8px; }
 .vc-mem-skel i { display: block; border-radius: 6px; background: var(--border-2); animation: vc-skel 1.4s ease-in-out infinite; animation-delay: var(--d, 0ms); }
@@ -2088,7 +2096,7 @@ a.vc-appdl-opt { text-decoration: none; }
 .vc-mem-skel-av { flex: none; width: 32px; height: 32px; border-radius: 50% !important; }
 .vc-mem-skel-line { height: 10px; }
 @keyframes vc-skel { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
-.vc.still .vc-ring, .vc .vc-ring { animation: vc-ring-spin .8s linear infinite !important; } /* (a loader that stops looks broken: it keeps going with animations off) */
+.vc.still .vc-ring, .vc .vc-ring, .vc.still .vc-loading::before, .vc .vc-loading::before, .vc.still .vc-thinking::before, .vc .vc-thinking::before { animation: vc-ring-spin .8s linear infinite !important; } /* (a loader that stops looks broken: it keeps going with animations off) */
 .vc-inst-card { margin-bottom: 12px; }
 .vc-inst-card small { display: flex; align-items: center; gap: 5px; }
 .vc-gap-top { margin-top: 12px; }

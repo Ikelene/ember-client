@@ -69,9 +69,8 @@
 .vc-int-who:hover b { color: var(--text); text-decoration: underline; }
 .vc-cmd-used { color: var(--accent); font-weight: 600; }
 .vc-thinking { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 14px; padding: 2px 0; }
-.vc-thinking i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: vc-think 1.2s infinite ease-in-out; }
-.vc-thinking i:nth-child(2) { animation-delay: .15s; }
-.vc-thinking i:nth-child(3) { animation-delay: .3s; }
+.vc-thinking i { display: none; }
+.vc-thinking::before { content: ''; display: block; width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--border-2); border-top-color: var(--muted); box-sizing: border-box; animation: vc-ring-spin .8s linear infinite; }
 .vc-thinking span { margin-left: 6px; }
 @keyframes vc-think { 0%, 80%, 100% { opacity: .25; transform: scale(.8); } 40% { opacity: 1; transform: scale(1); } }
 .vc-eph-note { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; color: var(--muted); }

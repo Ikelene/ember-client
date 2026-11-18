@@ -4,7 +4,9 @@
 import { clientPath, clientUrl, onEmberHost, AUTH_POPUP_URL, AUTH_ORIGINS } from './hosts.js';
 import { getToken, isWebBonfire } from '../api.js';
 import { dropVeloraSessions } from './instances.js';
-import { toast } from './store.js';
+import { toast, stopKeepingMessages } from './store.js';
+import { forgetAccount as forgetKeptMessages } from './msgCache.js';
+import { acctKey } from './ids.js';
 
 const STATE = 'bonfire_signin_state', BACK = 'bonfire_signin_back';
 export const hasVelora = () => !!getToken();
@@ -102,11 +104,14 @@ export const SIGNIN_TEXT = { declined: 'Sign-in was cancelled.', state: "That si
 
 // forget Ember's Velora sign-in (and the sessions it opened on Velora-login servers) and start over signed out
 export function endSession(notice) {
+  // this account's kept messages (msgCache.js) go first: nothing new is written, the delete gets a moment before the reload
+  stopKeepingMessages();
+  const kept = Promise.race([forgetKeptMessages(acctKey('a')).catch(() => {}), new Promise(r => setTimeout(r, 1500))]);
   dropVeloraSessions(); // (while bonfire_user still says whose sessions they are)
   try { indexedDB.deleteDatabase('nke1'); window.BonfireNotifications?.postMessage(JSON.stringify({ type: 'dm_key', kid: '', jwk: null })); } catch { /* */ } // this device's DM keys go too, it takes a PIN to read them again
   try { forgetAccount(localStorage.getItem('bonfire_user') || ''); localStorage.removeItem('bonfire_token'); localStorage.removeItem('bonfire_user'); localStorage.removeItem('bonfire_me_cache_v2'); if (notice) sessionStorage.setItem('bonfire_notice', notice); } catch { /* fine */ }
   history.replaceState(null, '', clientUrl('#/home'));
-  location.reload();
+  kept.then(() => location.reload());
 }
 // Settings > Sign out: tell Velora, drop Ember's token. The website's own session is untouched.
 export async function signOutVelora() {

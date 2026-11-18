@@ -254,13 +254,48 @@ const sleepOn = () => getState().settings?.sleep_servers !== false;
 const inVoiceOn = origin => { const v = getState().voice; return !!v && [v.room, v.info?.sid, v.info?.cid].some(k => k && instOf(String(k)) === origin); };
 const unreadSig = origin => JSON.stringify(getState().servers.filter(x => x.inst === origin).map(x => [x.sid, x.unread ? 1 : 0, x.mentions || 0]));
 function sleepInstance(c, why) {
-  clearTimeout(c.timer); clearTimeout(c.peekT);
+  clearTimeout(c.timer); clearTimeout(c.peekT); c.peekT = null;
   c.retry = 0; c.retryAt = 0; c.failed = false; c.peeking = false;
   c.sleep = why; c.sleepSig = unreadSig(c.origin);
-  const ws = c.ws; c.ws = null; try { ws?.close(1000, 'sleep'); } catch { /* gone */ }
+  const ws = c.ws; c.ws = null;
+  const close = () => { try { ws?.close(1000, 'sleep'); } catch { /* gone */ } };
+  if (why === 'manual' && c.wakeT) { // (it was asleep with a sign-up: off for real now, not "here")
+    clearInterval(c.wakeT); c.wakeT = null;
+    apiFetch('/api/v1/wake', { method: 'DELETE', inst: c.origin }).catch(() => {});
+  }
+  // a server that can ping us (features.wake): sign up first, so we stay "here" on it and hear when something new arrives. The socket
+  // closes once the sign-up is in (or after 3 s), so the server never sees us gone in between
+  if (why === 'idle' && c.info?.features?.wake && c.session) { const t = setTimeout(close, 3000); signUpWake(c).finally(() => { clearTimeout(t); close(); }); }
+  else { if (why === 'idle') c.peekT = setTimeout(() => peek(c), PEEK_EVERY); close(); }
   instanceVoiceClosed(c.origin);
   c.status = 'asleep'; c.error = null; mirror();
-  if (why === 'idle') c.peekT = setTimeout(() => peek(c), PEEK_EVERY);
+}
+// the wake sign-up (ember-server PROTOCOL §7.2): renewed while it sleeps. A server that can't ping (pings: false), or one that
+// didn't answer, gets the old look every few minutes instead
+const WAKE_RENEW = 2 * 60e3;
+function signUpWake(c) {
+  const fallback = () => { if (c.sleep === 'idle' && !c.peekT) c.peekT = setTimeout(() => peek(c), PEEK_EVERY); };
+  const go = () => apiFetch('/api/v1/wake', { method: 'POST', inst: c.origin })
+    .then(r => { c.wakePings = !!r?.pings; if (!c.wakePings) fallback(); })
+    .catch(() => fallback());
+  const first = go();
+  clearInterval(c.wakeT);
+  c.wakeT = setInterval(() => { if (c.sleep !== 'idle' || connections.get(c.origin) !== c) { clearInterval(c.wakeT); c.wakeT = null; return; } go(); }, WAKE_RENEW);
+  return first;
+}
+// Nookara's socket came back: a ping could have gone missing while it was down, so each server asleep with pings has one look
+export function recheckSleepers() {
+  for (const c of connections.values()) {
+    if (c.sleep !== 'idle' || !c.wakePings || c.peekT) continue;
+    c.peekT = setTimeout(() => { c.peekT = null; peek(c); }, 2000 + Math.random() * 20000);
+  }
+}
+// Nookara passed on a ping from a sleeping server (store.js instance_wake): something new there. Marked unread; it connects when opened
+export function instanceWoke(origin) {
+  const c = connections.get(normOrigin(origin));
+  if (!c || c.sleep !== 'idle') return; // (connected in this window, or disconnected by hand: not ours to mark)
+  patchState(s => ({ servers: s.servers.map(x => (x.inst === c.origin ? { ...x, unread: true } : x)) }));
+  c.sleepSig = null; // (a look, if one happens, keeps it awake)
 }
 function peek(c) {
   if (connections.get(c.origin) !== c || c.sleep !== 'idle' || held) return;
@@ -279,7 +314,7 @@ export function wakeInstance(origin) {
   const c = connections.get(origin);
   if (!c) return;
   if (c.sleep === 'manual') writeManual(origin, false);
-  clearTimeout(c.peekT);
+  clearTimeout(c.peekT); clearInterval(c.wakeT); c.wakeT = null; // (connecting ends the wake sign-up on the server)
   const was = c.sleep || c.peeking;
   c.sleep = null; c.peeking = false; c.activeAt = Date.now();
   if (was && c.status === 'asleep') { c.status = 'connecting'; mirror(); }
@@ -391,7 +426,10 @@ const onScreen = origin => { const v = getState().view; return v.inst === origin
 export function forgetIfEmpty(origin) {
   if (connections.has(origin) && !getState().servers.some(x => x.inst === origin)) removeInstance(origin);
 }
-const newConn = (origin, info) => ({ origin, info: info || null, session: loadSessions()[origin] || null, user: null, ws: null, status: 'connecting', retry: 0, acks: new Map(), isAdmin: false, isOwner: false });
+const newConn = (origin, info) => {
+  const off = readManual().has(origin); // (disconnected by hand: stays off, even after a reload, until it's opened or reconnected)
+  return { origin, info: info || null, session: loadSessions()[origin] || null, user: null, ws: null, status: off ? 'asleep' : 'connecting', sleep: off ? 'manual' : null, retry: 0, acks: new Map(), isAdmin: false, isOwner: false };
+};
 function addConnection(origin, info) {
   let c = connections.get(origin);
   if (c) return c;
@@ -578,6 +616,8 @@ export async function removeInstance(origin, { sync = true } = {}) {
   const c = connections.get(origin);
   if (!c) return;
   { const a = readAdds(); if (a.delete(origin)) writeAdds(a); }
+  writeManual(origin, false); clearTimeout(c.peekT); clearInterval(c.wakeT); c.wakeT = null;
+  if (c.session && c.sleep) await fetch(`${origin}/api/v1/wake`, { method: 'DELETE', headers: { Authorization: `Bearer ${c.session}` } }).catch(() => {}); // (not "here" any more)
   if (c.session) await fetch(`${origin}/api/v1/auth/logout`, { method: 'POST', headers: { Authorization: `Bearer ${c.session}` } }).catch(() => {});
   clearTimeout(c.timer);
   connections.delete(origin);

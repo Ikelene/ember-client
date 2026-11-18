@@ -17,7 +17,8 @@ import { applyUserUpdate, instancesWithAccount } from './userUpdate.js';
 import { findPending, dropSettled, wireText, settle } from './pending.js';
 import { VELORA, K, parseK, instOf, bare, isInst, normOrigin, acctKey } from './ids.js';
 import { myIdOn } from './tokens.js';
-import { connections, sendTo, startInstances, loadInstanceData, retryInstances, renewVeloraSession, holdInstances, forgetIfEmpty, wakeInstance } from './instances.js';
+import { readChannel as readMsgCache, writeChannel as writeMsgCache, dropChannels as dropMsgCache } from './msgCache.js';
+import { connections, sendTo, startInstances, loadInstanceData, retryInstances, renewVeloraSession, holdInstances, forgetIfEmpty, wakeInstance, instanceWoke, recheckSleepers } from './instances.js';
 import { attachmentRefs } from './signing-payload.js';
 import { spoilerName } from './spoiler.js';
 import { prepareInstanceAttachments } from './attachment-preparation.js';
@@ -633,6 +634,9 @@ function onEvent(m, inst = VELORA) {
         commands: s.commands[m.server] ? { ...s.commands, [m.server]: { ...s.commands[m.server], bots: s.commands[m.server].bots.map(b => (String(b.id) === String(m.user_id) ? { ...b, online: m.presence === 'online' } : b)) } } : s.commands,
       }));
       break;
+    case 'instance_wake': // (from Nookara) a server that's asleep here has something new: unread on the rail
+      if (inst === VELORA && m.instance) instanceWoke(m.instance);
+      break;
     case 'chat_server_removed':
       forgetServerCache(m.server);
       set(s => ({ servers: s.servers.filter(x => x.sid !== m.server), detail: Object.fromEntries(Object.entries(s.detail).filter(([k]) => k !== m.server)) }));
@@ -1032,6 +1036,7 @@ export async function loadMessages(v, { older = false } = {}) {
 export async function catchUp(inst = VELORA) {
   restoreOutbox(); // (once: the first socket that's up)
   flushOutbox(inst);
+  if (inst === VELORA) recheckSleepers(); // (a wake ping may have been missed while Nookara's socket was down)
   // the open server was showing its kept channel list: the real one, and its members, now that it's connected
   const cv = state.view;
   if (cv.kind === 'channel' && (isInst(cv.sid) ? instOf(cv.sid) === inst : inst === VELORA) && state.detail[cv.sid]?.cached) {
@@ -1761,9 +1766,36 @@ export function topChannel(d) {
   const ordered = (d?.channels || []).map((c, i) => [c, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([c]) => c);
   return ordered.find(c => !['voice', 'link'].includes(c.type)) || ordered[0] || null;
 }
+// ── a small page of each server channel's messages kept in this browser (msgCache.js), shown greyed while that server connects ──
+const savedSig = new Map(); // key -> what was last written (so a socket event that changes nothing writes nothing)
+let keepingMessages = true;
+// signing out: nothing more is written, and what's waiting to be is dropped (session.js then deletes what's kept)
+export function stopKeepingMessages() { keepingMessages = false; clearTimeout(msgCacheT); }
+let msgCacheT = null, msgCacheSeen = null;
+subscribe(() => {
+  if (state.msgs === msgCacheSeen) return;
+  msgCacheSeen = state.msgs;
+  clearTimeout(msgCacheT);
+  msgCacheT = setTimeout(() => {
+    const account = acctKey('a');
+    for (const [key, b] of Object.entries(state.msgs)) {
+      if (!key.startsWith('c:') || !b?.loaded || b.error || !state.detail[serverOfChannel(key.slice(2))]) continue;
+      const done = b.list.filter(m => !m.pending);
+      const sig = done.slice(-30).map(m => `${m.id}:${m.edited_at || ''}:${(m.reactions || []).length}`).join(',');
+      if (!sig || savedSig.get(key) === sig) continue;
+      savedSig.set(key, sig);
+      if (!keepingMessages) return;
+      writeMsgCache(account, `${account}|${key}`, done).catch(() => {});
+    }
+  }, 4000);
+});
+const serverOfChannel = cid => Object.keys(state.detail).find(sid => state.detail[sid]?.channels?.some(c => c.cid === cid));
+export const cachedMessages = view => (view?.kind === 'channel' ? readMsgCache(`${acctKey('a')}|${keyOf(view)}`) : Promise.resolve(null));
 // a server's kept copy is no good any more (left / kicked / deleted): off this device and out of the store
 export function forgetServerCache(sid) {
   const all = { ...readServerCache() };
+  const cids = (all[sid]?.channels || state.detail[sid]?.channels || []).map(c => c.cid);
+  if (cids.length) { const a = acctKey('a'); dropMsgCache(a, cids.map(cid => `${a}|c:${cid}`)).catch(() => {}); }
   if (all[sid]) { delete all[sid]; serverCache = all; try { localStorage.setItem(SERVER_CACHE(), JSON.stringify(all)); } catch { /* fine */ } }
   if (state.detail[sid]?.cached) set(s => { const detail = { ...s.detail }; delete detail[sid]; return { detail }; });
 }

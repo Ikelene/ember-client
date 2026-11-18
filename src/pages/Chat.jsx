@@ -17,7 +17,7 @@ import { Hash, Lock, Users, Menu, ChevronLeft, Search, X, AtSign, UsersRound, Lo
 import { reportDmUser } from '../chat/report.js';
 import { api, getToken, cachedMe, apiFetch, isWebBonfire } from '../api.js';
 import { applyAccentColor } from '../theme.js';
-import { jumpToMessage, loginAgain, retryNow, useBotPeer, isMobileDevice } from '../chat/store.js';
+import { jumpToMessage, loginAgain, retryNow, useBotPeer, isMobileDevice, cachedMessages } from '../chat/store.js';
 import { BotTag } from '../chat/Bots.jsx';
 import { useChat, init, open, go, readHash, keyOf, loadGroups, loadMembers, toast, errorText, getState, ask, unreadTotals } from '../chat/store.js';
 import { Rail, ServerSidebar, HomeSidebar, MemberList, UserPanel, VoiceQuotaNote, OutdatedNote, useConnLost } from '../chat/Parts.jsx';
@@ -78,6 +78,19 @@ import { aliasOf, shownName } from '../chat/aliases.js';
 
 function meFrom(d) {
   return { id: d.account.id != null ? String(d.account.id) : undefined, username: d.account.username, pfp: d.profile.pfp || null, color: d.profile.color || null, rank: d.account.rank, pro: !!d.account.pro };
+}
+
+// a server still connecting: the messages kept from last time (msgCache.js), greyed and black and white behind the loader
+function KeptMessages({ view, title }) {
+  const [list, setList] = useState(null);
+  useEffect(() => {
+    let live = true;
+    setList(null);
+    cachedMessages(view).then(l => { if (live) setList(l && l.length ? l : null); }).catch(() => {});
+    return () => { live = false; };
+  }, [view.sid, view.cid]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!list) return null;
+  return <div className="vc-frozen" aria-hidden="true"><MessageList view={view} title={title} frozen={list} onUser={() => {}} onReply={() => {}} canPost={false} canMod={false} /></div>;
 }
 
 // desktop app: the middle of its title bar says where you are (server / DM / group)
@@ -609,8 +622,11 @@ function ChatPage() {
               <div className="vc-convo" key={keyOf(view)}>
                 {view.kind === 'dm' && !sysDM && <DmCallBar username={view.username} />}
                 {wakeGate ? <InstanceGate origin={instOf(view.sid)} /> : waking ? <>
-                  <div className="vc-convo-wait" role="status"><i className="vc-ring vc-gate-ring" aria-hidden="true" /><span>Establishing connection to chat server</span></div>
-                  <Composer view={view} replyTo={replyTo} setReplyTo={setReplyTo} sendOff placeholder={`Message #${channel?.name || ''}`} />
+                  <div className="vc-waking">
+                    <KeptMessages view={view} title={title} />
+                    <div className="vc-convo-wait" role="status"><i className="vc-ring vc-gate-ring" aria-hidden="true" /><span>Establishing connection to chat server</span></div>
+                  </div>
+                  <Composer view={view} replyTo={replyTo} setReplyTo={setReplyTo} sendOff placeholder="Connecting to the chat server..." />
                 </> : channel?.type === 'game' && !(channel.config?.setup && channel.config?.purpose === 'chat') ? <GameChannel channel={channel} sid={view.sid} /> : channel?.type === 'voice' ? <VoiceView channel={channel} sid={view.sid} /> : channel?.type === 'roles' ? <RoleShop channel={channel} /> : channel?.type === 'starboard' ? <Starboard channel={channel} sid={view.sid} /> : channel?.type === 'link' ? (
                   <div className="vc-linkch">
                     <ExternalLink size={34} />

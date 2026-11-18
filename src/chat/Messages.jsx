@@ -686,9 +686,11 @@ function Translation({ tr, ctx, onHide }) {
 
 const motionOK = el => { try { return !el.closest('.vc.still') && !matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
 
-export function MessageList({ view, onUser, onReply, canPost, canMod, channels, title }) {
+// frozen: messages kept from the last visit (msgCache.js), shown greyed while the server connects - nothing loads or reacts
+export function MessageList({ view, onUser, onReply, canPost, canMod, channels, title, frozen = null }) {
   const key = keyOf(view);
-  const box = useChat(s => s.msgs[key]);
+  const live = useChat(s => s.msgs[key]);
+  const box = frozen ? { list: frozen, loaded: true, hasMore: true } : live;
   const me = useChat(s => (view.sid && isInst(view.sid) ? s.instances.find(i => i.origin === instOf(view.sid))?.user?.username : s.me?.username)); // who I am in this conversation (an instance has its own account for me)
   const scroller = useRef(null);
   const stick = useRef(true);
@@ -825,7 +827,7 @@ export function MessageList({ view, onUser, onReply, canPost, canMod, channels, 
     const el = scroller.current;
     stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
     prevH.current = el.scrollHeight;
-    if (el.scrollTop < 120 && box?.hasMore && !box.loading) loadMessages(view, { older: true });
+    if (!frozen && el.scrollTop < 120 && box?.hasMore && !box.loading) loadMessages(view, { older: true });
   }
   // images loading in push the bottom down: stay stuck
   function onLoadCapture() { if (stick.current && scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight; }
@@ -953,7 +955,7 @@ function StickerView({ s, sid }) {
   );
 }
 
-// sendOff: the server is still connecting (its kept channel list is showing): typing works, sending waits until it's up
+// sendOff: the server is still connecting (its kept channel list is showing): the box is there but can't be typed in or sent yet
 function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo, setReplyTo, sendOff = false }) {
   const timedOut = useTimedOut(view.kind === 'channel' ? view.sid : null); // (on an instance: a timeout hides the box until it ends)
   const locked = lockedBy || !!timedOut;
@@ -1413,7 +1415,7 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
           <button type="button" onClick={voice.clearError} title="Dismiss"><X size={14} /></button>
         </div>
       )}
-      <div className={`vc-composer${replyTo || srActive ? ' replying' : ''}${voice.active ? ' recording' : ''}`}>
+      <div className={`vc-composer${replyTo || srActive ? ' replying' : ''}${voice.active ? ' recording' : ''}${sendOff ? ' connecting' : ''}`} aria-disabled={sendOff || undefined}>
         {(view.kind !== 'channel' || canAttach) && view.username !== 'System' && !voice.active && (
           <button type="button" className="vc-ico-btn" title="Upload a file" onClick={uploadMenu}><Plus size={18} /></button>
         )}
@@ -1424,7 +1426,7 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
         <input ref={file} type="file" multiple hidden onChange={e => { const once = destOnce.current; destOnce.current = null; addFiles(e.target.files, once); e.target.value = ''; }} />
         <input ref={saveFile} type="file" multiple hidden accept={pictureAccept('image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm,video/quicktime,audio/*')} onChange={e => { addSavedFiles(e.target.files); e.target.value = ''; }} />
         <div
-          ref={ta} className="vc-input" style={cmd || voice.active ? { display: 'none' } : undefined} contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true"
+          ref={ta} className="vc-input" style={cmd || voice.active ? { display: 'none' } : undefined} contentEditable={!sendOff} suppressContentEditableWarning role="textbox" aria-multiline="true" aria-disabled={sendOff || undefined}
           data-placeholder={placeholder} spellCheck autoCorrect="on" autoCapitalize="sentences" inputMode="text"
           onInput={onInput}
           onCompositionStart={() => { composing.current = true; }}
