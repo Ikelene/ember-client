@@ -53,6 +53,8 @@ export function SetupWizard({ origin, onClose, name: givenName = '' }) {
   const claim = () => run(async () => {
     await call('/instance/claim', { method: 'POST', body: JSON.stringify({ code: code.trim(), accept_operator_terms: true }) });
     await refreshInstance(origin);
+    // the server is already made (its owner switched accounts mode and claimed it back): it's theirs again, nothing to set up
+    if (inst.community) { await loadInstanceData(origin); toast(`You own ${name} now.`, true); onClose(); return; }
     await loadCfg();
   });
   // the server and the instance are one thing: this form names both
@@ -101,7 +103,7 @@ export function SetupWizard({ origin, onClose, name: givenName = '' }) {
           {err && <p className="vc-err"><TriangleAlert size={14} /> {err}</p>}
           {step === 0 && (
             <>
-              <p className="vc-dialog-sub">Nobody owns this server yet. Enter its setup code to become the owner. The code is printed in the server's console when it starts, and saved in <span className="vc-mono">setup-code.txt</span> in its data folder.</p>
+              <p className="vc-dialog-sub">{inst.community ? `${name} needs its owner back: it switched how people log in, so the owner's old account can't. Enter the setup code to become the owner - the server and everything in it stay as they are.` : 'Nobody owns this server yet. Enter its setup code to become the owner.'} The code is printed in the server's console when it starts, and saved in <span className="vc-mono">setup-code.txt</span> in its data folder.</p>
               <label className="vc-field"><span>Setup code</span><input className="form-input vc-mono vc-narrow" autoFocus placeholder="XXXX-XXXX" maxLength={9} value={code} onChange={e => setCode(e.target.value.toUpperCase())} onKeyDown={e => { if (e.key === 'Enter' && code.trim() && terms) claim(); }} /></label>
               <OperatorTermsCheck checked={terms} onChange={setTerms} />
               <Foot onNext={claim} nextLabel="Claim this server" disabled={!code.trim() || !terms} canSkip={false} close={close} />

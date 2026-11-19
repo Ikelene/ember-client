@@ -66,7 +66,8 @@ export function AddInstance({ url, invite, onClose, onSetup, onCreate }) {
   async function authed(got, f = found) {
     const { origin } = f;
     const c = await addInstance(origin, f.info, got);
-    if (f.info.claimed === false || (!f.info.community && c.isAdmin)) { onSetup?.(origin); return; }
+    // (a server waiting for its owner to claim it back after switching accounts mode still has its community: people join it as usual)
+    if ((f.info.claimed === false && !f.info.community) || (!f.info.community && c.isAdmin)) { onSetup?.(origin); return; }
     setStep('join');
   }
   async function viaVelora() {
@@ -115,7 +116,7 @@ export function AddInstance({ url, invite, onClose, onSetup, onCreate }) {
             <>
               <InstanceCard origin={found.origin} info={info} />
               {info.community?.description && <p className="vc-dialog-sub">{info.community.description}</p>}
-              {(info.claimed === false || !info.community) && <p className="vc-note"><Server size={14} /> {info.claimed === false ? 'Nobody owns this server yet.' : "This server isn't set up yet."} {info.accounts_mode === 'local' ? 'Make an account' : 'Connect'}{info.claimed === false ? ' and you can set it up with its setup code.' : '.'}</p>}
+              {(info.claimed === false || !info.community) && <p className="vc-note"><Server size={14} /> {info.claimed === false ? (info.community ? 'This server is waiting for its owner to claim it back.' : 'Nobody owns this server yet.') : "This server isn't set up yet."} {info.accounts_mode === 'local' ? 'Make an account' : 'Connect'}{info.claimed === false ? (info.community ? ' and, if it\'s yours, claim it with its setup code.' : ' and you can set it up with its setup code.') : '.'}</p>}
               {info.accounts_mode === 'velora' ? (
                 <>
                   {!hasVelora() && <p className="vc-note"><ShieldCheck size={14} /> This server uses Nookara accounts. Sign in with Nookara first, then connect.</p>}
@@ -145,6 +146,7 @@ export function AddInstance({ url, invite, onClose, onSetup, onCreate }) {
               <InstanceCard origin={found.origin} info={info} />
               {info.community?.description && <p className="vc-dialog-sub">{info.community.description}</p>}
               {member && <p className="vc-note ok"><Check size={14} /> You're in this server.</p>}
+              {info.claimed === false && info.community && <p className="vc-note"><KeyRound size={14} /> <span>This server is waiting for its owner to claim it back (it switched how people log in). Is it yours?</span> <button type="button" className="btn btn-surface btn-sm" onClick={() => onSetup?.(found.origin)}>Claim it</button></p>}
               {!member && !info.community && <p className="vc-note"><Server size={14} /> {info.claimed === false ? 'Nobody owns this server yet.' : "Its owner hasn't set it up yet."} It shows up in your list and opens once it's ready.</p>}
               {!member && info.community && asked && <p className="vc-note"><Check size={14} /> Request sent. You'll be let in when someone accepts it.</p>}
               {!member && info.community && !asked && joinHint(info.community.join_policy) && <p className="vc-hint">{joinHint(info.community.join_policy)}</p>}
@@ -182,6 +184,7 @@ export function InstanceTab({ origin, tab, onDirty }) {
   const [newAdmin, setNewAdmin] = useState('');
   const [la, setLa] = useState({ username: '', password: '' }); // a local admin account, before switching to local accounts
   const [busy, setBusy] = useState('');
+  const [handover, setHandover] = useState(''); // the owner switched to accounts their own isn't: they claim the server back with this after the restart
   const call = (path, o = {}) => apiFetch(`/api/v1${path}`, { inst: origin, ...o });
   useEffect(() => { call('/instance/settings').then(d => { setCfg(d); setF(d); }).catch(e => toast(errorText(e.message))); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // accounts + voice save from the "unsaved changes" bar: dirty = the form differs from what the server has (or a secret is typed)
@@ -196,7 +199,7 @@ export function InstanceTab({ origin, tab, onDirty }) {
   const set = (k, v) => setF(x => ({ ...x, [k]: v }));
   async function save(patch) {
     setBusy('save');
-    try { const d = await call('/instance/settings', { method: 'PATCH', body: JSON.stringify(patch) }); setCfg(d); setF(d); setSecrets({ cf_app_secret: '', cf_turn_token: '' }); if (tab === 'velora') toast('Saved.', true); else flashSaved(); refreshInstance(origin); }
+    try { const d = await call('/instance/settings', { method: 'PATCH', body: JSON.stringify(patch) }); setCfg(d); setF(d); setHandover(d.handover_code || ''); setSecrets({ cf_app_secret: '', cf_turn_token: '' }); if (tab === 'velora') toast('Saved.', true); else flashSaved(); refreshInstance(origin); }
     catch (e) { toast(errorText(e.message)); }
     setBusy('');
   }
@@ -239,6 +242,9 @@ export function InstanceTab({ origin, tab, onDirty }) {
             {cfg.accounts_mode_env && <p className="vc-note"><TriangleAlert size={14} /> This server's environment fixes it (BONFIRE_ACCOUNTS_MODE={cfg.running_accounts_mode}). Remove that variable to change it here.</p>}
             {!cfg.accounts_mode_env && needsRestart && <p className="vc-note"><TriangleAlert size={14} /> {cfg.restart_required && f.accounts_mode === cfg.accounts_mode ? 'Saved - restart the server to switch.' : 'Save, then restart the server to switch.'}
               {cfg.restart_required && f.accounts_mode === cfg.accounts_mode && <button type="button" className="btn btn-surface btn-sm" onClick={() => restartInstance(origin, inst.name)}><RefreshCw size={13} /> Restart now</button>}</p>}
+            {!cfg.accounts_mode_env && inst.isOwner && !handover && (f.accounts_mode || 'velora') !== cfg.running_accounts_mode && <p className="vc-note"><KeyRound size={14} /> Your own account can't log in after the switch. You'll get a code to claim the server back with {(f.accounts_mode || 'velora') === 'velora' ? 'your Nookara account' : 'a local account'} - you stay the owner and keep the server.</p>}
+            {handover && cfg.restart_required && <p className="vc-note"><KeyRound size={14} /> <span>Keep this code: <b className="vc-mono">{handover}</b>. After the restart, {cfg.accounts_mode === 'velora' ? 'connect with your Nookara account' : 'log in with a local account'} and claim the server with it to stay its owner. It's also in <span className="vc-mono">setup-code.txt</span> in the server's data folder and in its log.</span>
+              <button type="button" className="btn btn-surface btn-sm" onClick={() => navigator.clipboard?.writeText(handover).then(() => toast('Copied.', true))}>Copy</button></p>}
             {needLocalAdmin && (
               <div className="bf-ss-reg warn vc-gap-top bf-la">
                 <TriangleAlert size={14} /><span><b>Make a local admin account first.</b> After the switch nobody can sign in with Nookara, so you need an account here with a username and password. It becomes an instance admin with the Administrator role, so you can always get back in and switch back.</span>
