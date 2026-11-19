@@ -17,9 +17,9 @@ const stub = {
 };
 const dir = mkdtempSync(join(tmpdir(), 'ember-text-'));
 const out = join(dir, 'text.mjs');
-writeFileSync(join(dir, 'entry.js'), `export * from ${JSON.stringify(join(root, 'src/chat/text.jsx'))}; export { parseEmberLink } from ${JSON.stringify(join(root, 'src/chat/tokens.js'))};`);
+writeFileSync(join(dir, 'entry.js'), `export * from ${JSON.stringify(join(root, 'src/chat/text.jsx'))}; export { parseEmberLink, isLegacyMessage } from ${JSON.stringify(join(root, 'src/chat/tokens.js'))};`);
 await build({ entryPoints: [join(dir, 'entry.js')], bundle: true, format: 'esm', platform: 'node', outfile: out, plugins: [stub], jsx: 'automatic', logLevel: 'silent', absWorkingDir: root });
-const { renderBody, parseEmberLink } = await import(pathToFileURL(out).href);
+const { renderBody, parseEmberLink, isLegacyMessage } = await import(pathToFileURL(out).href);
 rmSync(dir, { recursive: true, force: true });
 
 const UP = 'https://cdn.nookara.cc/uploads/images/abc123.png';
@@ -93,4 +93,14 @@ test('parseEmberLink: Nookara, instance and message forms; others are not', () =
   assert.equal(parseEmberLink('https://example.com/#/s/s0123456789/c0123456789'), null);
   assert.equal(parseEmberLink('https://ember.nookara.cc/#/dm/someone'), null);
   assert.equal(parseEmberLink('https://ember.nookara.cc/#/s/s0123456789/c0123456789/notanid'), null);
+});
+
+test('join / leave lines keep the person as a mention; a new plain @name in a message is just text', () => {
+  const now = Date.now();
+  assert.equal(isLegacyMessage({ system: true, sys_kind: 'join', created_at: now, body: '@pizzamanx99 just showed up!' }), true);
+  assert.equal(isLegacyMessage({ system: true, sys_kind: 'leave', created_at: now, body: '@Amperes left the server.' }), true);
+  assert.equal(isLegacyMessage({ created_at: now, body: '@someone hi' }), false);
+  assert.equal(isLegacyMessage({ system: true, sys_kind: 'pin', created_at: now, body: '@someone pinned a message' }), false);
+  const line = renderBody('@pizzamanx99 just showed up!', { legacy: true });
+  assert.ok(JSON.stringify(line.nodes).includes('vc-mention'), 'the name is a mention');
 });

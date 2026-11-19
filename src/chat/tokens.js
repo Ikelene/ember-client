@@ -17,7 +17,10 @@ export const channelToken = cid => `<#${bare(cid)}>`;
 
 // messages from before tokens existed still show their plain @name / #name as mentions (nothing pings for them now)
 export const TOKENS_SINCE = Date.parse('2026-11-17T00:00:00Z');
-export const isLegacyMessage = m => !!m?.created_at && new Date(m.created_at).getTime() < TOKENS_SINCE;
+// join / leave lines are written "@name hopped in" by the server (its template puts the account there), so their @name is always a
+// mention, before tokens or after
+const isPersonLine = m => !!m?.system && (m.sys_kind === 'join' || m.sys_kind === 'leave');
+export const isLegacyMessage = m => isPersonLine(m) || (!!m?.created_at && new Date(m.created_at).getTime() < TOKENS_SINCE);
 
 // id -> person, from everything Ember has seen: me, server member lists, people, and message authors.
 // Rebuilt only when one of those lists changes (by reference), so rendering a lot of mentions stays cheap.
