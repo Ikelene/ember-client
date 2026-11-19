@@ -14,11 +14,13 @@ export { E2eeLockedPanel };
 // what isn't a normal message: locked here, can't be opened, a signature that's wrong, waiting for them to set up, from before encryption
 export function E2eeMessageNote({ m, view }) {
   const s = m.sealed;
+  const status = useChat(st => st.e2eeStatus);
   if (m.waiting) return (
     <div className="e2-msg-note"><Clock size={13} /> <span>Waiting for @{view.username} to set up encrypted DMs. It sends by itself once they have, while Ember is open on this device. <button type="button" onClick={() => dropFailed(view, m.nonce)}>Remove</button></span></div>
   );
   // (no per-message 'Not encrypted' line: the lock beside the name at the top says whether the DM is encrypted)
   if (!s) return null;
+  if (s.state === 'locked' && status === 'loading' && E2EE.unlockedBefore()) return <div className="e2-msg-note"><i className="vc-ring e2-ring sm" aria-hidden="true" /> <span>Decrypting...</span></div>;
   if (s.state === 'locked') return <div className="e2-msg-note"><Lock size={13} /> <span>Encrypted. <button type="button" onClick={() => openE2eeGate()}>Unlock your DMs</button> to read this.</span></div>;
   if (s.state === 'failed') return <div className="e2-msg-note bad"><AlertTriangle size={13} /> This device can't open this message. It was sealed to a key you don't have any more.</div>;
   if (s.signature === 'invalid') return <div className="e2-msg-note bad"><AlertTriangle size={13} /> This message's signature doesn't match. It might not really be from them.</div>;

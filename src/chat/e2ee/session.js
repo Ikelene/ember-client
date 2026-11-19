@@ -4,6 +4,7 @@ import { apiFetch } from '../../api.js';
 import * as N from './nke1.js';
 import { mimeOf } from './files.js';
 import * as KS from './keystore.js';
+import { acctKey } from '../ids.js';
 
 // what stretches a DM passcode. 64 MB makes guessing expensive, on a phone it takes a second or two.
 const ARGON = { m: 65536, t: 3, p: 1 };
@@ -21,7 +22,14 @@ let listeners = new Set();
 const status = () => (!me ? 'loading' : keys ? 'ready' : info?.has ? 'locked' : info ? 'none' : 'loading');
 export const getStatus = status;
 export const onChange = fn => { listeners.add(fn); return () => listeners.delete(fn); };
-const changed = () => listeners.forEach(f => f(status()));
+// has this device unlocked DMs for this account before? Remembered here so that, while the keys are still being read after a reload,
+// Ember says it's decrypting instead of asking to unlock again (cleared when the device turns out locked, and on sign-out)
+const UNLOCKED = () => acctKey('ember_e2ee_unlocked');
+export const unlockedBefore = () => { try { return localStorage.getItem(UNLOCKED()) === '1'; } catch { return false; } };
+function rememberUnlocked(st) {
+  try { if (st === 'ready') localStorage.setItem(UNLOCKED(), '1'); else if (st === 'locked' || st === 'none') localStorage.removeItem(UNLOCKED()); } catch { /* fine */ }
+}
+const changed = () => { const st = status(); rememberUnlocked(st); listeners.forEach(f => f(st)); };
 
 // the Android app shows notifications from its own native connection, so it needs the key too (it keeps it in its Keystore-locked storage)
 function shareWithNative(enc_priv) {

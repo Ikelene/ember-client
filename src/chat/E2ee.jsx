@@ -187,6 +187,13 @@ function GateDialog({ first }) {
 // in place of a conversation until this device can read it
 export function E2eeLockedPanel() {
   const status = useChat(s => s.e2eeStatus);
+  // unlocked on this device before: the keys are still being read, not missing
+  if (status === 'loading' && S.unlockedBefore()) return (
+    <div className="e2-panel e2-decrypting" role="status">
+      <i className="vc-ring e2-ring" aria-hidden="true" />
+      <div><b>Decrypting this DM</b><p>Opening your keys on this device. This only takes a moment.</p></div>
+    </div>
+  );
   return (
     <div className="e2-panel">
       <Lock size={22} />
@@ -260,6 +267,7 @@ export function E2eeSettings() {
   const [, bump] = useState(0);
   const [recovery, setRecovery] = useState(null);
   const close = () => { setDlg(null); setRecovery(null); bump(x => x + 1); };
+  if (status === 'loading' && S.unlockedBefore()) return <div className="e2-settings"><p><i className="vc-ring e2-ring" aria-hidden="true" /> Opening your keys on this device...</p></div>;
   if (status !== 'ready') return (
     <div className="e2-settings">
       <p><Lock size={15} /> {status === 'none' ? "You haven't set up encrypted DMs yet." : "This device isn't unlocked yet."}</p>

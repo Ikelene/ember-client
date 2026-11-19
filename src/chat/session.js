@@ -108,6 +108,7 @@ export function endSession(notice) {
   stopKeepingMessages();
   const kept = Promise.race([forgetKeptMessages(acctKey('a')).catch(() => {}), new Promise(r => setTimeout(r, 1500))]);
   dropVeloraSessions(); // (while bonfire_user still says whose sessions they are)
+  try { localStorage.removeItem(acctKey('ember_e2ee_unlocked')); } catch { /* fine */ } // (the keys go below, so this device isn't unlocked any more)
   try { indexedDB.deleteDatabase('nke1'); window.BonfireNotifications?.postMessage(JSON.stringify({ type: 'dm_key', kid: '', jwk: null })); } catch { /* */ } // this device's DM keys go too, it takes a PIN to read them again
   try { forgetAccount(localStorage.getItem('bonfire_user') || ''); localStorage.removeItem('bonfire_token'); localStorage.removeItem('bonfire_user'); localStorage.removeItem('bonfire_me_cache_v2'); if (notice) sessionStorage.setItem('bonfire_notice', notice); } catch { /* fine */ }
   history.replaceState(null, '', clientUrl('#/home'));

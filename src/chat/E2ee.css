@@ -46,3 +46,8 @@ button.e2-label:hover { color: inherit; }
 button.e2-head-lock { cursor: pointer; }
 button.e2-head-lock:hover, button.e2-head-lock:focus-visible { color: var(--text, #ececf0); }
 .e2-head-lock.off { color: var(--vc-warn, #e0a030); }
+
+/* a device that has unlocked before, while it reads its keys after a reload: "Decrypting" instead of asking to unlock */
+.e2-ring { display: inline-block; width: 20px; height: 20px; flex: none; border-width: 2.5px; vertical-align: -5px; }
+.e2-ring.sm { width: 11px; height: 11px; border-width: 2px; vertical-align: -1px; }
+html.vc-light .e2-ring { border-color: rgba(0, 0, 0, .14); border-top-color: var(--accent); }
