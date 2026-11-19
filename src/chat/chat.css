@@ -26,7 +26,7 @@ body:has(.vc-sign-banner) .vc-notify-banner { top: 52px; } /* (the notifications
 .vc-left { display: flex; flex: none; min-height: 0; }
 .vc-rail { width: 72px; flex: none; background: #0a0a0c; border-right: 1px solid var(--border); overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 0; }
 .vc-rail::-webkit-scrollbar { display: none; }
-.vc-rail-item { position: relative; width: 72px; display: flex; justify-content: center; flex: none; animation: vc-rail-in .4s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i, 0) * 40ms); }
+.vc-rail-item { position: relative; width: 72px; display: flex; justify-content: center; flex: none; animation: vc-rail-in .55s cubic-bezier(.22, 1.2, .36, 1) both; animation-delay: calc(80ms + var(--i, 0) * 60ms); }
 .vc-rail-item > button { width: 48px; height: 48px; padding: 0; border: 1px solid var(--border); background: var(--box); color: var(--dim); cursor: pointer; display: grid; place-items: center; overflow: hidden;
   transition: border-color .15s, transform .18s cubic-bezier(.2, .8, .2, 1), box-shadow .15s; }
 .vc-rail-item > button:hover { border-color: var(--accent); transform: translateY(-1px); color: var(--text); }
@@ -468,7 +468,7 @@ a.vc-chip.vc-conn:hover { border-color: var(--cc, var(--accent)); background: #1
 .vc-empty-note { padding: 14px 16px; text-align: center; color: var(--muted); font-size: 13.5px; }
 
 /* ── dialogs ── */
-.vc-dialog { width: min(460px, 100%); max-height: calc(100dvh - 40px); overflow-y: auto; padding: 22px; background: var(--box); border: 1px solid var(--border-2); box-shadow: 0 30px 80px rgba(0, 0, 0, .6); animation: vc-pop .22s cubic-bezier(.2, .8, .2, 1); color: var(--text); }
+.vc-dialog { width: min(460px, 100%); max-height: calc(100dvh - 40px); overflow-y: auto; padding: 22px; background: var(--box); border: 1px solid var(--border-2); box-shadow: 0 30px 80px rgba(0, 0, 0, .6); animation: vc-pop .32s cubic-bezier(.22, 1.25, .36, 1); color: var(--text); }
 .vc-dialog.wide { width: min(760px, 100%); }
 .vc-dialog h3 { margin-bottom: 4px; font-size: 19px; color: #fff; }
 .vc-dialog-sub { margin-bottom: 14px; color: var(--dim); font-size: 13.5px; }
@@ -572,20 +572,20 @@ a.vc-chip.vc-conn:hover { border-color: var(--cc, var(--accent)); background: #1
 .vc-in-live { animation: vc-msg-live .3s cubic-bezier(.2, .8, .2, 1) both; }
 @keyframes vc-msg-send { from { opacity: 0; transform: scale(.94); } 60% { opacity: 1; } }
 @keyframes vc-msg-live { from { opacity: 0; } }
-@keyframes vc-msg-in { from { opacity: 0; transform: translateY(6px); } }
-@keyframes vc-pop { from { opacity: 0; transform: scale(.96) translateY(4px); } }
+@keyframes vc-msg-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes vc-pop { from { opacity: 0; transform: scale(.92) translateY(8px); filter: blur(3px); } 70% { filter: blur(0); } }
 @keyframes vc-pop-out { to { opacity: 0; transform: scale(.96) translateY(4px); } }
 @keyframes vc-fade { from { opacity: 0; } }
 @keyframes vc-fade-out { to { opacity: 0; } }
-@keyframes vc-swap { from { opacity: 0; transform: translateY(8px); } }
-@keyframes vc-side-in { from { opacity: 0; transform: translateX(-14px); } }
+@keyframes vc-swap { from { opacity: 0; transform: translateY(10px) scale(.995); filter: blur(2px); } 60% { filter: blur(0); } }
+@keyframes vc-side-in { from { opacity: 0; transform: translateX(-22px); filter: blur(2px); } 60% { filter: blur(0); } }
 @keyframes vc-slide-l { from { opacity: 0; transform: translateX(14px); } }
 @keyframes vc-up { from { opacity: 0; transform: translateY(6px); } }
-@keyframes vc-rail-in { from { opacity: 0; transform: translateX(-10px); } }
+@keyframes vc-rail-in { from { opacity: 0; transform: translateX(-90px) scale(.85); } 60% { opacity: 1; } }
 @keyframes vc-shimmer { to { background-position: -200% 0; } }
 @keyframes vc-pulse { to { opacity: .4; } }
 @keyframes vc-dot { 0%, 60%, 100% { transform: none; opacity: .4; } 30% { transform: translateY(-4px); opacity: 1; } }
-@keyframes vc-toast { 0% { opacity: 0; transform: translate(-50%, 10px); } 6%, 90% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, 6px); } }
+@keyframes vc-toast { 0% { opacity: 0; transform: translate(-50%, 24px) scale(.9); } 5% { opacity: 1; transform: translate(-50%, -4px) scale(1.02); } 8%, 90% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, 8px) scale(.97); } }
 @media (prefers-reduced-motion: reduce) {
   .vc-in-mine, .vc-in-live { animation-name: vc-fade !important; }
   .vc *, .vc-pop, .vc-modal-back, .vc-modal-back *, .vc-dialog, .vc-toast { animation-duration: .01ms !important; transition-duration: .01ms !important; }
@@ -2080,11 +2080,17 @@ a.vc-appdl-opt { text-decoration: none; }
 .vc-rail-sleep { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2; display: grid; place-items: center; color: #fff; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .6)); }
 @keyframes vc-ring-spin { to { transform: rotate(360deg); } }
 /* a server still connecting, shown from its kept channel list: greyed list, a loader where the messages go, grey lines for members */
-.vc-side-cached > * { opacity: .5; filter: grayscale(1); transition: opacity .3s, filter .3s; }
-.vc-waking { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
-.vc-frozen { flex: 1; min-height: 0; display: flex; flex-direction: column; filter: grayscale(1); opacity: .4; pointer-events: none; user-select: none; }
-.vc-waking .vc-convo-wait { position: absolute; inset: 0; color: var(--text); }
-.vc-waking .vc-convo-wait span { padding: 4px 10px; border-radius: 8px; background: var(--panel); }
+.vc-side > * { transition: opacity .6s ease, filter .6s ease; }
+.vc-side-cached > * { opacity: .5; filter: grayscale(1); }
+.vc-convo-stack { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+/* a server connecting: its kept messages greyed under the loader; once it's in, the layer fills with color and fades off the live list */
+.vc-wake-overlay { position: absolute; inset: 0; z-index: 4; display: flex; flex-direction: column; background: var(--bg); transition: opacity .6s ease, background-color .6s ease; }
+.vc-frozen { flex: 1; min-height: 0; display: flex; flex-direction: column; filter: grayscale(1); opacity: .4; pointer-events: none; user-select: none; transition: filter .6s ease, opacity .6s ease; }
+.vc-wake-overlay .vc-convo-wait { position: absolute; inset: 0; color: var(--text); transition: opacity .35s ease, transform .5s cubic-bezier(.2, .8, .2, 1); }
+.vc-wake-overlay .vc-convo-wait span { padding: 4px 10px; border-radius: 8px; background: var(--panel); }
+.vc-wake-overlay.out { opacity: 0; background-color: transparent; pointer-events: none; }
+.vc-wake-overlay.out .vc-frozen { filter: grayscale(0); opacity: 1; }
+.vc-wake-overlay.out .vc-convo-wait { opacity: 0; transform: scale(.9); }
 .vc-composer.connecting .vc-input { cursor: not-allowed; opacity: .55; }
 .vc-composer.connecting button { pointer-events: none; opacity: .4; }
 .vc-convo-wait { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; color: var(--muted); font-size: 13.5px; text-align: center; }
@@ -2338,6 +2344,14 @@ html.bf-mobile #bf-sheet-scrim { display: none !important; }
 .vc-att-spoiler-box > :not(.vc-att-spoiler-cover) { filter: blur(18px); pointer-events: none; user-select: none; }
 .vc-att-spoiler-cover { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; width: 100%; padding: 0; background: rgba(10, 10, 12, .45); border: 0; color: #fff; font: inherit; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
 .vc-att-spoiler-cover:hover { background: rgba(10, 10, 12, .3); }
+.vc-up-pic { position: relative; display: block; }
+.vc-up-pic .vc-up-grey { filter: grayscale(1) brightness(.55); }
+.vc-up-pic .vc-up-color { position: absolute; inset: 0; width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; clip-path: inset(0 calc(100% - var(--up)) 0 0); transition: clip-path .35s ease-out; }
+.vc-up-pic::after { content: ''; position: absolute; top: 0; bottom: 0; left: var(--up); width: 2px; margin-left: -1px; background: rgba(255, 255, 255, .9); box-shadow: 0 0 14px 3px rgba(255, 255, 255, .55); transition: left .35s ease-out; pointer-events: none; }
+.vc-up-chip { position: absolute; left: 8px; bottom: 8px; z-index: 1; padding: 2px 9px; border-radius: 999px; background: rgba(0, 0, 0, .65); color: #fff; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; backdrop-filter: blur(4px); }
+.vc-upload-mini { display: flex; align-items: center; gap: 10px; margin-top: 4px; font-size: 12.5px; color: var(--dim); }
+.vc-upload-mini button { display: inline-flex; align-items: center; gap: 4px; padding: 0; background: none; border: 0; color: var(--dim); font: inherit; cursor: pointer; }
+.vc-upload-mini button:hover { color: var(--text); }
 .vc-upload-bar { display: flex; flex-direction: column; gap: 6px; width: min(400px, 100%); margin-top: 6px; padding: 8px 10px; background: var(--box); border: 1px solid var(--border); }
 .vc-upload-bar-top { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); }
 .vc-upload-bar-top span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

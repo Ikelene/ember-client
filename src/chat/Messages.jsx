@@ -209,6 +209,8 @@ function Attachments({ list: all, extra = [], m, temps = [] }) {
     return () => io.disconnect();
   }, [hasTemp, seen]);
   const expiry = useExpiryLabel(tempUrls, seen);
+  // a picture still uploading: grey, filling in with its colors from the left as it goes up
+  const up = m?.uploading ? Math.min(100, Math.floor((m.uploading.sent / (m.uploading.total || 1)) * 100)) : null;
   if (!pics.length && !others.length && !gone.length && !hasTemp) return null; // (kept for temp links: the box is what notices it scrolled into view)
   const cover = a => hidden(a) && (
     <button type="button" className="vc-att-spoiler-cover" onClick={e => { e.preventDefault(); e.stopPropagation(); reveal(a); }}>Spoiler</button>
@@ -221,7 +223,13 @@ function Attachments({ list: all, extra = [], m, temps = [] }) {
           {pics.map((a, i) => (KLIPY_PAGE.test(a.url) ? <KlipyPageGif key={a.url} url={a.url} /> : deadPics.has(a.url) ? <ExpiredFile key={a.url} name={a.name || nameInLink(a.url)} /> :
             <a key={a.url} href={a.url} target="_blank" rel="noopener noreferrer" data-media-url={a.url} data-media-name={shownName(a.name)} className={`vc-att${a.type === 'gif' ? ' gif' : ''}${hidden(a) ? ' spoiler' : ''}`}
               onClick={e => { if (hidden(a)) { e.preventDefault(); reveal(a); return; } if (e.ctrlKey || e.metaKey || e.shiftKey || e.button) return; if (e.target.closest('.vc-star')) return; e.preventDefault(); viewMedia({ items: pics.filter(p => !hidden(p) || p === a), index: pics.filter(p => !hidden(p) || p === a).indexOf(a), author: m?.author, at: m?.created_at }); }}>
-              <img src={viaProxy(a.url)} alt={hidden(a) ? 'Spoiler' : shownName(a.name)} loading="lazy" onError={() => picFailed(a)} />
+              {a.local && up != null ? (
+                <span className="vc-up-pic" style={{ '--up': `${up}%` }}>
+                  <img className="vc-up-grey" src={a.url} alt="" aria-hidden="true" />
+                  <img className="vc-up-color" src={a.url} alt={shownName(a.name)} />
+                  <span className="vc-up-chip">{up >= 100 ? 'Finishing...' : `${up}%`}</span>
+                </span>
+              ) : <img src={viaProxy(a.url)} alt={hidden(a) ? 'Spoiler' : shownName(a.name)} loading="lazy" onError={() => picFailed(a)} />}
               {cover(a)}
               {a.type === 'gif' && !hidden(a) && <GifBadge />}
               {hidden(a) ? null : KLIPY.test(a.url) ? <StarButton gif={{ url: a.url, preview: a.url, title: a.name, width: a.width, height: a.height }} />
@@ -258,6 +266,15 @@ function UploadBar({ m, view }) {
   const { sent, total } = m.uploading;
   const pct = Math.min(100, Math.floor((sent / total) * 100));
   const n = m.uploads.length;
+  // only pictures: they show their own progress (Attachments), so this is just a line with the way to stop it
+  if (m.uploads.every(u => /^image\//.test(u.file?.type || ''))) {
+    return (
+      <div className="vc-upload-mini">
+        <span>{pct >= 100 ? 'Finishing upload...' : `Uploading ${n === 1 ? 'picture' : `${n} pictures`}`}</span>
+        <button type="button" title="Cancel upload" onClick={() => dropFailed(view, m.nonce)}><X size={13} /> Cancel</button>
+      </div>
+    );
+  }
   return (
     <div className="vc-upload-bar">
       <div className="vc-upload-bar-top">

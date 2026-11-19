@@ -80,6 +80,31 @@ function meFrom(d) {
   return { id: d.account.id != null ? String(d.account.id) : undefined, username: d.account.username, pfp: d.profile.pfp || null, color: d.profile.color || null, rank: d.account.rank, pro: !!d.account.pro };
 }
 
+// a server still connecting: its kept messages greyed behind the loader. Once it's connected and the real messages are in, this layer
+// fills with color and fades away over them (no remount, no slide), so the switch is one smooth change
+function WakeOverlay({ view, title, waking }) {
+  const loaded = useChat(s => !!s.msgs[keyOf(view)]?.loaded);
+  const [phase, setPhase] = useState(waking ? 'on' : 'gone');
+  useEffect(() => { if (waking) setPhase('on'); }, [waking]);
+  useEffect(() => {
+    if (waking || phase !== 'on') return undefined;
+    if (loaded) { setPhase('out'); return undefined; }
+    const t = setTimeout(() => setPhase('out'), 5000); // (the messages are taking a while: don't hold the cover up)
+    return () => clearTimeout(t);
+  }, [waking, loaded, phase]);
+  useEffect(() => {
+    if (phase !== 'out') return undefined;
+    const t = setTimeout(() => setPhase('gone'), 700);
+    return () => clearTimeout(t);
+  }, [phase]);
+  if (phase === 'gone') return null;
+  return (
+    <div className={`vc-wake-overlay${phase === 'out' ? ' out' : ''}`} aria-hidden={phase === 'out' || undefined}>
+      <KeptMessages view={view} title={title} />
+      <div className="vc-convo-wait" role="status"><i className="vc-ring vc-gate-ring" aria-hidden="true" /><span>Establishing connection to chat server</span></div>
+    </div>
+  );
+}
 // a server still connecting: the messages kept from last time (msgCache.js), greyed and black and white behind the loader
 function KeptMessages({ view, title }) {
   const [list, setList] = useState(null);
@@ -621,13 +646,7 @@ function ChatPage() {
             <div className="vc-body">
               <div className="vc-convo" key={keyOf(view)}>
                 {view.kind === 'dm' && !sysDM && <DmCallBar username={view.username} />}
-                {wakeGate ? <InstanceGate origin={instOf(view.sid)} /> : waking ? <>
-                  <div className="vc-waking">
-                    <KeptMessages view={view} title={title} />
-                    <div className="vc-convo-wait" role="status"><i className="vc-ring vc-gate-ring" aria-hidden="true" /><span>Establishing connection to chat server</span></div>
-                  </div>
-                  <Composer view={view} replyTo={replyTo} setReplyTo={setReplyTo} sendOff placeholder="Connecting to the chat server..." />
-                </> : channel?.type === 'game' && !(channel.config?.setup && channel.config?.purpose === 'chat') ? <GameChannel channel={channel} sid={view.sid} /> : channel?.type === 'voice' ? <VoiceView channel={channel} sid={view.sid} /> : channel?.type === 'roles' ? <RoleShop channel={channel} /> : channel?.type === 'starboard' ? <Starboard channel={channel} sid={view.sid} /> : channel?.type === 'link' ? (
+                {wakeGate ? <InstanceGate origin={instOf(view.sid)} /> : !waking && channel?.type === 'game' && !(channel.config?.setup && channel.config?.purpose === 'chat') ? <GameChannel channel={channel} sid={view.sid} /> : !waking && channel?.type === 'voice' ? <VoiceView channel={channel} sid={view.sid} /> : !waking && channel?.type === 'roles' ? <RoleShop channel={channel} /> : !waking && channel?.type === 'starboard' ? <Starboard channel={channel} sid={view.sid} /> : !waking && channel?.type === 'link' ? (
                   <div className="vc-linkch">
                     <ExternalLink size={34} />
                     <h2>#{channel.name}</h2>
@@ -635,12 +654,15 @@ function ChatPage() {
                     <button type="button" className="btn btn-primary" onClick={() => openLinkChannel(channel)}>Open {(() => { try { return new URL(channel.config?.url).host; } catch { return 'the link'; } })()}</button>
                   </div>
                 ) : <>
-                {channel?.type === 'game' && <GameChatStrip channel={channel} />}
-                <MessageList view={view} onUser={openMini} onReply={setReplyTo} canPost={canPost} canMod={canMod} channels={detail?.channels} title={title} />
-                {channel?.type === 'game' && <GameOfflineNote channel={channel} />}
-                <Composer view={view} locked={(isServer && !canPost) || sysDM || (modView && !view.username)} lockedText={sysDM ? "These are Nookara's own notices - there's no one to reply to here." : modView ? "This is a message from Nookara's admins - you can't reply here." : detail?.server?.read_only ? 'This server is read-only.' : lockedTextFor(channel)}
+                {!waking && channel?.type === 'game' && <GameChatStrip channel={channel} />}
+                <div className="vc-convo-stack">
+                  {!waking && <MessageList view={view} onUser={openMini} onReply={setReplyTo} canPost={canPost} canMod={canMod} channels={detail?.channels} title={title} />}
+                  {isServer && <WakeOverlay view={view} title={title} waking={waking} />}
+                </div>
+                {!waking && channel?.type === 'game' && <GameOfflineNote channel={channel} />}
+                <Composer view={view} sendOff={waking} locked={!waking && ((isServer && !canPost) || sysDM || (modView && !view.username))} lockedText={sysDM ? "These are Nookara's own notices - there's no one to reply to here." : modView ? "This is a message from Nookara's admins - you can't reply here." : detail?.server?.read_only ? 'This server is read-only.' : lockedTextFor(channel)}
  replyTo={replyTo} setReplyTo={setReplyTo}
-                  placeholder={modView ? `Message ${view.username} as Nookara Administrator` : notesView ? 'Write a note to yourself' : isServer ? `Message #${channel?.name || ''}${channel?.type === 'game' ? ' (also shows in Minecraft)' : ''}` : view.kind === 'dm' ? `Message @${view.username}` : `Message ${group?.name || 'the group'}`} /></>}
+                  placeholder={waking ? 'Connecting to the chat server...' : modView ? `Message ${view.username} as Nookara Administrator` : notesView ? 'Write a note to yourself' : isServer ? `Message #${channel?.name || ''}${channel?.type === 'game' ? ' (also shows in Minecraft)' : ''}` : view.kind === 'dm' ? `Message @${view.username}` : `Message ${group?.name || 'the group'}`} /></>}
               </div>
             </div>
             </div>
