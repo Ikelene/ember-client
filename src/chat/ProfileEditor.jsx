@@ -13,7 +13,7 @@ import { COUNTRIES, TIMEZONES } from '../profile-locales.js';
 import { useChat, useScopeStatus, loginAgain, ask, patchState, getState, remember, forgetProfile } from './store.js';
 import { imgHint, warnImage } from './imgHints.js';
 import { PopoutCard, localTimeFrom } from './ProfilePopout.jsx';
-import ServerProfileEditor, { useProfileTargets, askLeave } from './ServerProfileEditor.jsx';
+import ServerProfileEditor, { useProfileTargets, askLeave, ProfileTargetPicker } from './ServerProfileEditor.jsx';
 import { pictureAccept } from './accept.js';
 
 const isHex = c => /^#[0-9a-f]{6}$/i.test(c || '');
@@ -67,11 +67,8 @@ export default function ProfileEditor({ onDirty }) {
     <>
       {targets.length > 0 && (
         <div className="bf-pe-target">
-          <label htmlFor="bf-pe-target">Editing</label>
-          <select id="bf-pe-target" className="form-select" value={live ? target : 'global'} onChange={e => choose(e.target.value)}>
-            <option value="global">Global profile</option>
-            <optgroup label="Profile on a server">{targets.map(t => <option key={t.sid} value={t.sid}>{t.name}</option>)}</optgroup>
-          </select>
+          <span className="bf-pe-target-label">Editing</span>
+          <ProfileTargetPicker value={live ? target : 'global'} targets={targets} onChange={choose} />
         </div>
       )}
       {live && target !== 'global' ? <ServerProfileEditor key={target} sid={target} onDirty={track} /> : <GlobalProfile onDirty={track} />}

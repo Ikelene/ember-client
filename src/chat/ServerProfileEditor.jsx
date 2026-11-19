@@ -1,9 +1,11 @@
 // Settings > Profile, with an Ember server picked in the dropdown: your look on that server only (ember-server PROTOCOL §6.7). The same
 // layout as the global editor (fields left, live card right); empty fields fall back to your global profile. Saved on that server, not
 // on Nookara. Needs the server's "Customize profile in this server" permission; going back to your global profile never does.
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { RotateCcw, ShieldAlert } from 'lucide-react';
+import { RotateCcw, ShieldAlert, ChevronDown, Check } from 'lucide-react';
+import { Avatar } from './Profile.jsx';
+import { ServerIcon } from './ServerIcon.jsx';
 import { apiFetch, uploadFetch } from '../api.js';
 import ImageCropper from '../components/ImageCropper.jsx';
 import { useChat, lookup, ask, toast, errorText, loadMembers } from './store.js';
@@ -187,6 +189,54 @@ export default function ServerProfileEditor({ sid, onDirty }) {
 export function useProfileTargets() {
   const servers = useChat(s => s.servers);
   const instances = useChat(s => s.instances);
-  return servers.filter(x => x.inst && instances.find(i => i.origin === x.inst)?.features?.server_profiles).map(x => ({ sid: x.sid, name: x.name }));
+  return servers.filter(x => x.inst && instances.find(i => i.origin === x.inst)?.features?.server_profiles).map(x => ({ sid: x.sid, name: x.name, icon: x.icon || null }));
+}
+
+// the "Editing" picker: your global profile (your own picture) or a server (its icon). A menu of our own, so the icons can show
+export function ProfileTargetPicker({ value, targets, onChange }) {
+  const me = useChat(s => s.me);
+  const [open, setOpen] = useState(false);
+  const [hi, setHi] = useState(0);
+  const box = useRef(null);
+  const items = [{ sid: 'global', name: 'Global profile', hint: 'Your Nookara profile, everywhere' }, ...targets.map(t => ({ ...t, hint: 'Only on this server' }))];
+  const cur = items.find(i => i.sid === value) || items[0];
+  useEffect(() => {
+    if (!open) return undefined;
+    setHi(Math.max(0, items.findIndex(i => i.sid === cur.sid)));
+    const off = e => { if (!box.current?.contains(e.target)) setOpen(false); };
+    addEventListener('mousedown', off);
+    return () => removeEventListener('mousedown', off);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pick = i => { setOpen(false); onChange(i.sid); };
+  const onKey = e => {
+    if (!open && ['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) { e.preventDefault(); setOpen(true); return; }
+    if (!open) return;
+    if (e.key === 'Escape') { e.preventDefault(); setOpen(false); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); setHi(h => Math.min(items.length - 1, h + 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setHi(h => Math.max(0, h - 1)); }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(items[hi]); }
+  };
+  const face = i => (i.sid === 'global'
+    ? <Avatar user={{ username: me?.username, pfp: me?.pfp }} size={24} />
+    : <span className="vc-srv-ico bf-pt-ico"><ServerIcon src={i.icon} name={i.name} /></span>);
+  return (
+    <div className={`bf-pt${open ? ' open' : ''}`} ref={box}>
+      <button type="button" className="bf-pt-btn" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(o => !o)} onKeyDown={onKey}>
+        {face(cur)}<span className="bf-pt-name">{cur.name}</span><ChevronDown size={16} className="bf-pt-chev" />
+      </button>
+      {open && (
+        <div className="bf-pt-menu" role="listbox" aria-label="Which profile to edit">
+          {items.map((i, n) => (
+            <Fragment key={i.sid}>
+              {n === 1 && <div className="bf-pt-sep">Profile on a server</div>}
+              <button type="button" role="option" aria-selected={i.sid === cur.sid} className={`bf-pt-opt${i.sid === cur.sid ? ' on' : ''}${n === hi ? ' hi' : ''}`} onMouseEnter={() => setHi(n)} onClick={() => pick(i)}>
+                {face(i)}<span className="bf-pt-txt"><b>{i.name}</b><small>{i.hint}</small></span>{i.sid === cur.sid && <Check size={15} />}
+              </button>
+            </Fragment>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 export const askLeave = () => ask({ title: 'Leave without saving?', text: 'Your changes to this profile will be lost.', confirm: 'Leave', danger: true });
