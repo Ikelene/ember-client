@@ -13,6 +13,7 @@ import { COUNTRIES, TIMEZONES } from '../profile-locales.js';
 import { useChat, useScopeStatus, loginAgain, ask, patchState, getState, remember, forgetProfile } from './store.js';
 import { imgHint, warnImage } from './imgHints.js';
 import { PopoutCard, localTimeFrom } from './ProfilePopout.jsx';
+import ServerProfileEditor, { useProfileTargets, askLeave } from './ServerProfileEditor.jsx';
 import { pictureAccept } from './accept.js';
 
 const isHex = c => /^#[0-9a-f]{6}$/i.test(c || '');
@@ -54,7 +55,31 @@ function cropPreview(file, crop) {
   });
 }
 
+// Settings > Profile: your global (Nookara) profile, or - picked in the dropdown - your profile on one Ember server (ServerProfileEditor)
 export default function ProfileEditor({ onDirty }) {
+  const targets = useProfileTargets();
+  const [target, setTarget] = useState('global');
+  const dirtyRef = useRef(false);
+  const track = (d, nudge) => { dirtyRef.current = !!d; onDirty?.(d, nudge); };
+  const choose = async v => { if (v === target) return; if (dirtyRef.current && !(await askLeave())) return; dirtyRef.current = false; onDirty?.(false); setTarget(v); };
+  const live = target === 'global' || targets.some(t => t.sid === target);
+  return (
+    <>
+      {targets.length > 0 && (
+        <div className="bf-pe-target">
+          <label htmlFor="bf-pe-target">Editing</label>
+          <select id="bf-pe-target" className="form-select" value={live ? target : 'global'} onChange={e => choose(e.target.value)}>
+            <option value="global">Global profile</option>
+            <optgroup label="Profile on a server">{targets.map(t => <option key={t.sid} value={t.sid}>{t.name}</option>)}</optgroup>
+          </select>
+        </div>
+      )}
+      {live && target !== 'global' ? <ServerProfileEditor key={target} sid={target} onDirty={track} /> : <GlobalProfile onDirty={track} />}
+    </>
+  );
+}
+
+function GlobalProfile({ onDirty }) {
   const [user, setUser] = useState(null);
   const [loadErr, setLoadErr] = useState('');
   const presence = useChat(s => s.presence[s.me?.username]);

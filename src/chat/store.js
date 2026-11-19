@@ -232,13 +232,41 @@ async function flushFaces() {
 }
 // someone as shown in an instance server: a Velora person with their Velora face, a local account / bot as plain (no picture
 // of its own for local accounts for now). Velora's own servers already carry the live face.
+// what Ember uses of a server profile: a #rrggbb colour, http(s) pictures, plain text (the server should send just that; this makes sure)
+const httpUrl = v => (typeof v === 'string' && /^https?:\/\//i.test(v) ? v : null);
+export function cleanServerProfile(p) {
+  if (!p || typeof p !== 'object') return null;
+  const str = (v, n) => (typeof v === 'string' && v.trim() ? v.slice(0, n) : null);
+  const out = { pfp: httpUrl(p.pfp), banner: httpUrl(p.banner), color: /^#[0-9a-f]{6}$/i.test(p.color || '') ? p.color : null, bio: str(p.bio, 300), pronouns: str(p.pronouns, 40) };
+  return Object.values(out).some(Boolean) ? out : null;
+}
+// someone's look on their Ember server only (server profiles: the member's `profile`), by their id there. One index per member list
+const serverProfiles = new WeakMap();
+const instMembers = (inst, s) => { const sid = (s.servers || []).find(x => x.inst === inst)?.sid; return sid ? s.members?.[sid] || null : null; }; // (some callers pass a partial state)
+export function serverProfileOf(u, s = state) {
+  if (!u?.inst || u.inst === VELORA || u.id == null) return null;
+  const list = instMembers(u.inst, s);
+  if (!list) return null;
+  let idx = serverProfiles.get(list);
+  if (!idx) { idx = new Map(list.filter(m => m.profile).map(m => [String(m.id), cleanServerProfile(m.profile)])); serverProfiles.set(list, idx); }
+  return idx.get(String(u.id)) || null;
+}
 export function faceOf(u, s = state) {
   if (!u || !u.inst || u.inst === VELORA) return u;
-  if (u.kind === 'local') return { ...u, pfp: null, color: null };
-  const f = u.kind === 'velora' ? s.veloraFaces[String(u.velora_id)] : null;
-  return f && !f.miss ? { ...u, pfp: f.pfp || u.pfp || null, color: f.color || null, rank: f.rank } : u;
+  const sp = serverProfileOf(u, s);
+  let out;
+  if (u.kind === 'local') out = { ...u, pfp: null, color: null };
+  else {
+    const f = u.kind === 'velora' ? s.veloraFaces[String(u.velora_id)] : null;
+    out = f && !f.miss ? { ...u, pfp: f.pfp || u.pfp || null, color: f.color || null, rank: f.rank } : u;
+  }
+  return sp ? { ...out, pfp: sp.pfp || out.pfp, color: sp.color || out.color } : out;
 }
-export const useFace = u => { const f = useChat(s => (u?.inst && u.kind === 'velora' ? s.veloraFaces[String(u.velora_id)] : null)); return useMemo(() => faceOf(u), [u, f]); }; // eslint-disable-line react-hooks/exhaustive-deps
+export const useFace = u => {
+  const f = useChat(s => (u?.inst && u.kind === 'velora' ? s.veloraFaces[String(u.velora_id)] : null));
+  const ml = useChat(s => (u?.inst && u.inst !== VELORA ? instMembers(u.inst, s) : null)); // (their server profile can change)
+  return useMemo(() => faceOf(u), [u, f, ml]); // eslint-disable-line react-hooks/exhaustive-deps
+};
 // a profile card / page that is open re-reads its person when Velora says they changed (user_update); fn(event) -> unsubscribe
 export const onUserUpdate = fn => { const h = e => fn(e.detail); addEventListener('vc-user-update', h); return () => removeEventListener('vc-user-update', h); };
 // drop the cached public profile (after you edit your own), so the next lookup is fresh

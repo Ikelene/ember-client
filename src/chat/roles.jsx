@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import {
   Hash, Megaphone, Lock, MessageCircle, Gamepad2, Music, Image, Code, Bug, Lightbulb, HelpCircle, Star, Heart, BookOpen,
   Coffee, Sparkles, Trophy, Video, Palette, Terminal, Globe, Bell, Shield, Rocket, ScrollText, Smile, Flame, Zap, Gift, Pin,
-  Plus, Trash2, GripVertical, Upload, X, Check, BadgeCheck, DoorOpen, ExternalLink, Volume2, EyeOff, UserMinus, Ban, Clock, PenLine } from 'lucide-react';
+  Plus, Trash2, GripVertical, Upload, X, Check, BadgeCheck, DoorOpen, ExternalLink, Volume2, EyeOff, UserMinus, Ban, Clock, PenLine, RotateCcw } from 'lucide-react';
 const TYPE_ICONS = { logs: ScrollText, roles: BadgeCheck, welcome: DoorOpen, link: ExternalLink, voice: Volume2, game: Gamepad2, starboard: Star };
 import { apiFetch, uploadFetch } from '../api.js';
 import { useChat, getState, toast, errorText, ask, refreshServer, memberRef, loadMembers, untilText } from './store.js';
@@ -19,8 +19,9 @@ export const P = {
   MANAGE_MESSAGES: 64, MENTION_EVERYONE: 128, ATTACH: 256, ADMIN: 512, MANAGE_USERS: 2048,
   UNMARKED_ALIASES: 4096, // instances only: a bot's alias messages show unmarked while the server's Danger zone allows it
   CHANGE_NICKNAME: 8192, MANAGE_NICKNAMES: 16384, // instances only: your own server nickname / anyone's below you
+  CUSTOMIZE_PROFILE: 32768, // instances only: your own picture, banner, colour, bio and pronouns on that server
 };
-const INST_ONLY_PERMS = new Set(['UNMARKED_ALIASES', 'CHANGE_NICKNAME', 'MANAGE_NICKNAMES']); // Velora's own servers don't have these
+const INST_ONLY_PERMS = new Set(['UNMARKED_ALIASES', 'CHANGE_NICKNAME', 'MANAGE_NICKNAMES', 'CUSTOMIZE_PROFILE']); // Velora's own servers don't have these
 export const PERM_LIST = [
   ['ADMIN', 'Administrator', 'Every permission, and can do anything in the server. Be careful who gets this.'],
   ['MANAGE_SERVER', 'Manage server', 'Change the name, description, icon, banner and server settings.'],
@@ -35,6 +36,7 @@ export const PERM_LIST = [
   ['SEND', 'Send messages', 'Post in channels that let everyone send messages.'],
   ['ATTACH', 'Attach files', 'Send pictures with their messages.'],
   ['CHANGE_NICKNAME', 'Change nickname', 'Set their own nickname on this server.'],
+  ['CUSTOMIZE_PROFILE', 'Customize profile in this server', 'Set their own picture, banner, name color, bio and pronouns for this server only (Settings > Profile, pick this server). Off for everyone unless you turn it on.'],
   ['UNMARKED_ALIASES', 'Use unmarked aliases', "For bots: while the server owner has turned on unmarked aliases (Server settings > Danger zone > Advanced), this bot's alias messages look exactly like a member's, with no alias mark. Only give it to bots you trust."],
 ];
 export const has = (perms, bit) => ((Number(perms) || 0) & bit) === bit;
@@ -241,6 +243,27 @@ export async function changeNick(sid, m, isMe) {
     const r = await apiFetch(`/chat/servers/${sid}/members/${isMe ? '@me' : encodeURIComponent(m.id)}`, { method: 'PATCH', body: JSON.stringify({ nick: a.text || null }) });
     toast(r.nick ? `Nickname set to ${r.nick}.` : 'Nickname removed.', true); loadMembers(sid); return true;
   } catch (e) { toast(e.message === 'not_found' || e.message === 'method_not_allowed' ? "This server doesn't support nicknames yet (it needs an update)." : errorText(e.message)); return false; }
+}
+
+// Reset profile (Ember servers with server profiles): someone's look on this server back to their global profile. Manage users, and
+// above them. They get a line in their Nookara inbox saying so (the server sends it)
+export function profileMenuItems(sid, username) {
+  if (!sid || !isInst(sid)) return [];
+  const st = getState();
+  const srv = st.detail[sid]?.server;
+  const m = st.members[sid]?.find(x => x.username === username);
+  const inst = st.instances.find(i => i.origin === instOf(sid));
+  if (!srv || !m || m.bot || !inst?.user || !inst.features?.server_profiles || m.id === inst.user.id) return [];
+  if (!has(srv.perms, P.MANAGE_USERS) || (!m.profile && !m.nick)) return [];
+  const r = modRights(sid, username, st);
+  const below = m.role !== 'owner' && (srv.role === 'owner' || r.below);
+  return [{ label: 'Reset profile', icon: RotateCcw, danger: true, disabled: !below, hint: below ? 'Back to their global profile' : 'Their role is as high as yours', onClick: () => resetProfile(sid, m) }];
+}
+export async function resetProfile(sid, m) {
+  const ok = await ask({ title: `Reset ${m.display_name || m.username}'s profile?`, text: `Their picture, banner, name color, bio, pronouns and nickname on ${getState().detail[sid]?.server?.name || 'this server'} go back to their global profile. They get a notice saying so.`, confirm: 'Reset profile', danger: true });
+  if (!ok) return;
+  try { await apiFetch(`/chat/servers/${sid}/members/${encodeURIComponent(m.id)}/profile/reset`, { method: 'POST' }); toast('Profile reset.', true); loadMembers(sid); }
+  catch (e) { toast(errorText(e.message)); }
 }
 
 // timeouts (instances): no posting, reacting or voice until it ends. Kick or Ban; the server checks the role order too

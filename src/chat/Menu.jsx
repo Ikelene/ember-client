@@ -20,7 +20,7 @@ import { canReportDm } from './dm-report.js';
 import { reactionId } from './msg-actions.js';
 import { myReactions } from './msg-actions.js';
 import { setInstancePrefs } from './instances.js';
-import { roleMenuItems, modMenuItems, nickMenuItems, changeNick, canNick, P, has } from './roles.jsx';
+import { roleMenuItems, modMenuItems, nickMenuItems, profileMenuItems, changeNick, canNick, P, has } from './roles.jsx';
 import { viewPicture, copyImage, downloadImage } from './MediaViewer.jsx';
 import { saveToMedia } from './store.js';
 import { QuickReactions } from './Reactions.jsx';
@@ -303,6 +303,7 @@ export function userMenu(e, username, { onProfile, sid, extra = [] } = {}) {
     { label: 'Copy username', icon: Copy, onClick: () => copy(username, 'Username copied') },
     sid && !isMe && getState().view?.kind === 'channel' && member && appsItems({ sid, cid: getState().view.cid, type: 2, target: member.id }),
     ...nickMenuItems(sid, username),
+    ...profileMenuItems(sid, username),
     ...roleMenuItems(sid, username),
     ...modMenuItems(sid, username),
     sid && isInst(sid) && !isMe && member && !member.bot && { label: 'Report', icon: Flag, danger: true, onClick: () => reportTo(sid, { user_id: member.id }, `@${username}`, { target: member }) },

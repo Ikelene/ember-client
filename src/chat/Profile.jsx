@@ -2,12 +2,12 @@ import { siteHref } from './hosts.js';
 import { viaProxy } from './mediaProxy.js';
 // People: square avatars with a status square, the mini profile (the same card as the
 // profile editor's preview) and the large profile it expands into.
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MessageCircle, Maximize2, X, UserPlus, Check, Clock, ExternalLink, Globe, Gamepad2, Music, Tv, Trophy, Radio, MoreHorizontal, Pencil, CalendarDays, LogIn, ShieldCheck, Crown, UserMinus, Ban, Link as LinkIcon, Plus } from 'lucide-react';
 import { apiFetch, getToken } from '../api.js';
 import { BotTag, AddBotButton, TrustedIn } from './Bots.jsx';
-import { useChat, lookup, go, wantPresence, toast, errorText, getState, setCustom, ask, loadFriends, toggleBlock, memberRef, faceOf, botPresenceOf, loadMembers, onUserUpdate, markBotPeer } from './store.js';
+import { useChat, lookup, go, wantPresence, toast, errorText, getState, setCustom, ask, loadFriends, toggleBlock, memberRef, faceOf, botPresenceOf, loadMembers, onUserUpdate, markBotPeer, cleanServerProfile } from './store.js';
 import { isInst } from './ids.js';
 import { ServerIcon } from './ServerIcon.jsx';
 // your own profile's "Edit profile": Ember's settings, Profile page (Chat.jsx listens for vc-dialog)
@@ -210,8 +210,11 @@ export function MessageBotButton({ name, who, info, className, size = 15, onGo }
   };
   return <button type="button" className={className} disabled={busy} onClick={open}><MessageCircle size={size} /> Message</button>;
 }
-function useProfile(username, who) {
+// sid: the server they were clicked on. Their profile on that server (server profiles) wins over their account's there
+function useProfile(username, who, sid) {
   const [p, setP] = useState(null);
+  const rawSp = useChat(s => (sid ? s.members[sid]?.find(m => m.username === username)?.profile : null)) || null;
+  const sp = useMemo(() => cleanServerProfile(rawSp), [rawSp]);
   const [extra, setExtra] = useState(null);
   const vid = who?.inst && who.kind === 'velora' ? String(who.velora_id || '') : '';
   const vname = useChat(s => (vid ? s.veloraNames[vid] : null)) || username;
@@ -234,7 +237,8 @@ function useProfile(username, who) {
     if (!p || p.plain || p.missing || String(p.id) !== String(m.user.id)) return;
     lookup(m.user.username).then(d => { if (d && String(d.id) === String(m.user.id)) setP(d); }).catch(() => {});
   }), [p?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  return [p, extra, vname];
+  const shown = useMemo(() => (p && sp ? { ...p, pfp_url: sp.pfp || p.pfp_url, banner_url: sp.banner ? viaProxy(sp.banner) : p.banner_url, color: sp.color || p.color, bio: sp.bio || p.bio, pronouns: sp.pronouns || p.pronouns, server_profile: true } : p), [p, sp]);
+  return [shown, extra, vname];
 }
 // servers we both are in: Velora's own (the server says) plus the ones on Ember instances (only this browser knows who is in those:
 // a Velora account is matched by its Velora id, an instance's own account by its id on that instance)
@@ -287,7 +291,7 @@ export function HandleLine({ name, handle, pronouns, cls = 'vc-pronouns' }) {
   return <div className={`${cls} vc-handle-line`}>{at && <span className="vc-handle" title="Username">@{handle}</span>}{pronouns && <span title="Pronouns">{pronouns}</span>}</div>;
 }
 export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: outerRef }) {
-  const [p, extra, vname] = useProfile(username, who);
+  const [p, extra, vname] = useProfile(username, who, sid);
   const plain = plainOn(who); // an instance's own account / bot: name, roles, joined - nothing from Velora
   const [, tick] = useState(0);
   useEffect(() => { const t = setInterval(() => tick(x => x + 1), 30000); return () => clearInterval(t); }, []);
@@ -302,7 +306,7 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
   const [menu, setMenu] = useState(false);
   useArcadeBoard(ref, plain ? null : vname, 'mini');
   const isMe = who?.inst ? !!instMe && instMe === who?.id : me?.username === username;
-  const color = !plain && isHex(p?.color) ? p.color : '';
+  const color = (!plain || p?.server_profile) && isHex(p?.color) ? p.color : '';
   const botSt = plain && who?.kind === 'bot' ? botPresenceOf(member) || botPresenceOf(who) : null; // an instance bot: its presence comes with the member row
   const status = botSt || presence?.status || 'offline';
   const sub = subtitle(presence);
@@ -320,8 +324,8 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
 
   return (
     <div className={`pe-card vc-card${plain ? ' plain' : ''}`} ref={setRef} style={color ? { '--pe-accent': color } : undefined} onContextMenu={e => { if (!e.target.closest('input, textarea')) userMenu(e, username, { sid }); }}>
-      <div className={`pe-banner${!plain && p?.banner_url ? ' has-img' : ''}`} style={color ? { background: `linear-gradient(135deg, ${color}55, ${color}11)` } : undefined}>
-        {!plain && p?.banner_url && <img src={p.banner_url} alt="" />}
+      <div className={`pe-banner${(!plain || p?.server_profile) && p?.banner_url ? ' has-img' : ''}`} style={color ? { background: `linear-gradient(135deg, ${color}55, ${color}11)` } : undefined}>
+        {(!plain || p?.server_profile) && p?.banner_url && <img src={p.banner_url} alt="" />}
         <div className="vc-card-tools">
           {onExpand && !plain && <button type="button" title="Open the full profile" onClick={() => onExpand(ref.current?.getBoundingClientRect())}><Maximize2 size={14} /></button>}
           {canMod && <button type="button" title="More" onClick={() => setMenu(m => !m)}><MoreHorizontal size={15} /></button>}
@@ -336,7 +340,7 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
       <div className="pe-body">
         <div className="pe-avatar-row">
           <div className="pe-avatar vc-card-av" data-vpb-protect="">
-            <Avatar user={{ username, pfp: plain ? (who?.bot ? extra?.bot?.bot?.avatar_url || who.pfp || null : null) : p?.pfp_url }} size={80} status={plain ? botSt || undefined : status} />
+            <Avatar user={{ username, pfp: plain ? (who?.bot ? extra?.bot?.bot?.avatar_url || who.pfp || null : p?.server_profile ? p.pfp_url || null : null) : p?.pfp_url }} size={80} status={plain ? botSt || undefined : status} />
           </div>
           <div className="vc-av-side">
           {!plain && presence?.custom && !isMe && (
@@ -360,7 +364,7 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
           </div>
         </div>
         <div className="pe-name" data-vpb-protect="" style={color ? { color } : undefined}>{bigName}{(extra?.bot || (plain && who?.bot)) && <BotTag verified={!!(extra?.bot?.bot?.verified || (plain && who?.verified))} />}</div>
-        <HandleLine name={bigName} handle={handle} pronouns={!plain && !p?.private ? p?.pronouns : ''} />
+        <HandleLine name={bigName} handle={handle} pronouns={(!plain || p?.server_profile) && !p?.private ? p?.pronouns : ''} />
         {!plain && vname !== username && <div className="vc-card-sub">{username} on this server</div>}
         {who?.alias_name && <div className="vc-card-sub vc-card-alias"><MaskIcon size={13} /> Posting as alias: <b>{who.alias_name}</b></div>}
         {extra?.bot?.bot?.owner && <div className="vc-card-sub">Bot made by @{extra.bot.bot.owner}</div>}
@@ -374,7 +378,7 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
         ) : (
           <>
             {presence?.activities?.map((a, i) => <ActivityCard key={`${a.name}${i}`} a={a} compact />)}
-            {!plain && p?.bio ? <BioText text={p.bio} /> : null}
+            {(!plain || p?.server_profile) && p?.bio ? <BioText text={p.bio} /> : null}
             {plain && who?.bot && extra?.bot?.bot?.description ? <BioText text={extra.bot.bot.description} /> : null}
             {sid && <RoleChips sid={sid} username={username} />}
             {localTime && <div className="pe-fact"><b>Local time</b><span>{localTime}</span></div>}
@@ -438,7 +442,7 @@ export function MiniProfile({ username, anchor, side = 'right', sid, who, onClos
 
 // the large profile: grows out of the mini card it was opened from
 export function ProfileModal({ username: shown, from, sid, who, onClose }) {
-  const [p, extra, username] = useProfile(shown, who); // (username: their Velora name - on an instance it can differ from the one it shows)
+  const [p, extra, username] = useProfile(shown, who, sid); // (username: their Velora name - on an instance it can differ from the one it shows)
   const bigName = (who?.inst && who?.display_name && who.display_name !== who.username ? who.display_name : p?.display_name) || p?.username || username; // (display names: see ProfileCard)
   const me = useChat(s => s.me);
   const presence = useChat(s => s.presence[username]) || extra?.presence;
