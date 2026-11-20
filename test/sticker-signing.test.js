@@ -18,3 +18,12 @@ test('a received sticker message is checked with its sticker id', () => {
   assert.equal(p.sticker, 'tabc0123456');
   assert.equal('sticker' in receivedPayload({ ...m, sticker: undefined }, base.iss), false);
 });
+
+test('the issuer a message is signed with follows what the instance accepts', async () => {
+  const { issuerFor } = await import('../src/chat/signing-payload.js');
+  assert.equal(issuerFor({ velora: { issuer: 'https://nookara.cc', signing_issuers: ['https://nookara.cc', 'https://velora.ikelene.net'] } }), 'https://nookara.cc');
+  assert.equal(issuerFor({ velora: { issuer: 'https://velora.ikelene.net', signing_issuers: ['https://nookara.cc', 'https://velora.ikelene.net'] } }), 'https://nookara.cc');
+  assert.equal(issuerFor({ velora: { issuer: 'https://nookara.cc/' } }), 'https://nookara.cc', 'older instance: its own velora_url');
+  assert.equal(issuerFor({ velora: { issuer: 'https://velora.ikelene.net' } }), 'https://velora.ikelene.net');
+  assert.equal(issuerFor(null), 'https://velora.ikelene.net');
+});

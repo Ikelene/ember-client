@@ -11,7 +11,7 @@ const b64u = buf => { let s = ''; for (const b of new Uint8Array(buf)) s += Stri
 const unb64u = s => Uint8Array.from(atob(String(s).replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 
 export { canonical } from './signing-payload.js';
-import { canonical, payloadOf, receivedPayload } from './signing-payload.js';
+import { canonical, payloadOf, receivedPayload, issuerFor } from './signing-payload.js';
 const bytesOf = payload => enc.encode(`bonfire-msg-v1\n${canonical(payload)}`);
 
 // ── the account key ──
@@ -53,19 +53,22 @@ export async function setupSigning() {
   } catch (e) { patchState({ signing: { state: 'error', error: e.message } }); }
 }
 
-// The signed "iss" is the account issuer the instances check against (their velora_url), not the page's address: it stays
-// https://velora.ikelene.net after the move to nookara.cc / ember.nookara.cc. Checks also accept the new hosts, for messages
-// signed on ember.nookara.cc before this was pinned.
+// The signed "iss" is the account issuer the instance checks against, not the page's address. An instance lists the ones it
+// accepts in discovery (velora.signing_issuers, preferred first: https://nookara.cc on Nookara). One older than that list
+// checks against its own velora_url (velora.issuer); with neither, Velora's original https://velora.ikelene.net, which every
+// client signed with before. Checks of received messages try all of them (and the page's own host, for messages signed on
+// ember.nookara.cc before the issuer was pinned).
 const SIG_ISS = 'https://velora.ikelene.net';
-const SIG_ISS_ALL = [...new Set([SIG_ISS, location.origin, 'https://nookara.cc', 'https://ember.nookara.cc'])];
-// -> { kid, sig, ts, nonce } for a message about to be sent / edited
-export async function signMessage(fields) {
+const SIG_ISS_ALL = [...new Set(['https://nookara.cc', SIG_ISS, location.origin, 'https://ember.nookara.cc'])];
+// -> { kid, sig, ts, nonce } for a message about to be sent / edited (info: the instance's discovery info, for the issuer)
+export async function signMessage(fields, info) {
   if (!device) throw new Error('no_key');
   if (Date.now() - device.at > KEY_AGE) await refresh().catch(() => {});
+  const iss = issuerFor(info);
   const go = async () => {
     const ts = serverNow(); // instances refuse a time more than 5 min from theirs, so never the PC's own clock
     const nonce = b64u(crypto.getRandomValues(new Uint8Array(16)));
-    const payload = payloadOf({ iss: SIG_ISS, ...fields, ts, nonce });
+    const payload = payloadOf({ iss, ...fields, ts, nonce });
     const sig = await crypto.subtle.sign({ name: 'Ed25519' }, device.priv, bytesOf(payload));
     return { kid: device.kid, sig: b64u(sig), ts, nonce };
   };

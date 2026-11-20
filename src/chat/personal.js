@@ -109,7 +109,7 @@ export async function sendSticker(cid, tid, replyTo) {
     let signature;
     if (sid && isInst(sid) && signingInfo(sid).can) {
       try {
-        signature = await signMessage({ instance: instOf(sid), community: bare(sid), channel: bare(cid), author: connections.get(instOf(sid)).user.velora_id, body: '', attachments: [], reply_to: replyTo?.id ?? null, edit_of: null, sticker: tid });
+        signature = await signMessage({ instance: instOf(sid), community: bare(sid), channel: bare(cid), author: connections.get(instOf(sid)).user.velora_id, body: '', attachments: [], reply_to: replyTo?.id ?? null, edit_of: null, sticker: tid }, connections.get(instOf(sid)).info);
       } catch { if (!(await askSendUnsigned())) return; }
     }
     try { await post(signature); }
