@@ -13,7 +13,7 @@ import { holdOutcome, isVoiceAtt, isVoiceLink } from './voice-note.js';
 import { viewMedia } from './MediaViewer.jsx';
 import { Fragment, createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
-import { AudioLines, Eye, EyeOff, Reply, Pencil, Trash2, Copy, Plus, X, SmilePlus, Lock, SendHorizontal, AlertCircle, ImageIcon, CornerUpRight, Music, Film, ArrowRight, ArrowLeft, Webhook, Phone, Pin, ChevronUp, Star, Upload, CloudUpload, RotateCw } from 'lucide-react';
+import { AudioLines, Eye, EyeOff, Reply, Pencil, Trash2, Copy, Plus, X, SmilePlus, Lock, SendHorizontal, AlertCircle, ImageIcon, CornerUpRight, Music, Film, ArrowRight, ArrowLeft, Webhook, Phone, Pin, ChevronUp, Star, Upload, CloudUpload, RotateCw, Camera } from 'lucide-react';
 import { Embeds } from './ChannelTypes.jsx';
 import { LinkEmbeds } from './LinkEmbeds.jsx';
 import { E2eeMessageNote, OpenedAttachments, PreviewOnAsk, E2eeComposerNotes, E2eeLockedPanel } from './E2eeMessage.jsx';
@@ -62,6 +62,7 @@ import { playSound, loadEmojis, loadMembers, loadCommands, clearStatusReply, use
 import { sendSticker } from './personal.js';
 import { openStickerInfo, stickerMenuItems } from './StickerInfo.jsx';
 import { stickerOfBody } from './stickerLink.js';
+import { isMobileDevice } from './store.js';
 import { takeJump, fileKind, uploadMedia, saveToMedia, isMineMsg, loadUploadLimits, getUploadLimits, chooseUploadDest, rememberedUploadDest, tempFileInfo, tempFileInfoNow, onTempInfo, TEMP_LINK } from './store.js';
 import { useStarboardFor, starredByMe, STAR } from './Starboard.jsx';
 import { CALL_LINE, callLineText } from './callText.js';
@@ -1036,6 +1037,7 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
   }, [voice.active]); // eslint-disable-line react-hooks/exhaustive-deps
   const [dropping, setDropping] = useState(false); // a file is being dragged over the window
   const saveFile = useRef(null);
+  const camera = useRef(null); // the + menu's "Take a photo" (phones): the camera app straight away, the photo lands in the tray
   const destOnce = useRef(null); // the + menu's "Upload to ... storage": where the next picked files go
   const [picker, setPicker] = useState(false); // false | 'saved' | 'clips' (the tab it opens on)
   const [glintIntro, setGlintIntro] = useState(false);
@@ -1290,6 +1292,7 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
     const pickOnce = dest => { destOnce.current = dest; file.current?.click(); };
     const mine = rememberedUploadDest();
     openMenu({ clientX: r.left, clientY: Math.max(6, r.top - 150), preventDefault() {}, stopPropagation() {} }, [
+      ...(isMobileDevice() ? [{ label: 'Take a photo', hint: 'Opens your camera and attaches the picture', icon: Camera, onClick: () => camera.current?.click() }] : []),
       ...(onVelora ? [ // DMs / group chats: pick where these files go (just this once - the remembered choice stays)
         { label: 'Upload to temporary storage', hint: `Free, deleted after a set time - up to ${lim.server_mb} MB${mine === 'temp' ? ' (your default)' : ''}`, icon: Clock, onClick: () => pickOnce('temp') },
         { label: 'Upload to account storage', hint: `Kept on your Nookara account - up to ${lim.saved_mb} MB${mine === 'account' ? ' (your default)' : ''}`, icon: CloudUpload, onClick: () => pickOnce('account') },
@@ -1441,6 +1444,8 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
         {cpicker && <CommandPicker items={citems} sel={csel} setSel={setCsel} onPick={startCommand} bots={cbots} bot={cbotOn} onBot={pickBot} />}
         {cmd && <CommandBar key={cmd.key} view={view} entry={cmd} submitRef={cmdSubmit} onReady={setCmdMissing} onCancel={() => { setCmd(null); setTimeout(() => ta.current?.focus(), 0); }} onSent={() => { setCmd(null); setReplyTo?.(null); setTimeout(() => ta.current?.focus(), 0); }} />}
         <input ref={file} type="file" multiple hidden onChange={e => { const once = destOnce.current; destOnce.current = null; addFiles(e.target.files, once); e.target.value = ''; }} />
+        {/* capture: phones open the camera instead of a picker (a camera photo reads fine, unlike Android's Photo Picker - see accept.js) */}
+        <input ref={camera} type="file" hidden accept="image/*" capture="environment" onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
         <input ref={saveFile} type="file" multiple hidden accept={pictureAccept('image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm,video/quicktime,audio/*')} onChange={e => { addSavedFiles(e.target.files); e.target.value = ''; }} />
         <div
           ref={ta} className="vc-input" style={cmd || voice.active ? { display: 'none' } : undefined} contentEditable={!sendOff} suppressContentEditableWarning role="textbox" aria-multiline="true" aria-disabled={sendOff || undefined}
