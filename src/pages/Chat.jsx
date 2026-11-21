@@ -1,4 +1,5 @@
 import { clientUrl } from '../chat/hosts.js';
+import { StatusLink } from '../chat/StatusLink.jsx';
 // Ember (/chat): servers + channels, DMs and group chats in one place, with presence.
 import { ForwardDialog } from '../chat/MsgTools.jsx';
 import { SidePanel, useInboxCount } from '../chat/SidePanel.jsx';
@@ -265,7 +266,7 @@ function ReconnectPopup() {
     <div className="vc-upd vc-reconnect-pop" role="status">
       <span className="vc-upd-ico"><i className="vc-gate-spin" /></span>
       <div className="vc-upd-txt"><b>Reconnecting to Nookara...</b><span>Messages may not send or arrive until it's back. <RetryIn at={at} busy={connecting} /></span></div>
-      <div className="vc-upd-btns"><button type="button" className="btn btn-surface btn-sm" onClick={retryNow}>Retry now</button></div>
+      <div className="vc-upd-btns"><button type="button" className="btn btn-surface btn-sm" onClick={retryNow}>Retry now</button><StatusLink id="ember" className="btn btn-surface btn-sm" /></div>
     </div>
   );
 }

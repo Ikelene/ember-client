@@ -9,6 +9,8 @@ import { joinLabel, joinHint } from './Community.jsx';
 import { startSignIn } from './session.js';
 import { signOut, savedAccounts, switchTo } from './ProfilePopout.jsx';
 import { siteHref } from './hosts.js';
+import { StatusLink } from './StatusLink.jsx';
+import { statusIdForHost } from './status.js';
 
 export const SUPPORT_URL = 'https://nookara.cc/support';
 // where the birthday is set (Nookara account settings; a website session, the Ember token can't set it)
@@ -147,7 +149,7 @@ export function InstanceGate({ origin }) {
       <Box icon={<Server size={34} />} title={`Couldn't reach ${host}`}>
         {inst.error && inst.error !== 'instance_unreachable' && <p>{errorText(inst.error === 'insufficient_scope' ? 'inst_scope' : inst.error)}</p>}
         <RetryIn at={inst.retryAt} busy={status === 'connecting'} />
-        <div className="vc-gate-btns"><button type="button" className="btn btn-primary" onClick={() => reconnect(origin)}><RefreshCw size={15} /> Retry now</button>{remove}</div>
+        <div className="vc-gate-btns"><button type="button" className="btn btn-primary" onClick={() => reconnect(origin)}><RefreshCw size={15} /> Retry now</button>{statusIdForHost(host) && <StatusLink id={statusIdForHost(host)} className="btn btn-surface" size={15} />}{remove}</div>
       </Box>
     );
   }

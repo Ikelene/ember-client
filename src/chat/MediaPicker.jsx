@@ -8,6 +8,7 @@ import { apiFetch } from '../api.js';
 import { useChat, getState, toast, errorText, ask, loadMedia, saveGif, unsaveGif, deleteMedia, saveFilesToMedia, getUploadLimits } from './store.js';
 import { useMyClips, liveClips, glintMediaMatcher, glintLink, loadMyClips, GlintMark, NewTag, openOutside, GLINT_BROWSE } from './glint.jsx';
 import { fmtTime } from './MediaPlayer.jsx';
+import { StatusLink } from './StatusLink.jsx';
 import { pictureAccept } from './accept.js';
 
 export function GifBadge() { return <span className="vc-gif-badge">GIF</span>; }
@@ -179,7 +180,7 @@ function Clips({ clips, onSendLink }) {
       </div>
       <div className="vc-picker-scroll">
         {clips === undefined && <div className="vc-loading"><i /><i /><i /></div>}
-        {clips === null && <div className="vc-empty-note">Couldn't reach Glint right now.</div>}
+        {clips === null && <div className="vc-empty-note">Couldn't reach Glint right now. <StatusLink id="nookara-glint" className="vc-status-link" size={13} /></div>}
         {clips && !list.length && <div className="vc-empty-note">No clips yet. Clip a game with Glint (Alt+C) and it shows up here.</div>}
         <div className="vc-clip-grid">
           {list.map((c, i) => {

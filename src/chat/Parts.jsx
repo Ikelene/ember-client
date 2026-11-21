@@ -1,5 +1,6 @@
 // The frame around the conversation: server rail, channel / DM sidebar, member list, your panel.
 import { BotTag } from './Bots.jsx';
+import { StatusLink } from './StatusLink.jsx';
 import { isDesktopApp } from './BonfireLogo.jsx';
 import { VoiceChannelUsers, QuickVoiceBtns } from './VoiceParts.jsx';
 import { joinVoice } from './voice.js';
@@ -498,6 +499,7 @@ export function VeloraConnNote({ className = '' }) {
       <i className="vc-gate-spin" />
       <span><b>{conn === 'closed' ? 'Reconnecting to Nookara...' : 'Connecting to Nookara...'}</b>{conn === 'closed' && <RetryIn at={at} />}</span>
       {conn === 'closed' && <button type="button" onClick={retryNow}>Retry now</button>}
+      {conn === 'closed' && <StatusLink id="ember" className="vc-conn-status" label="Status" size={12} />}
     </div>
   );
 }

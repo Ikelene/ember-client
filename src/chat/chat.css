@@ -2187,6 +2187,10 @@ a.vc-appdl-opt { text-decoration: none; }
 .vc-conn-note small { color: var(--muted); }
 .vc-conn-note button { flex: none; background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
 .vc-conn-note button:hover { text-decoration: underline; }
+.vc-conn-note a.vc-conn-status { flex: none; display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-weight: 600; text-decoration: none; }
+.vc-conn-note a.vc-conn-status:hover { text-decoration: underline; }
+.vc-status-link { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; color: var(--accent); font-weight: 600; text-decoration: none; }
+.vc-status-link:hover { text-decoration: underline; }
 .vc-conn-note.wide { margin: 0 0 14px; padding: 10px 14px; font-size: 13.5px; }
 
 /* an instance's voice minutes nearly / all used (Parts.jsx VoiceQuotaNote), above the user panel */
