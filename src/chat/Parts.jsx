@@ -20,7 +20,7 @@ import { P, has, ChannelIcon, useNameStyle, colorFrom, NameDecor } from './roles
 import { serverMenu, instanceMenu, channelMenu, userMenu, openMenu, copy } from './Menu.jsx';
 import { apiFetch, getToken } from '../api.js';
 import { VELORA, instOf, isInst } from './ids.js';
-import { loudUnread } from './unread.js';
+import { loudUnread, needsChannelCount } from './unread.js';
 import { getLook, subscribeLook } from './look.js';
 import { removeInstance, reorderInstances, reconnect as reconnectInstance, disconnectInstance } from './instances.js';
 import { startSignIn } from './session.js';
@@ -79,13 +79,19 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
   const srvMentions = useChat(s => s.srvMentions);
   // a server lights up only for unread channels I haven't muted (its own unread flag can't know my channel mutes)
   const detail = useChat(s => s.detail), chUnread = useChat(s => s.unread), unreadN = useChat(s => s.unreadN);
-  useChat(s => s.notify);
+  const notify = useChat(s => s.notify);
   const chMuted = (cid, sid) => effectiveNotify(cid, sid).muted;
   const loudOf = srv => loudUnread(srv, { channels: detail[srv?.sid]?.channels || null, unread: chUnread, unreadN, muted: chMuted, serverMuted: !!srv && isMuted(srv.sid) });
   // can't tell yet (an older server that doesn't list its unread channels, channels not loaded): load its channels once, quiet until then
   const asked = useRef(new Set());
   useEffect(() => {
-    for (const srv of servers) if (loudOf(srv) === null && !asked.current.has(srv.sid)) { asked.current.add(srv.sid); refreshServer(srv.sid); }
+    // ...and Ember servers whose one unread total may include channels you muted: count them per channel (unread.js)
+    const t = Date.now();
+    const mutedIds = Object.keys(notify || {}).filter(k => (notify[k]?.muted_until || 0) > t);
+    for (const srv of servers) {
+      if (asked.current.has(srv.sid)) continue;
+      if (loudOf(srv) === null || needsChannelCount(srv, { channels: detail[srv.sid]?.channels || null, mutedIds })) { asked.current.add(srv.sid); refreshServer(srv.sid); }
+    }
   });
   const loudUnreadOf = srv => loudOf(srv) === true;
   // DMs with new messages sit in the rail under Home (with how many), like Discord / Fluxer

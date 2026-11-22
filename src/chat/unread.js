@@ -16,6 +16,17 @@ export function loudUnread(srv, { channels = null, unread = {}, unreadN = {}, mu
   return null;
 }
 
+// Should Ember load this server's channels to count its unread messages itself? Ember servers older than ember-server 2c598d6
+// (and ones run by other people, e.g. chat.velocityyy.dev) count muted channels in their unread_count, and one total can't be
+// split per channel. So when an Ember server is unread, its channels aren't loaded, and you've muted a channel on that instance,
+// load them (then serverUnreadCount counts per channel). Nookara's own servers (no `inst|` prefix) already leave muted ones out.
+//   mutedIds  the channel / server ids you have muted right now
+export function needsChannelCount(srv, { channels = null, mutedIds = [] } = {}) {
+  if (channels || !srv?.unread || !srv.inst) return false;
+  const pre = `${srv.inst}|`;
+  return mutedIds.some(id => typeof id === 'string' && id.startsWith(pre));
+}
+
 // How many unread messages a server adds to the totals (the tab title's (N), the favicon dot, the phone menu badge, the
 // desktop app's count) - muted channels never count (Ikelene 2026-11-22: a muted channel's messages still showed up there).
 // Same inputs as loudUnread; the server itself being muted is the caller's check.

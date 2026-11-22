@@ -1,6 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loudUnread, serverUnreadCount } from '../src/chat/unread.js';
+import { loudUnread, serverUnreadCount, needsChannelCount } from '../src/chat/unread.js';
+
+test('an Ember server whose total may include muted channels gets its channels loaded (counted per channel instead)', () => {
+  const srv = { sid: 'https://x.dev|5', inst: 'https://x.dev', unread: true, unread_count: 7 };
+  assert.equal(needsChannelCount(srv, { mutedIds: ['https://x.dev|9'] }), true);
+  assert.equal(needsChannelCount(srv, { mutedIds: ['https://other.dev|9', '12'] }), false, 'mutes elsewhere');
+  assert.equal(needsChannelCount(srv, { mutedIds: ['https://x.dev|9'], channels: [] }), false, 'already loaded');
+  assert.equal(needsChannelCount({ ...srv, unread: false }, { mutedIds: ['https://x.dev|9'] }), false, 'nothing unread');
+  assert.equal(needsChannelCount({ sid: '3', unread: true }, { mutedIds: ['4'] }), false, 'Nookara servers already skip mutes');
+  // once loaded, the muted channel's messages are left out
+  const channels = [{ cid: 'https://x.dev|9', unread: true, unread_count: 5 }, { cid: 'https://x.dev|8', unread: true, unread_count: 2 }];
+  assert.equal(serverUnreadCount(srv, { channels, muted: cid => cid === 'https://x.dev|9' }), 2);
+});
 
 const mutedSet = (...cids) => cid => cids.includes(cid);
 
