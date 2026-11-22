@@ -19,7 +19,7 @@ import { findPending, dropSettled, wireText, settle } from './pending.js';
 import { VELORA, K, parseK, instOf, bare, isInst, normOrigin, acctKey } from './ids.js';
 import { myIdOn } from './tokens.js';
 import { readChannel as readMsgCache, writeChannel as writeMsgCache, dropChannels as dropMsgCache } from './msgCache.js';
-import { connections, sendTo, startInstances, loadInstanceData, retryInstances, renewVeloraSession, holdInstances, forgetIfEmpty, wakeInstance, instanceWoke, recheckSleepers } from './instances.js';
+import { connections, sendTo, startInstances, loadInstanceData, retryInstances, resumeInstances, renewVeloraSession, holdInstances, forgetIfEmpty, wakeInstance, instanceWoke, recheckSleepers } from './instances.js';
 import { attachmentRefs } from './signing-payload.js';
 import { spoilerName } from './spoiler.js';
 import { prepareInstanceAttachments } from './attachment-preparation.js';
@@ -364,6 +364,23 @@ export function isMobileDevice() {
 // connection never signs anyone out - only Velora rejecting the token does (auth_error invalid_token, a 401, `kicked`).
 export const backoff = n => Math.min(30000, 1000 * 2 ** Math.min(n, 5)) * (0.8 + Math.random() * 0.4);
 let sockTimer = null;
+// Phones (Ikelene 2026-11-22): after a while in another app the socket is often stuck - still "connecting" (started while the app
+// was asleep) or "open" but dead - and Ember used to wait for the OS to give up on it, which could take minutes. Now a connect
+// that hasn't opened in CONNECT_TIMEOUT is dropped and retried, and coming back to the app checks the socket (resumeSocket).
+const CONNECT_TIMEOUT = 8000;
+let sockStarted = 0, lastHeard = 0, probeTimer = null;
+// throw a stuck / dead socket away and connect again right now
+function dropSocket() {
+  const old = sock;
+  clearTimeout(probeTimer); probeTimer = null;
+  if (old) {
+    sock = null; // (its onclose then does nothing: it's not the current socket any more)
+    try { old.close(); } catch { /* already gone */ }
+    if (old.readyState !== 0) voiceHook?.({ type: 'voice_closed', dropped: true });
+  }
+  set({ conn: 'closed' });
+  retry = 0; connect();
+}
 export function connect() {
   clearTimeout(sockTimer); sockTimer = null;
   if (sock && sock.readyState <= 1) return;
@@ -371,9 +388,13 @@ export function connect() {
   set({ conn: 'connecting', connRetryAt: 0 });
   const s = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
   sock = s;
-  s.onopen = () => s.send(JSON.stringify({ type: 'auth_token', token: getToken(), mobile: isMobileDevice(), client: { version: SHORT } })); // (`client` is shown to people with Manage users)
+  sockStarted = Date.now();
+  // never opened: let it go and run its close handling ourselves (the normal retry with backoff), not waiting on the browser to
+  setTimeout(() => { if (sock === s && s.readyState === 0) { const closed = s.onclose; s.onclose = null; try { s.close(); } catch { /* fine */ } closed?.(); } }, CONNECT_TIMEOUT);
+  s.onopen = () => { lastHeard = Date.now(); s.send(JSON.stringify({ type: 'auth_token', token: getToken(), mobile: isMobileDevice(), client: { version: SHORT } })); }; // (`client` is shown to people with Manage users)
   s.binaryType = 'arraybuffer';
   s.onmessage = e => {
+    if (sock === s) lastHeard = Date.now();
     if (typeof e.data !== 'string') { voiceHook?.({ binary: e.data }); return; }
     let m; try { m = JSON.parse(e.data); } catch { return; }
     handleEvent(m);
@@ -389,13 +410,28 @@ export function connect() {
 }
 // "Retry now" / the network or the tab came back: try again right away (the home socket and every instance)
 export function retryNow() {
-  if (state.signedIn && state.conn === 'closed') { retry = 0; connect(); }
+  if (state.signedIn) resumeSocket(true);
   retryInstances();
 }
+// back in the app (or the network came back): closed -> connect now; stuck connecting -> start over; open but quiet for a while
+// (pings stop while a phone app is in the background) -> ping it, and if nothing answers within 3.5 s it's dead: start over.
+// now = the Retry now button (a connect in progress is replaced straight away)
+export function resumeSocket(now = false) {
+  if (!state.signedIn || !getToken()) return;
+  const t = Date.now();
+  if (!sock || sock.readyState >= 2) { if (state.conn !== 'open') { retry = 0; connect(); } return; }
+  if (sock.readyState === 0) { if (now || t - sockStarted > 3000) dropSocket(); return; }
+  if (t - lastHeard < 30000 || probeTimer) return;
+  const s = sock, asked = t;
+  try { s.send(JSON.stringify({ type: 'ping' })); } catch { dropSocket(); return; }
+  probeTimer = setTimeout(() => { probeTimer = null; if (sock === s && lastHeard < asked) dropSocket(); }, 3500);
+}
 if (typeof window !== 'undefined') {
-  addEventListener('online', retryNow);
-  addEventListener('focus', retryNow);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') retryNow(); });
+  const back = () => { resumeSocket(); resumeInstances(); };
+  addEventListener('online', back);
+  addEventListener('focus', back);
+  addEventListener('pageshow', back);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') back(); });
 }
 setInterval(() => send({ type: 'ping' }), 25000);
 

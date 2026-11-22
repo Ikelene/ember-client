@@ -193,9 +193,12 @@ function openSocket(c) {
   setStatus(c, 'connecting');
   const ws = new WebSocket(`${c.origin.replace(/^http/, 'ws')}/gateway`);
   c.ws = ws;
-  ws.onopen = () => ws.send(JSON.stringify({ type: 'auth', session: c.session, client: { version: SHORT } })); // (`client`: shown to Manage users holders, PROTOCOL §7.1)
+  c.started = Date.now();
+  setTimeout(() => { if (c.ws === ws && ws.readyState === 0) dropWs(c); }, CONNECT_TIMEOUT); // never opened: start over (phones, see resumeInstances)
+  ws.onopen = () => { c.heard = Date.now(); ws.send(JSON.stringify({ type: 'auth', session: c.session, client: { version: SHORT } })); }; // (`client`: shown to Manage users holders, PROTOCOL §7.1)
   ws.onmessage = e => {
     if (c.ws !== ws || typeof e.data !== 'string') return;
+    c.heard = Date.now();
     let m; try { m = JSON.parse(e.data); } catch { return; }
     onFrame(c, m);
   };
@@ -222,6 +225,35 @@ function scheduleRetry(c, min = 0) {
   const wait = Math.max(min, backoff(c.retry++));
   c.retryAt = Date.now() + wait; mirror();
   c.timer = setTimeout(() => { if (connections.get(c.origin) === c) connect(c.origin); }, wait);
+}
+// Phones (Ikelene 2026-11-22): back from another app, a gateway socket is often stuck connecting or open-but-dead, and waiting for
+// the OS to notice took minutes. dropWs lets it go now (running its close handling, so it reconnects at once).
+const CONNECT_TIMEOUT = 8000;
+function dropWs(c) {
+  const ws = c.ws;
+  if (!ws) return;
+  clearTimeout(c.probe); c.probe = null;
+  const closed = ws.onclose;
+  ws.onclose = null;
+  try { ws.close(); } catch { /* already gone */ }
+  c.retry = 0;
+  closed?.({ code: 1006 });
+}
+// back in the app: stuck connecting -> start over; open but quiet a while (pings stop in the background) -> ping it, and drop it if
+// nothing answers within 3.5 s (the gateway answers ping with pong, PROTOCOL); then everything closed tries again now
+export function resumeInstances() {
+  if (held) return;
+  const t = Date.now();
+  for (const c of connections.values()) {
+    const ws = c.ws;
+    if (!ws) continue;
+    if (ws.readyState === 0 && t - (c.started || 0) > 3000) { dropWs(c); continue; }
+    if (ws.readyState !== 1 || t - (c.heard || 0) < 30000 || c.probe) continue;
+    const asked = t;
+    try { ws.send('{"type":"ping"}'); } catch { dropWs(c); continue; }
+    c.probe = setTimeout(() => { c.probe = null; if (c.ws === ws && (c.heard || 0) < asked) dropWs(c); }, 3500);
+  }
+  retryInstances();
 }
 // the network / tab came back, or the server was opened: every instance that isn't connected tries again now
 export function retryInstances(origin) {
