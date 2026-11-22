@@ -1089,6 +1089,7 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
     const el = ta.current;
     if (!el || !mq) return;
     const token = it.token || (it.kind === 'role' ? `<@&${it.role.rid}>` : it.insert.trim());
+    composing.current = false; // the pick replaces the word the keyboard was composing (and ends that composition)
     if (!replaceBeforeCaret(el, mq.q.length + 1, token, sid)) insertAt(el, saved.current, token, sid);
     styleMarkdown(el, view);
     setMq(null);
@@ -1112,7 +1113,11 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
     const el = ta.current;
     if (composing.current || e.nativeEvent.isComposing) {
       const value = serialize(el);
-      setText(value); setDraft(key, value); setMq(null);
+      setText(value); setDraft(key, value);
+      // phone keyboards compose every word, so "@ik" / ":sm" is typed mid-composition: keep the suggestions following it
+      // (they used to close here, so the list vanished as soon as you typed to search - Ikelene 2026-11-22)
+      const c = caretText(el);
+      setMq(c ? suggestQuery(c.before, c.before.length) : null);
       if (value.trim()) setTyping(view, true);
       return;
     }
