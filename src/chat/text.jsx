@@ -102,10 +102,11 @@ function CustomEmojiImg({ eid, animated, name, inst }) {
   // a picture that fails (address not known yet, or a hiccup) asks for the list again and tries a few more times
   const retry = () => {
     if (there && !onServer) { setOnServer(true); return; }
-    if (tries >= 3) return;
+    if (tries >= 3) { setTries(4); return; }
     if (!known && Date.now() - emojiRetryAt > 3000) { emojiRetryAt = Date.now(); loadEmojis(); }
     setTimeout(() => setTries(t => t + 1), 1500 * (tries + 1));
   };
+  if (tries > 3) return <span className="vc-cemoji-gone" title="This emoji was deleted">:{name}:</span>;
   return <img className="vc-cemoji" src={tries ? `${src}${src.includes('?') ? '&' : '?'}r=${tries}` : src} onError={retry} alt={`:${name}:`} title={`:${name}:`} draggable={false}
     data-eid={eid} data-name={name} data-animated={animated ? '1' : '0'} onClick={e => emojiInfo(e, { eid, name, animated: !!animated, inst })} />;
 }

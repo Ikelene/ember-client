@@ -53,8 +53,10 @@ function LazyGrid({ items, render, root }) {
 
 // stickerSid + onSticker: on an Ember server's channel, that server's stickers (onSticker(tid)) in the Stickers tab
 // onPersonalSticker: your personal stickers (anywhere you can send) in the Stickers tab (onPersonalSticker(sticker))
+// personalOnly: standard emojis + your personal emojis only (the bio editor: a server's emojis live on that server, so they
+// wouldn't show on your profile everywhere; personal ones are on Nookara and do)
 // docked: under the chat box on a phone (pickerDock.js): no search focus (it would bring the keyboard back)
-export default function EmojiPicker({ onPick, onClose, reactionSid, stickerSid, onSticker, onPersonalSticker, docked = false }) {
+export default function EmojiPicker({ onPick, onClose, reactionSid, stickerSid, onSticker, onPersonalSticker, docked = false, personalOnly = false }) {
   const [data, setData] = useState(dataSync);
   const [q, setQ] = useState('');
   const [tab, setTab] = useState('emoji');
@@ -69,7 +71,7 @@ export default function EmojiPicker({ onPick, onClose, reactionSid, stickerSid, 
   const stickerTab = !!(stickerSid || onPersonalSticker);
   const [hover, setHover] = useState(null);
   const allCustom = useChat(s => s.emojis);
-  const custom = useMemo(() => reactionSid === undefined ? allCustom : (allCustom || []).filter(s => s.sid === reactionSid), [allCustom, reactionSid]);
+  const custom = useMemo(() => (personalOnly ? [] : reactionSid === undefined ? allCustom : (allCustom || []).filter(s => s.sid === reactionSid)), [allCustom, reactionSid, personalOnly]);
   const box = useRef(null);
   const scroller = useRef(null);
   useEffect(() => { if (!data) loadData().then(setData); if (!getState().emojis) loadEmojis(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -98,7 +100,7 @@ export default function EmojiPicker({ onPick, onClose, reactionSid, stickerSid, 
     if (!allCustom || !personalAll) return null;
     return new Set([...personalAll.map(e => e.eid), ...allCustom.flatMap(s => s.emojis.map(e => e.eid))]);
   }, [allCustom, personalAll]);
-  const rec = recents().filter(r => !r.c || ((!known || known.has(r.c.eid)) && (reactionSid === undefined || (custom || []).some(s => s.emojis.some(e => e.eid === r.c.eid)))));
+  const rec = recents().filter(r => !r.c || (personalOnly ? personal.some(e => e.eid === r.c.eid) : (!known || known.has(r.c.eid)) && (reactionSid === undefined || (custom || []).some(s => s.emojis.some(e => e.eid === r.c.eid)))));
   const cell = (e, c) => (c
     ? <button type="button" key={e.eid} className="vc-em" onClick={() => pickCustom(e)} onContextMenu={ev => { const items = emojiMenuItems(e); if (items.length) openMenu(ev, items); else ev.preventDefault(); }} onMouseEnter={() => setHover({ name: `:${e.name}:`, img: e.url, sub: e.server })}><img src={e.url} alt={e.name} loading="lazy" /></button>
     : <button type="button" key={e[0]} className="vc-em" onClick={() => pickUni(e)} onMouseEnter={() => setHover({ name: `:${shortName(e)}:`, char: e[0] })}><Twemoji char={e[0]} className="vc-em-tw" lazy /></button>);
@@ -173,7 +175,7 @@ export default function EmojiPicker({ onPick, onClose, reactionSid, stickerSid, 
         </div>
       </div>
       <div className="vc-em-foot">
-        {hover ? <>{hover.img ? <img src={hover.img} alt="" /> : <Twemoji char={hover.char} className="vc-em-big" />}<b>{hover.name}</b>{hover.sub && <small>from {hover.sub}</small>}</> : <small>{reactionSid === undefined ? 'Custom emojis from your servers and your personal emojis work everywhere.' : 'React with this community’s custom emojis.'}</small>}
+        {hover ? <>{hover.img ? <img src={hover.img} alt="" /> : <Twemoji char={hover.char} className="vc-em-big" />}<b>{hover.name}</b>{hover.sub && <small>from {hover.sub}</small>}</> : <small>{personalOnly ? 'Your personal emojis show on your profile for everyone.' : reactionSid === undefined ? 'Custom emojis from your servers and your personal emojis work everywhere.' : 'React with this community’s custom emojis.'}</small>}
       </div>
       </>}
     </div>

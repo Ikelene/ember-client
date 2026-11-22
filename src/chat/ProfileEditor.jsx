@@ -4,7 +4,7 @@ import { siteHref } from './hosts.js';
 // right (the same card as your bottom-left pop-out). Saving goes through the unsaved-changes bar.
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ShieldAlert, LogIn } from 'lucide-react';
+import { ShieldAlert, LogIn, Smile } from 'lucide-react';
 import { api, uploadMedia } from '../api.js';
 import { applyAccentColor } from '../theme.js';
 import ImageCropper from '../components/ImageCropper.jsx';
@@ -15,6 +15,8 @@ import { imgHint, warnImage } from './imgHints.js';
 import { PopoutCard, localTimeFrom } from './ProfilePopout.jsx';
 import ServerProfileEditor, { useProfileTargets, askLeave, ProfileTargetPicker } from './ServerProfileEditor.jsx';
 import { pictureAccept } from './accept.js';
+import EmojiPicker from './EmojiPicker.jsx';
+import { bioLength, bioEmojiCount, BIO_EMOJI_MAX } from './bioLength.js';
 
 const isHex = c => /^#[0-9a-f]{6}$/i.test(c || '');
 const UPLOAD_ERRORS = {
@@ -129,8 +131,22 @@ function Editor({ user, reload, presence, onDirty }) {
   }, [dirty]);
   useEffect(() => { if (!shake) return undefined; const t = setTimeout(() => setShake(0), 700); return () => clearTimeout(t); }, [shake]);
 
+  // the bio: a custom emoji counts as one character, at most BIO_EMOJI_MAX of them (bioLength.js, the same rule as Nookara)
+  const bioLen = bioLength(f.bio), bioEmojis = bioEmojiCount(f.bio);
+  const bioRef = useRef(null);
+  const [bioPick, setBioPick] = useState(null); // the emoji button's rect while the picker is open
+  function addToBio(tok) {
+    const ta = bioRef.current;
+    const at = ta ? ta.selectionStart : f.bio.length, end = ta ? ta.selectionEnd : at;
+    const next = f.bio.slice(0, at) + tok + f.bio.slice(end);
+    if (bioLength(next) > bioLimit || bioEmojiCount(next) > BIO_EMOJI_MAX) return;
+    set('bio', next);
+    requestAnimationFrame(() => { if (ta) { ta.focus(); ta.setSelectionRange(at + tok.length, at + tok.length); } });
+  }
   async function save() {
     if (f.color && !isHex(f.color)) { setMsg({ type: 'error', text: 'Accent colours look like #9d8ad1.' }); setShake(n => n + 1); return; }
+    if (bioLen > bioLimit) { setMsg({ type: 'error', text: `Bio too long (max ${bioLimit} characters).` }); setShake(n => n + 1); return; }
+    if (bioEmojis > BIO_EMOJI_MAX) { setMsg({ type: 'error', text: `Bios can have at most ${BIO_EMOJI_MAX} custom emojis.` }); setShake(n => n + 1); return; }
     setSaving(true); setMsg(null);
     try {
       if (fieldsDirty) {
@@ -155,7 +171,7 @@ function Editor({ user, reload, presence, onDirty }) {
         setShake(n => n + 1); setSaving(false); reload().catch(() => {});
         return;
       }
-      const m = { bio_too_long: `Bio too long (max ${bioLimit} characters).`, invalid_website: "That website link doesn't look right - use something like https://your-site.com" };
+      const m = { bio_too_long: `Bio too long (max ${bioLimit} characters).`, bio_too_many_emojis: `Bios can have at most ${BIO_EMOJI_MAX} custom emojis.`, invalid_website: "That website link doesn't look right - use something like https://your-site.com" };
       setMsg({ type: 'error', text: m[e.message] || DISPLAY_NAME_ERRORS[e.message] || "Couldn't save - try again." });
       setShake(n => n + 1);
     }
@@ -302,8 +318,17 @@ function Editor({ user, reload, presence, onDirty }) {
 
           <div className="bf-pe-sec">
             <div className="bf-pe-label">About me</div>
-            <textarea className="form-textarea" placeholder="Tell people a little about yourself..." value={f.bio} onChange={e => set('bio', e.target.value)} maxLength={bioLimit} rows={5} />
-            <div className="bf-pe-hint">{f.bio.length} / {bioLimit} characters. {'Supports markdown: **bold**, *italic*, __underline__, ~~strike~~, `code`, ||spoiler||, [links](https://...), lists, > quotes, -# small text and # headers.'}</div>
+            <div className="bf-pe-bio">
+              <textarea ref={bioRef} className="form-textarea" placeholder="Tell people a little about yourself..." value={f.bio} onChange={e => set('bio', e.target.value)} rows={5} />
+              <button type="button" className="bf-pe-bio-emoji vc-emoji-btn" aria-label="Add an emoji" data-tip="Emoji" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setBioPick(p => (p ? null : r)); }}><Smile size={18} /></button>
+            </div>
+            {bioPick && createPortal(
+              <div className="vc-react-pop" style={{ left: Math.max(8, Math.min(bioPick.right - 352, innerWidth - 360)), top: bioPick.top - 438 > 8 ? bioPick.top - 438 : Math.max(8, Math.min(bioPick.bottom + 8, innerHeight - 438)) }}>
+                <EmojiPicker personalOnly onPick={addToBio} onClose={() => setBioPick(null)} />
+              </div>,
+              document.body,
+            )}
+            <div className={`bf-pe-hint${bioLen > bioLimit || bioEmojis > BIO_EMOJI_MAX ? ' bad' : ''}`}>{bioLen} / {bioLimit} characters{bioEmojis ? `, ${bioEmojis} / ${BIO_EMOJI_MAX} custom emojis (each counts as one character)` : ''}. {'Supports markdown: **bold**, *italic*, __underline__, ~~strike~~, `code`, ||spoiler||, [links](https://...), lists, > quotes, -# small text and # headers.'}</div>
           </div>
 
           <div className="bf-pe-sec">
