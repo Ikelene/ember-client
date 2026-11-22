@@ -323,7 +323,7 @@ function Editor({ user, reload, presence, onDirty }) {
               <button type="button" className="bf-pe-bio-emoji vc-emoji-btn" aria-label="Add an emoji" data-tip="Emoji" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setBioPick(p => (p ? null : r)); }}><Smile size={18} /></button>
             </div>
             {bioPick && createPortal(
-              <div className="vc-react-pop" style={{ left: Math.max(8, Math.min(bioPick.right - 352, innerWidth - 360)), top: bioPick.top - 438 > 8 ? bioPick.top - 438 : Math.max(8, Math.min(bioPick.bottom + 8, innerHeight - 438)) }}>
+              <div className="vc-react-pop bf-pe-emoji-pop" style={{ left: Math.max(8, Math.min(bioPick.right - 352, innerWidth - 360)), top: bioPick.top - 438 > 8 ? bioPick.top - 438 : Math.max(8, Math.min(bioPick.bottom + 8, innerHeight - 438)) }}>
                 <EmojiPicker personalOnly onPick={addToBio} onClose={() => setBioPick(null)} />
               </div>,
               document.body,

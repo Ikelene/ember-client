@@ -82,6 +82,8 @@
 .bf-pe-bio-emoji { position: absolute; right: 6px; top: 6px; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; background: none; color: var(--muted); cursor: pointer; }
 .bf-pe-bio-emoji:hover { color: var(--text); background: var(--surface-3); }
 .bf-pe-hint.bad { color: var(--red); }
+/* the bio's picker sits over the Settings window (.vc-modal-back is 2100; a plain .vc-react-pop is 410, behind it) */
+.vc-react-pop.bf-pe-emoji-pop { z-index: 2200; }
 .bf-pe-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .bf-pe-row .form-input { width: auto; flex: 1 1 180px; min-width: 0; }
 .bf-pe-two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: stretch; width: 100%; }

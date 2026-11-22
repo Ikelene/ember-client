@@ -12,7 +12,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const chat = join(root, 'src/chat').replaceAll('\\', '/');
 const entry = `import React from 'react';import{createRoot}from'react-dom/client';import ProfileEditor from'${chat}/ProfileEditor.jsx';import{patchState}from'${chat}/store.js';
 patchState({ personalEmojis: { list: [{ eid: 'e0000000001', name: 'kiyori_wave', url: '/uploads/emojis/e0000000001.png' }] } });
-createRoot(document.getElementById('root')).render(<div className="vc"><ProfileEditor onDirty={()=>{}}/></div>);`;
+createRoot(document.getElementById('root')).render(<div className="vc"><div className="vc-modal-back bf-sd-back"><section className="bf-sd" role="dialog"><nav className="bf-sd-side"/><div className="bf-sd-main"><ProfileEditor onDirty={()=>{}}/></div></section></div></div>);`;
 const built = await build({ stdin: { contents: entry, loader: 'jsx', resolveDir: root }, nodePaths: [join(root, 'node_modules')], jsx: 'automatic', bundle: true, write: false, loader: { '.json': 'json', '.css': 'empty', '.png': 'dataurl', '.svg': 'dataurl', '.mp3': 'dataurl', '.woff2': 'dataurl' }, define: { __EMBER_COMMIT__: '"test"', __EMBER_REPO__: '"test"', 'process.env.NODE_ENV': '"development"' }, logLevel: 'error' });
 const css = ['src/chat/chat.css', 'src/styles.css', 'src/chat/SettingsDialog.css'].map(p => readFileSync(join(root, p), 'utf8')).join('\n');
 const EMOJI = readFileSync(process.env.EMOJI_JSON || join(root, '../VELORA-modernui/public/assets/emoji/emoji.json'), 'utf8');
@@ -40,9 +40,12 @@ try {
   assert.ok(ta >= sec - 2, `textarea ${ta}px of ${sec}px`);
   console.log('PASS the bio box keeps the full width');
   // cursor after "hello " then the emoji button
-  await page.$eval('.bf-pe-bio textarea', t => { t.focus(); t.setSelectionRange(6, 6); });
+  await page.$eval('.bf-pe-bio textarea', t => { t.scrollIntoView({ block: 'center' }); t.focus(); t.setSelectionRange(6, 6); });
   await page.click('.bf-pe-bio-emoji');
   await page.waitForSelector('.vc-em-sec[data-sec=personal] + * .vc-em', { state: 'attached' }); // (the grid fills in lazily)
+  // it opened ON TOP of the Settings window (it was hidden behind it on live 2026-11-22)
+  assert.equal(await page.$eval('.vc-emoji-picker', p => { const r = p.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return p.contains(top); }), true);
+  console.log('PASS the picker shows over the Settings window');
   await page.$eval('.vc-em-sec[data-sec=personal] + * .vc-em', b => b.click());
   assert.equal(await page.$eval('.bf-pe-bio textarea', t => t.value), 'hello <:kiyori_wave:e0000000001>');
   console.log('PASS the emoji button puts the token in at the cursor');
