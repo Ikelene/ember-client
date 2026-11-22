@@ -1070,6 +1070,12 @@ export async function catchUp(inst = VELORA) {
   if (cv.kind === 'channel' && (isInst(cv.sid) ? instOf(cv.sid) === inst : inst === VELORA) && state.detail[cv.sid]?.cached) {
     wakeServer(cv.sid).then(d => { if (d && keyOf(state.view) === keyOf(cv)) open(state.view); });
   }
+  // bot slash commands of this socket's servers (bots may have changed them while it was down / asleep), and the open one's
+  if (inst !== VELORA) {
+    const want = new Set(Object.keys(state.commands).filter(sid => isInst(sid) && instOf(sid) === inst));
+    if (cv.kind === 'channel' && isInst(cv.sid) && instOf(cv.sid) === inst) want.add(cv.sid);
+    for (const sid of want) loadCommands(sid, cv.kind === 'channel' && cv.sid === sid ? cv.cid : undefined);
+  }
   const mine = key => instOf(key.slice(2)) === inst;
   if (inst === VELORA) {
     // A rename may have happened while this socket was offline. Refresh the IDs
@@ -1697,18 +1703,38 @@ export async function uploadAttachment(v, file, opts = {}) {
   }
   return dest === 'account' ? uploadAccount(file, opts) : uploadTemp(file, opts);
 }
-// custom emojis of my Velora servers + every connected instance's (each listed under its own namespaced sid)
-let emojiLoad = 0;
-export async function loadEmojis() {
-  const mine = ++emojiLoad; // an older answer must not replace a newer one (instances connect while the first load is still running)
-  const open = [...connections.values()].filter(c => c.session && c.status === 'open').map(c => c.origin);
-  const [home, ...more] = await Promise.all([state.signedIn ? apiFetch('/chat/emojis').catch(() => null) : null, ...open.map(o => apiFetch('/chat/emojis', { inst: o }).catch(() => null))]);
-  const lists = [...(home?.servers || []), ...more.flatMap(d => d?.servers || [])];
-  if (mine !== emojiLoad || (!home && !more.some(Boolean))) return;
+// custom emojis of my Velora servers + every instance's (each listed under its own namespaced sid). A server that isn't connected
+// right now (asleep, disconnected, still connecting) keeps the list it had last time, also kept on this device, so its emojis can
+// still be picked and sent from anywhere. Only a server you're not in any more (instances.js drops it) loses them.
+const EMOJI_CACHE = () => acctKey('ember_emoji_cache');
+const readEmojiCache = () => { try { const v = JSON.parse(localStorage.getItem(EMOJI_CACHE()) || 'null'); return Array.isArray(v) ? v : null; } catch { return null; } };
+const emojiUrlsOf = lists => {
   const urls = {};
   for (const sv of lists) for (const e of sv.emojis || []) if (e.url && !urls[e.eid]) urls[e.eid] = e.url;
   for (const e of state.personalEmojis?.list || []) if (e.url && !urls[e.eid]) urls[e.eid] = e.url; // (personal.js)
-  set({ emojis: lists, emojiUrls: urls });
+  return urls;
+};
+// the kept lists, before anything has answered (opening Ember while a server is asleep or offline)
+function seedEmojis() {
+  if (state.emojis) return;
+  const kept = readEmojiCache();
+  if (kept?.length) set({ emojis: kept, emojiUrls: { ...emojiUrlsOf(kept), ...state.emojiUrls } });
+}
+let emojiLoad = 0;
+export async function loadEmojis() {
+  const mine = ++emojiLoad; // an older answer must not replace a newer one (instances connect while the first load is still running)
+  seedEmojis();
+  const open = [...connections.values()].filter(c => c.session && c.status === 'open').map(c => c.origin);
+  const [home, ...more] = await Promise.all([state.signedIn ? apiFetch('/chat/emojis').catch(() => null) : null, ...open.map(o => apiFetch('/chat/emojis', { inst: o }).catch(() => null))]);
+  if (mine !== emojiLoad || (!home && !more.some(Boolean))) return;
+  // what didn't answer keeps what it had: Nookara's own servers if that call failed, and every instance that isn't open (or failed)
+  const answered = new Set(open.filter((o, i) => more[i]));
+  const prev = state.emojis || readEmojiCache() || [];
+  // (not checked against `connections`: at start-up the instances aren't in it yet. Leaving one drops its lists in instances.js)
+  const keep = prev.filter(sv => (isInst(sv.sid) ? !answered.has(instOf(sv.sid)) : !home));
+  const lists = [...(home?.servers || []), ...more.flatMap(d => d?.servers || []), ...keep];
+  set({ emojis: lists, emojiUrls: emojiUrlsOf(lists) });
+  try { localStorage.setItem(EMOJI_CACHE(), JSON.stringify(lists)); } catch { /* full: the next load tries again */ }
 }
 export async function loadMedia() {
   const d = await apiFetch('/chat/media').catch(() => null);
@@ -1884,11 +1910,22 @@ export async function loadMoreMembers(sid) {
     watchPresence(d.members.map(m => m.username));
   } finally { loadingMore.delete(sid); }
 }
+// a server's bot slash commands. Kept on this device too, so the / menu is there while the server is asleep or still connecting;
+// catchUp() loads them again once its socket is up (they used to load only when the channel opened, and a server that was
+// asleep then never got them)
+const CMD_CACHE = () => acctKey('ember_cmd_cache');
+const readCmdCache = () => { try { const v = JSON.parse(localStorage.getItem(CMD_CACHE()) || '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; } };
 export async function loadCommands(sid, cid) {
   if (!isInst(sid)) return;
   const want = cid || state.commands[sid]?.cid || null;
+  if (!state.commands[sid]) { const kept = readCmdCache()[sid]; if (kept?.commands) set(s => (s.commands[sid] ? null : { commands: { ...s.commands, [sid]: { ...kept, cached: true } } })); }
   const d = await apiFetch(`/chat/servers/${sid}/commands${want ? `?channel=${encodeURIComponent(bare(want))}` : ''}`).catch(() => null);
-  if (d) set(s => ({ commands: { ...s.commands, [sid]: { ...d, cid: want } } }));
+  if (!d) return;
+  set(s => ({ commands: { ...s.commands, [sid]: { ...d, cid: want } } }));
+  const all = readCmdCache();
+  all[sid] = { bots: d.bots || [], commands: d.commands || [], cid: want, at: Date.now() };
+  for (const k of Object.keys(all).sort((a, b) => (all[b].at || 0) - (all[a].at || 0)).slice(60)) delete all[k];
+  try { localStorage.setItem(CMD_CACHE(), JSON.stringify(all)); } catch { /* full: fine */ }
 }
 export const sendInteraction = (sid, body) => {
   return apiFetch(`/chat/servers/${sid}/interactions`, { method: 'POST', body: JSON.stringify({ ...body, channel: bare(body.channel) }) });
