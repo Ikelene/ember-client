@@ -8,6 +8,7 @@ import { AtSign, Bell, Check, CheckCheck, ChevronRight, Headphones, Inbox, Messa
 import { apiFetch } from '../api.js';
 import { useChat, go, isMuted, readNotifs, followNotifLink, loadFriends, toast, errorText } from './store.js';
 import { NameText } from './displayNames.js';
+import { serverUnreadCount } from './unread.js';
 import { Avatar, subtitle } from './Profile.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
 import { NotifIcon, NotifText, ago } from './Notifications.jsx';
@@ -113,14 +114,15 @@ export default function Dashboard({ onUser, onTab, bare = false }) {
   // ── servers: where you were mentioned, then where there's new stuff (muted servers stay quiet) ──
   const srv = useMemo(() => {
     const rows = servers.filter(s => !isMuted(s.sid)).map(s => {
-      const live = Object.values(unreadN).reduce((n, u) => n + (u.sid === s.sid ? u.n : 0), 0);
       const chans = detail[s.sid]?.channels;
       const hot = chans ? chans.filter(c => (c.unread || c.mentions) && !isMuted(c.cid)).sort((a, b) => (b.mentions || 0) - (a.mentions || 0) || (b.unread_count || 0) - (a.unread_count || 0)).slice(0, 3).map(c => c.name) : [];
-      return { s, mentions: (s.mentions || 0) + (srvMentions[s.sid] || 0), news: (s.unread_count || 0) + live, unread: !!s.unread || live > 0, hot };
+      // muted channels don't count (unread.js)
+      const news = serverUnreadCount(s, { channels: chans || null, unread, unreadN, muted: cid => isMuted(cid) });
+      return { s, mentions: (s.mentions || 0) + (srvMentions[s.sid] || 0), news, unread: news > 0, hot };
     });
-    const active = rows.filter(r => r.mentions || r.news || r.unread).sort((a, b) => b.mentions - a.mentions || b.news - a.news);
+    const active = rows.filter(r => r.mentions || r.news).sort((a, b) => b.mentions - a.mentions || b.news - a.news);
     return { active, mentions: rows.reduce((n, r) => n + r.mentions, 0), quiet: rows.length - active.length };
-  }, [servers, srvMentions, unreadN, detail]);
+  }, [servers, srvMentions, unreadN, detail, unread]);
 
   // ── people: who's around, who's in voice, who's playing something ──
   const friendNames = useMemo(() => new Set(friends.map(f => lc(f.friend_username))), [friends]);

@@ -6,6 +6,7 @@ import { Bell, Bookmark, CheckCheck, Inbox as InboxIco, Pin, Search, Settings, U
 import { apiFetch } from '../api.js';
 import { useChat, getState, go, jumpToMessage, toast, errorText, isMuted, readNotifs, loadNotifs, closeNotifs, followNotifLink, markChannelRead, markServerRead } from './store.js';
 import { MemberList } from './Parts.jsx';
+import { serverUnreadCount } from './unread.js';
 import { PinsPanel } from './MsgTools.jsx';
 import { ProfileCard, Avatar } from './Profile.jsx';
 import { NotifIcon, NotifText, ago } from './Notifications.jsx';
@@ -193,7 +194,11 @@ function useUnreadRows() {
           const ping = (c.mentions || 0) + (mentions[c.cid] || 0);
           if (n || c.unread || unread[`c:${c.cid}`]) rows.push({ k: c.cid, icon, title: `#${c.name}`, where: s.name, text: ping ? `${ping} mention${ping === 1 ? '' : 's'} · ${n || 'new'} message${n === 1 ? '' : 's'}` : `${n || 'New'} message${n === 1 ? '' : 's'}`, n: n || 1, ping, go: { kind: 'channel', sid: s.sid, cid: c.cid } });
         });
-      } else if (s.unread || s.unread_count) rows.push({ k: s.sid, icon, title: s.name, text: `${s.unread_count || 'New'} message${s.unread_count === 1 ? '' : 's'}`, n: s.unread_count || 1, ping: s.mentions || 0, go: { kind: 'server', sid: s.sid } });
+      } else {
+        // channels not loaded: muted channels don't count here either (unread.js; Ikelene 2026-11-22)
+        const n = serverUnreadCount(s, { unread, unreadN, muted: cid => isMuted(cid) });
+        if (n || s.mentions) rows.push({ k: s.sid, icon, title: s.name, text: `${n || 'New'} message${n === 1 ? '' : 's'}`, n: n || 1, ping: s.mentions || 0, go: { kind: 'server', sid: s.sid } });
+      }
     });
     return rows.sort((a, b) => (b.ping || 0) - (a.ping || 0));
   }, [dms, groups, unread, modmail, servers, detail, unreadN, mentions, people]);
