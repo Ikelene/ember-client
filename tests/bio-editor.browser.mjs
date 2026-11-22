@@ -35,6 +35,10 @@ try {
   page.on('pageerror', e => { errors.push(e.message); console.log('pageerror', e.message); });
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   await page.waitForSelector('.bf-pe-bio textarea');
+  // the wrapper for the emoji button mustn't shrink the box (it went narrow on live 2026-11-22)
+  const [ta, sec] = await page.$eval('.bf-pe-bio textarea', t => [t.getBoundingClientRect().width, t.closest('.bf-pe-sec').getBoundingClientRect().width]);
+  assert.ok(ta >= sec - 2, `textarea ${ta}px of ${sec}px`);
+  console.log('PASS the bio box keeps the full width');
   // cursor after "hello " then the emoji button
   await page.$eval('.bf-pe-bio textarea', t => { t.focus(); t.setSelectionRange(6, 6); });
   await page.click('.bf-pe-bio-emoji');

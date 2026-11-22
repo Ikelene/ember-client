@@ -77,8 +77,8 @@
 .bf-pe-hint { color: var(--muted); font-size: 12px; }
 .bf-pe-hint-up { margin-top: -14px; }
 /* the bio: an emoji button in its corner, the picker opens above it; the count turns red past the limit */
-.bf-pe-bio { position: relative; }
-.bf-pe-bio .form-textarea { padding-right: 40px; }
+.bf-pe-bio { position: relative; width: 100%; }
+.bf-pe-bio .form-textarea { display: block; width: 100%; box-sizing: border-box; padding-right: 40px; }
 .bf-pe-bio-emoji { position: absolute; right: 6px; top: 6px; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; background: none; color: var(--muted); cursor: pointer; }
 .bf-pe-bio-emoji:hover { color: var(--text); background: var(--surface-3); }
 .bf-pe-hint.bad { color: var(--red); }
