@@ -1,6 +1,7 @@
 // Ember's state + its connection (one Velora socket when signed in with Velora, the /chat, /im and /groups APIs, and one socket per server instance).
 // Components read it with useChat(selector) and change it through the actions below.
 import { shareLink, clientUrl, notifLinkUrl, EMBER_ORIGIN } from './hosts.js';
+import { serverUnreadCount } from './unread.js';
 import { shortLinkFor } from './shortLinks.js';
 import { loadPersonalEmojis, setStickers } from './personal.js';
 import { packActive, playPackSound } from './messageSounds.js';
@@ -865,17 +866,8 @@ export function unreadTotals(s = state) {
   for (const x of s.servers) {
     if (muted(x.sid)) continue;
     pings += (x.mentions || 0) + (s.srvMentions[x.sid] || 0);
-    const d = s.detail[x.sid];
-    if (d) {
-      for (const c of d.channels) {
-        if (muted(c.cid)) continue;
-        const live = s.unreadN[c.cid]?.n || 0;
-        if (c.unread || s.unread[`c:${c.cid}`] || live) count += Math.max(1, (c.unread ? c.unread_count || 0 : 0) + live);
-      }
-    } else {
-      const live = Object.values(s.unreadN).reduce((n, u) => n + (u.sid === x.sid ? u.n : 0), 0);
-      if (x.unread || live) count += Math.max(1, (x.unread_count || 0) + live);
-    }
+    // muted channels never count, loaded or not (unread.js serverUnreadCount)
+    count += serverUnreadCount(x, { channels: s.detail[x.sid]?.channels || null, unread: s.unread, unreadN: s.unreadN, muted: cid => muted(cid) });
   }
   for (const c of s.dms) if (c.unread) { count += c.unread; pings += c.unread; }
   for (const [k, v] of Object.entries(s.unread)) {

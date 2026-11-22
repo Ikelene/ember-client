@@ -15,3 +15,32 @@ export function loudUnread(srv, { channels = null, unread = {}, unreadN = {}, mu
   if (Array.isArray(srv.unread_channels)) return srv.unread_channels.some(cid => !muted(cid, sid));
   return null;
 }
+
+// How many unread messages a server adds to the totals (the tab title's (N), the favicon dot, the phone menu badge, the
+// desktop app's count) - muted channels never count (Ikelene 2026-11-22: a muted channel's messages still showed up there).
+// Same inputs as loudUnread; the server itself being muted is the caller's check.
+//   loaded channels: each unread, unmuted one counts its unread_count (at least 1) + live messages
+//   not loaded: live messages in unmuted channels, plus the server's own count - all of it when none of its unread channels
+//   are muted, one per unmuted unread channel when some are (the server sends one total, not one per channel), and
+//   all of it when it doesn't say which channels (older servers)
+export function serverUnreadCount(srv, { channels = null, unread = {}, unreadN = {}, muted = () => false } = {}) {
+  const sid = srv?.sid;
+  let count = 0;
+  if (channels) {
+    for (const c of channels) {
+      if (muted(c.cid, sid)) continue;
+      const live = unreadN[c.cid]?.n || 0;
+      if (c.unread || unread[`c:${c.cid}`] || live) count += Math.max(1, (c.unread ? c.unread_count || 0 : 0) + live);
+    }
+    return count;
+  }
+  const live = Object.entries(unreadN).reduce((n, [cid, x]) => n + (x?.sid === sid && !muted(cid, sid) ? x.n || 0 : 0), 0);
+  if (!srv?.unread) return live;
+  if (Array.isArray(srv.unread_channels)) {
+    const loud = srv.unread_channels.filter(cid => !muted(cid, sid)).length;
+    if (!loud) return live;
+    if (loud === srv.unread_channels.length) return Math.max(1, (srv.unread_count || 0) + live);
+    return loud + live;
+  }
+  return Math.max(1, (srv.unread_count || 0) + live);
+}
