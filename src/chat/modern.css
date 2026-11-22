@@ -343,6 +343,11 @@ html.vc-rounded .vc, html.vc-rounded .vc-dialog, html.vc-rounded .bf-sd { color:
 html.vc-rounded .vc-text { color: color-mix(in srgb, var(--m-text-color, #e2e2e6) 92%, transparent); }
 html.vc-rounded.vc-has-bgimg .vc { background: var(--m-app) var(--m-bgimg) center / cover no-repeat; }
 html.vc-rounded.vc-has-bgimg .vc-rail { background: color-mix(in srgb, var(--m-app) 55%, transparent); backdrop-filter: blur(8px); }
+/* Internet Radio (chat/Radio.jsx): Modern's cards are solid, so bars painted behind them only showed in the gaps (Ikelene
+   2026-11-22). Here they sit over the cards and blend in (screen on dark, multiply on light): on a dark card that looks the same as
+   being behind it, text stays readable, clicks pass through, and popups (z-index 2+) stay on top. */
+html.vc-rounded .vc-radio-viz { z-index: 1; mix-blend-mode: screen; }
+html.vc-rounded.vc-light .vc-radio-viz { mix-blend-mode: multiply; }
 html.vc-rounded.vc-hide-scroll .vc *, html.vc-rounded.vc-hide-scroll .vc { scrollbar-width: none; }
 html.vc-rounded.vc-hide-scroll .vc ::-webkit-scrollbar { display: none; }
 html.vc-rounded .vc-msg.mention { background: color-mix(in srgb, var(--m-mention) 10%, transparent); box-shadow: inset 3px 0 0 var(--m-mention); }
