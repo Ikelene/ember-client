@@ -79,15 +79,24 @@ async function proxied(url, token) {
   a.preload = 'none';
   a.volume = 1; // loudness is the gain node, so the bars don't shrink with the volume
   a.src = src;
-  let started = false;
-  a.addEventListener('playing', () => { started = true; if (token === R.token && (!R.ctx || R.ctx.state === 'running')) emit({ status: 'playing' }); });
-  a.addEventListener('error', () => {
+  let started = false, steady = null;
+  a.addEventListener('playing', () => {
+    started = true;
+    // playing fine for 30 s: a later drop gets the full set of retries again (they used to run out for good after 3)
+    clearTimeout(steady); steady = setTimeout(() => { if (token === R.token) R.retries = 0; }, 30e3);
+    if (token === R.token && (!R.ctx || R.ctx.state === 'running')) emit({ status: 'playing' });
+  });
+  const dropped = () => {
+    clearTimeout(steady);
     if (token !== R.token) return;
     if (!started) return direct(url, token); // proxy refused it (not audio, unreachable, busy): play it straight, no bars
     emit({ status: 'error' });
-    // the stream dropped after playing: tune in again a few times (a fresh ticket each time)
-    if (R.retries < 3) { R.retries++; setTimeout(() => { if (token === R.token && !snap.paused) restart(); }, 5000 * R.retries); }
-  });
+    // the stream dropped after playing (or a live stream "ended", which is the same thing): tune in again, a fresh
+    // ticket each time, waiting a bit longer each try (3 s, 6 s, 12 s, 24 s, 30 s)
+    if (R.retries < 5) { const wait = Math.min(30e3, 3000 * 2 ** R.retries); R.retries++; setTimeout(() => { if (token === R.token && !snap.paused) restart(); }, wait); }
+  };
+  a.addEventListener('error', dropped);
+  a.addEventListener('ended', dropped);
   R.audio = a;
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
