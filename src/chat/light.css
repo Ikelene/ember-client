@@ -368,7 +368,8 @@ html.vc-rounded.vc-light .vc-stb-inline { color: #8e7226; }
 html.vc-rounded.vc-light .vc-stage.compact { background: radial-gradient(ellipse at top, #f3f3f6, #f8f8fb 70%); }
 html.vc-rounded.vc-light .vc-stage-focus { background: #fcfcff; }
 html.vc-rounded.vc-light .vc-stage-focus > video { background: #ffffff; }
-html.vc-rounded.vc-light .vc-stage-btn:hover { background: #e8e8eb; }
+html.vc-rounded.vc-light .vc-stage-btn:hover, html.vc-rounded.vc-light .vc-stream-mute:hover { background: #e8e8eb; }
+html.vc-rounded.vc-light .vc-stage-btn.on, html.vc-rounded.vc-light .vc-stream-mute.on { color: #824747; }
 html.vc-rounded.vc-light .vc-stage-btn.stop:hover { color: #16161b; }
 html.vc-rounded.vc-light .vc-stream-card { background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 16%, #f1f1f4), #f4f4f7); }
 html.vc-rounded.vc-light .vc-stream-live { color: #16161b; }

@@ -2,11 +2,11 @@
 // view, the DM call bar and incoming call popups. Voice settings live in right-click / long-press menus on
 // the mic (input), deafen (output + soundboard) and camera buttons. Speaking rings: data-vlevel (levels.js).
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Mic, MicOff, Headphones, HeadphoneOff, PhoneOff, Phone, PhoneIncoming, UserPlus, Volume2, Search, AudioLines, Video, VideoOff, MonitorUp, MonitorOff, MonitorPlay, Eye, Maximize2, Minimize2, X } from 'lucide-react';
+import { Mic, MicOff, Headphones, HeadphoneOff, PhoneOff, Phone, PhoneIncoming, UserPlus, Volume2, VolumeX, Search, AudioLines, Video, VideoOff, MonitorUp, MonitorOff, MonitorPlay, Eye, Maximize2, Minimize2, X } from 'lucide-react';
 import { useChat, getState, go, syncRing, isBlockedName, BLOCKED_NAME } from './store.js';
 import { NameText, displayNameOf } from './displayNames.js';
 import { Avatar, BlockedMark } from './Profile.jsx';
-import { joinVoice, leaveVoice, setMute, setDeafen, answer, callDm, callInto, cancelCall, prefs, setPrefs, toggleCamera, toggleScreen, desktopScreenSources, canSelectOutput, watchStream, unwatchStream, refreshDevices, knownDevices, micMeter, micProcessing, sensLabel } from './voice.js';
+import { joinVoice, leaveVoice, setMute, setDeafen, answer, callDm, callInto, cancelCall, prefs, setPrefs, toggleCamera, toggleScreen, desktopScreenSources, canSelectOutput, watchStream, unwatchStream, muteStream, refreshDevices, knownDevices, micMeter, micProcessing, sensLabel } from './voice.js';
 import { levelKey } from './levels.js';
 import { openMenu } from './Menu.jsx';
 import { Dialog } from './Dialogs.jsx';
@@ -265,6 +265,7 @@ function CallStage({ v, tiles, compact, sid }) {
   const myName = getState().me?.username || 'You';
   const myId = v?.myId;
   const watching = v?.watching || [];
+  const hushed = v?.streamMuted || [];
   const remote = v?.remoteVideo || [];
   const screens = new Map(remote.filter(x => x.kind === 'screen').map(x => [x.userId, x.stream]));
   const cameras = new Map(remote.filter(x => x.kind === 'camera').map(x => [String(x.name).toLowerCase(), { stream: x.stream }]));
@@ -275,7 +276,7 @@ function CallStage({ v, tiles, compact, sid }) {
   const entries = streams.map(s => {
     const mine = s.userId === myId;
     const active = mine ? preview && !!v?.screenVideo : watching.includes(s.userId);
-    return { ...s, mine, active, stream: mine ? (active ? v.screenVideo : null) : (active ? screens.get(s.userId) : null) };
+    return { ...s, mine, active, quiet: !mine && hushed.includes(s.userId), stream: mine ? (active ? v.screenVideo : null) : (active ? screens.get(s.userId) : null) };
   });
   const focus = entries.find(e => e.userId === focused && e.active) || entries.find(e => e.active) || null;
   useEffect(() => { if (!v?.screen) setPreview(false); }, [v?.screen]);
@@ -296,6 +297,7 @@ function CallStage({ v, tiles, compact, sid }) {
         <div key={`s${e.userId}`} className="vc-vtile vc-stream-thumb" onClick={() => setFocused(e.userId)} role="button" tabIndex={0}>
           {e.stream ? <Vid stream={e.stream} muted /> : <span className="vc-stream-wait">Connecting...</span>}
           <b className="vc-vtile-name"><MonitorPlay size={12} /> {e.mine ? 'Your stream' : `${maskedIn(sid, e.name) ? BLOCKED_NAME : e.name}'s stream`}</b>
+          {!e.mine && <button type="button" className={`vc-stream-mute${e.quiet ? ' on' : ''}`} title={e.quiet ? 'Unmute stream' : 'Mute stream'} onClick={ev => { ev.stopPropagation(); muteStream(e.userId); }}>{e.quiet ? <VolumeX size={14} /> : <Volume2 size={14} />}</button>}
         </div>
       );
     }
@@ -351,6 +353,7 @@ function CallStage({ v, tiles, compact, sid }) {
             <span className="vc-stage-title"><MonitorPlay size={15} /> <b>{focus.mine ? 'Your stream' : `${focus.name}'s stream`}</b></span>
             <StreamViewers watchers={focus.watchers} mine={focus.mine} names={focus.mine} />
             <span className="grow" />
+            {!focus.mine && <button type="button" className={`vc-stage-btn${focus.quiet ? ' on' : ''}`} title={focus.quiet ? 'Unmute stream' : 'Mute stream (keeps watching)'} onClick={() => muteStream(focus.userId)}>{focus.quiet ? <VolumeX size={16} /> : <Volume2 size={16} />}</button>}
             <button type="button" className="vc-stage-btn" title={isFull ? 'Exit fullscreen' : 'Fullscreen'} onClick={fullscreen}>{isFull ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>
             <button type="button" className="vc-stage-btn stop" title={focus.mine ? 'Hide preview' : 'Stop watching'} onClick={() => stop(focus)}><X size={16} /> {focus.mine ? 'Hide preview' : 'Stop watching'}</button>
           </div>

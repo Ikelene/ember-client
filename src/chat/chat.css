@@ -1714,6 +1714,10 @@ button.vc-stream-card:hover { border-color: var(--accent); box-shadow: 0 0 0 1px
 .vc-stream-thumb { cursor: pointer; overflow: hidden; background: #050506; }
 .vc-stream-thumb > video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .vc-stream-thumb:hover { border-color: var(--accent); }
+.vc-stage-btn.on { color: #e07a7a; }
+.vc-stream-mute { position: absolute; top: 6px; right: 6px; z-index: 1; display: inline-flex; padding: 5px; background: rgba(20,20,24,.85); border: 1px solid var(--border-2); color: var(--text); cursor: pointer; }
+.vc-stream-mute:hover { background: #26262c; }
+.vc-stream-mute.on { color: #e07a7a; }
 .vc-stream-wait { color: var(--muted); font-size: 13px; }
 .vc-dmcall-ctl { display: inline-flex; gap: 6px; }
 

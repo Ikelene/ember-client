@@ -137,7 +137,7 @@ html.vc-rounded .vc-quota-bar, html.vc-rounded .vc-quota-bar i, html.vc-rounded 
 
 /* ── voice and video ── */
 html.vc-rounded .vc-vpanel { border-radius: var(--r-lg) var(--r-lg) 0 0; }
-html.vc-rounded .vc-vbtn, html.vc-rounded .vc-vbig, html.vc-rounded .vc-incoming-btn, html.vc-rounded .vc-stage-btn { border-radius: var(--r-md); }
+html.vc-rounded .vc-vbtn, html.vc-rounded .vc-vbig, html.vc-rounded .vc-incoming-btn, html.vc-rounded .vc-stage-btn, html.vc-rounded .vc-stream-mute { border-radius: var(--r-md); }
 html.vc-rounded .vc-vtile, html.vc-rounded .vc-stage-focus, html.vc-rounded .vc-screen-focus, html.vc-rounded .vc-yt-stage, html.vc-rounded .vc-mp.video { border-radius: var(--r-lg); overflow: hidden; }
 html.vc-rounded .vc-vtile-name { border-radius: var(--r-xs); }
 html.vc-rounded .vc-incoming, html.vc-rounded .vc-dmcall, html.vc-rounded .vc-screen-menu { border-radius: var(--r-lg); }
