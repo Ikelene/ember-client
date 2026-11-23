@@ -1163,6 +1163,8 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
     setMq(null);
     if (ta.current) ta.current.textContent = '';
     setText(''); setDraft(key, ''); setAtts([]); setReplyTo?.(null);
+    // phones: sending with the docked emoji / media picker open closes it and the keyboard comes back (Ikelene 2026-11-23)
+    if (docked) { setEmoji(false); setPicker(false); }
     ta.current?.focus({ preventScroll: true });
   }
   // DMs, group chats and Velora-hosted channels send files to Velora (account or temporary storage); instance communities keep their own
