@@ -1245,6 +1245,16 @@ ul.vc-list ul.vc-list > li::before { background: none; border: 1px solid var(--a
 ol.vc-list { list-style: decimal; }
 ol.vc-list > li::marker { color: var(--accent); font-weight: 700; }
 .vc-pre { position: relative; }
+/* ```lang code colours (codeColors.js) */
+.vc-pre .hl-cm { color: #7a8290; font-style: italic; }
+.vc-pre .hl-st { color: #a5d6a7; }
+.vc-pre .hl-nu { color: #f6b26b; }
+.vc-pre .hl-kw { color: #c792ea; }
+.vc-pre .hl-li { color: #f78c6c; }
+.vc-pre .hl-fn { color: #82aaff; }
+.vc-pre .hl-ty { color: #ffcb6b; }
+.vc-pre .hl-pr { color: #89ddff; }
+.vc-pre .hl-va { color: #f07178; }
 .vc-pre-lang { position: absolute; top: 0; right: 0; padding: 2px 7px; background: rgba(255, 255, 255, .06); color: var(--muted); font-size: 10.5px; font-family: inherit; text-transform: lowercase; }
 .vc-stamp { padding: 0 3px; background: rgba(255, 255, 255, .07); color: var(--text); }
 

@@ -14,6 +14,7 @@ import { UNI_EMOJI, Twemoji, nameOfChar } from './emoji.jsx';
 import { emojiDataSync } from './EmojiPicker.jsx';
 import { extractInvites } from './gameInvite.js';
 import { isHiddenInviteLine } from './inviteLink.js';
+import { highlight } from './codeColors.js';
 import { VID, AUD, VUP, NOOKARA_FILE, TEMP_FILE, inLinks } from './uploadLinks.js'; // account uploads also live on cdn.nookara.cc (/uploads/ only)
 
 const IMG = /^https:\/\/\S+\.(png|jpe?g|gif|webp)(\?\S*)?(#\S*)?$/i;
@@ -255,7 +256,8 @@ export function renderBody(body, ctx) {
     if (bi % 2 === 1) {
       const lang = (/^([a-z0-9+#-]{1,20})\n/i.exec(b) || [])[1];
       const code = lang ? b.slice(lang.length + 1) : b.replace(/^\n/, '');
-      nodes.push(<pre key={`b${bi}`} className="vc-pre">{lang && <span className="vc-pre-lang">{lang}</span>}<code>{code.replace(/\n$/, '')}</code></pre>);
+      const toks = highlight(code.replace(/\n$/, ''), lang);
+      nodes.push(<pre key={`b${bi}`} className="vc-pre">{lang && <span className="vc-pre-lang">{lang}</span>}<code>{toks.map((x, ti) => (x.c ? <span key={ti} className={`hl-${x.c}`}>{x.t}</span> : x.t))}</code></pre>);
       return;
     }
     // block markdown: # / ## / ### headers, -# small text, - / * / 1. lists (indent to nest), > quote, >>> quote-the-rest

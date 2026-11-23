@@ -78,6 +78,15 @@ html.vc-rounded.vc-light .vc-text { color: #16161b; }
 html.vc-rounded.vc-light .vc-text a { color: #506890; }
 html.vc-rounded.vc-light .vc-code { background: #f9f9fc; }
 html.vc-rounded.vc-light .vc-pre { background: #f9f9fc; }
+html.vc-rounded.vc-light .vc-pre .hl-cm { color: #6a737d; }
+html.vc-rounded.vc-light .vc-pre .hl-st { color: #22863a; }
+html.vc-rounded.vc-light .vc-pre .hl-nu { color: #b35900; }
+html.vc-rounded.vc-light .vc-pre .hl-kw { color: #8a2be2; }
+html.vc-rounded.vc-light .vc-pre .hl-li { color: #c2410c; }
+html.vc-rounded.vc-light .vc-pre .hl-fn { color: #0b5cd5; }
+html.vc-rounded.vc-light .vc-pre .hl-ty { color: #9a6700; }
+html.vc-rounded.vc-light .vc-pre .hl-pr { color: #00708a; }
+html.vc-rounded.vc-light .vc-pre .hl-va { color: #c0262d; }
 html.vc-rounded.vc-light .vc-spoiler { background: #e5e5e8; }
 html.vc-rounded.vc-light .vc-spoiler.shown { background: rgba(0, 0, 0, 0.084); }
 html.vc-rounded.vc-light .vc-mention.me { color: #8b7343; }
