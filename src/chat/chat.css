@@ -2805,3 +2805,8 @@ html.vc-rounded .vc-drawer-badge { border-radius: 999px; }
 .vc-linkpill-hash, .vc-linkpill-msg { flex: none; }
 .vc-mention.unknown { cursor: default; opacity: .75; }
 .vc-mention.unknown:hover { background: var(--accent-dim); color: var(--accent); }
+
+/* people bridged in from another platform (Discord voice links): their name + the platform's mark */
+.vc-ext-name { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; }
+.vc-ext-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.vc-ext-mark { flex: none; }

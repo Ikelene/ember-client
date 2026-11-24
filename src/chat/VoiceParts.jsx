@@ -11,6 +11,7 @@ import { levelKey } from './levels.js';
 import { openMenu } from './Menu.jsx';
 import { Dialog } from './Dialogs.jsx';
 import { SoundboardButton } from './Soundboard.jsx';
+import { PlatformIcon, PLATFORM_NAMES } from './platforms.jsx';
 
 const roomOf = cid => `bf_${cid}`;
 // your own picture comes from `me` (nothing puts you in `people` until a message of yours is seen, e.g. right after a reload);
@@ -21,6 +22,11 @@ const faceIn = (sid, name) => (maskedIn(sid, name) ? { username: BLOCKED_NAME, p
 // the person behind a voice name: the server's member (an Ember server's own name wins) or just the username (displayNames.js)
 const personIn = (sid, name) => (sid && getState().members[sid]?.find(m => m.username === name)) || { username: name };
 const pfpOf = name => { const s = getState(); return s.people[name]?.pfp || (s.me?.username === name ? s.me.pfp : null) || null; };
+// someone bridged in from another platform (a voice channel linked to a Discord one): no account here, so their own name +
+// picture from over there and the platform's mark, never a member card or a block mask
+const extOf = x => (x?.platform ? { platform: x.platform, name: x.name || 'Someone', avatar: x.avatar || null } : null);
+const extFace = ext => ({ username: ext.name, pfp: ext.avatar });
+const ExtName = ({ ext, size = 12 }) => <span className="vc-ext-name" title={`In ${PLATFORM_NAMES[ext.platform] || ext.platform}`}><span className="vc-ext-txt">{ext.name}</span><PlatformIcon p={ext.platform} size={size} className="vc-ext-mark" /></span>;
 
 // ── voice control menus ──
 const coarse = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
@@ -117,11 +123,12 @@ export function VoiceChannelUsers({ cid, sid, onUser }) {
   return (
     <div className="vc-vusers">
       {users.map(u => {
+        const ext = extOf(u), click = onUser && !ext;
         return (
-          <div key={u.username} className={`vc-vuser${onUser ? ' clickable' : ''}`} role={onUser ? 'button' : undefined} tabIndex={onUser ? 0 : undefined}
-            onClick={onUser ? e => onUser(u.username, e.currentTarget) : undefined} onKeyDown={onUser ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onUser(u.username, e.currentTarget); } } : undefined}>
-            <span className="vc-vuser-av vc-vlvl" data-vlevel={levelKey(u.username)}><Avatar user={faceIn(sid, u.username)} size={20} /></span>
-            {maskedIn(sid, u.username) ? <span className="vc-vuser-name vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={11} /></span> : <span className="vc-vuser-name"><NameText u={personIn(sid, u.username)} fallback={u.username} /></span>}
+          <div key={u.username} className={`vc-vuser${click ? ' clickable' : ''}${ext ? ' vc-ext' : ''}`} role={click ? 'button' : undefined} tabIndex={click ? 0 : undefined}
+            onClick={click ? e => onUser(u.username, e.currentTarget) : undefined} onKeyDown={click ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onUser(u.username, e.currentTarget); } } : undefined}>
+            <span className="vc-vuser-av vc-vlvl" data-vlevel={levelKey(u.username)}><Avatar user={ext ? extFace(ext) : faceIn(sid, u.username)} size={20} /></span>
+            {ext ? <span className="vc-vuser-name"><ExtName ext={ext} size={11} /></span> : maskedIn(sid, u.username) ? <span className="vc-vuser-name vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={11} /></span> : <span className="vc-vuser-name"><NameText u={personIn(sid, u.username)} fallback={u.username} /></span>}
             {u.deafened ? <HeadphoneOff size={13} /> : u.muted ? <MicOff size={13} /> : null}
           </div>
         );
@@ -331,11 +338,11 @@ function CallStage({ v, tiles, compact, sid }) {
     return (
       <div key={t.name} className={`vc-vtile${cam ? ' vc-video vc-vlvl' : ''}${flash && flash.by === t.name ? ' sb-flash' : ''}`} data-vlevel={cam && v ? levelKey(t.name) : undefined}>
         {flash && flash.by === t.name && <span className="vc-vtile-sound" key={flash.at}><AudioLines size={12} /><span>{flash.name}</span></span>}
-        {cam ? <Vid stream={cam.stream} muted={!!cam.mine} /> : <span className="vc-vlvl-av vc-vlvl" data-vlevel={v ? levelKey(t.name) : undefined}><Avatar user={t.me ? { username: t.name, pfp: pfpOf(t.name) } : faceIn(sid, t.name)} size={compact ? 48 : 72} /></span>}
-        {!t.me && maskedIn(sid, t.name) ? <b className="vc-vtile-name vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={12} /></b> : <b className="vc-vtile-name"><NameText u={personIn(sid, t.name)} fallback={t.name} />{t.me ? ' (you)' : ''}</b>}
+        {cam ? <Vid stream={cam.stream} muted={!!cam.mine} /> : <span className="vc-vlvl-av vc-vlvl" data-vlevel={v ? levelKey(t.name) : undefined}><Avatar user={t.ext ? extFace(t.ext) : t.me ? { username: t.name, pfp: pfpOf(t.name) } : faceIn(sid, t.name)} size={compact ? 48 : 72} /></span>}
+        {t.ext ? <b className="vc-vtile-name"><ExtName ext={t.ext} size={13} /></b> : !t.me && maskedIn(sid, t.name) ? <b className="vc-vtile-name vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={12} /></b> : <b className="vc-vtile-name"><NameText u={personIn(sid, t.name)} fallback={t.name} />{t.me ? ' (you)' : ''}</b>}
         <span className="vc-vtile-state">{t.deafened ? <HeadphoneOff size={15} /> : t.muted ? <MicOff size={15} /> : null}</span>
         {v && !t.me && (
-          <label className="vc-vtile-vol" title={`${maskedIn(sid, t.name) ? BLOCKED_NAME : t.name}'s volume`}>
+          <label className="vc-vtile-vol" title={`${t.ext ? t.ext.name : maskedIn(sid, t.name) ? BLOCKED_NAME : t.name}'s volume`}>
             <Volume2 size={13} />
             <input type="range" min={0} max={200} value={vols[t.name] ?? 100} onChange={ev => setPrefs({ volumes: { ...vols, [t.name]: Number(ev.target.value) } })} />
           </label>
@@ -375,8 +382,11 @@ export function VoiceView({ channel, sid }) {
   const others = useChat(s => s.voiceStates[channel.cid]);
   const [startShare, picker] = useScreenShare(v);
   const flags = name => (others || []).find(o => String(o.username).toLowerCase() === String(name).toLowerCase());
-  const tiles = dedupeTiles(v ? v.users.map(u => ({ name: u.name, muted: u.id === v.myId ? !!v.muted : !!flags(u.name)?.muted, deafened: u.id === v.myId ? !!v.deafened : !!flags(u.name)?.deafened, speaking: u.id === v.myId ? v.speaking : u.speaking, me: u.id === v.myId }))
-    : (others || []).map(u => ({ name: u.username, muted: u.muted, deafened: u.deafened })));
+  // (people bridged in from Discord who have nothing to say yet aren't in the call's list: they come from the channel's voice state)
+  const inCall = v ? v.users.map(u => ({ name: u.name, ext: u.ext || extOf(flags(u.name)), muted: u.id === v.myId ? !!v.muted : !!flags(u.name)?.muted, deafened: u.id === v.myId ? !!v.deafened : !!flags(u.name)?.deafened, speaking: u.id === v.myId ? v.speaking : u.speaking, me: u.id === v.myId })) : [];
+  const waiting = (others || []).filter(u => extOf(u) && !inCall.some(t => String(t.name).toLowerCase() === String(u.username).toLowerCase()));
+  const tiles = dedupeTiles(v ? [...inCall, ...waiting.map(u => ({ name: u.username, ext: extOf(u), muted: u.muted, deafened: u.deafened }))]
+    : (others || []).map(u => ({ name: u.username, ext: extOf(u), muted: u.muted, deafened: u.deafened })));
   return (
     <div className="vc-voiceview">
       <CallStage v={v} tiles={tiles} sid={sid} />

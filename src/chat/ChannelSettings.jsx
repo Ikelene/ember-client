@@ -6,7 +6,7 @@ import { Hash, Upload, Trash2, Shield, ArrowLeftRight, LayoutGrid, Settings, Ima
 import { apiFetch, uploadFetch } from '../api.js';
 import { useChat, getState, go, ask, toast, errorText, refreshServer } from './store.js';
 import { imgHint, warnImage } from './imgHints.js';
-import { isInst } from './ids.js';
+import { isInst, instOpt } from './ids.js';
 import { P, has, CHANNEL_ICONS, ChannelIcon, Toggle } from './roles.jsx';
 import { TYPES, TypePicker, TypeSettings } from './ChannelTypes.jsx';
 import { ChannelBridge } from './Bridge.jsx';
@@ -23,7 +23,8 @@ const startOf = (channel, cats) => ({ name: channel.name || '', topic: channel.t
 export function ChannelSettings({ sid, channel: opened, onClose, tab }) {
   const d = useChat(s => s.detail[sid]);
   const channel = d?.channels.find(c => c.cid === opened.cid); // (live: the saved values)
-  const canBridge = has(d?.server.perms, P.MANAGE_SERVER) && (channel?.type || 'text') === 'text';
+  // voice channels link to Discord voice channels, on an instance (its server carries the audio; Nookara's own servers can't)
+  const canBridge = has(d?.server.perms, P.MANAGE_SERVER) && ((channel?.type || 'text') === 'text' || (channel?.type === 'voice' && !!instOpt(sid)));
   const groups = useMemo(() => [
     ['Channel', [['overview', 'Overview', LayoutGrid, ['Name', 'Topic', 'Category', 'Icon', 'Type', 'Webhooks', 'Post', 'Messages']], ['perms', 'Permissions', Shield, ['Private', 'Roles', 'See', 'Send', 'Attach']]]],
     ['Integrations', canBridge ? [['bridge', 'Bridge', ArrowLeftRight, ['Discord', 'Fluxer', 'Link']]] : []],

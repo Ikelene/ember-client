@@ -26,6 +26,7 @@ const ERR = {
   already_linked: 'That channel is already bridged to another Ember channel.',
   already_bridged: 'This server already has a bridge for that platform.',
   text_channels_only: 'Only text channels can be bridged.',
+  voice_channels_only: 'A voice channel can only be linked to a voice channel.',
 };
 // an instance's bridge runs on its owner's own bot, not Velora's
 const INST_ERR = {
@@ -215,7 +216,7 @@ export function BridgeSettings({ sid, gated, onPlan }) {
   const channels = useChat(s => s.detail[sid]?.channels);
   const [linking, setLinking] = useState(false);
   const [busy, setBusy] = useState('');
-  const text = useMemo(() => (channels || []).filter(c => (c.type || 'text') === 'text'), [channels]);
+  const text = useMemo(() => (channels || []).filter(c => (c.type || 'text') === 'text' || c.type === 'voice'), [channels]);
   const call = async (key, fn) => { setBusy(key); try { await fn(); reload(); refreshServer(sid); return true; } catch (e) { if (!plan.catchPlan(e)) toast(why(e, inst)); return false; } finally { setBusy(''); } };
   const block = plan.gate || (st.error && planOf(st.error) ? { ...planOf(st.error), what: 'bridges' } : null); // (the plan has no bridges)
   useEffect(() => { if (block && !gated) onPlan?.(block); }, [!!block, !!gated]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -245,11 +246,12 @@ export function BridgeSettings({ sid, gated, onPlan }) {
           <div className="vc-br-map">
             {text.filter(c => b.links.some(l => sameCh(l.cid, c.cid))).map(c => {
               const l = b.links.find(x => sameCh(x.cid, c.cid));
+              const voice = c.type === 'voice';
               return <div key={c.cid} className="vc-br-row ro">
-                <span className="vc-br-ch"><Hash size={14} /> {c.name}</span>
+                <span className="vc-br-ch">{voice ? <Volume2 size={14} /> : <Hash size={14} />} {c.name}</span>
                 <ArrowLeftRight size={14} className="vc-br-arrow on" />
-                <span className="vc-br-ch"><PlatformIcon p={b.platform} size={14} /> #{l.ext_name || 'channel'}</span>
-                {l.hook ? <Check size={14} className="vc-br-ok" /> : <small className="vc-br-flag" title="The bot couldn't make a webhook there yet - it needs Manage webhooks">no webhook</small>}
+                <span className="vc-br-ch"><PlatformIcon p={b.platform} size={14} /> {voice ? '' : '#'}{l.ext_name || 'channel'}</span>
+                {voice ? <Check size={14} className="vc-br-ok" /> : l.hook ? <Check size={14} className="vc-br-ok" /> : <small className="vc-br-flag" title="The bot couldn't make a webhook there yet - it needs Manage webhooks">no webhook</small>}
               </div>;
             })}
             {!b.links.length && <div className="vc-empty-note">No channels linked yet. Open a text channel's settings and pick a {b.platform_name} channel under Bridge.</div>}
@@ -278,12 +280,16 @@ export function ChannelBridge({ sid, channel }) {
   const [busy, setBusy] = useState(false);
   if (st.loading && !st.data) return null;
   if (st.error) return null; // not allowed to manage the bridge
-  const bridges = st.data?.bridges || [];
+  // a voice channel: Discord voice channels only (everyone over there shows up here as themselves, the bot carries the sound)
+  const voice = channel.type === 'voice';
+  const bridges = (st.data?.bridges || []).filter(b => !voice || b.platform === 'discord');
+  const fits = x => (voice ? x.kind === 'voice' : x.kind !== 'voice');
+  if (voice && st.data?.voice_links === false) return <div className="vc-field"><span>Bridge</span><small className="vc-hint">This server can't link voice channels: its voice bridge parts aren't installed.</small></div>;
   return (
     <div className="vc-field"><span>Bridge</span>
       {!bridges.length ? (
         <div className="vc-br-chnote">
-          <small>Link this server to a Discord or Fluxer server first, then pick a channel here.</small>
+          <small>{voice ? 'Link this server to a Discord server first, then pick a Discord voice channel here.' : 'Link this server to a Discord or Fluxer server first, then pick a channel here.'}</small>
           <button type="button" className="btn btn-surface btn-sm" onClick={() => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'settings', sid, tab: 'bridge' } }))}><Link2 size={13} /> Link a server</button>
         </div>
       ) : bridges.map(b => {
@@ -297,10 +303,12 @@ export function ChannelBridge({ sid, channel }) {
               setBusy(false);
             }}>
               <option value="">Not bridged</option>
-              {b.ext_channels.map(x => <option key={x.id} value={x.id}>#{x.name}{x.category ? ` (${x.category})` : ''}</option>)}
+              {b.ext_channels.filter(fits).map(x => <option key={x.id} value={x.id}>{voice ? '' : '#'}{x.name}{x.category ? ` (${x.category})` : ''}</option>)}
             </select>
           </div>
-          <small className="vc-hint"><PlatformIcon p={b.platform} size={12} /> {l ? `Messages here and in ${b.platform_name} #${l.ext_name} (${b.guild_name}) go both ways.` : `Pick a channel in ${b.guild_name} to bridge with ${b.platform_name}.`}{!b.enabled ? ' The bridge is paused in Server settings.' : ''}</small>
+          <small className="vc-hint"><PlatformIcon p={b.platform} size={12} /> {voice
+            ? (l ? `People in ${b.platform_name} ${l.ext_name} (${b.guild_name}) show up here as themselves, and while someone is in here the ${b.platform_name} bot joins over there so they hear everyone.` : `Pick a voice channel in ${b.guild_name} to bridge with ${b.platform_name}.`)
+            : (l ? `Messages here and in ${b.platform_name} #${l.ext_name} (${b.guild_name}) go both ways.` : `Pick a channel in ${b.guild_name} to bridge with ${b.platform_name}.`)}{!b.enabled ? ' The bridge is paused in Server settings.' : ''}</small>
         </div>;
       })}
     </div>
