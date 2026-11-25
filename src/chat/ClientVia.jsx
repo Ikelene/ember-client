@@ -39,15 +39,17 @@ export function ViaBadge({ via, inst }) {
   if (!via) return null;
   return <Chip via={via} list={list} tip iconOnly inst={inst} />; // (everyone sees it since 2026-11-07: just the app's icon, or a globe; the name is in the hover card)
 }
-// the hover card (Tooltip.jsx, data-tip-via): "Sent from <name>", the domain in small text
+// the hover card (Tooltip.jsx, data-tip-via): "Sent from <name>", the domain in small text under it, the icon as tall as both lines
 export function ViaTip({ t }) {
   if (!t) return null;
+  const domain = t.domain && t.known ? t.domain : '';
+  const line = t.verified ? `A verified Nookara app.${domain ? ` ${domain}` : ''}` : t.known ? domain : 'Not sent with a Nookara app.';
   return (
-    <div className="vc-tip-card vc-tip-via">
-      {t.icon ? <img className="vc-tip-via-ico" src={t.icon} alt="" /> : <Globe size={17} />}
+    <div className={`vc-tip-card vc-tip-via${line ? ' two' : ''}`}>
+      {t.icon ? <img className="vc-tip-via-ico" src={t.icon} alt="" /> : <Globe size={line ? 28 : 17} />}
       <div>
         <b>{t.known ? <>Sent from {t.name}</> : t.text}{t.verified && <BadgeCheck size={13} className="vc-via-check" aria-label="Verified client" />}</b>
-        <span>{t.verified ? 'A verified Nookara app.' : t.known ? 'A Nookara app.' : 'Not sent with a Nookara app.'}{t.domain && t.known ? ` ${t.domain}` : ''}</span>
+        {line && <span>{line}</span>}
       </div>
     </div>
   );

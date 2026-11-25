@@ -269,6 +269,10 @@ html.vc-rounded .vc-tooltip:has(.vc-tip-via) { padding: 12px 14px; border-radius
 .vc-tip-via b { display: inline-flex; align-items: center; gap: 5px; }
 .vc-tip-card.vc-tip-via { flex-direction: row; align-items: flex-start; gap: 10px; }
 .vc-tip-card.vc-tip-via > svg { color: var(--accent); }
+.vc-tip-card.vc-tip-via.two { align-items: center; }
+.vc-tip-via.two .vc-tip-via-ico { width: 38px; height: 38px; border-radius: calc(8px * var(--rk, 1)); }
+.vc-tip-card.vc-tip-via.two > svg { margin-top: 0; }
+.vc-tip-via:not(.two) b { margin-bottom: 0; }
 html.vc-rounded .bf-ss-hero-id .vc-srv-ico.lg { border-radius: 50%; overflow: hidden; }
 
 /* ── phones and narrow windows ── */
