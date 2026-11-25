@@ -24,7 +24,8 @@ import { loudUnread, needsChannelCount } from './unread.js';
 import { getLook, subscribeLook } from './look.js';
 import { removeInstance, reorderInstances, reconnect as reconnectInstance, disconnectInstance } from './instances.js';
 import { startSignIn } from './session.js';
-import { Avatar, subtitle, RoleChip, STATUS_LABEL, BlockedMark } from './Profile.jsx';
+import { Avatar, subtitle, RoleChip, STATUS_LABEL, BlockedMark, openProfileEditor } from './Profile.jsx';
+import { hasAccountProfile, accountTarget } from './accountProfileCore.js';
 import { MePopout } from './ProfilePopout.jsx';
 import { PinCategoryHost, pinMenuItems, catMenuItems, pinItem, unpinItem, moveCategory } from './DmPins.jsx';
 import { cleanPins, pinnedSet, dmKey, groupKey, viewKeyOf } from './dmPinsCore.js';
@@ -860,9 +861,11 @@ export function UserPanel({ onSettings, onEditProfile }) {
   }, []);
   if (!signedIn || (here?.user && here.user.kind === 'local')) { // signed out of Velora, or on a server with its own accounts: no Velora pop-out
     const u = here?.user;
+    const editable = hasAccountProfile(here); // its own accounts keep a profile: the name opens it (Settings > Profile, on this server)
+    const who = u && <><Avatar user={u} size={36} /><span className="vc-me-txt"><b>{u.display_name || u.username}</b><small>{here.host}</small></span></>;
     return (
       <div className="vc-me">
-        {u ? <div className="vc-me-who"><Avatar user={u} size={36} /><span className="vc-me-txt"><b>{u.username}</b><small>{here.host}</small></span></div>
+        {u ? (editable ? <button type="button" className="vc-me-who" title="Edit your profile on this server" onClick={() => openProfileEditor(accountTarget(here.origin))}>{who}</button> : <div className="vc-me-who">{who}</div>)
           : <button type="button" className="vc-me-who" onClick={() => startSignIn()} title="Sign in with Nookara"><span className="vc-av vc-sys-av" style={{ width: 36, height: 36 }}><UserRound size={19} /></span><span className="vc-me-txt"><b>Not signed in</b><small>Sign in with Nookara</small></span></button>}
         <QuickVoiceBtns />
         <button type="button" className="vc-ico-btn" onClick={onSettings} title="Settings"><Settings size={17} /></button>

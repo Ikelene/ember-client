@@ -17,6 +17,7 @@ import { NameText } from './displayNames.js';
 import { isWebBonfire } from '../api.js';
 import { signOutVelora, startSignIn } from './session.js';
 import { Avatar } from './Profile.jsx';
+import { hasAccountProfile } from './accountProfileCore.js';
 import './SettingsDialog.css';
 
 const rowText = title => (GROUPS.find(([t]) => t === title)?.[1] || []).flatMap(([, label, hint, choices]) => [label, hint, ...(choices || []).map(c => c[1])]);
@@ -82,7 +83,7 @@ export function useNarrow() {
   return n;
 }
 
-export default function SettingsDialog({ page: startPage, onClose }) {
+export default function SettingsDialog({ page: startPage, target, onClose }) {
   const narrow = useNarrow();
   const [mview, setMview] = useState(startPage ? 'page' : 'list'); // phones: which screen is showing
   const depth = useRef(0); // history entries this dialog added (phones: the dialog, then an opened page)
@@ -90,6 +91,7 @@ export default function SettingsDialog({ page: startPage, onClose }) {
   const closeRef = useRef(null);
   const me = useChat(s => s.me);
   const signedIn = useChat(s => s.signedIn);
+  const serverAccount = useChat(s => s.instances.some(hasAccountProfile)); // an account of a server's own has a profile to edit, Nookara or not
   const desktop = !!window.bonfireDesktop?.isDesktop || typeof window.bonfireDesktop?.getAppSettings === 'function';
   const mac = useDesktopMac();
   const [page, setPage] = useState(startPage || (signedIn ? 'profile' : 'Account'));
@@ -103,8 +105,8 @@ export default function SettingsDialog({ page: startPage, onClose }) {
   // signed out of Velora (web Ember): only the pages that don't need an account
   const [design, setDesignState] = useState(() => effectiveDesign());
   useEffect(() => subscribeDesign(() => setDesignState(effectiveDesign())), []);
-  const groups = useMemo(() => PAGES.map(([g, items]) => [g, items.filter(it => (it[4] !== 'desktop' || desktop) && (it[4] !== 'modern' || design === 'rounded') && (signedIn || ['Account', 'About', 'theme', 'text', 'voice', 'accounts'].includes(it[0])))
-    .map(it => (it[4] === 'desktop' && mac ? [it[0], desktopAppTitle(true), it[2], MAC_APP_WORDS, it[4]] : it))]).filter(([, items]) => items.length), [desktop, signedIn, mac, design]);
+  const groups = useMemo(() => PAGES.map(([g, items]) => [g, items.filter(it => (it[4] !== 'desktop' || desktop) && (it[4] !== 'modern' || design === 'rounded') && (signedIn || ['Account', 'About', 'theme', 'text', 'voice', 'accounts'].includes(it[0]) || (it[0] === 'profile' && serverAccount)))
+    .map(it => (it[4] === 'desktop' && mac ? [it[0], desktopAppTitle(true), it[2], MAC_APP_WORDS, it[4]] : it))]).filter(([, items]) => items.length), [desktop, signedIn, mac, design, serverAccount]);
   const shown = useMemo(() => groups.map(([g, items]) => [g, items.filter(([, label, , words]) => matches(q, label, ...words))]).filter(([, items]) => items.length), [groups, q]);
   const help = useMemo(() => HELP.filter(([label, , , words]) => matches(q, label, ...words)), [q]);
   const all = shown.flatMap(([, items]) => items);
@@ -225,7 +227,7 @@ export default function SettingsDialog({ page: startPage, onClose }) {
             <button type="button" className="bf-sd-x" aria-label="Close settings" data-tip="Close (Esc)" onClick={() => close()}><X size={18} /></button>
           </header>
           <div className="bf-sd-content" ref={content} key={page}>
-            {page === 'profile' ? <ProfileEditor onDirty={(on, nudge) => { dirty.current = { on, nudge }; }} />
+            {page === 'profile' ? <ProfileEditor target={target} onDirty={(on, nudge) => { dirty.current = { on, nudge }; }} />
               : page === 'accounts' ? <AccountsPage onClose={() => close()} />
                 : page === 'hosting' ? <HostingPage onClose={() => close()} />
                   : page === 'expressions' ? <PersonalExpressionsPage />

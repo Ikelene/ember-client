@@ -11,13 +11,14 @@ import ImageCropper from '../components/ImageCropper.jsx';
 import { useChat, lookup, ask, toast, errorText, loadMembers } from './store.js';
 import { PopoutCard } from './ProfilePopout.jsx';
 import { pictureAccept } from './accept.js';
+import { hasAccountProfile, accountTarget } from './accountProfileCore.js';
 
 const isHex = c => /^#[0-9a-f]{6}$/i.test(c || '');
 const ERRORS = { not_allowed: "This server doesn't let you customize your profile there.", invalid_color: 'Colors look like #9d8ad1.', bio_too_long: 'Bios here are at most 300 characters.', pronouns_too_long: 'Pronouns are at most 40 characters.', invalid_nick: 'That name can’t be used here.', images_only: 'Pick a PNG, JPG, GIF or WebP picture.', file_too_large: 'Pictures here can be up to 4 MB.' };
 const say = e => ERRORS[e.message] || errorText(e.message);
 
 // the cropped part of a picture as a PNG (the server keeps what it's given)
-function cropToBlob(file, crop, max) {
+export function cropToBlob(file, crop, max) {
   return new Promise((resolve, reject) => {
     const src = URL.createObjectURL(file), img = new Image();
     img.onload = () => {
@@ -185,20 +186,27 @@ export default function ServerProfileEditor({ sid, onDirty }) {
   );
 }
 
-// the "which profile" dropdown at the top of Settings > Profile: your global one, or an Ember server that has server profiles
+// the "which profile" dropdown at the top of Settings > Profile: your global one, an Ember server that has server profiles, or -
+// on a server with its own accounts - your account's profile there (AccountProfileEditor: `account` = that server's address)
 export function useProfileTargets() {
   const servers = useChat(s => s.servers);
   const instances = useChat(s => s.instances);
-  return servers.filter(x => x.inst && instances.find(i => i.origin === x.inst)?.features?.server_profiles).map(x => ({ sid: x.sid, name: x.name, icon: x.icon || null }));
+  const accounts = instances.filter(hasAccountProfile).map(i => {
+    const srv = servers.find(x => x.inst === i.origin);
+    return { sid: accountTarget(i.origin), name: srv?.name || i.name, icon: srv?.icon || i.icon || null, account: i.origin };
+  });
+  const own = new Set(accounts.map(a => a.account));
+  return [...accounts, ...servers.filter(x => x.inst && !own.has(x.inst) && instances.find(i => i.origin === x.inst)?.features?.server_profiles).map(x => ({ sid: x.sid, name: x.name, icon: x.icon || null }))];
 }
 
 // the "Editing" picker: your global profile (your own picture) or a server (its icon). A menu of our own, so the icons can show
-export function ProfileTargetPicker({ value, targets, onChange }) {
+// noGlobal: signed out of Nookara (only the servers' own accounts have a profile to edit)
+export function ProfileTargetPicker({ value, targets, onChange, noGlobal = false }) {
   const me = useChat(s => s.me);
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(0);
   const box = useRef(null);
-  const items = [{ sid: 'global', name: 'Global profile', hint: 'Your Nookara profile, everywhere' }, ...targets.map(t => ({ ...t, hint: 'Only on this server' }))];
+  const items = [...(noGlobal ? [] : [{ sid: 'global', name: 'Global profile', hint: 'Your Nookara profile, everywhere' }]), ...targets.map(t => ({ ...t, hint: t.account ? 'Your account on this server' : 'Only on this server' }))];
   const cur = items.find(i => i.sid === value) || items[0];
   useEffect(() => {
     if (!open) return undefined;
@@ -228,7 +236,7 @@ export function ProfileTargetPicker({ value, targets, onChange }) {
         <div className="bf-pt-menu" role="listbox" aria-label="Which profile to edit">
           {items.map((i, n) => (
             <Fragment key={i.sid}>
-              {n === 1 && <div className="bf-pt-sep">Profile on a server</div>}
+              {n === 1 && !noGlobal && <div className="bf-pt-sep">Profile on a server</div>}
               <button type="button" role="option" aria-selected={i.sid === cur.sid} className={`bf-pt-opt${i.sid === cur.sid ? ' on' : ''}${n === hi ? ' hi' : ''}`} onMouseEnter={() => setHi(n)} onClick={() => pick(i)}>
                 {face(i)}<span className="bf-pt-txt"><b>{i.name}</b><small>{i.hint}</small></span>{i.sid === cur.sid && <Check size={15} />}
               </button>

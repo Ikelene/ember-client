@@ -9,9 +9,11 @@ import { apiFetch, getToken } from '../api.js';
 import { BotTag, AddBotButton, TrustedIn } from './Bots.jsx';
 import { useChat, lookup, go, wantPresence, toast, errorText, getState, setCustom, ask, loadFriends, toggleBlock, memberRef, faceOf, botPresenceOf, loadMembers, onUserUpdate, markBotPeer, cleanServerProfile } from './store.js';
 import { isInst } from './ids.js';
+import { hasAccountProfile, accountTarget } from './accountProfileCore.js';
 import { ServerIcon } from './ServerIcon.jsx';
 // your own profile's "Edit profile": Ember's settings, Profile page (Chat.jsx listens for vc-dialog)
-export const openProfileEditor = () => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'chat-settings', page: 'profile' } }));
+// target: which profile to open on (accountProfileCore.js accountTarget: your account on a server with its own accounts)
+export const openProfileEditor = target => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'chat-settings', page: 'profile', ...(typeof target === 'string' ? { target } : {}) } }));
 import { elapsed, BioText } from './text.jsx';
 import { userMenu } from './Menu.jsx';
 import { RoleChips, modRights, moderate } from './roles.jsx';
@@ -306,6 +308,7 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
   const [menu, setMenu] = useState(false);
   useArcadeBoard(ref, plain ? null : vname, 'mini');
   const isMe = who?.inst ? !!instMe && instMe === who?.id : me?.username === username;
+  const ownAccount = useChat(s => plain && isMe && !who?.bot && hasAccountProfile(s.instances?.find(i => i?.origin === who.inst))); // my account on a server with its own: its profile is edited there
   const color = (!plain || p?.server_profile) && isHex(p?.color) ? p.color : '';
   const botSt = plain && who?.kind === 'bot' ? botPresenceOf(member) || botPresenceOf(who) : null; // an instance bot: its presence comes with the member row
   const status = botSt || presence?.status || 'offline';
@@ -389,6 +392,11 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
           </>
         )}
         {!p && <div className="vc-skel" />}
+        {ownAccount && (
+          <div className="vc-card-btns">
+            <button type="button" className="pe-msg vc-btn-msg" onClick={() => { onClose?.(); openProfileEditor(accountTarget(who.inst)); }}><Pencil size={14} /> Edit profile</button>
+          </div>
+        )}
         {(!plain || (who?.bot && extra?.bot)) && getToken() && (
           <div className="vc-card-btns">
             {isMe

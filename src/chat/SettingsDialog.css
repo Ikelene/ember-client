@@ -133,6 +133,10 @@ body:has(.bf-sd-back, .bf-pp-pop) .vc-notify-banner { z-index: 2000; }
 .bf-pe-lock { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; padding: 10px 12px; background: var(--box-2, #19191c); border: 1px solid var(--border-2); border-left: 3px solid var(--accent); font-size: 13.5px; }
 .bf-pe-lock > svg { flex: none; color: var(--accent); }
 .bf-pe-lock > span { flex: 1; min-width: 0; }
+/* your account on a server with its own accounts (AccountProfileEditor): the Nookara copy / sync box above the fields */
+.bf-pe-nk { display: flex; flex-direction: column; gap: 10px; margin: 0 0 18px; }
+.bf-pe-nk .bf-pe-lock { margin: 0; }
+.bf-pe-nk .bf-pe-row .btn { display: inline-flex; align-items: center; gap: 6px; }
 fieldset.bf-pe-form { margin: 0; border: 0; padding: 0 0 24px; }
 .bf-pe-form.locked { opacity: .5; }
 .bf-pe-form.locked input, .bf-pe-form.locked textarea, .bf-pe-form.locked select, .bf-pe-form.locked button, .bf-pe-form.locked label { cursor: not-allowed; }

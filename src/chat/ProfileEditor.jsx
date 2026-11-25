@@ -15,6 +15,7 @@ import { imgHint, warnImage } from './imgHints.js';
 import { PopoutCard, localTimeFrom } from './ProfilePopout.jsx';
 import ServerProfileEditor, { useProfileTargets, askLeave, ProfileTargetPicker } from './ServerProfileEditor.jsx';
 import { pictureAccept } from './accept.js';
+import AccountProfileEditor from './AccountProfileEditor.jsx';
 import EmojiPicker from './EmojiPicker.jsx';
 import { bioLength, bioEmojiCount, BIO_EMOJI_MAX } from './bioLength.js';
 
@@ -58,22 +59,26 @@ function cropPreview(file, crop) {
 }
 
 // Settings > Profile: your global (Nookara) profile, or - picked in the dropdown - your profile on one Ember server (ServerProfileEditor)
-export default function ProfileEditor({ onDirty }) {
+// (signed out of Nookara there is no global one: only the profiles of accounts on servers that have their own. `open`: the target to start on)
+export default function ProfileEditor({ onDirty, target: open }) {
   const targets = useProfileTargets();
-  const [target, setTarget] = useState('global');
+  const signedIn = useChat(s => s.signedIn);
+  const [target, setTarget] = useState(open || (signedIn ? 'global' : targets[0]?.sid || 'global'));
   const dirtyRef = useRef(false);
   const track = (d, nudge) => { dirtyRef.current = !!d; onDirty?.(d, nudge); };
   const choose = async v => { if (v === target) return; if (dirtyRef.current && !(await askLeave())) return; dirtyRef.current = false; onDirty?.(false); setTarget(v); };
-  const live = target === 'global' || targets.some(t => t.sid === target);
+  const cur = targets.find(t => t.sid === target) || (signedIn ? null : targets[0]) || null; // (a server that went away: back to the global one)
+  if (!cur && !signedIn) return <div className="inline-msg">Sign in with Nookara to edit your profile.</div>;
   return (
     <>
       {targets.length > 0 && (
         <div className="bf-pe-target">
           <span className="bf-pe-target-label">Editing</span>
-          <ProfileTargetPicker value={live ? target : 'global'} targets={targets} onChange={choose} />
+          <ProfileTargetPicker value={cur ? cur.sid : 'global'} targets={targets} onChange={choose} noGlobal={!signedIn} />
         </div>
       )}
-      {live && target !== 'global' ? <ServerProfileEditor key={target} sid={target} onDirty={track} /> : <GlobalProfile onDirty={track} />}
+      {cur?.account ? <AccountProfileEditor key={cur.sid} origin={cur.account} onDirty={track} />
+        : cur ? <ServerProfileEditor key={cur.sid} sid={cur.sid} onDirty={track} /> : <GlobalProfile onDirty={track} />}
     </>
   );
 }

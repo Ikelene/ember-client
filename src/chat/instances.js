@@ -416,6 +416,8 @@ function onFrame(c, m) {
       c.activeAt = Date.now();
       loadInstanceData(c.origin).then(() => { catchUp(c.origin); if (autoJoin.has(c.origin)) joinOnce(c); if (c.peeking) { clearTimeout(c.peekT); c.peekT = setTimeout(() => endPeek(c), PEEK_FOR); } });
 
+      // its own accounts, and my profile there follows my Nookara one: bring over what changed while I was away (accountProfile.js)
+      if (c.info?.accounts_mode === 'local' && c.info.features?.account_profiles && getToken()) import('./accountProfile.js').then(x => x.syncAccountProfile(c.origin)).catch(() => {});
       if (c.isAdmin) loadServerInfo(c);
       if (c.isAdmin) apiFetch('/api/v1/instance/settings', { inst: c.origin }).then(d => { c.voiceQuota = d.velora?.voice || null; mirror(); }).catch(() => {});
       return;
@@ -432,6 +434,7 @@ function onFrame(c, m) {
     default: break;
   }
   if (/^chat_message/.test(m.type)) c.activeAt = Date.now(); // (people chatting there keeps it awake)
+  if (m.type === 'chat_identity_update' && c.user && m.user?.id === c.user.id) setInstanceUser(c.origin, m.user); // (my own name / picture, changed on another device)
   handleEvent(fromInstance(c.origin, m), c.origin);
 }
 
@@ -696,6 +699,13 @@ export async function joinCommunity(origin, code, password) {
   return { sid: d.server.sid };
 }
 export const instanceConn = origin => connections.get(origin);
+// my account on an instance changed (its own accounts: I edited my profile there, here or on another device)
+export function setInstanceUser(origin, user) {
+  const c = connections.get(origin);
+  if (!c || !user?.id || (c.user && c.user.id !== user.id)) return;
+  c.user = { ...c.user, ...user };
+  mirror();
+}
 // Velora's per-server push consent (PROTOCOL §12.3): may this server push to me through Velora, and is it muted
 export async function setInstancePrefs(origin, patch) {
   const c = connections.get(origin);

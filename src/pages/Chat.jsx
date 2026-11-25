@@ -715,7 +715,7 @@ function ChatPage() {
       {dialog?.kind === 'dm' && <NewDM onClose={() => setDialog(null)} />}
       {dialog?.kind === 'group' && <NewGroup onClose={() => setDialog(null)} />}
       {dialog?.kind === 'quick' && <QuickSwitcher onClose={() => setDialog(null)} />}
-      {dialog?.kind === 'chat-settings' && <SettingsDialog key={dialog.page || 'settings'} page={dialog.page} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'chat-settings' && <SettingsDialog key={`${dialog.page || 'settings'}${dialog.target || ''}`} page={dialog.page} target={dialog.target} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'forward' && <ForwardDialog message={dialog.message} from={dialog.from} onClose={() => setDialog(null)} />}
       <AskHost />
       {signedIn && <E2eeGate />}

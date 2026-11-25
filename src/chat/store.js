@@ -231,8 +231,8 @@ async function flushFaces() {
   for (const id of ids) if (!got[id]) got[id] = { id, miss: true }; // nobody to show: stop holding their name colour back
   if (Object.keys(got).length) set(s => ({ veloraFaces: { ...s.veloraFaces, ...got }, veloraNames: { ...s.veloraNames, ...Object.fromEntries(Object.entries(got).filter(([, u]) => !u.miss).map(([id, u]) => [id, u.username])) } }));
 }
-// someone as shown in an instance server: a Velora person with their Velora face, a local account / bot as plain (no picture
-// of its own for local accounts for now). Velora's own servers already carry the live face.
+// someone as shown in an instance server: a Velora person with their Velora face, a local account with the picture it set on that
+// server (account profiles), a bot as plain. Velora's own servers already carry the live face.
 // what Ember uses of a server profile: a #rrggbb colour, http(s) pictures, plain text (the server should send just that; this makes sure)
 const httpUrl = v => (typeof v === 'string' && /^https?:\/\//i.test(v) ? v : null);
 export function cleanServerProfile(p) {
@@ -256,7 +256,7 @@ export function faceOf(u, s = state) {
   if (!u || !u.inst || u.inst === VELORA) return u;
   const sp = serverProfileOf(u, s);
   let out;
-  if (u.kind === 'local') out = { ...u, pfp: null, color: null };
+  if (u.kind === 'local') out = { ...u, pfp: httpUrl(u.pfp), color: null }; // (its picture is the one it set on that server: account profiles)
   else {
     const f = u.kind === 'velora' ? s.veloraFaces[String(u.velora_id)] : null;
     out = f && !f.miss ? { ...u, pfp: f.pfp || u.pfp || null, color: f.color || null, rank: f.rank } : u;
@@ -514,6 +514,8 @@ function onEvent(m, inst = VELORA) {
       dispatchEvent(new CustomEvent('vc-user-update', { detail: m }));
       if (m.previous_username && m.previous_username !== m.user.username) { loadDMs(); loadGroups(); loadFriends(); } // (name-keyed lists + conversations)
       for (const o of instancesWithAccount(state, m.user.id)) sendTo(o, { type: 'chat_profile_refresh', velora_id: String(m.user.id) });
+      // my own profile: the servers with their own accounts where my profile follows it get the new one (accountProfile.js)
+      if (state.me && [m.user.username, m.previous_username].includes(state.me.username)) import('./accountProfile.js').then(x => x.syncAllAccountProfiles()).catch(() => {});
       break;
     case 'chat_identity_update':
       if (inst !== VELORA) { if (m.user?.id) { set(s => applyIdentity(s, m.user, inst)); loadMembersOf(inst); } break; }
