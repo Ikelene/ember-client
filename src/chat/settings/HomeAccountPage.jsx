@@ -6,7 +6,7 @@ import { SettingsPage, SCard } from './ui.jsx';
 import { ask, toast } from '../store.js';
 import { Avatar } from '../Profile.jsx';
 import { HomeserverIcon, useHomeSession, useHomeSessions } from '../HomeserverLogin.jsx';
-import { setCurrent } from '../homeserver.js';
+import { setCurrent, homeInfo } from '../homeserver.js';
 import { signOutHome } from '../session.js';
 import { loadLogins, unlinkLogin, linkLogin } from '../homeApi.js';
 import { loginErrorText, KIND_LABEL } from '../homeAdmin.js';
@@ -28,6 +28,9 @@ export default function HomeAccountPage() {
   const [logins, setLogins] = useState(null); // null = loading
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
+  // "Manage this account": the account page the homeserver names in its discovery (login.account_url), /account until it answers
+  const [accountUrl, setAccountUrl] = useState(null);
+  useEffect(() => { let gone = false; setAccountUrl(null); if (origin) homeInfo(origin).then(i => !gone && setAccountUrl(i.account_url)).catch(() => {}); return () => { gone = true; }; }, [origin]);
   const load = () => {
     if (!origin) return;
     setError('');
@@ -62,7 +65,7 @@ export default function HomeAccountPage() {
     signOutHome(origin);
     toast(`Signed out of ${a.handle}.`, true);
   }
-  const manage = `${origin}/account`;
+  const manage = accountUrl || `${origin}/account`;
 
   return (
     <SettingsPage icon={CircleUserRound} title="My account" sub={`Your account on ${s.name || s.domain}.`}>
