@@ -75,7 +75,7 @@ import { embedLabel } from './inviteLink.js';
 import { fmtSize, RISKY, KIND_OF } from './fileKinds.js';
 import { Avatar, BlockedMark } from './Profile.jsx';
 import { messageMenu, userMenu, openMenu } from './Menu.jsx';
-import { useScope, mentionsMe as isMention, useFace, wantVeloraFaces, useBlocked, blockedFace, isBlockedName, faceOf, BLOCKED_NAME } from './store.js';
+import { useScope, mentionsMe as isMention, useFace, wantVeloraFaces, useBlocked, blockedFace, isBlockedName, faceOf, BLOCKED_NAME, bridgedTyper } from './store.js';
 import { useNameStyle, colorFrom, NameDecor, P, has } from './roles.jsx';
 import { suggestQuery, useSuggestItems, MentionPicker, encodeRoleMentions } from './Mentions.jsx';
 import { serialize, fill, caretToEnd, caretText, replaceBeforeCaret, insertAt, resolveWord, markdownShortcut, styleMarkdown } from './richInput.js';
@@ -923,10 +923,11 @@ export function Typing({ view }) {
   // in a server, somebody I blocked types as "Blocked User" with the default picture
   const blockedNames = useChat(s => (view.kind === 'channel' ? names.filter(n => isBlockedName(view.sid, n, s)).join('\n') : ''));
   const isB = n => !!blockedNames && blockedNames.split('\n').includes(n);
-  const who = n => (isB(n) ? <b className="vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={11} /></b> : <b><NameText u={members?.find(x => x.username === n) || { username: n }} fallback={n} /></b>);
+  // (someone typing over a bridge: their name there, with the platform's mark)
+  const who = n => (isB(n) ? <b className="vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={11} /></b> : bridgedTyper(n) ? <b className="vc-typing-bridged">{bridgedTyper(n).name}<PlatformIcon p={bridgedTyper(n).platform} size={12} /></b> : <b><NameText u={members?.find(x => x.username === n) || { username: n }} fallback={n} /></b>);
   return (
     <div className={`vc-typing${names.length ? ' on' : ''}`} aria-live="polite">
-      {names.length > 0 && <span className="vc-ch-typing-avs">{names.slice(0, 3).map(u => <Avatar key={u} user={isB(u) ? { username: BLOCKED_NAME, pfp: null } : { username: u, pfp: pfpOf(u) }} size={18} />)}</span>}
+      {names.length > 0 && <span className="vc-ch-typing-avs">{names.slice(0, 3).map(u => <Avatar key={u} user={isB(u) ? { username: BLOCKED_NAME, pfp: null } : bridgedTyper(u) ? { username: bridgedTyper(u).name, pfp: bridgedTyper(u).pfp } : { username: u, pfp: pfpOf(u) }} size={18} />)}</span>}
       {names.length > 0 && <span className="vc-dots"><i /><i /><i /></span>}
       {names.length === 1 && <span>{who(names[0])} is typing...</span>}
       {names.length === 2 && <span>{who(names[0])} and {who(names[1])} are typing...</span>}

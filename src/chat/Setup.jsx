@@ -33,7 +33,7 @@ export function SetupWizard({ origin, onClose, name: givenName = '' }) {
   const [sid, setSid] = useState(had?.sid || null); // the server (namespaced)
   const [opts, setOpts] = useState({ join_policy: 'request', allow_uploads: true, upload_max_mb: '25' });
   const [restartNote, setRestartNote] = useState(false);
-  const [importing, setImporting] = useState(false); // "Your server" -> Import from Discord / Fluxer
+  const [importing, setImporting] = useState(false); // "Your server" -> Import from Discord / Fluxer / Matrix
   const signedIn = useChat(s => s.signedIn);
   const pick = useRef(null);
   const call = (path, o = {}) => apiFetch(`/api/v1${path}`, { inst: origin, ...o });
@@ -113,7 +113,7 @@ export function SetupWizard({ origin, onClose, name: givenName = '' }) {
 
           {step === 1 && !importing && (
             <>
-              <p className="vc-dialog-sub">What should people see when they find this server? You can change all of this later in its settings. Or bring one over: from an Ember export (a <span className="vc-mono">.zip</span> from another server or from Nookara), or from Discord / Fluxer.</p>
+              <p className="vc-dialog-sub">What should people see when they find this server? You can change all of this later in its settings. Or bring one over: from an Ember export (a <span className="vc-mono">.zip</span> from another server or from Nookara), or from Discord, Fluxer or Matrix.</p>
               <div className="vc-field"><span>Icon</span>
                 <div className="vc-img-row"><span className="vc-srv-ico lg">{icon ? <img src={icon.url} alt="" /> : initials(f.name || 'My server')}</span>
                   <button type="button" className="btn btn-surface" onClick={() => pick.current?.click()}><Upload size={14} /> Upload</button>
@@ -122,7 +122,7 @@ export function SetupWizard({ origin, onClose, name: givenName = '' }) {
               <label className="vc-field"><span>Server name</span><input className="form-input" autoFocus maxLength={60} value={f.name} placeholder="My server" onChange={e => setF(x => ({ ...x, name: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter' && f.name.trim()) createServer(); }} /></label>
               <label className="vc-field"><span>Description</span><textarea className="form-textarea" rows={3} maxLength={300} value={f.description} onChange={e => setF(x => ({ ...x, description: e.target.value }))} placeholder="What is it for?" /></label>
               <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" onClick={close}>Finish later</button><span className="grow" />
-                <button type="button" className="btn btn-surface" disabled={busy || !signedIn} data-tip={signedIn ? undefined : 'Sign in with Nookara to import from Discord or Fluxer'} onClick={() => setImporting(true)}><PlatformIcon p="discord" size={14} /><PlatformIcon p="fluxer" size={14} /> Import from Discord / Fluxer</button>
+                <button type="button" className="btn btn-surface" disabled={busy} data-tip={signedIn ? undefined : 'Discord and Fluxer need you signed in with Nookara. Matrix works without.'} onClick={() => setImporting(true)}><PlatformIcon p="discord" size={14} /><PlatformIcon p="fluxer" size={14} /><PlatformIcon p="matrix" size={14} /> Import from another app</button>
                 <label className={`btn btn-surface${busy ? ' disabled' : ''}`}><Upload size={14} /> Import an export<input type="file" hidden accept=".zip,application/zip" onChange={e => { const x = e.target.files[0]; e.target.value = ''; if (x) importZip(x); }} /></label>
                 <button type="button" className="btn btn-primary" disabled={busy || !f.name.trim()} onClick={createServer}>{busy ? 'Working...' : 'Create server'}</button></div>
             </>

@@ -323,6 +323,7 @@ body:has(.vc-sign-banner) .vc-notify-banner { top: 52px; } /* (the notifications
 .vc-typing { height: 24px; display: flex; align-items: center; gap: 7px; padding: 0 2px; font-size: 12px; color: var(--dim); opacity: 0; transform: translateY(3px); transition: opacity .2s, transform .2s; }
 .vc-typing.on { opacity: 1; transform: none; }
 .vc-typing b { color: var(--text); }
+.vc-typing-bridged { display: inline-flex; align-items: center; gap: 4px; vertical-align: bottom; }
 .vc-dots { display: inline-flex; gap: 3px; }
 .vc-dots i { display: block; width: 5px; height: 5px; background: var(--dim); animation: vc-dot 1.2s ease-in-out infinite; }
 .vc-dots i:nth-child(2) { animation-delay: .15s; }

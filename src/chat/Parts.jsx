@@ -15,7 +15,7 @@ import { RetryIn } from './Gate.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
 import { linkFor } from './store.js';
 import { useName, NameText, personName, displayNameOf, useDisplayNamesVersion, wantDisplayNames, serverOwnName } from './displayNames.js';
-import { useChat, retryNow, go, keyOf, setStatus, setCustom, isMuted, effectiveNotify, ask, refreshServer, toast, errorText, setDetailLayout, patchState, saveSettings, getState, statusOf, presenceFor, useFace, isBlockedPerson, isBlockedName, blockedFace, BLOCKED_NAME, loadMoreMembers, lastHomeView } from './store.js';
+import { useChat, retryNow, go, keyOf, setStatus, setCustom, isMuted, effectiveNotify, ask, refreshServer, toast, errorText, setDetailLayout, patchState, saveSettings, getState, statusOf, presenceFor, useFace, isBlockedPerson, isBlockedName, blockedFace, BLOCKED_NAME, loadMoreMembers, lastHomeView, bridgedTyper } from './store.js';
 import { P, has, ChannelIcon, useNameStyle, colorFrom, NameDecor } from './roles.jsx';
 import { serverMenu, instanceMenu, channelMenu, userMenu, openMenu, copy } from './Menu.jsx';
 import { apiFetch, getToken } from '../api.js';
@@ -50,10 +50,10 @@ function TypingMark({ names, people, sid }) {
   useDisplayNamesVersion(); // (the title below reads display names)
   if (!names.length || !show) return null;
   const masked = n => !!blocked && blocked.split('\n').includes(n);
-  const shown = names.map(n => (masked(n) ? BLOCKED_NAME : displayNameOf(n) || n));
+  const shown = names.map(n => (masked(n) ? BLOCKED_NAME : bridgedTyper(n)?.name || displayNameOf(n) || n));
   return (
     <span className="vc-ch-typing" title={`${shown.join(', ')} ${names.length === 1 ? 'is' : 'are'} typing`}>
-      <span className="vc-ch-typing-avs">{names.slice(0, 3).map(u => <Avatar key={u} user={masked(u) ? { username: BLOCKED_NAME, pfp: null } : { username: u, pfp: people[u]?.pfp }} size={16} />)}</span>
+      <span className="vc-ch-typing-avs">{names.slice(0, 3).map(u => <Avatar key={u} user={masked(u) ? { username: BLOCKED_NAME, pfp: null } : bridgedTyper(u) ? { username: bridgedTyper(u).name, pfp: bridgedTyper(u).pfp } : { username: u, pfp: people[u]?.pfp }} size={16} />)}</span>
       <span className="vc-dots"><i /><i /><i /></span>
     </span>
   );

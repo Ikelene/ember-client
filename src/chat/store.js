@@ -635,7 +635,7 @@ function onEvent(m, inst = VELORA) {
       } else if (!['chat_typing', 'chat_presence', 'chat_read'].includes(m.request)) toast(inst !== VELORA && m.error === 'insufficient_scope' ? errorText('inst_scope') : errorText(m.error));
       break;
     }
-    case 'chat_typing': typingFrom(`c:${m.channel}`, m.username, m.typing, inst); break;
+    case 'chat_typing': typingFrom(`c:${m.channel}`, m.bridged?.name ? noteBridgedTyper(m.bridged) : m.username, m.typing, inst); break;
     case 'dm_typing': typingFrom(`d:${String(m.from).toLowerCase()}`, m.from, m.typing); break;
     case 'chat_channels_update':
       set(s => ({ detail: upd(s.detail, m.server, d => d && { ...d, categories: m.categories ?? d.categories, channels: m.channels.map(c => ({ ...(d.channels.find(x => x.cid === c.cid) || {}), ...c })) }) }));
@@ -833,7 +833,7 @@ function addMessage(key, msg) {
     if (p >= 0) { sentOk(list[p].nonce); list = list.map((x, i) => (i === p ? msg : x)); } else list = [...list, msg];
     set(s => ({ msgs: { ...s.msgs, [key]: { ...b, list: ordered(list) } } }));
   }
-  if (msg.author) typingFrom(key, msg.author.username, false, msg.inst || VELORA);
+  if (msg.author) typingFrom(key, msg.author.bridge ? bridgedToken(msg.author.bridge, msg.author.username) : msg.author.username, false, msg.inst || VELORA);
   // The conversation only counts as "open" when Ember itself has focus.
   // A new message in the visible-but-inactive window should still notify.
   const open = keyOf(state.view) === key && pageFocused();
@@ -981,6 +981,17 @@ function ping(key, msg, everyMessage = false, quiet = false) {
 let overlayToastHook = null;
 export const onOverlayToast = fn => { overlayToastHook = fn; };
 
+// someone typing on the other side of a bridge (Discord / Fluxer / Matrix) has no account here: the typing list holds a
+// token for them, and this keeps the name, picture and platform behind it
+const bridgedTypers = new Map();
+export const bridgedTyper = token => bridgedTypers.get(token) || null;
+const bridgedToken = (platform, name) => `~${platform}:${name}`;
+function noteBridgedTyper(b) {
+  const token = bridgedToken(b.platform, b.name);
+  bridgedTypers.set(token, { name: String(b.name), pfp: b.avatar || null, platform: String(b.platform) });
+  if (bridgedTypers.size > 500) bridgedTypers.delete(bridgedTypers.keys().next().value);
+  return token;
+}
 const typingTimers = {};
 function typingFrom(key, username, on = true, inst = VELORA) {
   if (!username || username === meOn(inst)?.username) return;

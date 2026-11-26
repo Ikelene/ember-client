@@ -1,5 +1,6 @@
 import { siteHref } from './hosts.js';
-// Discord / Fluxer: import a server into Ember (Create a server > Import; or, for a new instance, a Velora import bundle),
+// Discord / Fluxer / Matrix: import a server into Ember (Create a server > Import; or, for a new instance, a Velora import
+// bundle - a Matrix space comes over with the instance's own bot instead),
 // and the Bridge tab in Server settings (Velora's bot for Velora-hosted servers, the instance owner's own bot on an instance).
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Check, ExternalLink, RefreshCw, Link2, Unlink, Volume2, Hash, Lock, EyeOff, Smile, Shield, Image as ImageIcon, ArrowLeftRight, TriangleAlert } from 'lucide-react';
@@ -38,6 +39,13 @@ const INST_ERR = {
 // Matrix has rooms, not servers with channels: no # in front of a name, no webhooks
 const roomy = p => p === 'matrix';
 const why = (e, inst) => (inst && INST_ERR[e?.message]) || ERR[e?.message] || errorText(e?.message);
+// a Matrix space, imported by the instance itself with a bot account its admin brings
+const MX_ERR = {
+  invalid_token: "That access token didn't work on that homeserver.", invalid_homeserver: "That homeserver address can't be used - it has to be a public https address.",
+  platform_unreachable: "Can't reach that homeserver right now.", bridge_not_set_up: 'Add the bot again - it was forgotten after half an hour.',
+  bot_not_in_server: "The bot isn't in that space any more.", pick_a_channel: 'Pick at least one room.', import_running: 'An import is already running - give it a moment.',
+  community_exists: 'This server already has its community.', forbidden: "Only this server's admins can import.", not_allowed: "Only this server's admins can import.",
+};
 const IMPORT_ERR = { not_linked: 'Link that account to Nookara first (Account > Security > Connected accounts).', bot_not_in_server: "Nookara's bot isn't in that server - add it first.", not_your_server: 'You need to own that server, or have Administrator / Manage server there.', import_running: 'An import is already running - give it a moment.', invalid_instance: "Nookara can't make an import for this server's address.", ticket_invalid: 'That import is gone - run it again.', ticket_expired: 'That import ran out - run it again.', ticket_wrong_instance: 'That import was made for another server.', import_failed: "Nookara couldn't build the import - try again.", velora_not_registered: "This server isn't registered with Nookara yet - try again in a minute.", velora_off: 'This server has its Nookara connection turned off.', community_exists: 'This server already has its community.' };
 
 function useLoad(url, deps, inst) {
@@ -57,24 +65,35 @@ const Loading = () => <div className="vc-loading"><i /><i /><i /></div>;
 // step 1 + 2 (shared with the Bridge tab): pick Discord or Fluxer, add the bot, pick one of your servers there.
 // inst: an instance's bridge (its owner's bot: no linked account, every server the bot is in); base: where the routes are
 // ('/chat/bridge' = Velora-hosted bridge / import, '/bonfire/import' = a Velora import bundle for an instance)
-function GuildPicker({ onPick, pickLabel = 'Choose', exclude = [], inst, base = '/chat/bridge' }) {
+// extra: more tiles next to the platforms ([{ id, name, sub, onClick }]); they stay when the platforms themselves can't be listed
+function GuildPicker({ onPick, pickLabel = 'Choose', exclude = [], inst, base = '/chat/bridge', extra = [], errorNote }) {
   const [plats] = useLoad(`${base}/platforms`, [], inst);
   const [p, setP] = useState(null);
   const plat = plats.data?.platforms.find(x => x.id === p);
   const [guilds, reload] = useLoad(plat?.linked ? `${base}/${p}/guilds` : null, [p], inst);
   if (plats.loading) return <Loading />;
-  if (plats.error) return <div className="vc-empty-note">{why(plats.error, inst)}</div>;
+  if (plats.error && !extra.length) return <div className="vc-empty-note">{why(plats.error, inst)}</div>;
   if (!p) {
     return (
-      <div className="vc-br-plats">
-        {plats.data?.platforms.filter(x => !exclude.includes(x.id)).map(x => (
-          <button type="button" key={x.id} className="vc-br-plat" disabled={!x.ready} onClick={() => setP(x.id)}>
-            <PlatformIcon p={x.id} size={30} />
-            <b>{x.name}</b>
-            <small>{!x.ready ? (inst ? 'No bot set up yet' : `Nookara's ${x.name} bot isn't configured on this Nookara`) : inst ? `Bot: ${x.bot || 'ready'}` : x.linked ? 'Your account is linked' : 'Link your account first'}</small>
-          </button>
-        ))}
-      </div>
+      <>
+        <div className="vc-br-plats">
+          {(plats.data?.platforms || []).filter(x => !exclude.includes(x.id)).map(x => (
+            <button type="button" key={x.id} className="vc-br-plat" disabled={!x.ready} onClick={() => setP(x.id)}>
+              <PlatformIcon p={x.id} size={30} />
+              <b>{x.name}</b>
+              <small>{!x.ready ? (inst ? 'No bot set up yet' : `Nookara's ${x.name} bot isn't configured on this Nookara`) : inst ? `Bot: ${x.bot || 'ready'}` : x.linked ? 'Your account is linked' : 'Link your account first'}</small>
+            </button>
+          ))}
+          {extra.map(x => (
+            <button type="button" key={x.id} className="vc-br-plat" onClick={x.onClick}>
+              <PlatformIcon p={x.id} size={30} />
+              <b>{x.name}</b>
+              <small>{x.sub}</small>
+            </button>
+          ))}
+        </div>
+        {plats.error && <div className="vc-empty-note">{errorNote || why(plats.error, inst)}</div>}
+      </>
     );
   }
   return (
@@ -144,9 +163,11 @@ function ImportServerForm({ onClose }) {
 }
 // the channel / role / extras picker; onImport({ name, channels, roles, opts }) does the import (throws to show an error).
 // base: where the preview comes from; bridge: offer "keep them talking" (only Velora-hosted servers bridge with Velora's bot)
-function ImportPicker({ p, g, plat, back, close, onImport, base = '/chat/bridge', bridge = true, label = 'Import server' }) {
-  const [pv] = useLoad(`${base}/${p}/guilds/${g.id}`, []);
-  const [name, setName] = useState(g.name);
+// inst: the preview comes from that instance (a Matrix space); errs: its own words for what can go wrong
+function ImportPicker({ p, g, plat, back, close, onImport, base = '/chat/bridge', bridge = true, label = 'Import server', inst, errs }) {
+  const [pv] = useLoad(`${base}/${p}/guilds/${encodeURIComponent(g.id)}`, [], inst);
+  const rooms = roomy(p);
+  const [name, setName] = useState(g.loose ? '' : g.name);
   const [chans, setChans] = useState(null);
   const [roles, setRoles] = useState(null);
   const [opts, setOpts] = useState({ icon: true, banner: true, emojis: true, ...(bridge ? { bridge: true } : {}) });
@@ -163,23 +184,25 @@ function ImportPicker({ p, g, plat, back, close, onImport, base = '/chat/bridge'
   async function go2() {
     setBusy(true);
     try { await onImport({ name, channels: [...chans], roles: [...roles], opts }); }
-    catch (e) { toast((!bridge && IMPORT_ERR[e.message]) || why(e)); setBusy(false); }
+    catch (e) { toast(say(e)); setBusy(false); }
   }
+  const say = e => errs?.[e?.message] || (!bridge && IMPORT_ERR[e?.message]) || why(e, inst);
+  const canBridge = bridge && d?.can_bridge !== false;
   if (pv.loading) return <Loading />;
-  if (pv.error) return <div className="vc-br-step"><button type="button" className="vc-br-back" onClick={back}><ArrowLeft size={14} /> Back</button><div className="vc-empty-note">{(!bridge && IMPORT_ERR[pv.error.message]) || why(pv.error)}</div></div>;
+  if (pv.error) return <div className="vc-br-step"><button type="button" className="vc-br-back" onClick={back}><ArrowLeft size={14} /> Back</button><div className="vc-empty-note">{say(pv.error)}</div></div>;
   return (
     <div className="vc-br-step">
       <button type="button" className="vc-br-back" onClick={back}><ArrowLeft size={14} /> <PlatformIcon p={p} size={14} /> {plat.name}: {g.name}</button>
       <label className="vc-field"><span>Ember server name</span><input className="form-input" maxLength={60} value={name} onChange={e => setName(e.target.value)} /></label>
       <div className="vc-br-cols">
         <div className="vc-br-col">
-          <div className="vc-br-head"><b>Channels</b><small>{count} picked{count > 60 ? ' - only the first 60 fit' : ''}</small></div>
+          <div className="vc-br-head"><b>{rooms ? 'Rooms' : 'Channels'}</b><small>{count} picked{count > 60 ? ' - only the first 60 fit' : ''}</small></div>
           <div className="vc-br-list">
             {d.groups.map(grp => (
               <div key={grp.id || 'none'} className="vc-br-group">
                 <div className="vc-br-cat">{grp.name}</div>
                 {grp.channels.map(c => (
-                  <label key={c.id} className={`vc-br-item${c.kind ? '' : ' off'}`} title={c.skip || (c.private ? `Private on ${plat.name} - stays private on Ember (for the roles you import)` : undefined)}>
+                  <label key={c.id} className={`vc-br-item${c.kind ? '' : ' off'}`} title={c.skip || (c.private ? `${rooms ? 'Invite-only' : 'Private'} on ${plat.name} - stays private on Ember (for the roles you import)` : undefined)}>
                     <input type="checkbox" disabled={!c.kind} checked={!!chans?.has(c.id)} onChange={() => flip(chans, setChans, c.id)} />
                     {c.kind === 'voice' ? <Volume2 size={14} /> : <Hash size={14} />}
                     <span className="grow">{c.name}</span>
@@ -191,7 +214,8 @@ function ImportPicker({ p, g, plat, back, close, onImport, base = '/chat/bridge'
               </div>
             ))}
           </div>
-          <small className="vc-hint">Private channels keep their per-role permissions (see / send / attach) for the roles you import. Read-only channels come over as locked.</small>
+          {!d.groups.length && <div className="vc-empty-note">The bot can't see any rooms here. Invite it to them, then go back and press Refresh.</div>}
+          <small className="vc-hint">{rooms ? 'Each room becomes a channel, and a space inside the space becomes a category. Invite-only rooms come over private: only the roles you import see them. Rooms where only moderators can write come over as locked.' : 'Private channels keep their per-role permissions (see / send / attach) for the roles you import. Read-only channels come over as locked.'}</small>
         </div>
         <div className="vc-br-col">
           <div className="vc-br-head"><b>Roles</b><small>{roles?.size || 0} of {d.roles.length}</small></div>
@@ -205,17 +229,17 @@ function ImportPicker({ p, g, plat, back, close, onImport, base = '/chat/bridge'
             ))}
             {!d.roles.length && <div className="vc-empty-note">No roles.</div>}
           </div>
-          <small className="vc-hint">Roles keep their colours and permissions. Nobody has them yet - people get roles once they join.</small>
+          <small className="vc-hint">{rooms ? "Matrix has power levels, not roles: these two stand in for its admins and moderators. Nobody has them yet - you give them out once people join." : 'Roles keep their colours and permissions. Nobody has them yet - people get roles once they join.'}</small>
           <div className="vc-br-head"><b>Also bring</b></div>
           <div className="vc-br-extras">
-            {d.guild.icon && <label className="vc-br-item"><input type="checkbox" checked={opts.icon} onChange={e => setOpts(o => ({ ...o, icon: e.target.checked }))} /><ImageIcon size={14} /> Server icon</label>}
+            {(d.guild.icon || d.guild.has_icon) && <label className="vc-br-item"><input type="checkbox" checked={opts.icon} onChange={e => setOpts(o => ({ ...o, icon: e.target.checked }))} /><ImageIcon size={14} /> {rooms ? "The space's picture" : 'Server icon'}</label>}
             {d.guild.banner && <label className="vc-br-item"><input type="checkbox" checked={opts.banner} onChange={e => setOpts(o => ({ ...o, banner: e.target.checked }))} /><ImageIcon size={14} /> Banner</label>}
             {d.emojis.length > 0 && <label className="vc-br-item"><input type="checkbox" checked={opts.emojis} onChange={e => setOpts(o => ({ ...o, emojis: e.target.checked }))} /><Smile size={14} /> {d.emojis.length} custom emoji{d.emojis.length === 1 ? '' : 's'}{d.emojis.some(e => e.animated) ? `, including ${d.emojis.filter(e => e.animated).length} animated` : ''}{d.emoji_total > d.emojis.length ? ` (first ${d.emojis.length} of ${d.emoji_total})` : ''}</label>}
           </div>
-          {opts.emojis && d.emojis.length > 0 && <div className="vc-br-emojis">{d.emojis.slice(0, 24).map(e => <img key={e.id} src={e.url} alt={e.name} title={`:${e.name}:${e.animated ? ' (animated)' : ''}`} loading="lazy" />)}</div>}
+          {opts.emojis && d.emojis.some(e => e.url) && <div className="vc-br-emojis">{d.emojis.filter(e => e.url).slice(0, 24).map(e => <img key={e.id} src={e.url} alt={e.name} title={`:${e.name}:${e.animated ? ' (animated)' : ''}`} loading="lazy" />)}</div>}
         </div>
       </div>
-      {bridge && <Toggle label={`Bridge it with ${plat.name}`} hint={`Messages in the imported text channels go both ways between Ember and ${g.name}. You can change or turn this off in Server settings > Bridge.`} on={opts.bridge} onChange={v => setOpts(o => ({ ...o, bridge: v }))} />}
+      {canBridge && <Toggle label={`Bridge it with ${plat.name}`} hint={rooms ? `Messages go both ways between each imported channel and its room, through ${plat.bot || 'the bot'}. Rooms with encryption turned on are left out. You can change or turn this off in Server settings > Bridge.` : `Messages in the imported text channels go both ways between Ember and ${g.name}. You can change or turn this off in Server settings > Bridge.`} on={opts.bridge} onChange={v => setOpts(o => ({ ...o, bridge: v }))} />}
       <div className="vc-dialog-btns"><span className="grow" /><button type="button" className="btn btn-surface" onClick={close}>Cancel</button>
         <button type="button" className="btn btn-primary" disabled={busy || !count || !name.trim()} onClick={go2}>{busy ? 'Importing...' : label}</button></div>
     </div>
@@ -334,11 +358,14 @@ export function ChannelBridge({ sid, channel }) {
 }
 
 // ── a new instance's community from a Discord / Fluxer server (setup wizard): Velora's bot builds a bundle (channels, roles,
-// emojis - no members or messages) with the signed-in Velora account; the instance downloads it with a one-time ticket ──
+// emojis - no members or messages) with the signed-in Velora account; the instance downloads it with a one-time ticket.
+// A Matrix space is read by the instance itself, with a bot account its admin gives it (MatrixImport) ──
 const STAGES = { queued: 'Waiting to start...', running: 'Copying the server...', done: 'Bringing it over...' };
 export function VeloraImport({ origin, onDone, onCancel }) {
   const [pick, setPick] = useState(null); // { p, g, plat }
   const [job, setJob] = useState(null); // { job_id, ticket }
+  const [matrix, setMatrix] = useState(false);
+  if (matrix) return <MatrixImport origin={origin} onDone={onDone} onCancel={() => setMatrix(false)} />;
   if (job) return <ImportProgress origin={origin} job={job} onDone={onDone} onBack={() => { setJob(null); setPick(null); }} />;
   if (pick) {
     return (
@@ -350,8 +377,90 @@ export function VeloraImport({ origin, onDone, onCancel }) {
   return (
     <div className="vc-br-step">
       <button type="button" className="vc-br-back" onClick={onCancel}><ArrowLeft size={14} /> Back</button>
-      <p className="vc-dialog-sub">Nookara copies the server's channels, categories, roles and emojis into this one with its own bot. Members and messages stay where they are. You need your Discord / Fluxer account linked to Nookara, Nookara's bot in that server, and to own or manage it there.</p>
-      <GuildPicker base="/bonfire/import" pickLabel="Import" onPick={(p, g, plat) => setPick({ p, g, plat })} />
+      <p className="vc-dialog-sub">Nookara copies the server's channels, categories, roles and emojis into this one with its own bot. Members and messages stay where they are. You need your Discord / Fluxer account linked to Nookara, Nookara's bot in that server, and to own or manage it there. A Matrix space comes over with a bot account of your own instead.</p>
+      <GuildPicker base="/bonfire/import" pickLabel="Import" onPick={(p, g, plat) => setPick({ p, g, plat })} errorNote="Sign in with Nookara to import from Discord or Fluxer."
+        extra={[{ id: 'matrix', name: 'Matrix', sub: 'With a bot account you bring', onClick: () => setMatrix(true) }]} />
+    </div>
+  );
+}
+// Matrix: give the server a bot (homeserver + access token, kept for half an hour unless the rooms get bridged), invite it
+// to the space, pick the space, then the usual picker
+function MatrixImport({ origin, onDone, onCancel }) {
+  const [info] = useLoad('/api/v1/import/matrix', [], origin);
+  const [given, setGiven] = useState(null); // the server's answer once a bot was given here
+  const [form, setForm] = useState(false);
+  const [f, setF] = useState({ homeserver: '', token: '' });
+  const [busy, setBusy] = useState(false);
+  const [list, setList] = useState({ loading: false, data: null, error: null });
+  const [pick, setPick] = useState(null); // { g, plat }
+  const st = given || info.data;
+  const load = fresh => {
+    setList(x => ({ ...x, loading: true, error: null }));
+    apiFetch(`/api/v1/import/matrix/guilds${fresh ? '?fresh=1' : ''}`, { inst: origin }).then(data => setList({ loading: false, data, error: null }), error => setList({ loading: false, data: null, error }));
+  };
+  useEffect(() => { if (st?.ready) load(false); }, [st?.ready, st?.bot]); // eslint-disable-line react-hooks/exhaustive-deps
+  async function save(e) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      setGiven(await apiFetch('/api/v1/import/matrix/bot', { inst: origin, method: 'PUT', body: JSON.stringify({ homeserver: f.homeserver.trim(), token: f.token.trim() }) }));
+      setF(x => ({ ...x, token: '' })); setForm(false);
+    } catch (x) { toast(MX_ERR[x.message] || why(x, origin)); }
+    setBusy(false);
+  }
+  const plat = { id: 'matrix', name: 'Matrix', bot: st?.bot };
+  if (pick) {
+    return (
+      <ImportPicker p="matrix" g={pick} plat={plat} base="/api/v1/import" inst={origin} errs={MX_ERR} bridge={!!st?.can_bridge} label="Import" back={() => setPick(null)} close={onCancel} onImport={async ({ name, channels, roles, opts }) => {
+        const r = await apiFetch('/api/v1/import/matrix', { inst: origin, method: 'POST', body: JSON.stringify({ guild_id: pick.id, channels, roles, name, ...opts }) });
+        toast(`Imported ${r.channels} channel${r.channels === 1 ? '' : 's'}${r.emojis ? ` and ${r.emojis} emoji${r.emojis === 1 ? '' : 's'}` : ''}${r.bridged ? ` - ${r.bridged} bridged with Matrix` : ''}.`, true);
+        onDone(r.sid);
+      }} />
+    );
+  }
+  return (
+    <div className="vc-br-step">
+      <button type="button" className="vc-br-back" onClick={onCancel}><ArrowLeft size={14} /> <PlatformIcon p="matrix" size={14} /> Matrix</button>
+      <p className="vc-dialog-sub">Copies a Matrix space into this server: its rooms become channels and the spaces inside it become categories, with its picture and custom emoji. Members and messages stay on Matrix.</p>
+      {info.loading ? <Loading /> : info.error ? <div className="vc-empty-note">{MX_ERR[info.error.message] || why(info.error, origin)}</div> : !st?.ready || form ? (
+        <div className="vc-br-note">
+          <p><b>1.</b> Make an ordinary Matrix account for the bot on any homeserver, then paste that homeserver's address and the account's access token (in Element: Settings &gt; Help &amp; About &gt; Access Token). This server keeps the token for half an hour, or for good if you bridge the rooms.</p>
+          <form className="vc-br-mx" onSubmit={save}>
+            <input className="form-input" type="text" autoComplete="off" spellCheck={false} aria-label="Matrix homeserver address" placeholder="Homeserver address, e.g. https://matrix.org" value={f.homeserver} onChange={e => setF(x => ({ ...x, homeserver: e.target.value }))} />
+            <div className="vc-row">
+              <input className="form-input" type="password" autoComplete="off" aria-label="Matrix access token" placeholder="Access token" value={f.token} onChange={e => setF(x => ({ ...x, token: e.target.value }))} />
+              {form && <button type="button" className="btn btn-surface" onClick={() => setForm(false)}>Cancel</button>}
+              <button type="submit" className="btn btn-primary" disabled={busy || !f.homeserver.trim() || !f.token.trim()}>{busy ? 'Checking...' : 'Continue'}</button>
+            </div>
+          </form>
+        </div>
+      ) : (
+        <>
+          <div className="vc-br-note">
+            <div className="vc-row"><p className="grow"><b>1.</b> The bot is <b>{st.bot}</b>{st.saved ? " (this server's bridge bot)" : ''}.</p>
+              <button type="button" className="btn btn-surface btn-sm" onClick={() => setForm(true)}>Use another</button></div>
+          </div>
+          <div className="vc-br-note">
+            <p><b>2.</b> In Matrix, invite <b>{st.bot}</b> to your space, and to each room in it that is invite-only or that you want bridged. It joins on its own.</p>
+          </div>
+          <div className="vc-br-note">
+            <div className="vc-row"><p className="grow"><b>3.</b> Pick the space. Every space the bot is in shows here.</p>
+              <button type="button" className="btn btn-surface btn-sm" disabled={list.loading} onClick={() => load(true)}><RefreshCw size={13} /> Refresh</button></div>
+            {list.loading && <Loading />}
+            {list.error && <div className="vc-empty-note">{MX_ERR[list.error.message] || why(list.error, origin)}</div>}
+            {list.data && !list.data.guilds.length && <div className="vc-empty-note">None yet - invite the bot, then press Refresh.</div>}
+            <div className="vc-br-guilds">
+              {list.data?.guilds.map(g => (
+                <div key={g.id} className="vc-br-guild">
+                  <span className="vc-srv-ico">{g.loose ? <Hash size={16} /> : g.name.slice(0, 2)}</span>
+                  <b>{g.name}</b><small className="vc-hint">{g.rooms} room{g.rooms === 1 ? '' : 's'}</small>
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => setPick(g)}>Import</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
