@@ -21,7 +21,7 @@ const env = {
   base: import.meta.env?.BASE_URL || '/', // where the built files are served from (auth/callback.html sits under it)
   timeout: 10000,
 };
-export function configure(o) { Object.assign(env, o); probing = probed = null; }
+export function configure(o) { Object.assign(env, o); probing = probed = null; docs.clear(); }
 
 // code: invalid | not_found | legacy | not_homeserver | unreachable | bad_url | domain_mismatch (finding a homeserver),
 // state | declined | cancelled | failed | signed_out (signing in), or the homeserver's own OAuth error (invalid_grant...)
@@ -301,7 +301,7 @@ export async function homeFetch(path, options = {}) {
   let s = getSession(origin);
   if (!s) throw fail('signed_out', '', 401);
   const url = new URL(path, `${s.origin}/`);
-  if (url.origin !== s.origin) throw fail('bad_url'); // the token never leaves its homeserver
+  if (!ownUrl(s, url)) throw fail('bad_url'); // the token never leaves its homeserver
   const call = token => env.fetch(url.href, { ...opts, headers: { ...(opts.headers || {}), Authorization: `Bearer ${token}` } });
   let res = await call(s.access_token);
   if (res.status !== 401) return res;
@@ -317,6 +317,78 @@ export async function homeFetch(path, options = {}) {
   res = await call(s.access_token);
   if (res.status === 401) { signOut(origin, 'ended'); throw fail('signed_out', '', 401); }
   return res;
+}
+
+// the homeserver's own origin, or its domain's (nookara.cc accounts live on chat.nookara.cc, their friends and DMs on nookara.cc)
+function ownUrl(s, url) {
+  if (!s || !url || url.username || url.password) return false;
+  if (url.origin === s.origin) return true;
+  return url.host === s.domain && !!safeUrl(url.href);
+}
+export const isOwnUrl = (u, origin = currentOrigin()) => { try { return ownUrl(getSession(origin), new URL(u)); } catch { return false; } };
+
+// ── what else the homeserver's discovery says (PROTOCOL 3, 4a-4c, 20) ──
+// -> { origin, domain, api_url (the social API's base), account_url, remote_token_url, remote_url, accepts_remote, pushers_url }
+// Every address has to be on the homeserver's origin (api_url: or its domain's); one that isn't is left out (null).
+const docs = new Map(); // origin -> { at, p }
+export function homeInfo(origin = currentOrigin(), { fresh = false } = {}) {
+  if (!origin) return Promise.reject(fail('signed_out', '', 401));
+  const had = docs.get(origin);
+  if (had && !fresh && Date.now() - had.at < 10 * 60 * 1000) return had.p;
+  const p = (async () => {
+    const doc = (await getJson(`${origin}/.well-known/ember`)) || {};
+    const s = getSession(origin);
+    const domain = s?.domain || cleanDomain(doc.homeserver?.domain) || new URL(origin).host;
+    const at = (u, wide) => { const x = safeUrl(u, `${origin}/`); return x && (x.origin === origin || (wide && x.host === domain)) && !x.search && !x.hash ? x.href.replace(/\/+$/, '') : null; };
+    const f = doc.federation && typeof doc.federation === 'object' ? doc.federation : {};
+    return {
+      origin, domain,
+      api_url: at(doc.social?.api_url, true) || `${origin}/api/v2`,
+      account_url: at(doc.login?.account_url) || null,
+      remote_token_url: at(f.remote_token_url) || (f.remote_token_url === null ? null : `${origin}/api/v2/auth/remote-token`),
+      remote_url: at(f.remote_url) || null,
+      accepts_remote: str(f.accepts_remote) || 'none',
+      pushers_url: at(doc.push?.pushers_url) || null,
+    };
+  })();
+  docs.set(origin, { at: Date.now(), p });
+  p.catch(() => { if (docs.get(origin)?.p === p) docs.delete(origin); });
+  return p;
+}
+
+// ── other homeservers (4b): home signs a token for them, they trade it for a session of their own ──
+const sameOrigin = u => { try { const x = new URL(u); return x.origin; } catch { return null; } };
+// -> the token (a jwt, good for one exchange)
+export async function remoteToken(audience, { origin = currentOrigin() } = {}) {
+  const aud = safeUrl(audience)?.origin;
+  if (!aud) throw fail('bad_url');
+  if (aud === origin) throw fail('own_homeserver');
+  const info = await homeInfo(origin);
+  if (!info.remote_token_url) throw fail('account_not_hosted_here', '', 403);
+  let res;
+  try { res = await homeFetch(info.remote_token_url, { origin, method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ audience: aud }) }); }
+  catch (e) { if (e instanceof HomeserverError) throw e; throw fail('unreachable'); }
+  const d = await res.json().catch(() => null);
+  if (!res.ok || typeof d?.token !== 'string' || !d.token) throw fail(str(d?.error) || 'failed', str(d?.reason || d?.error_description, 300), res.status);
+  return d.token;
+}
+// the other homeserver's side: the token becomes a session there. remoteUrl: its federation.remote_url (default: the usual path)
+export async function remoteExchange(target, token, remoteUrl) {
+  const o = safeUrl(target)?.origin;
+  const url = safeUrl(remoteUrl || `${o}/api/v2/auth/remote`);
+  if (!o || !url || sameOrigin(url.href) !== o) throw fail('bad_url'); // the token is for that homeserver and goes nowhere else
+  let res;
+  try { res = await env.fetch(url.href, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ token }) }); } catch { throw fail('unreachable'); }
+  const d = await res.json().catch(() => null);
+  if (!res.ok || typeof d?.access_token !== 'string' || !d.access_token) throw Object.assign(fail(str(d?.error) || 'failed', str(d?.error_description, 300), res.status), d && typeof d === 'object' ? { data: d } : {});
+  return { access_token: d.access_token, refresh_token: typeof d.refresh_token === 'string' ? d.refresh_token : null, expires_at: Number(d.expires_in) > 0 ? Date.now() + Number(d.expires_in) * 1000 : null, account: d.account && typeof d.account === 'object' ? d.account : null };
+}
+// both steps. One at a time per homeserver (a socket and three requests noticing a 401 together make one trip)
+const signingIn = new Map();
+export function remoteSignIn(target, { origin = currentOrigin(), remoteUrl } = {}) {
+  const key = `${origin}>${target}`;
+  if (!signingIn.has(key)) signingIn.set(key, (async () => remoteExchange(target, await remoteToken(target, { origin }), remoteUrl))().finally(() => signingIn.delete(key)));
+  return signingIn.get(key);
 }
 
 // ── the round trip ──
