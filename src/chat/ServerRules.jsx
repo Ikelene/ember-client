@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   DoorOpen, MessageSquare, Flag, ShieldAlert, ScrollText, Upload, Users, Ban, HardDrive, Hash, Lock, X, Plus,
-  KeyRound, Link2, Trash2, UserMinus, ArrowUpRight, Check, RotateCcw, Timer, Image, Bot,
+  KeyRound, Link2, Trash2, UserMinus, ArrowUpRight, Check, RotateCcw, Timer, Image, Bot, Globe,
 } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { useChat, toast, errorText, refreshServer, jumpToMessage, loadMembers } from './store.js';
@@ -15,6 +15,7 @@ import { stampOf } from './text.jsx';
 import { Card } from './SettingsShell.jsx';
 import { useUnsaved, UnsavedBar } from './unsaved.jsx';
 import { JoinInvites, UploadsTab } from './Community.jsx';
+import { SERVER_REMOTE_MODES, DAYS_MAX, clampDays, effectiveDays, domainRules, domainRuleIssue } from './federation.js';
 
 const clone = v => JSON.parse(JSON.stringify(v));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -186,7 +187,10 @@ const POLICIES = [
 export function JoiningPage({ sid, onDirty, goTo, instAdmin }) {
   const [pass, setPass] = useState('');
   const [who, setWho] = useState('');
-  const r = useRules(sid, onDirty, ['join_policy', 'join'], { changed: !!pass, body: () => (pass ? { join_password: pass } : {}), reset: () => setPass('') });
+  const [host, setHost] = useState('');
+  // a server's wait for new homeservers is never under the homeserver's floor
+  const clean = d => (d.join && 'remote_min_age_days' in d.join && r.s ? { ...d, join: { ...d.join, remote_min_age_days: clampDays(d.join.remote_min_age_days, r.s.remote_min_age_floor_days) } } : d);
+  const r = useRules(sid, onDirty, ['join_policy', 'join'], { changed: !!pass, body: () => (pass ? { join_password: pass } : {}), reset: () => setPass(''), clean });
   const people = useChat(s => s.members[sid]);
   useEffect(() => { loadMembers(sid); }, [sid]);
   if (r.failed) return <div className="bf-ss-page"><JoinInvites sid={sid} /></div>;
@@ -226,9 +230,44 @@ export function JoiningPage({ sid, onDirty, goTo, instAdmin }) {
         <RolePicker sid={sid} label="Roles new members get" value={j.default_roles} onChange={v => set('join', 'default_roles', v)} hint="Given to everyone who joins from now on (not bots). You can only pick roles below your own." />
         {instAdmin && <div className="cs-row"><div className="cs-text"><b>Sign-in methods</b><span>Nookara accounts, this server's own accounts and who can register.</span></div><button type="button" className="btn btn-surface" onClick={() => goTo('accounts')}><KeyRound size={14} /> Accounts</button></div>}
       </Card>
+      {j.remote_accounts && <RemoteJoin j={j} floor={s.remote_min_age_floor_days || 0} set={(k, v) => set('join', k, v)} host={host} setHost={setHost} />}
       <Card title="Requests & invites" icon={Link2}><JoinInvites sid={sid} requestsOnly /></Card>
       {r.ui}
     </div>
+  );
+}
+
+// accounts of other homeservers (PROTOCOL §4b): who, how long a new homeserver waits, whether a moderator's invite skips that
+function RemoteJoin({ j, floor, set, host, setHost }) {
+  const ra = j.remote_accounts, list = ra.list || [];
+  const typed = domainRules(host), issue = domainRuleIssue(typed.bad);
+  const add = () => { if (issue || !typed.list.length) return; set('remote_accounts', { ...ra, list: [...list, ...typed.list.filter(x => !list.includes(x))] }); setHost(''); };
+  const days = j.remote_min_age_days ?? 3, below = Number(days) < floor;
+  return (
+    <Card title="People from other homeservers" icon={Globe}>
+      <div className="bf-sr-modes" role="radiogroup" aria-label="People from other homeservers">
+        {SERVER_REMOTE_MODES.map(([id, label, hint]) => (
+          <button key={id} type="button" role="radio" aria-checked={ra.mode === id} className={`bf-sr-mode${ra.mode === id ? ' on' : ''}`} onClick={() => set('remote_accounts', { ...ra, mode: id })}>
+            <b>{label}</b><small>{hint}</small>
+          </button>
+        ))}
+      </div>
+      {ra.mode === 'allowlist' && (
+        <div className="vc-field vc-gap-top"><span>Homeservers let in - {list.length}</span>
+          <form className="vc-row" onSubmit={e => { e.preventDefault(); add(); }}>
+            <input className="form-input" maxLength={255} spellCheck={false} autoCapitalize="none" placeholder="example.org or *.example.org" value={host} onChange={e => setHost(e.target.value)} />
+            <button type="submit" className="btn btn-surface" disabled={!typed.list.length || !!issue}><Plus size={14} /> Add</button>
+          </form>
+          <div className="bf-sr-chips">{list.map(d => <span key={d} className="vc-chip bf-sr-chip">{d}<button type="button" aria-label={`Remove ${d}`} onClick={() => set('remote_accounts', { ...ra, list: list.filter(x => x !== d) })}><X size={12} /></button></span>)}</div>
+          <small className={`vc-hint${issue ? ' vc-err' : ''}`}>{issue || (list.length ? 'example.org is that homeserver only; *.example.org is every name under it.' : 'Nobody from another homeserver can join until you add one.')}</small>
+        </div>
+      )}
+      {ra.mode !== 'none' && <>
+        <NumField label="New homeservers wait" min={floor} max={DAYS_MAX} value={days} unit="days" onChange={v => set('remote_min_age_days', v)}
+          hint={`People from a homeserver this one first saw less than this long ago can't join or ask to join. ${floor ? `This homeserver asks for at least ${floor} day${floor === 1 ? '' : 's'}${below ? `, so ${effectiveDays(days, floor)} apply and ${floor} is saved` : ''}. ` : ''}${floor}-${DAYS_MAX}.`} />
+        <Toggle label="Moderator invites skip the wait" hint="An invite made by someone who can kick or manage the server lets them in straight away. The server's own invite code still waits." on={j.remote_invite_bypass !== false} onChange={v => set('remote_invite_bypass', v)} />
+      </>}
+    </Card>
   );
 }
 

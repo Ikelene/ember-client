@@ -62,7 +62,7 @@ function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, 
     ]],
     ['Members', [
       canMod && ['members', onInst ? 'Members & bans' : 'Members', Users, ['Kick', 'Remove', 'Ban', 'Unban']],
-      onInst && canServer && ['join', 'Joining', DoorOpen, ['Join requests', 'Invites', 'Anyone can join', 'Password', 'Allowlist', 'Member limit', 'Default roles']],
+      onInst && canServer && ['join', 'Joining', DoorOpen, ['Join requests', 'Invites', 'Anyone can join', 'Password', 'Allowlist', 'Member limit', 'Default roles', 'Other homeservers', 'Federation']],
     ]],
     ['Moderation', onInst ? [
       canReports && ['reports', 'Reports', Flag, ['Report', 'Open', 'Resolved', 'Dismissed']],
