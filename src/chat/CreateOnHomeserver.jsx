@@ -9,10 +9,9 @@ import { Dialog } from './Dialogs.jsx';
 import { initials } from './Parts.jsx';
 import { useChat, go } from './store.js';
 import { K, normOrigin } from './ids.js';
-import { discover, addInstance, nookaraSession, instanceConn, loadInstanceData, hostOf, canHomeConnect, homeConnect } from './instances.js';
+import { discover, addInstance, nookaraSession, instanceConn, loadInstanceData, hostOf, canHomeConnect, homeConnect, nookaraSignsIn } from './instances.js';
 import { hasNookara } from './session.js';
 import { currentSession, currentOrigin } from './homeserver.js';
-import { isNookara } from '../compat.js';
 import { isV2, slugIssue, slugFrom, createErrorText } from './addresses.js';
 
 // the homeservers a server can be made on: [{ origin, domain, name, icon, count, listed }]
@@ -47,7 +46,7 @@ export function CreateOnHomeserver({ onClose, onOther }) {
     const d = await discover(h.origin);
     if (!isV2(d.info)) throw new Error('forbidden');
     if (canHomeConnect(d.origin, d.info)) { await homeConnect(d.origin, d.info); return true; } // (a homeserver session: its own token there)
-    if (isNookara(d.info.accounts_mode) && hasNookara()) { await addInstance(d.origin, d.info, await nookaraSession(d.origin)); return true; }
+    if (nookaraSignsIn(d.info) && hasNookara()) { await addInstance(d.origin, d.info, await nookaraSession(d.origin)); return true; }
     onClose();
     dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'add-instance', url: d.origin } })); // (it has to ask for a login)
     return false;

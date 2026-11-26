@@ -11,7 +11,7 @@ import { Avatar } from './Profile.jsx';
 import { useChat, go, toast, errorText, ask } from './store.js';
 import { Toggle } from './roles.jsx';
 import { PlatformIcon } from './platforms.jsx';
-import { discover, nookaraSession, localSession, addInstance, loginInstance, instanceConn, refreshInstance, joinCommunity, joinByAddress, hostOf, canHomeConnect, homeConnect } from './instances.js';
+import { discover, nookaraSession, localSession, addInstance, loginInstance, instanceConn, refreshInstance, joinCommunity, joinByAddress, hostOf, canHomeConnect, homeConnect, nookaraSignsIn } from './instances.js';
 import { communityOf, parseAddress } from './addresses.js';
 import { K } from './ids.js';
 import { startSignIn, hasNookara } from './session.js';
@@ -33,7 +33,7 @@ function InstanceCard({ origin, info }) {
     <div className="vc-invite-srv vc-inst-card">
       <span className="vc-srv-ico lg">{(c?.icon_url || info.icon_url) ? <img src={c?.icon_url || info.icon_url} alt="" /> : initials(c?.name || info.name)}</span>
       <div><b>{c?.name || info.name}</b><small>{hostOf(origin)}{c && c.member_count != null ? <> - <Users size={13} /> {c.member_count} member{c.member_count === 1 ? '' : 's'}</> : ''}</small>
-        <small>{isNookara(info.accounts_mode) ? <><ShieldCheck size={13} /> Signs you in with your Nookara account</> : <><KeyRound size={13} /> Has its own accounts</>}</small></div>
+        <small>{nookaraSignsIn(info) ? <><ShieldCheck size={13} /> Signs you in with your Nookara account</> : <><KeyRound size={13} /> Has its own accounts</>}</small></div>
     </div>
   );
 }
@@ -74,7 +74,7 @@ export function AddInstance({ url, invite, server, onClose, onSetup, onCreate })
         } catch (e) { setErr(homeConnectText(e.message, hostOf(d.origin))); setStep('auth'); }
       }
       // a server that uses Nookara accounts, while signed in: no Connect step, it connects with this account right away
-      else if (!instanceConn(d.origin)?.session && isNookara(d.info.accounts_mode) && hasNookara() && d.info.claimed !== false && (d.info.community || server != null)) {
+      else if (!instanceConn(d.origin)?.session && nookaraSignsIn(d.info) && hasNookara() && d.info.claimed !== false && (d.info.community || server != null)) {
         try { await authed(await nookaraSession(d.origin), d); } catch { setStep('auth'); }
       } else setStep(instanceConn(d.origin)?.session ? 'join' : 'auth');
     } catch (e) { setErr(errorText(e.message)); setStep('url'); }
@@ -141,7 +141,7 @@ export function AddInstance({ url, invite, server, onClose, onSetup, onCreate })
               <InstanceCard origin={found.origin} info={info} />
               {info.community?.description && <p className="vc-dialog-sub">{info.community.description}</p>}
               {(info.claimed === false || !info.community) && <p className="vc-note"><Server size={14} /> {info.claimed === false ? (info.community ? 'This server is waiting for its owner to claim it back.' : 'Nobody owns this server yet.') : "This server isn't set up yet."} {info.accounts_mode === 'local' ? 'Make an account' : 'Connect'}{info.claimed === false ? (info.community ? ' and, if it\'s yours, claim it with its setup code.' : ' and you can set it up with its setup code.') : '.'}</p>}
-              {isNookara(info.accounts_mode) ? (
+              {nookaraSignsIn(info) ? (
                 <>
                   {!hasNookara() && <p className="vc-note"><ShieldCheck size={14} /> This server uses Nookara accounts. Sign in with Nookara first, then connect.</p>}
                   {err && <p className="vc-err"><TriangleAlert size={14} /> {err}</p>}

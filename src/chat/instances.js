@@ -12,7 +12,7 @@ import { getState, patchState, toast, handleEvent, socialEvent, homeConnected, R
 import { isV2, communityOf, parseAddress, createErrorText } from './addresses.js';
 import { locate, currentOrigin, onSignedOut } from './homeserver.js';
 import { sourceFor, tagFor, openSession } from './homeAuth.js';
-import { SOCIAL_EVENTS } from './social.js';
+import { SOCIAL_EVENTS, isTradedTag } from './social.js';
 import { EMBER_API, INST_AUTH_NOOKARA, WELL_KNOWN, isInstanceSoftware, isNookara, nookaraInfo } from '../compat.js';
 
 export const connections = new Map();
@@ -46,6 +46,7 @@ export const instView = c => ({
   community: c.info?.community || null, mode: c.info?.accounts_mode || null, status: c.peeking && c.status !== 'open' ? 'asleep' : c.status, claimed: c.info?.claimed !== false, features: c.info?.features || {},
   registration: c.info?.registration || 'closed', isAdmin: !!c.isAdmin, isOwner: !!c.isOwner, user: c.user || null, error: c.error || null, restricted: c.restricted || null,
   needsNookara: isNookara(c.info?.accounts_mode) && !getToken() && srcOf(c) === 'legacy', pending: !!c.pending, failed: !!c.failed,
+  viaNookara: nookaraSignsIn(c.info) && srcOf(c) === 'legacy', // the Nookara instance token signs me in there
   source: c.source || null, // 'home' (my homeserver, on its own session) | 'remote' (signed in from my homeserver) | null (as before)
   quiet: !!(c.dmHost || c.source === 'home'), // only there for my account or a DM: no rail entry until I'm in a server on it
   loaded: !!c.loaded, // this account's communities on it have been fetched (so "not in it" is known)
@@ -132,8 +133,17 @@ export async function discover(input) {
 
 // ── sessions ──
 // Which sign-in this server gets (homeAuth.js): 'legacy' = the Nookara instance token or its own login, everything below as it
-// always was. 'home' / 'remote' only happen on a v2 homeserver session with no Nookara sign-in.
-const srcOf = c => sourceFor(c.origin, c.info, !!getToken());
+// always was. 'home' / 'remote' only happen on a v2 homeserver session with no Nookara sign-in. 'nookara' is a Nookara session
+// on a v2 homeserver that lets other homeservers' accounts in: Nookara signs a token for it (never over a login of its own there).
+const ownLogin = c => !!c.session && !c.source && !isTradedTag(loadSessionTags()[c.origin]);
+const srcOf = c => sourceFor(c.origin, c.info, !!getToken(), ownLogin(c));
+// does the Nookara instance token sign me in there: a server in Nookara-accounts mode, or (signed in with Nookara) a homeserver
+// whose accounts are Nookara accounts (discovery accounts.nookara_identity: chat.nookara.cc)
+export const nookaraSignsIn = info => isNookara(info?.accounts_mode) || (info?.accounts?.nookara_identity === true && !!getToken());
+const nookaraKey = () => tokenTag(getToken());
+// the token Nookara signs for another homeserver (POST /api/v2/auth/remote-token, with the Nookara token)
+const nookaraAuth = () => ({ key: nookaraKey(), token: async audience => { const d = await apiFetch('/api/v2/auth/remote-token', { method: 'POST', body: JSON.stringify({ audience }) }); if (typeof d?.token !== 'string' || !d.token) throw Object.assign(new Error('request_failed'), { status: 502 }); return d.token; } });
+const openFor = (c, renew = false) => openSession(c.origin, c.info, { legacy: !!getToken(), renew, nookara: getToken() ? nookaraAuth() : null });
 export const homeHere = () => (!getToken() && currentOrigin() ? normOrigin(currentOrigin()) : null);
 const refused = e => Object.assign(new Error(e?.code || e?.message || 'request_failed'), { status: e?.status ?? 0, refused: e?.status >= 400 && e?.status < 500 });
 function adoptHome(c, r) {
@@ -145,8 +155,14 @@ let homeWas = null; // the home homeserver the sessions below were made with
 async function ensureHome(c, source) {
   homeWas = homeHere();
   if (c.session && c.source !== source) { c.session = null; registry.delete(c.origin); }
-  if (c.session && source === 'remote' && loadSessionTags()[c.origin] !== tagFor(c.origin, c.info, false)) { c.session = null; registry.delete(c.origin); saveSession(c.origin, null); } // another account's
-  if (source === 'home' || !c.session) { try { adoptHome(c, await openSession(c.origin, c.info)); } catch (e) { throw refused(e); } }
+  if (c.session && source !== 'home' && loadSessionTags()[c.origin] !== tagFor(c.origin, c.info, !!getToken(), nookaraKey())) { c.session = null; registry.delete(c.origin); saveSession(c.origin, null); } // another account's
+  if (source === 'home' || !c.session) {
+    try { adoptHome(c, await openFor(c)); } catch (e) {
+      const err = refused(e);
+      if (source === 'nookara' && err.refused && getToken()) { setStatus(c, 'login', err.message); return false; } // it won't take my Nookara account: its own login is still there
+      throw err;
+    }
+  }
   else { c.source = source; registry.set(c.origin, c); }
   await me(c); // (a 401 goes through hooks.refresh below: a refresh, or the trip to home and back, once)
   return true;
@@ -156,7 +172,7 @@ function adopt(c, { session, user, instance_admin, instance_owner }) {
   if (user) c.user = user;
   if (instance_admin !== undefined) { c.isAdmin = !!instance_admin; c.isOwner = !!instance_owner; }
   registry.set(c.origin, c);
-  saveSession(c.origin, session, isNookara(c.info?.accounts_mode) ? tokenTag(getToken()) : null);
+  saveSession(c.origin, session, nookaraSignsIn(c.info) ? tokenTag(getToken()) : null);
 }
 // -> { session, user } (nothing is stored until the instance is added or adopts it)
 export async function nookaraSession(origin) {
@@ -176,7 +192,7 @@ function dropSession(c) {
   c.session = null; registry.delete(c.origin); saveSession(c.origin, null);
 }
 // Nookara sign-out: Nookara-login instances lose their session (local-account ones keep theirs)
-export function dropNookaraSessions() { for (const c of connections.values()) if (isNookara(c.info?.accounts_mode)) dropSession(c); }
+export function dropNookaraSessions() { for (const c of connections.values()) if (nookaraSignsIn(c.info) || c.source === 'nookara' || /^nk:/.test(loadSessionTags()[c.origin] || '')) dropSession(c); }
 // an existing (logged out) local-mode instance: log in again
 export async function loginInstance(origin, kind, username, password) {
   const c = connections.get(origin);
@@ -199,17 +215,21 @@ hooks.refresh = origin => {
     const p = (async () => {
       const source = srcOf(c);
       if (source !== 'legacy') { // a v2 session: home refreshes its token, another homeserver gets a new one from home
-        try { adoptHome(c, await openSession(origin, c.info, { renew: true })); return true; } catch (e) {
-          c.session = null; registry.delete(origin); saveSession(origin, null);
+        try { adoptHome(c, await openFor(c, true)); return true; } catch (e) {
+          c.session = null; c.source = null; registry.delete(origin); saveSession(origin, null);
           if (e?.code === 'signed_out') { setStatus(c, 'login'); return false; }
           const err = refused(e);
+          if (source === 'nookara' && err.refused) { setStatus(c, 'login', err.message); return false; }
           c.failed = true; setStatus(c, err.refused ? 'error' : 'closed', err.message);
           if (!err.refused) scheduleRetry(c);
           return false;
         }
       }
       c.session = null; registry.delete(origin); saveSession(origin, null);
-      if (!isNookara(c.info?.accounts_mode) || !getToken()) { setStatus(c, 'login'); return false; }
+      if (srcOf(c) === 'nookara') { // (a login of its own there ran out, and it lets my Nookara account in)
+        try { adoptHome(c, await openFor(c)); return true; } catch { c.session = null; c.source = null; registry.delete(origin); setStatus(c, 'login'); return false; }
+      }
+      if (!nookaraSignsIn(c.info) || !getToken()) { setStatus(c, 'login'); return false; }
       // Nookara rejecting the token signs out (api.js); anything else (Nookara / the instance unreachable) is retried
       try { await authNookara(c); return true; } catch (e) { c.failed = true; setStatus(c, getToken() ? 'closed' : 'login', e.message); if (getToken()) scheduleRetry(c, e.restricted ? RESTRICTED_RETRY : 0); return false; }
     })().finally(() => refreshing.delete(origin));
@@ -222,14 +242,16 @@ async function ensureSession(c) {
   if (source !== 'legacy') return ensureHome(c, source);
   if (c.source) { c.session = null; c.source = null; registry.delete(c.origin); saveSession(c.origin, null); } // (was on a homeserver session that is gone)
   if (isNookara(c.info.accounts_mode) && !getToken()) { dropSession(c); setStatus(c, 'login'); return false; } // Nookara-login instances need the Nookara sign-in
-  if (c.session && isNookara(c.info.accounts_mode) && loadSessionTags()[c.origin] !== tokenTag(getToken())) dropSession(c); // from an older Ember sign-in
+  if (c.session && nookaraSignsIn(c.info) && loadSessionTags()[c.origin] !== tokenTag(getToken())) dropSession(c); // from an older Ember sign-in
+  if (c.session && isTradedTag(loadSessionTags()[c.origin])) dropSession(c); // (traded for with a sign-in that is not the one in use)
   if (c.session) {
     registry.set(c.origin, c);
 
     try { await me(c); return true; } catch (e) { if (e.status !== 401 && e.message !== 'instance_not_connected') throw e; }
     c.session = null; registry.delete(c.origin); saveSession(c.origin, null);
+    if (srcOf(c) !== 'legacy') return ensureHome(c, srcOf(c)); // (that login is over, and my Nookara account is let in)
   }
-  if (isNookara(c.info.accounts_mode)) { await authNookara(c); await me(c).catch(() => {}); return true; }
+  if (nookaraSignsIn(c.info)) { await authNookara(c); await me(c).catch(() => {}); return true; }
   setStatus(c, 'login');
   return false;
 }
@@ -595,7 +617,7 @@ export async function moveInstance(from, to) {
 const renewing = new Map();
 export function renewNookaraSession(origin) {
   const c = connections.get(origin);
-  if (!c || !isNookara(c.info?.accounts_mode) || !getToken()) return Promise.resolve(null);
+  if (!c || !nookaraSignsIn(c.info) || !getToken()) return Promise.resolve(null);
   if (!renewing.has(origin)) {
     renewing.set(origin, (async () => {
       try {
@@ -768,7 +790,10 @@ export async function homeConnect(origin, info) {
   if (!canHomeConnect(origin, info)) throw new Error('instance_not_connected');
   const c = addConnection(origin, info);
   c.info = info || c.info; c.dmHost = false;
-  if (!c.session) { try { await ensureHome(c, srcOf(c)); } catch (e) { if (!getState().servers.some(x => x.inst === origin)) removeInstance(origin, { sync: false }); throw e; } }
+  if (!c.session) {
+    try { if (!(await ensureHome(c, srcOf(c)))) throw Object.assign(new Error(c.error || 'remote_accounts_off'), { status: 403, refused: true }); }
+    catch (e) { if (!getState().servers.some(x => x.inst === origin)) removeInstance(origin, { sync: false }); throw e; }
+  }
   await saveList();
   if (!c.ws && !c.sleep) openSocket(c);
   mirror();
@@ -836,7 +861,7 @@ export async function quickJoin(input, code, sid) {
   const info = d.info || {};
   const com = communityOf(info, sid);
   const viaHome = canHomeConnect(d.origin, info); // (a v2 session: my homeserver's own token, or one it signs for that homeserver)
-  if (!(viaHome || (getToken() && isNookara(info.accounts_mode))) || info.claimed === false || !(sid != null ? isV2(info) || com : info.community)) return null;
+  if (!(viaHome || (getToken() && nookaraSignsIn(info))) || info.claimed === false || !(sid != null ? isV2(info) || com : info.community)) return null;
   if (!code && com && com.join_policy !== 'open') return null; // (a server it doesn't list: only asking tells)
   let c = connections.get(d.origin);
   if (!c?.session && viaHome) c = await homeConnect(d.origin, info);

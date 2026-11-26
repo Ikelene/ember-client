@@ -6,9 +6,23 @@ const HOME = 'https://a.example', B = 'https://b.example';
 const fed = (origin, accepts = 'all') => ({ protocol_version: 2, federation: { remote_url: `${origin}/api/v2/auth/remote`, accepts_remote: accepts } });
 
 test('which sign-in a server gets: the Nookara one, the home session, or a token from home', () => {
-  // a Nookara sign-in keeps everything on the old path, whatever else is there
-  assert.equal(so.tokenSource({ legacy: true, home: HOME, origin: HOME, info: fed(HOME) }), 'legacy');
-  assert.equal(so.tokenSource({ legacy: true, home: HOME, origin: B, info: fed(B) }), 'legacy');
+  // a Nookara sign-in: a v1 server and one that takes Nookara's instance token stay on the old path, a homeserver session next to it or not
+  assert.equal(so.tokenSource({ legacy: true, home: HOME, origin: B, info: { accounts_mode: 'velora' } }), 'legacy');
+  assert.equal(so.tokenSource({ legacy: true, home: null, origin: B, info: { accounts_mode: 'local' } }), 'legacy');
+  assert.equal(so.tokenSource({ legacy: true, home: null, origin: B, info: { ...fed(B), protocol_version: 1 } }), 'legacy');
+  assert.equal(so.tokenSource({ legacy: true, home: null, origin: B, info: { ...fed(B), accounts_mode: 'nookara' } }), 'legacy');
+  // chat.nookara.cc: its accounts are Nookara accounts, the instance token signs in there
+  assert.equal(so.tokenSource({ legacy: true, home: null, origin: B, info: { ...fed(B), accounts_mode: 'local', accounts: { nookara_identity: true } } }), 'legacy');
+  assert.equal(so.takesNookara({ accounts_mode: 'local', accounts: { nookara_identity: true } }), true);
+  assert.equal(so.takesNookara({ accounts_mode: 'local', accounts: { nookara_identity: 'true' } }), false);
+  assert.equal(so.takesNookara({ accounts_mode: 'local' }), false);
+  // any other v2 homeserver that lets other homeservers' accounts in: a token Nookara signs, traded there
+  assert.equal(so.tokenSource({ legacy: true, home: null, origin: B, info: { ...fed(B), accounts_mode: 'local' } }), 'nookara');
+  assert.equal(so.tokenSource({ legacy: true, home: HOME, origin: B, info: fed(B, 'allowlist') }), 'nookara');
+  assert.equal(so.tokenSource({ legacy: true, home: null, origin: B, info: fed(B, 'none') }), 'legacy');
+  assert.equal(so.tokenSource({ legacy: true, home: null, origin: B, info: { protocol_version: 2, federation: { remote_url: 'https://evil.example/api/v2/auth/remote', accepts_remote: 'all' } } }), 'legacy');
+  // ... unless I signed in there with an account of its own: that stays
+  assert.equal(so.tokenSource({ legacy: true, home: null, origin: B, info: fed(B), ownLogin: true }), 'legacy');
   // no homeserver session: as before (its own login)
   assert.equal(so.tokenSource({ legacy: false, home: null, origin: B, info: fed(B) }), 'legacy');
   // a v2 session: home is home, others take a remote token when they let other homeservers in
@@ -30,6 +44,9 @@ test('stored sessions are tagged with the account they are for', () => {
   assert.equal(so.sessionTag('remote', alice), 'hs:remote:l:5@a.example');
   assert.notEqual(so.sessionTag('remote', alice), so.sessionTag('remote', bob));
   assert.notEqual(so.sessionTag('remote', alice), so.sessionTag('home', alice));
+  assert.equal(so.nookaraTag('k1'), 'nk:k1');
+  assert.equal(so.nookaraTag(''), null);
+  assert.deepEqual(['nk:k1', 'hs:remote:l:5@a.example', 'k1', null].map(so.isTradedTag), [true, true, false, false]);
 });
 
 test('handles: username@domain, the domain hidden for people on my own homeserver', () => {

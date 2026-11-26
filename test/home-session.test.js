@@ -13,7 +13,7 @@ globalThis.location = { hostname: 'localhost', pathname: '/chat', hash: '', orig
 globalThis.screen = { width: 1, height: 1, colorDepth: 24 };
 
 const hs = await import('../src/chat/homeserver.js');
-const { openSession, sourceFor, tagFor } = await import('../src/chat/homeAuth.js');
+const { openSession, sourceFor, tagFor, nookaraSignIn } = await import('../src/chat/homeAuth.js');
 const { socialFetch, social, createDm, socialBase, resetSocialApi } = await import('../src/chat/socialApi.js');
 const { registry, hooks } = await import('../src/chat/ids.js');
 const { apiFetch } = await import('../src/api.js');
@@ -116,8 +116,8 @@ test('the token source per server, with a real session: home, remote, and the No
     assert.equal(sourceFor(b.origin, b.info, false), 'remote');
     assert.equal(sourceFor(c.origin, c.info, false), 'legacy'); // it lets no other homeserver in: its own login, as before
     assert.equal(sourceFor(a.origin, null, true), 'legacy');
-    assert.equal(sourceFor(b.origin, b.info, true), 'legacy');
-    assert.equal(await openSession(b.origin, b.info, { legacy: true }), null); // (nothing is asked of anyone)
+    assert.equal(sourceFor(c.origin, c.info, true), 'legacy');
+    assert.equal(await openSession(c.origin, c.info, { legacy: true }), null); // (nothing is asked of anyone)
     assert.equal(a.st.remoteTokens.length, 0);
     const mine = await openSession(a.origin, null);
     assert.equal(mine.source, 'home');
@@ -129,6 +129,65 @@ test('the token source per server, with a real session: home, remote, and the No
     assert.equal(again.session, 'home-2');
     assert.equal(a.st.refreshes, 1);
   } finally { await a.close(); await b.close(); await c.close(); }
+});
+
+// Nookara: POST /api/v2/auth/remote-token with the Nookara token -> a jwt for the audience; /bonfire/instance-token for the old path
+async function nookara() {
+  const st = { remote: [], instance: [], refuse: null };
+  const m = await listen((req, send, body, u) => {
+    if (bearer(req) !== 'nk-token') return send(401, { error: 'unauthorized' });
+    if (u.pathname === '/api/v2/auth/remote-token' && req.method === 'POST') { st.remote.push(body?.audience); return st.refuse ? send(st.refuse.status, { error: st.refuse.error }) : send(200, { token: `nk-jwt-${st.remote.length}-for-${body?.audience}`, expires_in: 3600 }); }
+    if (u.pathname === '/bonfire/instance-token' && req.method === 'POST') { st.instance.push(body?.instance); return send(200, { token: `inst-${body?.instance}` }); }
+    return send(404, { error: 'not_found' });
+  });
+  m.st = st;
+  const post = (path, b) => fetch(m.origin + path, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer nk-token' }, body: JSON.stringify(b) }).then(async r => { const d = await r.json(); if (!r.ok) throw Object.assign(new Error(d.error), { status: r.status }); return d; });
+  m.auth = { key: 'k1', token: async audience => (await post('/api/v2/auth/remote-token', { audience })).token };
+  m.instanceToken = async instance => (await post('/bonfire/instance-token', { instance })).token;
+  return m;
+}
+
+test('a Nookara session: a v2 homeserver gets a token Nookara signs, chat.nookara.cc and v1 servers the instance token', async () => {
+  const nk = await nookara(), b = await other(), chat = await other(), old = await other({ accepts: 'none' });
+  chat.info = { ...chat.info, accounts: { hosts_accounts: true, nookara_identity: true } }; // nookara.cc's own homeserver
+  old.info = { protocol_version: 1, accounts_mode: 'velora' };
+  try {
+    // which way each goes
+    assert.equal(sourceFor(b.origin, b.info, true), 'nookara');
+    assert.equal(sourceFor(chat.origin, chat.info, true), 'legacy');
+    assert.equal(sourceFor(old.origin, old.info, true), 'legacy');
+    assert.equal(sourceFor(b.origin, b.info, true, true), 'legacy'); // (signed in there with an account of its own)
+    // the v2 homeserver: remote-token from Nookara (Bearer = the Nookara token, audience = its origin), traded at its remote_url
+    const r = await openSession(b.origin, b.info, { legacy: true, nookara: nk.auth });
+    assert.equal(r.source, 'nookara');
+    assert.equal(r.session, 'sess-1');
+    assert.equal(r.tag, 'nk:k1');
+    assert.equal(tagFor(b.origin, b.info, true, 'k1'), 'nk:k1');
+    assert.deepEqual(nk.st.remote, [b.origin]);
+    assert.deepEqual(b.st.exchanges, [`nk-jwt-1-for-${b.origin}`]);
+    assert.deepEqual(nk.st.instance, []);
+    // the session ran out there (401): the same trip once more
+    const again = await openSession(b.origin, b.info, { legacy: true, renew: true, nookara: nk.auth });
+    assert.equal(again.session, 'sess-2');
+    assert.deepEqual(nk.st.remote, [b.origin, b.origin]);
+    // several requests noticing it at once make one trip
+    const [x, y] = await Promise.all([nookaraSignIn(b.origin, b.info.federation.remote_url, nk.auth.token), nookaraSignIn(b.origin, b.info.federation.remote_url, nk.auth.token)]);
+    assert.equal(x.access_token, y.access_token);
+    assert.equal(nk.st.remote.length, 3);
+    // chat.nookara.cc and the v1 server: nothing is asked of the remote-token route (instances.js takes the instance token there)
+    assert.equal(await openSession(chat.origin, chat.info, { legacy: true, nookara: nk.auth }), null);
+    assert.equal(await openSession(old.origin, old.info, { legacy: true, nookara: nk.auth }), null);
+    assert.equal(nk.st.remote.length, 3);
+    assert.equal(chat.st.exchanges.length + old.st.exchanges.length, 0);
+    assert.equal(await nk.instanceToken(chat.origin), `inst-${chat.origin}`);
+    // Nookara says no (rate limited), or the homeserver does (not on its list): the error comes through with its status
+    nk.st.refuse = { status: 429, error: 'rate_limited' };
+    await assert.rejects(openSession(b.origin, b.info, { legacy: true, nookara: nk.auth }), e => e.message === 'rate_limited' && e.status === 429);
+    nk.st.refuse = null; b.st.refuse = { status: 403, error: 'homeserver_not_allowed' };
+    await assert.rejects(openSession(b.origin, b.info, { legacy: true, nookara: nk.auth }), e => e.code === 'homeserver_not_allowed' && e.status === 403);
+    // without a way to ask Nookara nothing is traded
+    await assert.rejects(openSession(b.origin, b.info, { legacy: true }), e => e.code === 'signed_out');
+  } finally { await nk.close(); await b.close(); await chat.close(); await old.close(); }
 });
 
 test('another homeserver: a token from home for it, traded there for a session', async () => {

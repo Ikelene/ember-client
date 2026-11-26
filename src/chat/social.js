@@ -3,21 +3,29 @@
 // Pure: no imports, nothing from the browser (the node tests run it as is).
 
 // ── which sign-in a server gets ──
-// legacy: Ember's Nookara token is there (everything stays on the old path). home: the home homeserver's origin (a v2 session).
+// legacy: Ember's Nookara token is there (a Nookara session). home: the home homeserver's origin (a v2 session).
 // info: the server's discovery document. -> 'legacy' (instance token / its own login, as before) | 'home' (the home session's
-// access token) | 'remote' (a token from home, traded there: 4b)
+// access token) | 'remote' (a token from home, traded there: 4b) | 'nookara' (a Nookara session on a v2 homeserver that lets
+// other homeservers' accounts in: the same trade, with a token Nookara signs)
+// ownLogin: I already signed in there with an account of its own (kept: nothing is traded over it)
 export function remoteUrlOf(origin, info) {
   const f = info?.federation;
   if (!f || typeof f !== 'object' || typeof f.remote_url !== 'string' || f.accepts_remote === 'none') return null;
   try { const u = new URL(f.remote_url, `${origin}/`); return u.origin === origin && !u.username && !u.password ? u.href : null; } catch { return null; }
 }
-export function tokenSource({ legacy, home, origin, info }) {
-  if (legacy || !home || !origin) return 'legacy';
+// a server that takes Nookara's instance token: one in Nookara-accounts mode, or a homeserver whose accounts are Nookara's
+export const takesNookara = info => info?.accounts_mode === 'nookara' || info?.accounts_mode === 'velora' || info?.accounts?.nookara_identity === true;
+export function tokenSource({ legacy, home, origin, info, ownLogin = false }) {
+  if (legacy) return origin && !ownLogin && !takesNookara(info) && Number(info?.protocol_version) >= 2 && remoteUrlOf(origin, info) ? 'nookara' : 'legacy';
+  if (!home || !origin) return 'legacy';
   if (origin === home) return 'home';
   return remoteUrlOf(origin, info) ? 'remote' : 'legacy';
 }
 // the tag a stored session carries, so one account's session is never used by the next one signed in on this browser
 export const sessionTag = (source, account) => (source === 'legacy' || !account ? null : `hs:${source}:${account.id ?? ''}@${account.domain ?? ''}`);
+// the same for a session a Nookara token was traded for (key: what stands for that Nookara sign-in)
+export const nookaraTag = key => (key ? `nk:${key}` : null);
+export const isTradedTag = tag => /^(hs|nk):/.test(String(tag || ''));
 
 // ── ids and handles ──
 // 'l:5@a.example' / 'alice@a.example' -> { name, domain } (domain '' when there is none)
