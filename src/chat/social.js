@@ -114,6 +114,43 @@ export function mergeDms(sources, ctx = {}) {
   }
   return sortDms([...out.values()].map(({ _home, ...dm }) => dm));
 }
+// ── a Nookara session (the Nookara sign-in, not a homeserver's) ──
+// Nookara's own friends, DMs and groups stay where they are (its own API and UI, end-to-end encrypted). Its /api/v2/social
+// answers with those too, next to what is on other homeservers; the client takes only the second kind from it.
+// a Nookara account's id: v:<n>@<my domain> (or v:<n>)
+export const isNookaraAccount = (id, myDomain) => { const { name, domain } = splitHandle(id); return /^v:[1-9]\d{0,18}$/.test(name) && (!domain || domain === String(myDomain || '').toLowerCase()); };
+// GET /social/friends -> the four lists with only the people who are not Nookara accounts
+export function remoteFriendLists(d, myDomain) {
+  const l = friendLists(d, myDomain), far = x => !isNookaraAccount(x.id, myDomain);
+  return { friends: l.friends.filter(far), incoming: l.incoming.filter(far), outgoing: l.outgoing.filter(far), blocked: l.blocked.filter(far) };
+}
+// where a DM the social API answered with opens: Nookara's own DM or group view ({ nookara: { kind, username | room } }), or
+// the homeserver it is on (a pointer)
+export function nookaraDmView(dm) {
+  const n = dm?.nookara;
+  if (n && typeof n === 'object') return n.kind === 'im' && typeof n.username === 'string' && n.username ? { kind: 'dm', username: n.username } : n.kind === 'group' && typeof n.room === 'string' && n.room ? { kind: 'group', room: n.room } : null;
+  return dm && dm.hosted_here !== true && typeof dm.id === 'string' && dm.id ? { kind: 'sdm', id: dm.id } : null;
+}
+// GET /social/dms -> { pointers: the DMs on other homeservers (as sent), hosted: [{ id, view }] Nookara's own }
+export function splitNookaraDms(d) {
+  const pointers = [], hosted = [];
+  for (const dm of Array.isArray(d?.dms) ? d.dms : []) {
+    const view = nookaraDmView(dm);
+    if (view?.kind === 'sdm') pointers.push(dm); else if (view) hosted.push({ id: dm.id, view });
+  }
+  return { pointers, hosted };
+}
+const ms = v => { const n = typeof v === 'number' ? v : Date.parse(v || ''); return Number.isFinite(n) && n > 0 ? (n < 1e11 ? n * 1000 : n) : 0; };
+// the DM list: Nookara's conversations (convs: newest first, as GET /im/conversations gives them; their order is kept) with the
+// pointers slotted in by when they were last active. -> [{ kind: 'dm', c, at } | { kind: 'sdm', dm, at }]
+export function nookaraDmRows(convs, pointers) {
+  const a = (convs || []).map(c => ({ kind: 'dm', c, at: ms(c?.last_message?.sent_at) }));
+  const b = sortDms(pointers || []).map(dm => ({ kind: 'sdm', dm, at: ms(dm.updated_at) }));
+  const out = [];
+  let i = 0, j = 0;
+  while (i < a.length || j < b.length) out.push(j >= b.length || (i < a.length && a[i].at >= b[j].at) ? a[i++] : b[j++]);
+  return out;
+}
 export const dmUnread = dms => (dms || []).reduce((n, d) => n + (d.unread || 0), 0);
 export const dmMentions = dms => (dms || []).filter(d => d.mention).length;
 

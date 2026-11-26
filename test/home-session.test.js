@@ -14,7 +14,7 @@ globalThis.screen = { width: 1, height: 1, colorDepth: 24 };
 
 const hs = await import('../src/chat/homeserver.js');
 const { openSession, sourceFor, tagFor, nookaraSignIn } = await import('../src/chat/homeAuth.js');
-const { socialFetch, social, createDm, socialBase, resetSocialApi } = await import('../src/chat/socialApi.js');
+const { socialFetch, social, createDm, socialBase, resetSocialApi, setNookaraSocial, onNookaraSocial, dmHostUrl } = await import('../src/chat/socialApi.js');
 const { registry, hooks } = await import('../src/chat/ids.js');
 const { apiFetch } = await import('../src/api.js');
 
@@ -337,4 +337,73 @@ test('409 create_on_homeserver: the same POST goes to the url it names, on the h
     await assert.rejects(createDm({ members: ['carol@b.example'] }), e => e.message === 'create_on_homeserver' && e.status === 409);
     assert.equal(made.length, 2);
   } finally { await a.close(); await n.close(); }
+});
+
+test('a Nookara session: the social API is Nookara, and a DM with someone elsewhere is made on its homeserver with my session there', async () => {
+  // nk = Nookara (/api/v2/social with the Nookara token), chat = nookara.cc's homeserver (takes the session the instance token got)
+  const seen = [];
+  const chat = await listen((req, send, body, u) => {
+    seen.push(`chat ${req.method} ${u.pathname} ${bearer(req)}`);
+    if (bearer(req) !== 'chat-session') return send(401, { error: 'invalid_session' });
+    if (u.pathname === '/api/v2/social/dms' && req.method === 'POST') return send(200, { dm: { id: 'd9@nk.test', host: 'nk.test', host_origin: chat.origin, hosted_here: true, sid: 's9', channel: 'c9', members: [{ id: 'v:5@nk.test' }, { id: 'l:2@b.example' }], updated_at: 5 }, created: true, got: body });
+    return send(404, { error: 'not_found' });
+  });
+  let where = () => `${chat.origin}/api/v2/social/dms`;
+  const nk = await listen((req, send, body, u) => {
+    seen.push(`nk ${req.method} ${u.pathname} ${bearer(req)}`);
+    if (bearer(req) !== 'nk-token') return send(401, { error: 'unauthorized' });
+    if (u.pathname === '/api/v2/social/friends' && req.method === 'GET') return send(200, { friends: [{ id: 'v:6@nk.test', handle: 'bob@nk.test' }, { id: 'l:2@b.example', handle: 'carol@b.example' }], incoming: [], outgoing: [], blocked: [] });
+    if (u.pathname === '/api/v2/social/friends' && req.method === 'POST') return send(200, { status: 'pending', friend: { id: 'l:2@b.example', handle: body.handle } });
+    if (u.pathname === '/api/v2/social/profile/l%3A2%40b.example') return send(200, { profile: { id: 'l:2@b.example', handle: 'carol@b.example', bio: 'hi' } });
+    if (u.pathname === '/api/v2/social/dms' && req.method === 'POST') {
+      if (body.members.some(h => /@/.test(h))) return send(409, { error: 'create_on_homeserver', url: where() });
+      return send(200, { dm: { id: 'im:5-6@nk.test', hosted_here: true, nookara: { kind: 'im', username: body.members[0] } }, created: false });
+    }
+    return send(404, { error: 'not_found' });
+  });
+  // what store.js installs: Nookara with the Nookara token, another homeserver through its instance connection (api.js)
+  const viaNookara = async (path, { method = 'GET', body } = {}) => {
+    const r = await fetch(nk.origin + path, { method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer nk-token' }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+    const d = await r.json();
+    if (!r.ok) throw Object.assign(new Error(d.error || 'request_failed'), d, { status: r.status });
+    return d;
+  };
+  const posted = [];
+  const postAt = (url, body) => { const at = dmHostUrl(url); posted.push(at.origin); return apiFetch(at.path, { inst: at.origin, method: 'POST', body: JSON.stringify(body) }); };
+  registry.set(chat.origin, { session: 'chat-session' });
+  setNookaraSocial({ fetch: viaNookara, postAt });
+  try {
+    assert.equal(onNookaraSocial(), true);
+    // friends, a request to someone elsewhere, a profile: Nookara, with the Nookara token
+    assert.equal((await social.friends()).friends.length, 2);
+    assert.equal((await social.addFriend({ handle: 'carol@b.example' })).status, 'pending');
+    assert.equal((await social.profile('l:2@b.example')).profile.bio, 'hi');
+    // a DM with a Nookara account: Nookara answers, it is one of its own (opened in its own DM view)
+    const own = await createDm({ members: ['bob'] });
+    assert.deepEqual(own.dm.nookara, { kind: 'im', username: 'bob' });
+    assert.deepEqual(posted, []);
+    // with someone on another homeserver: 409 create_on_homeserver, the same POST goes to the url on nookara.cc's homeserver,
+    // with the session I have there - the Nookara token never leaves Nookara
+    const far = await createDm({ members: ['carol@b.example'] });
+    assert.equal(far.dm.id, 'd9@nk.test');
+    assert.deepEqual(far.got, { members: ['carol@b.example'] });
+    assert.deepEqual(posted, [chat.origin]);
+    assert.deepEqual(seen, [
+      'nk GET /api/v2/social/friends nk-token', 'nk POST /api/v2/social/friends nk-token', 'nk GET /api/v2/social/profile/l%3A2%40b.example nk-token',
+      'nk POST /api/v2/social/dms nk-token', 'nk POST /api/v2/social/dms nk-token', 'chat POST /api/v2/social/dms chat-session',
+    ]);
+    assert.ok(!seen.some(x => x.startsWith('chat') && x.includes('nk-token')));
+    // a url that is not the route for making DMs is not followed
+    where = () => `${chat.origin}/api/v1/auth/logout`;
+    await assert.rejects(createDm({ members: ['carol@b.example'] }), e => e.error === 'create_on_homeserver' && e.status === 409);
+    where = () => `${chat.origin}/api/v2/social/dms?x=1`;
+    await assert.rejects(createDm({ members: ['carol@b.example'] }), e => e.error === 'create_on_homeserver');
+    assert.deepEqual(posted, [chat.origin]);
+    assert.equal(dmHostUrl('https://chat.nookara.cc/api/v2/social/dms').origin, 'https://chat.nookara.cc');
+    assert.equal(dmHostUrl('http://chat.nookara.cc/api/v2/social/dms'), null);
+    assert.equal(dmHostUrl('https://u:p@chat.nookara.cc/api/v2/social/dms'), null);
+    // other errors come through as they are
+    await assert.rejects(social.accept('l:404@b.example'), e => e.status === 404);
+  } finally { setNookaraSocial(null); registry.clear(); await nk.close(); await chat.close(); }
+  assert.equal(onNookaraSocial(), false);
 });

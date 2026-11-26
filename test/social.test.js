@@ -195,3 +195,75 @@ test('push: a pusher for every homeserver that takes them, and the relay push of
   assert.deepEqual(so.pushPlan({ v2: true, pushkey: 'epk_x', instances, registered: [HOME, B, 'https://c.example'] }).relayOff, [B]);
   assert.deepEqual(so.pushPlan({ v2: true, pushkey: 'epk_x', instances, registered: [HOME] }).relayOff, []); // (b's failed: its relay push stays)
 });
+
+// ── a Nookara session: Nookara's own friends and DMs stay in its UI, /api/v2/social adds the ones elsewhere ──
+const NK = 'https://nookara.cc', CHAT = 'https://chat.nookara.cc';
+const nkMe = { id: 'v:5@nookara.cc', handle: 'alice@nookara.cc', display_name: 'alice', avatar_url: null };
+const nkIm = (them, id, t, unread = 0) => ({ id: `im:5-${id}@nookara.cc`, host: 'nookara.cc', host_origin: NK, hosted_here: true, sid: null, channel: null, group: false, name: null, owner: null, nookara: { kind: 'im', username: them }, members: [nkMe, { id: `v:${id}@nookara.cc`, handle: `${them}@nookara.cc`, display_name: them }], created_at: 1, updated_at: t, last_message_id: '9', unread, mention: false });
+const nkGroup = (room, t) => ({ id: `g:${room.replace(/^grp_/, '')}@nookara.cc`, host: 'nookara.cc', host_origin: NK, hosted_here: true, sid: null, channel: null, group: true, name: 'The squad', owner: 'v:5@nookara.cc', nookara: { kind: 'group', room }, members: [nkMe], created_at: t, updated_at: t, last_message_id: '0', unread: 0, mention: false });
+const nkPointer = (id, host, origin, t, extra = {}) => ({ id: `${id}@${host}`, host, host_origin: origin, hosted_here: false, group: false, name: null, owner: null, sid: id, channel: `c${id}`, members: [nkMe, { id: `l:2@${host}`, handle: `carol@${host}`, display_name: 'Carol' }], created_at: 1, updated_at: t, last_message_id: '3', unread: 1, mention: false, ...extra });
+
+test('a Nookara session: friends who are not Nookara accounts come from the social API, the rest stay in the lists Nookara has', () => {
+  assert.equal(so.isNookaraAccount('v:5@nookara.cc', 'nookara.cc'), true);
+  assert.equal(so.isNookaraAccount('v:5', 'nookara.cc'), true);
+  assert.equal(so.isNookaraAccount('v:5@other.example', 'nookara.cc'), false);
+  assert.equal(so.isNookaraAccount('l:5@nookara.cc', 'nookara.cc'), false); // one of nookara.cc's homeserver's own accounts: elsewhere, to Nookara
+  assert.equal(so.isNookaraAccount('v:05@nookara.cc', 'nookara.cc'), false);
+  assert.equal(so.isNookaraAccount(null, 'nookara.cc'), false);
+  const l = so.remoteFriendLists({
+    friends: [{ id: 'v:6@nookara.cc', handle: 'bob@nookara.cc', display_name: 'bob' }, { id: 'l:2@b.example', handle: 'carol@b.example', display_name: 'Carol' }, { id: 'l:9@nookara.cc', handle: 'dan@nookara.cc', display_name: 'Dan' }],
+    incoming: [{ id: 'v:7@nookara.cc', handle: 'eve@nookara.cc' }, { id: 'l:4@c.example', handle: 'fay@c.example', message: 'hi' }],
+    outgoing: [{ id: 'v:8@nookara.cc', handle: 'gus@nookara.cc' }],
+    blocked: [{ id: 'v:9@nookara.cc', handle: 'hal@nookara.cc' }, { id: 'l:1@d.example', handle: 'ian@d.example' }],
+  }, 'nookara.cc');
+  assert.deepEqual(l.friends.map(f => f.id), ['l:2@b.example', 'l:9@nookara.cc']);
+  assert.deepEqual(l.incoming.map(f => [f.id, f.message]), [['l:4@c.example', 'hi']]);
+  assert.deepEqual(l.outgoing, []);
+  assert.deepEqual(l.blocked.map(f => f.id), ['l:1@d.example']);
+  // names: my own domain is left out, theirs is shown
+  assert.equal(so.shownHandle(l.friends[0], 'nookara.cc'), 'carol@b.example');
+  assert.equal(so.shownHandle(l.friends[1], 'nookara.cc'), 'dan');
+  assert.equal(so.cleanHandle('alice@other.example', 'nookara.cc'), 'alice@other.example');
+  assert.equal(so.cleanHandle('bob@nookara.cc', 'nookara.cc'), 'bob'); // (a Nookara name: the friend request Nookara always had)
+});
+
+test('a Nookara session: the DM list keeps the DMs Nookara has where they are and takes the pointers', () => {
+  const answer = { dms: [nkPointer('7', 'b.example', B, 900), nkIm('bob', 6, 800, 2), nkPointer('3', 'nookara.cc', CHAT, 700, { group: true, name: 'Mixed' }), nkGroup('grp_ab12', 600), { id: 'odd@nookara.cc', hosted_here: true }, null, { hosted_here: false }] };
+  const { pointers, hosted } = so.splitNookaraDms(answer);
+  assert.deepEqual(pointers.map(d => d.id), ['7@b.example', '3@nookara.cc']);
+  assert.deepEqual(hosted, [{ id: 'im:5-6@nookara.cc', view: { kind: 'dm', username: 'bob' } }, { id: 'g:ab12@nookara.cc', view: { kind: 'group', room: 'grp_ab12' } }]);
+  // where each opens: the DM / group view Nookara has (end-to-end encrypted, as ever), or the homeserver the pointer names
+  assert.deepEqual(so.nookaraDmView(answer.dms[1]), { kind: 'dm', username: 'bob' });
+  assert.deepEqual(so.nookaraDmView(answer.dms[3]), { kind: 'group', room: 'grp_ab12' });
+  assert.deepEqual(so.nookaraDmView(answer.dms[0]), { kind: 'sdm', id: '7@b.example' });
+  assert.equal(so.nookaraDmView(answer.dms[4]), null);
+  assert.equal(so.nookaraDmView({ id: 'x@nookara.cc', hosted_here: true, nookara: { kind: 'im' } }), null);
+  // the pointers as the list keeps them: on the homeserver that hosts them, never "hosted here" (chat.nookara.cc is not Nookara)
+  const list = so.mergeDms([{ origin: NK, dms: pointers }], { home: NK, me: 'v:5@nookara.cc', domain: 'nookara.cc' });
+  assert.deepEqual(list.map(d => [d.id, d.host_origin, d.hosted_here, d.unread]), [['7@b.example', B, false, 1], ['3@nookara.cc', CHAT, false, 1]]);
+  assert.deepEqual(list[0].others.map(m => m.id), ['l:2@b.example']);
+  assert.equal(so.dmTitle(list[0], 'nookara.cc'), 'Carol');
+  assert.equal(so.dmTitle(list[1], 'nookara.cc'), 'Mixed');
+});
+
+test('a Nookara session: one DM list, the conversations Nookara has and the pointers by activity', () => {
+  const conv = (username, sent_at, unread = 0) => ({ username, unread, last_message: { id: 1, sent_at } });
+  const convs = [conv('bob', '2026-11-20T12:00:00.000Z', 2), conv('System', '2026-11-10T12:00:00.000Z'), conv('zed', '2026-11-01T12:00:00.000Z')];
+  const at = iso => Date.parse(iso);
+  const ctx2 = { home: NK, me: 'v:5@nookara.cc', domain: 'nookara.cc' };
+  const pointers = so.mergeDms([{ origin: NK, dms: [nkPointer('3', 'nookara.cc', CHAT, at('2026-11-05T00:00:00Z')), nkPointer('7', 'b.example', B, at('2026-11-15T00:00:00Z')), nkPointer('8', 'c.example', 'https://c.example', at('2026-11-25T00:00:00Z'))] }], ctx2);
+  const rows = so.nookaraDmRows(convs, pointers);
+  assert.deepEqual(rows.map(r => (r.kind === 'dm' ? r.c.username : r.dm.id)), ['8@c.example', 'bob', '7@b.example', 'System', '3@nookara.cc', 'zed']);
+  assert.deepEqual(rows.map(r => r.kind), ['sdm', 'dm', 'sdm', 'dm', 'sdm', 'dm']);
+  // nothing on other homeservers: the list exactly as it was
+  assert.deepEqual(so.nookaraDmRows(convs, []).map(r => r.c), convs);
+  assert.deepEqual(so.nookaraDmRows([], pointers).map(r => r.dm.id), ['8@c.example', '7@b.example', '3@nookara.cc']);
+  // the order Nookara gave is never changed (a conversation with no time stays where it was put)
+  assert.deepEqual(so.nookaraDmRows([conv('a', '2026-11-20T12:00:00Z'), { username: 'b', unread: 0 }, conv('c', '2026-11-19T12:00:00Z')], []).map(r => r.c.username), ['a', 'b', 'c']);
+  // new activity on a pointer (social_dm_activity over the Nookara socket) moves it to the top and counts it
+  const s = so.socialReduce({ ...so.emptySocial(), dms: pointers }, { type: 'social_dm_activity', dm: nkPointer('3', 'nookara.cc', CHAT, at('2026-11-26T00:00:00Z'), { unread: 4 }), preview: 'hello' }, { ...ctx2, from: NK, now: at('2026-11-26T00:00:01Z') });
+  assert.equal(so.nookaraDmRows(convs, s.dms)[0].dm.id, '3@nookara.cc');
+  assert.equal(s.dms[0].unread, 4);
+  assert.equal(s.dms[0].preview, 'hello');
+  assert.equal(so.dmUnread(s.dms), 6);
+});
