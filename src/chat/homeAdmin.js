@@ -1,5 +1,6 @@
 // A homeserver's account settings, as its admins edit them (PROTOCOL §4a: GET / PATCH /api/v2/homeserver/accounts), and the
-// sign-in methods of your own account there (GET /api/v2/account/logins). Pure: no imports, nothing from the browser.
+// sign-in methods of your own account there (GET /api/v2/account/logins). Pure: nothing from the browser.
+import { RATE_FIELDS, FLOOR_MAX, DAYS_MAX, MAX_DENYLISTS, MAX_DENY } from './federation.js';
 
 export const REGISTRATION = [
   ['open', 'Open', 'Anyone can make an account.'],
@@ -9,9 +10,9 @@ export const REGISTRATION = [
 ];
 export const REMOTE_MODES = [
   ['none', 'Nobody', 'Only accounts made here.'],
-  ['all', 'Any homeserver', 'Accounts from every other homeserver.'],
+  ['all', 'Everyone', 'Accounts from every other homeserver.'],
   ['allowlist', 'Only these', 'Accounts from the homeservers on the list.'],
-  ['blocklist', 'All but these', 'Accounts from every homeserver except the ones on the list.'],
+  ['blocklist', 'Everyone except these', 'Accounts from every homeserver except the ones on the list.'],
 ];
 export const CREATION_MODES = [
   ['admins', 'Admins only', "Only the homeserver's admins can create servers."],
@@ -118,6 +119,7 @@ export const nameList = raw => [...new Set(String(raw || '').split(/[\s,]+/).map
 
 // ── errors ──
 const FIELD_WORDS = { id: 'id', kind: 'kind', issuer: 'issuer address', authorize_url: 'authorize address', token_url: 'token address', userinfo_url: 'user info address', jwks_url: 'keys address', client_id: 'client id', client_secret: 'client secret', scopes: 'scopes', id_field: 'id field', username_field: 'username field', email_field: 'email field', email_verified_field: 'verified-email field', token_auth: 'client secret setting' };
+const RATE_WORDS = Object.fromEntries(RATE_FIELDS.map(([k, label]) => [k, label.toLowerCase()]));
 const of = (e, methods) => { const m = e?.method && (methods || []).find(x => x.id === e.method); return m ? `"${m.name || m.id}"` : e?.method ? `"${e.method}"` : ''; };
 // a refused save (an Error from apiFetch: message = the code, plus the server's method / field / message) in plain words
 export function adminErrorText(e, methods) {
@@ -129,7 +131,13 @@ export function adminErrorText(e, methods) {
     case 'invalid_login_methods': return e?.field === 'id' ? `${who ? `${who}: that` : 'That'} id is taken or isn't allowed. Ids are 1-32 of a-z, 0-9, - and _.` : field ? `${who ? `${who}: the` : 'The'} ${field} isn't valid.` : "One of the sign-in methods isn't valid.";
     case 'no_login_method': return 'Keep at least one sign-in method switched on, or nobody could sign in.';
     case 'invalid_registration': return "That isn't a way to register this homeserver knows.";
-    case 'invalid_remote_accounts': return 'The list of homeservers has something that is not a domain, like example.org.';
+    case 'invalid_remote_accounts': return 'The list of homeservers has something that is not a domain. Use example.org, or *.example.org for every name under it.';
+    case 'invalid_rate_limits': return RATE_WORDS[e?.field] ? `The "${RATE_WORDS[e.field]}" limit is out of range.` : "One of the limits for other homeservers isn't valid.";
+    case 'invalid_min_age_floor_days': return `New homeservers can be made to wait 0 to ${FLOOR_MAX} days.`;
+    case 'invalid_denylists': return `Deny lists are https addresses, at most ${MAX_DENYLISTS} of them.`;
+    case 'invalid_deny': return `Blocked entries are a domain, *.domain, an IP range or an account (id@domain), at most ${MAX_DENY.toLocaleString('en')}.`;
+    case 'invalid_federation': case 'invalid_remote_invite_bypass': return "The homeserver didn't understand that setting.";
+    case 'invalid_remote_min_age_days': return `New homeservers can be made to wait 0 to ${DAYS_MAX} days.`;
     case 'invalid_hosts_accounts': case 'invalid_accounts': case 'invalid_link_verified_emails': return "The homeserver didn't understand that setting.";
     case 'invalid_ember_clients': return 'One of the client addresses is not a web address.';
     case 'local_admin_required': return 'Make an admin account on this homeserver first: after the switch somebody has to be able to sign in.';
