@@ -69,7 +69,7 @@ function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, 
     ] : []],
     ['Integrations', [
       onInst && (canServer || instAdmin) && ['bots', 'Bots', Bot, ['Bot accounts', 'Token']],
-      (canServer || instAdmin) && ['bridge', 'Bridge', ArrowLeftRight, ['Discord', 'Fluxer', 'Bridge bots']],
+      (canServer || instAdmin) && ['bridge', 'Bridge', ArrowLeftRight, ['Discord', 'Fluxer', 'Matrix', 'Bridge bots']],
       canServer && ['game', 'Game servers', Gamepad2, ['Minecraft', 'CloudLink', 'Audit log']],
     ]],
     ['Instance', instAdmin ? [

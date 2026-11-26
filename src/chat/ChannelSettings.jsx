@@ -27,7 +27,7 @@ export function ChannelSettings({ sid, channel: opened, onClose, tab }) {
   const canBridge = has(d?.server.perms, P.MANAGE_SERVER) && ((channel?.type || 'text') === 'text' || (channel?.type === 'voice' && !!instOpt(sid)));
   const groups = useMemo(() => [
     ['Channel', [['overview', 'Overview', LayoutGrid, ['Name', 'Topic', 'Category', 'Icon', 'Type', 'Webhooks', 'Post', 'Messages']], ['perms', 'Permissions', Shield, ['Private', 'Roles', 'See', 'Send', 'Attach']]]],
-    ['Integrations', canBridge ? [['bridge', 'Bridge', ArrowLeftRight, ['Discord', 'Fluxer', 'Link']]] : []],
+    ['Integrations', canBridge ? [['bridge', 'Bridge', ArrowLeftRight, ['Discord', 'Fluxer', 'Matrix', 'Link']]] : []],
     ['Manage', [['danger', 'Delete channel', TriangleAlert, ['Remove']]]],
   ].filter(([, items]) => items.length), [canBridge]);
   return (

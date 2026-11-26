@@ -32,7 +32,11 @@ const ERR = {
 const INST_ERR = {
   bot_not_in_server: "Your bot isn't in that server - add it first.", bridge_not_set_up: "That platform's bot isn't set up on this server yet - its admins add the bot's token in Server settings > Bridge.",
   bot_needs_webhooks: 'Your bot needs the Manage webhooks permission in that channel.', unreachable: "Can't reach the platform right now.",
+  room_encrypted: "That room is encrypted, so the bot can't read or post there. Only rooms without encryption can be bridged.",
+  channel_not_found: "The bot isn't in that room any more.", platform_unreachable: "Can't reach the platform right now.",
 };
+// Matrix has rooms, not servers with channels: no # in front of a name, no webhooks
+const roomy = p => p === 'matrix';
 const why = (e, inst) => (inst && INST_ERR[e?.message]) || ERR[e?.message] || errorText(e?.message);
 const IMPORT_ERR = { not_linked: 'Link that account to Nookara first (Account > Security > Connected accounts).', bot_not_in_server: "Nookara's bot isn't in that server - add it first.", not_your_server: 'You need to own that server, or have Administrator / Manage server there.', import_running: 'An import is already running - give it a moment.', invalid_instance: "Nookara can't make an import for this server's address.", ticket_invalid: 'That import is gone - run it again.', ticket_expired: 'That import ran out - run it again.', ticket_wrong_instance: 'That import was made for another server.', import_failed: "Nookara couldn't build the import - try again.", velora_not_registered: "This server isn't registered with Nookara yet - try again in a minute.", velora_off: 'This server has its Nookara connection turned off.', community_exists: 'This server already has its community.' };
 
@@ -76,7 +80,17 @@ function GuildPicker({ onPick, pickLabel = 'Choose', exclude = [], inst, base = 
   return (
     <div className="vc-br-step">
       <button type="button" className="vc-br-back" onClick={() => setP(null)}><ArrowLeft size={14} /> <PlatformIcon p={p} size={14} /> {plat?.name}</button>
-      {!plat?.linked ? (
+      {plat?.rooms ? (
+        <>
+          <div className="vc-br-note">
+            <p><b>1.</b> In {plat.name}, invite <b>{plat.bot}</b> (this server's bot) to each room you want to bridge. It joins on its own. Rooms with encryption turned on can't be bridged: the bot can't read them.</p>
+          </div>
+          <div className="vc-br-note">
+            <div className="vc-row"><p className="grow"><b>2.</b> Link {plat.name}, then pick a room for each channel in the channel's own settings (Edit channel &gt; Bridge).</p>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => onPick(p, { id: 'rooms', name: plat.bot }, plat)}>{pickLabel}</button></div>
+          </div>
+        </>
+      ) : !plat?.linked ? (
         <div className="vc-br-note">
           <p>Link your {plat?.name} account to Nookara so Ember can check which servers are yours.</p>
           <div className="vc-row"><a className="btn btn-primary" href={siteHref("/me#settings/security")} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> Connected accounts</a>
@@ -214,6 +228,7 @@ export function BridgeSettings({ sid, gated, onPlan }) {
   const plan = usePlan('bridges');
   const [st, reload] = useLoad(gated || plan.gate ? null : `/chat/bridge/servers/${sid}`, [sid, !!gated || !!plan.gate]);
   const channels = useChat(s => s.detail[sid]?.channels);
+  const instBridges = useChat(s => (inst ? s.instances?.find(i => i.origin === inst)?.features?.bridges : null));
   const [linking, setLinking] = useState(false);
   const [busy, setBusy] = useState('');
   const text = useMemo(() => (channels || []).filter(c => (c.type || 'text') === 'text' || c.type === 'voice'), [channels]);
@@ -225,7 +240,8 @@ export function BridgeSettings({ sid, gated, onPlan }) {
     if (st.error) return <div className="vc-empty-note">{why(st.error, inst)}</div>;
   }
   const bridges = st.data?.bridges || [];
-  const available = ['discord', 'fluxer'].filter(p => !bridges.some(b => b.platform === p));
+  const matrix = !!inst && !!instBridges && 'matrix' in instBridges; // (an Ember server new enough to have the Matrix bridge)
+  const available = ['discord', 'fluxer', ...(matrix ? ['matrix'] : [])].filter(p => !bridges.some(b => b.platform === p));
   return (
     <PlanGate block={gated ? null : block}>
     <div className="vc-br-settings">
@@ -234,10 +250,10 @@ export function BridgeSettings({ sid, gated, onPlan }) {
         <div key={b.platform}>
           <div className="vc-br-top">
             <PlatformIcon p={b.platform} size={28} />
-            <div><b>{b.platform_name}: {b.guild_name}</b><small>{b.links.length} channel{b.links.length === 1 ? '' : 's'} bridged</small></div>
+            <div><b>{b.platform_name}: {b.guild_name}</b><small>{b.links.length} channel{b.links.length === 1 ? '' : 's'} bridged{roomy(b.platform) ? ` - ${b.ext_channels.length} room${b.ext_channels.length === 1 ? '' : 's'} the bot is in` : ''}</small></div>
             <span className="grow" />
             <button type="button" className="btn btn-danger btn-sm" disabled={!!busy} onClick={async () => {
-              if (await ask({ title: `Unlink ${b.guild_name}?`, text: `Messages stop going between Ember and ${b.platform_name}, and the bridge webhooks over there are removed. Messages already sent stay.`, confirm: 'Unlink', danger: true })) call(`unlink-${b.platform}`, () => apiFetch(`/chat/bridge/servers/${sid}`, { method: 'DELETE', body: JSON.stringify({ platform: b.platform }) }));
+              if (await ask({ title: `Unlink ${roomy(b.platform) ? b.platform_name : b.guild_name}?`, text: roomy(b.platform) ? `Messages stop going between Ember and ${b.platform_name}. The bot stays in its rooms, and messages already sent stay.` : `Messages stop going between Ember and ${b.platform_name}, and the bridge webhooks over there are removed. Messages already sent stay.`, confirm: 'Unlink', danger: true })) call(`unlink-${b.platform}`, () => apiFetch(`/chat/bridge/servers/${sid}`, { method: 'DELETE', body: JSON.stringify({ platform: b.platform }) }));
             }}><Unlink size={14} /> Unlink</button>
           </div>
           {b.problem && <div className="vc-br-warn">{b.problem === 'bot_not_in_server' ? `${inst ? 'Your' : 'The Nookara'} bot isn't in ${b.guild_name} any more - add it back to keep the bridge working.` : b.problem === 'bridge_not_set_up' ? INST_ERR.bridge_not_set_up : `Can't reach ${b.platform_name} right now.`}</div>}
@@ -250,11 +266,11 @@ export function BridgeSettings({ sid, gated, onPlan }) {
               return <div key={c.cid} className="vc-br-row ro">
                 <span className="vc-br-ch">{voice ? <Volume2 size={14} /> : <Hash size={14} />} {c.name}</span>
                 <ArrowLeftRight size={14} className="vc-br-arrow on" />
-                <span className="vc-br-ch"><PlatformIcon p={b.platform} size={14} /> {voice ? '' : '#'}{l.ext_name || 'channel'}</span>
-                {voice ? <Check size={14} className="vc-br-ok" /> : l.hook ? <Check size={14} className="vc-br-ok" /> : <small className="vc-br-flag" title="The bot couldn't make a webhook there yet - it needs Manage webhooks">no webhook</small>}
+                <span className="vc-br-ch"><PlatformIcon p={b.platform} size={14} /> {voice || roomy(b.platform) ? '' : '#'}{l.ext_name || 'channel'}</span>
+                {voice || roomy(b.platform) ? <Check size={14} className="vc-br-ok" /> : l.hook ? <Check size={14} className="vc-br-ok" /> : <small className="vc-br-flag" title="The bot couldn't make a webhook there yet - it needs Manage webhooks">no webhook</small>}
               </div>;
             })}
-            {!b.links.length && <div className="vc-empty-note">No channels linked yet. Open a text channel's settings and pick a {b.platform_name} channel under Bridge.</div>}
+            {!b.links.length && <div className="vc-empty-note">No channels linked yet. Open a text channel's settings and pick a {b.platform_name} {roomy(b.platform) ? 'room' : 'channel'} under Bridge.{roomy(b.platform) && !b.ext_channels.length ? ` The bot isn't in any room yet: invite ${b.guild_name} to one.` : ''}</div>}
           </div>
         </div>
       ))}
@@ -265,8 +281,8 @@ export function BridgeSettings({ sid, gated, onPlan }) {
         }} />
       </> : available.length > 0 && <div className="vc-br-empty">
         <ArrowLeftRight size={28} />
-        <b>{bridges.length ? 'Link another server' : 'Bridge this server with Discord or Fluxer'}</b>
-        <p>Link a Discord server, a Fluxer server, or both. Pick which channels talk to each other in each channel's settings. Messages, replies, edits and deletes go both ways.{inst ? " This server uses its own bots - its admins set them up at the top of this page." : ''}</p>
+        <b>{bridges.length ? 'Link another server' : `Bridge this server with Discord${matrix ? ', Fluxer or Matrix' : ' or Fluxer'}`}</b>
+        <p>Link a Discord server, a Fluxer server{matrix ? ', Matrix rooms,' : ''} or {matrix ? 'all of them' : 'both'}. Pick which channels talk to each other in each channel's settings. Messages, replies, edits and deletes go both ways.{inst ? " This server uses its own bots - its admins set them up at the top of this page." : ''}</p>
         <button type="button" className="btn btn-primary" onClick={() => setLinking(true)}><Link2 size={14} /> Link a server</button>
       </div>}
     </div>
@@ -283,13 +299,14 @@ export function ChannelBridge({ sid, channel }) {
   // a voice channel: Discord voice channels only (everyone over there shows up here as themselves, the bot carries the sound)
   const voice = channel.type === 'voice';
   const bridges = (st.data?.bridges || []).filter(b => !voice || b.platform === 'discord');
+  const names = [...new Set(['Discord', 'Fluxer', ...(st.data?.bridges || []).map(b => b.platform_name)])].filter(Boolean);
   const fits = x => (voice ? x.kind === 'voice' : x.kind !== 'voice');
   if (voice && st.data?.voice_links === false) return <div className="vc-field"><span>Bridge</span><small className="vc-hint">This server can't link voice channels: its voice bridge parts aren't installed.</small></div>;
   return (
     <div className="vc-field"><span>Bridge</span>
       {!bridges.length ? (
         <div className="vc-br-chnote">
-          <small>{voice ? 'Link this server to a Discord server first, then pick a Discord voice channel here.' : 'Link this server to a Discord or Fluxer server first, then pick a channel here.'}</small>
+          <small>{voice ? 'Link this server to a Discord server first, then pick a Discord voice channel here.' : `Link this server to ${names.length > 2 ? `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}` : 'a Discord or Fluxer server'} first, then pick a channel here.`}</small>
           <button type="button" className="btn btn-surface btn-sm" onClick={() => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'settings', sid, tab: 'bridge' } }))}><Link2 size={13} /> Link a server</button>
         </div>
       ) : bridges.map(b => {
@@ -303,11 +320,12 @@ export function ChannelBridge({ sid, channel }) {
               setBusy(false);
             }}>
               <option value="">Not bridged</option>
-              {b.ext_channels.filter(fits).map(x => <option key={x.id} value={x.id}>{voice ? '' : '#'}{x.name}{x.category ? ` (${x.category})` : ''}</option>)}
+              {b.ext_channels.filter(fits).map(x => <option key={x.id} value={x.id} disabled={!!x.encrypted}>{voice || roomy(b.platform) ? '' : '#'}{x.name}{x.category ? ` (${x.category})` : ''}{x.encrypted ? " (encrypted - can't be bridged)" : ''}</option>)}
             </select>
           </div>
           <small className="vc-hint"><PlatformIcon p={b.platform} size={12} /> {voice
             ? (l ? `People in ${b.platform_name} ${l.ext_name} (${b.guild_name}) show up here as themselves, and while someone is in here the ${b.platform_name} bot joins over there so they hear everyone.` : `Pick a voice channel in ${b.guild_name} to bridge with ${b.platform_name}.`)
+            : roomy(b.platform) ? (l ? `Messages here and in the ${b.platform_name} room ${l.ext_name} go both ways. Over there, ${b.guild_name} posts them with the sender's name in front.` : `Pick a ${b.platform_name} room. Only rooms ${b.guild_name} is in show here: invite it to a room to add one.`)
             : (l ? `Messages here and in ${b.platform_name} #${l.ext_name} (${b.guild_name}) go both ways.` : `Pick a channel in ${b.guild_name} to bridge with ${b.platform_name}.`)}{!b.enabled ? ' The bridge is paused in Server settings.' : ''}</small>
         </div>;
       })}

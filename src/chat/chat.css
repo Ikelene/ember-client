@@ -1431,6 +1431,7 @@ ol.vc-list > li::marker { color: var(--accent); font-weight: 700; }
 
 /* bridge fixes */
 .vc-br-note > .btn { align-self: flex-start; }
+.vc-br-mx { display: flex; flex-direction: column; gap: 8px; }
 .vc-br-guild .vc-srv-ico { width: 36px; height: 36px; flex: none; font-size: 13px; }
 .vc-br-guild .vc-srv-ico img { width: 100%; height: 100%; object-fit: cover; }
 .vc-br-guild b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

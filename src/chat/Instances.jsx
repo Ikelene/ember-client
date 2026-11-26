@@ -377,17 +377,23 @@ function VeloraTab({ origin, cfg, setCfg, save, busy }) {
 
 // ── Bridge bots (top of Server settings > Bridge, for the instance's admins): the owner's own Discord / Fluxer bots
 // (tokens are write-only; only the last 4 characters come back) ──
+const BRIDGE_NAME = { discord: 'Discord', fluxer: 'Fluxer', matrix: 'Matrix' };
 const BRIDGE_STATE = { off: 'Off', connecting: 'Connecting...', ready: 'Connected', waiting: 'Not connected - trying again soon', error: 'Stopped - check the token', stopped: 'Stopped' };
 export function BridgeBots({ origin, onPlan, gated }) {
   const [d, setD] = useState(null);
-  const [tok, setTok] = useState({ discord: '', fluxer: '' });
+  const [tok, setTok] = useState({ discord: '', fluxer: '', matrix: '' });
+  const [hs, setHs] = useState(''); // the Matrix homeserver address being typed
   const [busy, setBusy] = useState('');
   const call = (o = {}) => apiFetch('/api/v1/bridge/settings', { inst: origin, ...o });
   useEffect(() => { if (gated) return undefined; let live = true; const load = () => call().then(x => live && setD(x.bridges)).catch(e => { if (!live) return; const p = planOf(e); if (p) { live = false; onPlan?.({ ...p, what: 'bridges' }); } else toast(errorText(e.message)); }); load(); const t = setInterval(load, 5000); return () => { live = false; clearInterval(t); }; }, [gated]); // eslint-disable-line react-hooks/exhaustive-deps
-  async function put(p, token) {
+  async function put(p, token, extra = {}) {
     setBusy(p);
-    try { const x = await call({ method: 'PATCH', body: JSON.stringify({ [p]: { token } }) }); setD(x.bridges); setTok(t => ({ ...t, [p]: '' })); toast(token === null ? 'Removed.' : 'Saved.', true); }
-    catch (e) { toast(e.message === 'invalid_token' ? `That ${p === 'discord' ? 'Discord' : 'Fluxer'} token didn't work.` : errorText(e.message)); }
+    try { const x = await call({ method: 'PATCH', body: JSON.stringify({ [p]: { token, ...extra } }) }); setD(x.bridges); setTok(t => ({ ...t, [p]: '' })); if (p === 'matrix') setHs(''); toast(token === null ? 'Removed.' : 'Saved.', true); }
+    catch (e) {
+      toast(e.message === 'invalid_token' ? `That ${BRIDGE_NAME[p]} token didn't work.${p === 'matrix' ? ' Check that it belongs to an account on that homeserver.' : ''}`
+        : e.message === 'invalid_homeserver' ? "That homeserver address can't be used. It has to be a public https address, like https://matrix.org."
+          : e.message === 'platform_unreachable' ? `Couldn't reach ${BRIDGE_NAME[p]} at that address.` : errorText(e.message));
+    }
     setBusy('');
   }
   if (!d && !gated) return <div className="vc-loading"><i /><i /><i /></div>;
@@ -395,7 +401,7 @@ export function BridgeBots({ origin, onPlan, gated }) {
   return (
     <>
       <h3 className="vc-game-sec-title">Bridge bots</h3>
-      <p className="vc-dialog-sub">Bridges carry messages between this server and Discord or Fluxer with <b>your own bot</b>. Make a bot in the platform's developer portal (Discord: turn on the Message Content intent), paste its token here, then link a server below and pick channels in each channel's settings.</p>
+      <p className="vc-dialog-sub">Bridges carry messages between this server and Discord{dd.matrix ? ', Fluxer or Matrix' : ' or Fluxer'} with <b>your own bot</b>. Make a bot in the platform's developer portal (Discord: turn on the Message Content intent), paste its token here, then link a server below and pick channels in each channel's settings.</p>
       {['discord', 'fluxer'].map(p => {
         const b = dd[p] || {};
         return (
@@ -411,6 +417,26 @@ export function BridgeBots({ origin, onPlan, gated }) {
           </div>
         );
       })}
+      {dd.matrix && (() => { // a Matrix bot is an ordinary account: where it lives (its homeserver) and its access token
+        const b = dd.matrix;
+        const ready = (hs.trim() || b.homeserver) && (tok.matrix.trim() || b.token) && (hs.trim() || tok.matrix.trim());
+        return (
+          <div className="vc-br-note vc-gap-top">
+            <div className="vc-row"><PlatformIcon p="matrix" size={20} /><p className="grow"><b>Matrix</b> - {b.configured ? `${b.state === 'error' ? 'Stopped - check the token' : BRIDGE_STATE[b.state] || b.state}${b.bot ? ` as ${b.bot.username}` : ''}` : 'no bot'}</p>
+              {b.configured && b.source !== 'env' && <button type="button" className="btn btn-danger btn-sm" disabled={!!busy} onClick={() => put('matrix', null)}><Trash2 size={13} /> Remove</button>}</div>
+            {b.error && <p className="vc-err"><TriangleAlert size={14} /> {b.error === 'invalid_token' ? 'The homeserver no longer accepts this token. Paste a new one.' : b.error}</p>}
+            {b.source === 'env' && <p className="vc-hint">Set by the server's environment (BONFIRE_MATRIX_HOMESERVER, BONFIRE_MATRIX_TOKEN).</p>}
+            <p className="vc-hint">Make an ordinary Matrix account for the bot on any homeserver, then paste that homeserver's address and the account's access token (in Element: Settings &gt; Help &amp; About &gt; Access Token). Invite the bot to the rooms you want to bridge. Rooms with encryption on can't be bridged.</p>
+            <form className="vc-br-mx" onSubmit={e => { e.preventDefault(); if (ready) put('matrix', tok.matrix.trim(), hs.trim() ? { homeserver: hs.trim() } : {}); }}>
+              <input className="form-input" type="text" autoComplete="off" spellCheck={false} aria-label="Matrix homeserver address" placeholder={b.homeserver ? `Homeserver: ${b.homeserver}` : 'Homeserver address, e.g. https://matrix.org'} value={hs} onChange={e => setHs(e.target.value)} />
+              <div className="vc-row">
+                <input className="form-input" type="password" autoComplete="off" aria-label="Matrix access token" placeholder={b.token ? `Saved (${b.token}) - paste a new one to replace it` : 'Access token'} value={tok.matrix} onChange={e => setTok(t => ({ ...t, matrix: e.target.value }))} />
+                <button type="submit" className="btn btn-primary" disabled={!ready || !!busy}>{busy === 'matrix' ? 'Checking...' : 'Save'}</button>
+              </div>
+            </form>
+          </div>
+        );
+      })()}
     </>
   );
 }
