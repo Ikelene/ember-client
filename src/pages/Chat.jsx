@@ -60,7 +60,8 @@ import Home from '../chat/Home.jsx';
 import { TestBotDialog } from '../chat/BotTest.jsx';
 import { AddInstance } from '../chat/Instances.jsx';
 import { InstanceGate, LockedScreen, SUPPORT_URL, SignInPrompt, SignedOutSidebar, RetryIn } from '../chat/Gate.jsx';
-import { finishSignIn, SIGNIN_TEXT } from '../chat/session.js';
+import { finishSignIn, finishHomeLogin, homeLoginText, SIGNIN_TEXT } from '../chat/session.js';
+import { probeDefault } from '../chat/homeserver.js';
 import { SetupWizard } from '../chat/Setup.jsx';
 import { MenuHost, openMenu, copy } from '../chat/Menu.jsx';
 import { InteractionModalHost } from '../chat/Commands.jsx';
@@ -427,12 +428,13 @@ function ChatPage() {
   const staff = useChat(s => s.staff); // Nookara staff: Moderator chat button in DMs
   const { openMini, ui: profileUI } = useProfiles();
 
-  const signin = useRef(null);
+  const signin = useRef(null), homeSignin = useRef(null);
   useEffect(() => {
     document.title = 'Ember';
     document.documentElement.classList.add('vc-page');
     const web = isWebEmber(); // in a browser Ember works without a Nookara sign-in; the desktop / Android apps always have one
     (async () => {
+      if (web) { probeDefault(); homeSignin.current = await finishHomeLogin(); } // (does nookara.cc speak v2 yet? | back from a homeserver's login page, #/auth/callback)
       signin.current = await finishSignIn(); // back from Nookara's approve-this-app screen (#/signin?code=...)
       if (!getToken()) {
         if (!web) { location.href = '/login'; return; }
@@ -457,6 +459,8 @@ function ChatPage() {
     if (!ready) return;
     const r = signin.current;
     if (r) { if (r.ok) toast('Signed in with Nookara.', true); else toast(SIGNIN_TEXT[r.error]); if (r.back?.add) setDialog({ kind: 'add-instance', url: r.back.add }); else if (r.back?.create) setDialog({ kind: 'create-server' }); }
+    const h = homeSignin.current;
+    if (h) { if (h.ok) toast(`Signed in as ${h.session.account.handle}.`, true); else toast(homeLoginText(h.error, '')); if (h.back?.add) setDialog({ kind: 'add-instance', url: h.back.add }); else if (h.back?.create) setDialog({ kind: 'create-server' }); }
     try { if (sessionStorage.getItem('ember_notice')) { sessionStorage.removeItem('ember_notice'); toast('Your Nookara sign-in ended - sign in again to get your messages back.'); } } catch { /* fine */ }
   }, [ready]);
 

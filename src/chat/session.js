@@ -8,6 +8,7 @@ import { toast, stopKeepingMessages } from './store.js';
 import { forgetAccount as forgetKeptMessages } from './msgCache.js';
 import { acctKey } from './ids.js';
 import { EMBER_API, notifBridge } from '../compat.js';
+import { DEFAULT_HOMESERVER, probeDefault, defaultProbe, startLogin, handleCallback, isCallbackHash, currentSession, signOut as forgetHome, signOutAll as forgetHomes } from './homeserver.js';
 
 const STATE = 'ember_signin_state', BACK = 'ember_signin_back';
 export const hasNookara = () => !!getToken();
@@ -42,7 +43,49 @@ function popupSignIn(back) {
     toast(win ? 'Your browser blocked the pop-up, so Nookara sign-in opened in a new tab.' : 'Your browser blocked the sign-in pop-up. Allow pop-ups for this site and try again.');
   }
 }
+// Signing in starts on the default homeserver, nookara.cc. Until it answers Ember Protocol v2 (homeserver.js) that is the
+// Nookara sign-in below, unchanged; once it does, the same button opens its login page like any other homeserver's.
+// -> a promise while a homeserver login is open (the session, or null), nothing for the Nookara sign-in
 export function startSignIn(back = {}) {
+  if (!isWebEmber()) { startNookaraSignIn(back); return undefined; }
+  const via = p => (p?.v2 ? homeLogin(p.hs, { back }) : startNookaraSignIn(back));
+  const known = defaultProbe();
+  if (known) { if (known.error === 'unreachable') probeDefault(); return via(known); } // (answered already: the pop-up opens inside the click)
+  return Promise.race([probeDefault(), new Promise(r => setTimeout(r, 2500))]).then(via);
+}
+// open a homeserver's login page (hs from homeserver.js resolve) and say how it went. -> the session | null
+export async function homeLogin(hs, { hint, back } = {}) {
+  try {
+    const s = await startLogin(hs, { hint, back });
+    toast(`Signed in as ${s.account.handle}.`, true);
+    return s;
+  } catch (e) {
+    if (e?.code !== 'cancelled') toast(homeLoginText(e?.code, hs?.domain));
+    return null;
+  }
+}
+export const homeLoginText = (code, domain) => (code === 'declined' ? 'Sign-in was cancelled.' : code === 'state' ? SIGNIN_TEXT.state : code === 'unreachable' ? `Couldn't reach ${domain || 'the homeserver'} - try again.` : `Couldn't sign in${domain ? ` to ${domain}` : ''} - try again.`);
+// page load: back from a homeserver's login page after a full-page trip (#/auth/callback, the pop-up was blocked)
+// -> null | { ok, session, back } | { error, back }
+let homeFinishing = null;
+export const finishHomeLogin = () => (homeFinishing ||= (async () => {
+  if (!isCallbackHash(location.hash)) return null;
+  const run = handleCallback({ hash: location.hash, search: location.search });
+  history.replaceState(null, '', clientUrl('#/home')); // the code leaves the address bar straight away
+  const r = await run;
+  if (r?.back?.hash && !isCallbackHash(r.back.hash) && !r.back.hash.startsWith('#/signin')) history.replaceState(null, '', clientUrl(r.back.hash));
+  return r;
+})());
+// which sign-in this browser has: 'nookara' (the Nookara session everything Nookara-side runs on today), 'homeserver'
+// (only a v2 homeserver session), or null. Both can exist; homeSession() is the v2 one either way.
+export const homeSession = () => currentSession();
+export const sessionKind = () => (getToken() ? 'nookara' : currentSession() ? 'homeserver' : null);
+// the signed-in Nookara account's name as a handle (nookara.cc is its homeserver)
+export const nookaraHandle = username => `${username}@${DEFAULT_HOMESERVER}`;
+// sign out of a homeserver (its tokens are forgotten), or of all of them
+export const signOutHome = origin => forgetHome(origin);
+export const signOutHomes = () => forgetHomes();
+function startNookaraSignIn(back = {}) {
   if (onEmberHost()) { popupSignIn(back); return; }
   if (!isWebEmber()) { location.href = `/login?next=${encodeURIComponent(clientPath())}`; return; }
   const state = rand();
