@@ -393,4 +393,36 @@ test('nookara.cc: the old Nookara sign-in until it answers protocol 2, the homes
   const p = await hs.probeDefault();
   assert.equal(p.v2, true);
   assert.deepEqual(p.hs, { domain: 'nookara.cc', origin: 'https://chat.nookara.cc', name: 'Nookara', icon_url: 'https://nookara.cc/icon.png', authorize_url: login.authorize_url, token_url: login.token_url, methods: login.methods, protocol: 2 });
+  assert.equal(hs.signInWith(p.hs), 'homeserver');
+});
+
+test('a homeserver whose accounts are Nookara accounts is signed in to with Nookara, however it was found', async () => {
+  const json = (status, data) => ({ ok: status >= 200 && status < 300, status, json: async () => data });
+  const net = routes => async url => (url in routes ? json(200, routes[url]) : json(404, {}));
+  const login = { authorize_url: 'https://chat.nookara.cc/login', token_url: 'https://chat.nookara.cc/api/v2/auth/token', methods: [{ id: 'nookara', kind: 'oidc', name: 'Nookara' }] };
+  const doc = (accounts, at = 'chat.nookara.cc') => ({ protocol: 1, protocol_version: 2, homeserver: { domain: at === 'chat.nookara.cc' ? 'nookara.cc' : at, name: 'Home' }, accounts, login: at === 'chat.nookara.cc' ? login : { authorize_url: `https://${at}/login`, token_url: `https://${at}/token` } });
+  const world = {
+    'https://nookara.cc/.well-known/ember': { protocol: 2, homeserver: 'https://chat.nookara.cc' },
+    'https://chat.nookara.cc/.well-known/ember': doc({ hosts_accounts: true, registration: 'open', nookara_identity: true }),
+    'https://plain.example/.well-known/ember': doc({ hosts_accounts: true, registration: 'open' }, 'plain.example'),
+    'https://odd.example/.well-known/ember': doc({ hosts_accounts: true, nookara_identity: 'yes' }, 'odd.example'),
+    'https://other.example/.well-known/ember': doc({ hosts_accounts: true, nookara_identity: true }, 'other.example'),
+  };
+  // the default homeserver: v2, and still the Nookara sign-in
+  fresh({ dev: false, fetch: net(world) });
+  const p = await hs.probeDefault();
+  assert.equal(p.v2, true);
+  assert.equal(p.hs.nookara_identity, true);
+  assert.equal(hs.signInWith(p.hs), 'nookara');
+  // typed under "Use another homeserver": the domain, a handle on it, the homeserver's own address
+  for (const typed of ['nookara.cc', 'alice@nookara.cc', '@alice@nookara.cc', 'chat.nookara.cc', 'https://nookara.cc']) {
+    const found = await hs.resolve(hs.parseHomeserver(typed));
+    assert.equal(found.origin, 'https://chat.nookara.cc', typed);
+    assert.equal(hs.signInWith(found), 'nookara', typed);
+  }
+  // the rule is what discovery says, not the name: any homeserver that says so, and only `true` counts
+  assert.equal(hs.signInWith(await hs.resolve('other.example')), 'nookara');
+  assert.equal(hs.signInWith(await hs.resolve('bob@plain.example')), 'homeserver');
+  assert.equal(hs.signInWith(await hs.resolve('odd.example')), 'homeserver');
+  assert.equal(hs.signInWith(null), 'homeserver');
 });

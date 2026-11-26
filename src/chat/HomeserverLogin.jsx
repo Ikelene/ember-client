@@ -4,7 +4,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { ShieldCheck, Globe, TriangleAlert, ArrowLeft, ArrowRight } from 'lucide-react';
 import { DEFAULT_HOMESERVER, SESSIONS_KEY, CURRENT_KEY, parseHomeserver, resolve, probeDefault, recentHomeservers, currentSession, sessions, subscribe } from './homeserver.js';
-import { startSignIn, homeLogin } from './session.js';
+import { startSignIn, signInOn } from './session.js';
 
 // the v2 homeserver session in use (null = none), kept current across tabs
 let snapRaw = null, snapVal = null;
@@ -75,7 +75,7 @@ function OtherHomeserver({ back, onBack }) {
     e.preventDefault();
     if (!ok || busy) return;
     setBusy(true);
-    await homeLogin(look.hs, { hint: look.hint, back });
+    await signInOn(look.hs, { hint: look.hint, back });
     setBusy(false);
   }
   return (
@@ -86,7 +86,7 @@ function OtherHomeserver({ back, onBack }) {
       {ok && (
         <div className="vc-invite-srv vc-inst-card vc-hs-found">
           <HomeserverIcon hs={look.hs} />
-          <div><b>{look.hs.name}</b><small><Globe size={13} /> {look.hs.domain}</small>{look.hint && <small>Signing in as {look.hint}@{look.hs.domain}</small>}</div>
+          <div><b>{look.hs.name}</b><small><Globe size={13} /> {look.hs.domain}</small>{look.hs.nookara_identity ? <small><ShieldCheck size={13} /> Signs you in with Nookara</small> : look.hint && <small>Signing in as {look.hint}@{look.hs.domain}</small>}</div>
         </div>
       )}
       {look.status === 'error' && <p className="vc-err" role="alert"><TriangleAlert size={14} /> {RESOLVE_TEXT(look.error, look.domain)}</p>}

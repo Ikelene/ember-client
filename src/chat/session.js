@@ -8,7 +8,7 @@ import { toast, stopKeepingMessages } from './store.js';
 import { forgetAccount as forgetKeptMessages } from './msgCache.js';
 import { acctKey } from './ids.js';
 import { EMBER_API, notifBridge } from '../compat.js';
-import { DEFAULT_HOMESERVER, probeDefault, defaultProbe, startLogin, handleCallback, isCallbackHash, currentSession, signOut as forgetHome, signOutAll as forgetHomes } from './homeserver.js';
+import { DEFAULT_HOMESERVER, probeDefault, defaultProbe, startLogin, handleCallback, isCallbackHash, currentSession, signInWith, signOut as forgetHome, signOutAll as forgetHomes } from './homeserver.js';
 
 const STATE = 'ember_signin_state', BACK = 'ember_signin_back';
 export const hasNookara = () => !!getToken();
@@ -44,14 +44,20 @@ function popupSignIn(back) {
   }
 }
 // Signing in starts on the default homeserver, nookara.cc. Until it answers Ember Protocol v2 (homeserver.js) that is the
-// Nookara sign-in below, unchanged; once it does, the same button opens its login page like any other homeserver's.
+// Nookara sign-in below, unchanged; once it does, the same button opens its login page like any other homeserver's -
+// unless its accounts are Nookara accounts (homeserver.js signInWith): those keep signing in with Nookara.
 // -> a promise while a homeserver login is open (the session, or null), nothing for the Nookara sign-in
 export function startSignIn(back = {}) {
   if (!isWebEmber()) { startNookaraSignIn(back); return undefined; }
-  const via = p => (p?.v2 ? homeLogin(p.hs, { back }) : startNookaraSignIn(back));
+  const via = p => (p?.v2 ? signInOn(p.hs, { back }) : startNookaraSignIn(back));
   const known = defaultProbe();
   if (known) { if (known.error === 'unreachable') probeDefault(); return via(known); } // (answered already: the pop-up opens inside the click)
   return Promise.race([probeDefault(), new Promise(r => setTimeout(r, 2500))]).then(via);
+}
+// sign in on a homeserver that was looked up (the default one, or one typed in: nookara.cc, alice@nookara.cc, example.org)
+export function signInOn(hs, { hint, back = {} } = {}) {
+  if (signInWith(hs) === 'nookara') { startNookaraSignIn(back); return undefined; }
+  return homeLogin(hs, { hint, back });
 }
 // open a homeserver's login page (hs from homeserver.js resolve) and say how it went. -> the session | null
 export async function homeLogin(hs, { hint, back } = {}) {

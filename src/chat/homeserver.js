@@ -89,7 +89,7 @@ async function wellKnown(origin) {
   return old ? { legacy: true } : null;
 }
 const str = (v, max = 200) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
-// -> { domain, origin, name, icon_url, authorize_url, token_url, methods: [{ id, kind, name }], protocol }
+// -> { domain, origin, name, icon_url, authorize_url, token_url, methods: [{ id, kind, name }], protocol, nookara_identity?: true }
 export async function resolve(input) {
   const p = input && typeof input === 'object' ? input : parseHomeserver(input);
   if (!p?.origin || !p.domain) throw fail('invalid');
@@ -122,8 +122,11 @@ export async function resolve(input) {
     if (to !== origin) throw fail('domain_mismatch');
   }
   const methods = (Array.isArray(login.methods) ? login.methods : []).filter(x => x && typeof x === 'object' && str(x.id)).slice(0, 20).map(x => ({ id: str(x.id), kind: str(x.kind), name: str(x.name) || str(x.id) }));
-  return { domain, origin, name: str(info.name) || domain, icon_url: safeUrl(info.icon_url, origin)?.href || null, authorize_url: a.href, token_url: t.href, methods, protocol: versionOf(doc) };
+  return { domain, origin, name: str(info.name) || domain, icon_url: safeUrl(info.icon_url, origin)?.href || null, authorize_url: a.href, token_url: t.href, methods, protocol: versionOf(doc), ...(doc.accounts?.nookara_identity === true ? { nookara_identity: true } : {}) };
 }
+// How to sign in on a homeserver (hs from resolve). One whose accounts are Nookara accounts (discovery accounts.nookara_identity)
+// is signed in to with Nookara: DMs, keys and everything else those accounts have live there. -> 'nookara' | 'homeserver'
+export const signInWith = hs => (hs?.nookara_identity === true ? 'nookara' : 'homeserver');
 
 // Where a domain's servers live, for an address like slug@domain. Lighter than resolve(): it asks for no login block, so it
 // also answers for a server that signs people in the old way (protocol 1, with or without many servers).
@@ -148,6 +151,7 @@ export async function locate(input) {
 
 // nookara.cc is the default. Asked once per page load (the answer has to be ready by the time a button is clicked, a pop-up
 // can't wait for the network): { v2: true, hs } once it speaks protocol 2, { v2: false, error } until then (the old Nookara sign-in).
+// (v2 and signInWith(hs) === 'nookara': its accounts are Nookara's, so it is still the Nookara sign-in)
 let probing = null, probed = null;
 export function probeDefault() {
   return (probing ||= resolve(DEFAULT_HOMESERVER).then(hs => ({ v2: true, hs }), e => ({ v2: false, error: e?.code || 'failed' })).then(r => {
