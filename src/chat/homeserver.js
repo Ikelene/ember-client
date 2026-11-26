@@ -123,6 +123,27 @@ export async function resolve(input) {
   return { domain, origin, name: str(info.name) || domain, icon_url: safeUrl(info.icon_url, origin)?.href || null, authorize_url: a.href, token_url: t.href, methods, protocol: Number(doc.protocol) };
 }
 
+// Where a domain's servers live, for an address like slug@domain. Lighter than resolve(): it asks for no login block, so it
+// also answers for a server that signs people in the old way (protocol 1, with or without many servers).
+// -> { domain, origin, protocol_version (1 = one server per instance, 2 = many), doc }
+export async function locate(input) {
+  const p = input && typeof input === 'object' ? input : parseHomeserver(input);
+  if (!p?.origin || !p.domain) throw fail('invalid');
+  const read = async origin => (await getJson(`${origin}/.well-known/ember`)) || (await getJson(`${origin}/.well-known/bonfire`).catch(() => null));
+  let origin = p.origin, doc = await read(origin);
+  if (!doc) throw fail('not_found');
+  if (typeof doc.homeserver === 'string' && doc.homeserver) { // the domain points at its homeserver
+    const u = safeUrl(doc.homeserver);
+    if (!u) throw fail('bad_url');
+    if (u.origin !== origin) {
+      origin = u.origin;
+      doc = await read(origin);
+      if (!doc || typeof doc.homeserver === 'string') throw fail('not_homeserver'); // (one hop: a homeserver doesn't point on)
+    }
+  }
+  return { domain: p.domain, origin, protocol_version: Math.max(1, Math.floor(Number(doc.protocol_version)) || 1), doc };
+}
+
 // nookara.cc is the default. Asked once per page load (the answer has to be ready by the time a button is clicked, a pop-up
 // can't wait for the network): { v2: true, hs } once it speaks protocol 2, { v2: false, error } until then (the old Nookara sign-in).
 let probing = null, probed = null;
