@@ -2609,7 +2609,7 @@ async function refreshHomeMe() {
   } catch { /* offline: what the sign-in said stays */ }
 }
 // the home homeserver's socket is up (instances.js): what changed while it was down
-export function homeConnected(origin) { if (state.home?.origin === origin) { refreshHomeMe(); loadSocial(); dispatchEvent(new CustomEvent('ember-home-ready')); } }
+export function homeConnected(origin) { if (state.home?.origin === origin) { refreshHomeMe(); loadSocial(); } }
 export async function loadSocialFriends() {
   const h = state.home;
   if (!h) return;
@@ -2701,6 +2701,29 @@ function readSocialDm(id) {
   readAt.set(id, Date.now());
   socialApi.readDm(id).catch(() => {});
 }
+// ── profiles (4c.5): what a person's own homeserver says about them, asked through mine and kept a few minutes ──
+const profiles = new Map(); // stable id -> { at, p }
+export function socialProfileById(id) {
+  if (!state.home || !id) return Promise.resolve(null);
+  const key = stableId(id, state.home.domain), had = profiles.get(key);
+  if (had && Date.now() - had.at < 5 * 60 * 1000) return had.p;
+  const p = socialApi.profile(key).then(d => (d?.profile ? { ...d.profile, ...(d.stale ? { stale: true } : {}) } : null));
+  profiles.set(key, { at: Date.now(), p });
+  p.catch(() => profiles.delete(key));
+  return p;
+}
+// someone clicked on a server (who = the member / author object): their account's profile, when they have one a homeserver can
+// answer for (its own accounts and other homeservers' - not bots, not Nookara accounts). -> the profile | null
+export function socialProfileOf(who) {
+  if (!state.home || !who?.inst || who.bot || who.id == null || !/^l:|@/.test(String(who.id))) return Promise.resolve(null);
+  const inst = state.instances.find(i => i.origin === who.inst);
+  let host = ''; try { host = new URL(who.inst).host; } catch { /* odd */ }
+  return socialProfileById(String(who.id).includes('@') ? String(who.id) : `${who.id}@${inst?.homeserver?.domain || host}`).catch(() => null);
+}
+// a name as shown: username@domain, the domain left out for people on my own homeserver
+export const shownUser = name => (state.home && String(name || '').includes('@') ? shownHandleOf(name, state.home.domain) : name);
+const shownHandleOf = (name, domain) => { const { name: n, domain: d } = splitHandle(name); return !d || d === String(domain).toLowerCase() ? n : `${n}@${d}`; };
+
 const SOCIAL_TEXT = {
   cannot_friend_yourself: "That's you!", user_not_found: "Couldn't find anyone with that name.", wrong_homeserver: "Couldn't find anyone with that name.", blocked: "You can't send them a request.", user_blocked: 'You blocked them - unblock them first.',
   too_many_friends: 'Your friends list is full.', rate_limited: "You're doing that a lot - try again in a bit.", homeserver_rate_limited: 'Their homeserver is busy - try again in a bit.', no_request: 'That request is gone.', not_friends: "You're not friends any more.",

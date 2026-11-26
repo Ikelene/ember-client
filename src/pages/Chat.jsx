@@ -20,7 +20,8 @@ import { api, getToken, cachedMe, apiFetch, isWebEmber } from '../api.js';
 import { applyAccentColor } from '../theme.js';
 import { jumpToMessage, loginAgain, retryNow, useBotPeer, isMobileDevice, cachedMessages } from '../chat/store.js';
 import { BotTag } from '../chat/Bots.jsx';
-import { useChat, init, open, go, readHash, keyOf, loadGroups, loadMembers, toast, errorText, getState, ask, unreadTotals } from '../chat/store.js';
+import { useChat, init, open, go, readHash, keyOf, loadGroups, loadMembers, toast, errorText, getState, ask, unreadTotals, meFromHome, homeFrom } from '../chat/store.js';
+import SocialHome, { SocialSidebar, SocialDmHead } from '../chat/SocialHome.jsx';
 import { Rail, ServerSidebar, HomeSidebar, MemberList, UserPanel, VoiceQuotaNote, OutdatedNote, useConnLost } from '../chat/Parts.jsx';
 
 import { MessageList, Composer } from '../chat/Messages.jsx';
@@ -62,7 +63,7 @@ import { TestBotDialog } from '../chat/BotTest.jsx';
 import { AddInstance } from '../chat/Instances.jsx';
 import { InstanceGate, LockedScreen, SUPPORT_URL, SignInPrompt, SignedOutSidebar, RetryIn } from '../chat/Gate.jsx';
 import { finishSignIn, finishHomeLogin, homeLoginText, SIGNIN_TEXT } from '../chat/session.js';
-import { probeDefault } from '../chat/homeserver.js';
+import { probeDefault, currentSession } from '../chat/homeserver.js';
 import { parseLinkReturn, stripLinkReturn, loginErrorText } from '../chat/homeAdmin.js';
 import { SetupWizard } from '../chat/Setup.jsx';
 import { MenuHost, openMenu, copy } from '../chat/Menu.jsx';
@@ -443,7 +444,10 @@ function ChatPage() {
       signin.current = await finishSignIn(); // back from Nookara's approve-this-app screen (#/signin?code=...)
       if (!getToken()) {
         if (!web) { location.href = '/login'; return; }
-        init(null); setReady(true);
+        // no Nookara sign-in: a v2 homeserver session runs the app (my account, friends and DMs are on that homeserver)
+        const hs = currentSession(), home = homeFrom(hs);
+        if (home) init(meFromHome(hs.account), home); else init(null);
+        setReady(true);
         return;
       }
       const cached = cachedMe();
@@ -537,8 +541,11 @@ function ChatPage() {
   const unreadCount = useTabBadge();
   const createHosts = useCreateHosts(); // homeservers a server can be made on (none: Create a server is the hosting dialog, as before)
   const gateName = useChat(s => (view.kind === 'instance' ? s.instances.find(i => i.origin === view.inst)?.name : null));
-  useEffect(() => { document.title = `${unreadCount ? `(${unreadCount > 999 ? '999+' : unreadCount}) ` : ''}${channel ? `#${channel.name} - ${detail.server.name}` : view.kind === 'instance' ? gateName || 'Server' : view.kind === 'dm' ? `@${view.username}` : view.kind === 'notes' ? 'Personal Notes' : group ? group.name : 'Home'} | Ember`; }, [unreadCount, channel, detail, view, group, gateName]);
+  useEffect(() => { document.title = `${unreadCount ? `(${unreadCount > 999 ? '999+' : unreadCount}) ` : ''}${sdm ? sdmName || 'Conversation' : channel ? `#${channel.name} - ${detail.server.name}` : view.kind === 'instance' ? gateName || 'Server' : view.kind === 'dm' ? `@${view.username}` : view.kind === 'notes' ? 'Personal Notes' : group ? group.name : 'Home'} | Ember`; }, [unreadCount, channel, detail, view, group, gateName]);
   const signedIn = useChat(s => s.signedIn);
+  const homeMode = useChat(s => !!s.home); // on a v2 homeserver session (SocialHome.jsx)
+  const sdm = view.kind === 'channel' && view.dm ? view.dm : null; // a DM on a homeserver: a one-channel server underneath
+  const sdmName = useChat(s => (sdm ? s.detail[view.sid]?.server?.name : null));
   const locked = useChat(s => s.locked); // staff switched Ember and DMs off for the account (store.js lockAccount)
   const waking = view.kind === 'channel' && !!detail?.cached; // its kept channel list: still connecting
   const wakeStatus = useChat(s => { if (!waking || !isInst(view.sid)) return null; const i = s.instances.find(x => x.origin === instOf(view.sid)); return i && ['insufficient_scope', 'unauthorized', 'invalid_session'].includes(i.error) ? 'error' : i?.status; });
@@ -546,7 +553,7 @@ function ChatPage() {
   if (!ready) return <BootScreen />;
   if (locked) return <div className="vc"><LockedScreen /></div>; // (no rail, lists, dialogs or toasts: just the notice)
 
-  const isServer = view.kind === 'channel';
+  const isServer = view.kind === 'channel' && !sdm;
   const wakeGate = waking && !!wakeStatus && !['connecting', 'closed', 'open'].includes(wakeStatus); // signed out / banned / refused: its own screen
   const sysDM = view.kind === 'dm' && view.username === 'System';
   const modView = view.kind === 'modmail';
@@ -566,7 +573,9 @@ function ChatPage() {
     try { await apiFetch(`/groups/${group.room}/members/${encodeURIComponent(getState().me.username)}`, { method: 'DELETE' }); await loadGroups(); go({ kind: 'home' }); } catch (e) { toast(errorText(e.message)); }
   }
 
-  const title = isServer
+  const title = sdm
+    ? { icon: <AtSign size={34} />, big: sdmName || 'Conversation', sub: 'This is the start of the conversation. It is not end-to-end encrypted: the homeserver it is on can read it.' }
+    : isServer
     ? { icon: <ChIcon size={34} />, big: `Welcome to #${channel?.name || ''}`, sub: channel?.topic || `This is the start of the #${channel?.name} channel.` }
     : modView
       ? { icon: <ShieldCheck size={34} />, big: view.username ? `Moderator chat with ${view.username}` : 'Nookara Moderator Chat', sub: view.username ? `They see these as "Nookara Administrator" - never who sent them. Only Nookara staff see the names.` : "Messages from Nookara's admins. You can't reply here - if you need to answer, use nookara.cc/support." }
@@ -575,7 +584,7 @@ function ChatPage() {
     : view.kind === 'dm'
       ? (sysDM ? { icon: <AtSign size={34} />, big: 'Nookara', sub: 'Notices about your account: credits, reports and more.' } : { icon: <AtSign size={34} />, big: view.username, sub: `This is the start of your conversation with ${view.username}.` })
       : { icon: <UsersRound size={34} />, big: group?.name || 'Group chat', sub: 'This is the start of the group chat.' };
-  const sideKey = discover ? 'discover' : view.kind === 'channel' ? view.sid : 'home';
+  const sideKey = discover ? 'discover' : view.kind === 'channel' && !sdm ? view.sid : 'home';
 
   return (
     <div className={`vc${drawer ? ' drawer' : ''}${settings.compact ? ' compact' : ''}${settings.animations === false ? ' still' : ''}`}
@@ -595,17 +604,18 @@ function ChatPage() {
         ]);
         e.preventDefault();
       }}>
-      {signedIn && <NotificationBanner />}
+      {(signedIn || homeMode) && <NotificationBanner />}
       <GifPauseGate />
       <div className="vc-left" onClick={e => { const t = e.target.closest?.('.vc-dm, .vc-ch, .vc-home-link, .vc-rail-item'); if (!t || !drawer) return; const h = location.hash; setTimeout(() => { if (location.hash === h) closeDrawer(); }, 60); }}>
         <Rail discoverOn={discover} onDiscover={() => { if (drawer) { closeDrawer(); setTimeout(() => setDiscover(true), 320); } else setDiscover(true); }} onAddInstance={() => setDialog({ kind: 'add-instance' })} onCreate={() => setDialog({ kind: 'create-server' })} />
         <div className="vc-side-col">
           <div className="vc-side-swap" key={sideKey}>
             {discover ? <DiscoverSidebar tab={discoverTab} onTab={setDiscoverTab} />
+              : sdm ? <SocialSidebar />
               : view.kind === 'channel'
               ? <ServerSidebar sid={view.sid} onInvite={() => setDialog({ kind: 'invite' })} onSettings={() => setDialog({ kind: 'settings' })} onChannel={c => setDialog({ kind: 'channel', channel: c })} onLeave={leaveServer} onUser={openMini} />
               : view.kind === 'instance' ? <div className="vc-side" /> // a server that isn't connected yet: no channel list
-                : signedIn ? <HomeSidebar onNewDM={() => setDialog({ kind: 'dm' })} onNewGroup={() => setDialog({ kind: 'group' })} onQuick={() => setDialog({ kind: 'quick' })} /> : <SignedOutSidebar />}
+                : signedIn ? <HomeSidebar onNewDM={() => setDialog({ kind: 'dm' })} onNewGroup={() => setDialog({ kind: 'group' })} onQuick={() => setDialog({ kind: 'quick' })} /> : homeMode ? <SocialSidebar /> : <SignedOutSidebar />}
           </div>
           <VoicePanel />
           <VoiceQuotaNote />
@@ -626,7 +636,7 @@ function ChatPage() {
         {discover ? <DiscoverPage onClose={() => setDiscover(false)} tab={discoverTab} onTab={setDiscoverTab} /> : view.kind === 'home' || view.kind === 'instance' ? (
           <>
             <button type="button" className="vc-ico-btn vc-burger floating" onClick={openDrawer} title="Menu"><Menu size={19} /><DrawerBadge /></button>
-            {view.kind === 'instance' ? <InstanceGate origin={view.inst} /> : signedIn ? <Home onUser={openMini} /> : <SignInPrompt />}
+            {view.kind === 'instance' ? <InstanceGate origin={view.inst} /> : signedIn ? <Home onUser={openMini} /> : homeMode ? <SocialHome /> : <SignInPrompt />}
           </>
         ) : (
           <>
@@ -635,6 +645,7 @@ function ChatPage() {
             <header className="vc-head">
               <button type="button" className="vc-ico-btn vc-burger" onClick={openDrawer} title="Menu"><Menu size={19} /><DrawerBadge /></button>
               <button type="button" className="vc-ico-btn vc-back" onClick={openDrawer} title="Back to your chats" aria-label="Back to your chats"><ChevronLeft size={22} /><DrawerBadge /></button>
+              {sdm && <SocialDmHead id={sdm} />}
               {isServer && <><ChIcon size={20} className="vc-head-ico" /><b className="vc-head-name">{channel?.name || ''}</b>{(channel?.bridges || (channel?.bridged ? [channel.bridged] : [])).map(link => <span key={link.platform} className="vc-bridge-tag" title={link.platform === 'matrix' ? `Bridged with the Matrix room ${link.name}` : `Bridged with #${link.name} in the linked ${link.platform === 'discord' ? 'Discord' : 'Fluxer'} community`}><PlatformIcon p={link.platform} size={14} /> {link.platform === 'matrix' ? '' : '#'}{link.name}</span>)}{channel?.type === 'logs' && channel.config?.mode === 'cloudlink' && <span className="vc-bridge-tag" title={`Bridged with CloudLink (${channel.config.url}${channel.config.room ? `, room ${channel.config.room}` : ''}) - messages go both ways. Type !online to see who's there.`}><PlatformIcon p="cloudlink" size={14} /> CloudLink</span>}{channel?.topic && <span className="vc-head-topic" title={channel.topic}>{channel.topic}</span>}</>}
               {sysDM && <><b className="vc-head-name">Nookara</b><span className="vc-head-topic">Notices about your account</span></>}
               {modView && <><ShieldCheck size={20} className="vc-head-ico" /><b className="vc-head-name">{view.username ? `Moderator chat: ${view.username}` : 'Nookara Moderator Chat'}</b><span className="vc-head-topic">{view.username ? 'You write as Nookara Administrator' : 'From Nookara\'s admins - read only'}</span></>}
@@ -655,7 +666,7 @@ function ChatPage() {
               {view.kind === 'dm' && !sysDM && staff && <button type="button" className="vc-ico-btn" title="Message them as Nookara Administrator (Nookara Moderator Chat)" onClick={() => go({ kind: 'modmail', username: view.username })}><ShieldCheck size={19} /></button>}
               {view.kind === 'dm' && !sysDM && <DmCallButton username={view.username} />}
               {view.kind === 'dm' && !sysDM && <button type="button" className="vc-ico-btn" title={`Report @${view.username} to Nookara staff`} aria-label={`Report @${view.username}`} onClick={() => reportDmUser(view.username)}><Flag size={19} /></button>}
-              {(isServer || (view.kind === 'dm' && !sysDM) || view.kind === 'group') && <PanelToggle on={showMembers} onClick={() => setShowMembers(x => !x)} />}
+              {(isServer || sdm || (view.kind === 'dm' && !sysDM) || view.kind === 'group') && <PanelToggle on={showMembers} onClick={() => setShowMembers(x => !x)} />}
             </header>
             <div className="vc-body">
               <div className="vc-convo" key={keyOf(view)}>
@@ -671,16 +682,16 @@ function ChatPage() {
                 {!waking && channel?.type === 'game' && <GameChatStrip channel={channel} />}
                 <div className="vc-convo-stack">
                   {!waking && <MessageList view={view} onUser={openMini} onReply={setReplyTo} canPost={canPost} canMod={canMod} channels={detail?.channels} title={title} />}
-                  {isServer && <WakeOverlay view={view} title={title} waking={waking} />}
+                  {(isServer || sdm) && <WakeOverlay view={view} title={title} waking={waking} />}
                 </div>
                 {!waking && channel?.type === 'game' && <GameOfflineNote channel={channel} />}
                 <Composer view={view} sendOff={waking} locked={!waking && ((isServer && !canPost) || sysDM || (modView && !view.username))} lockedText={sysDM ? "These are Nookara's own notices - there's no one to reply to here." : modView ? "This is a message from Nookara's admins - you can't reply here." : detail?.server?.read_only ? 'This server is read-only.' : lockedTextFor(channel)}
  replyTo={replyTo} setReplyTo={setReplyTo}
-                  placeholder={waking ? 'Connecting to the chat server...' : modView ? `Message ${view.username} as Nookara Administrator` : notesView ? 'Write a note to yourself' : isServer ? `Message #${channel?.name || ''}${channel?.type === 'game' ? ' (also shows in Minecraft)' : ''}` : view.kind === 'dm' ? `Message @${view.username}` : `Message ${group?.name || 'the group'}`} /></>}
+                  placeholder={waking ? 'Connecting to the chat server...' : modView ? `Message ${view.username} as Nookara Administrator` : notesView ? 'Write a note to yourself' : sdm ? `Message ${sdmName || ''}` : isServer ? `Message #${channel?.name || ''}${channel?.type === 'game' ? ' (also shows in Minecraft)' : ''}` : view.kind === 'dm' ? `Message @${view.username}` : `Message ${group?.name || 'the group'}`} /></>}
               </div>
             </div>
             </div>
-              {showMembers && (isServer || (view.kind === 'dm' && view.username !== 'System') || (view.kind === 'group' && group)) && (
+              {showMembers && (isServer || sdm || (view.kind === 'dm' && view.username !== 'System') || (view.kind === 'group' && group)) && (
                 <><div className="vc-panel-scrim" onClick={() => setShowMembers(false)} /><SidePanel view={view} channel={channel} detail={detail} group={group} onUser={openMini} onLeaveGroup={leaveGroup} onClose={() => setShowMembers(false)} /></>
               )}
             </div>

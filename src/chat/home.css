@@ -92,3 +92,16 @@ html.vc-rounded .hm-friend-msg { border-radius: calc(8px * var(--rk, 1)); }
 html.vc-rounded .hm-friend-msg:hover { background: var(--m-on); }
 html.vc-rounded .hm-ico { border-radius: calc(10px * var(--rk, 1)); background: var(--m-on); }
 html.vc-rounded .hm-sub { font-size: 12px; font-weight: 600; letter-spacing: .04em; }
+
+/* a homeserver session's Home (SocialHome.jsx): a person's card, the new-conversation picker, the "not encrypted" note */
+.sh-card { display: flex; flex-direction: column; gap: 12px; }
+.sh-card-top { display: flex; align-items: center; gap: 14px; }
+.sh-card-top > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sh-card-top small { color: var(--muted); font-size: 12.5px; }
+.sh-bio { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+.sh-card .dialog-actions { flex-wrap: wrap; }
+.sh-pick { display: flex; flex-direction: column; max-height: 220px; overflow-y: auto; margin-bottom: 10px; }
+.sh-pick-row { display: flex; align-items: center; gap: 9px; padding: 5px 4px; cursor: pointer; min-width: 0; }
+.sh-pick-row:hover { background: rgba(255, 255, 255, .04); }
+.sh-pick-row small { color: var(--muted); font-size: 12px; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sh-noe2ee { display: inline-flex; align-items: center; gap: 5px; }

@@ -7,7 +7,7 @@ import { createPortal } from 'react-dom';
 import { MessageCircle, Maximize2, X, UserPlus, Check, Clock, ExternalLink, Globe, Gamepad2, Music, Tv, Trophy, Radio, MoreHorizontal, Pencil, CalendarDays, LogIn, ShieldCheck, Crown, UserMinus, Ban, Link as LinkIcon, Plus } from 'lucide-react';
 import { apiFetch, getToken } from '../api.js';
 import { BotTag, AddBotButton, TrustedIn } from './Bots.jsx';
-import { useChat, lookup, go, wantPresence, toast, errorText, getState, setCustom, ask, loadFriends, toggleBlock, memberRef, faceOf, botPresenceOf, loadMembers, onUserUpdate, markBotPeer, cleanServerProfile } from './store.js';
+import { useChat, lookup, go, wantPresence, toast, errorText, getState, setCustom, ask, loadFriends, toggleBlock, memberRef, faceOf, botPresenceOf, loadMembers, onUserUpdate, markBotPeer, cleanServerProfile, socialProfileOf, shownUser } from './store.js';
 import { isInst } from './ids.js';
 import { hasAccountProfile, accountTarget } from './accountProfileCore.js';
 import { ServerIcon } from './ServerIcon.jsx';
@@ -226,6 +226,8 @@ function useProfile(username, who, sid) {
     setP(null); setExtra(null);
     if (plainOn(who)) {
       setP({ username, plain: true });
+      // on a homeserver session: their account's own profile, from their homeserver (bio, pronouns, picture, colour)
+      socialProfileOf(who).then(sp => { if (!gone && sp) setP({ username, plain: true, server_profile: true, social: true, handle: sp.handle || null, display_name: sp.display_name || '', pfp_url: sp.avatar_url || who.pfp || null, banner_url: sp.banner_url || null, color: sp.color || null, bio: sp.bio || '', pronouns: sp.pronouns || '' }); }).catch(() => {});
       if (who?.bot) instanceBotInfo(who, username).then(x => !gone && setExtra(x)).catch(() => {});
       return () => { gone = true; };
     }
@@ -322,7 +324,7 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
   const act = async what => { setMenu(false); if (await moderate(sid, username, what, member)) onClose?.(); };
   const canMod = canKick || canBan;
   // display name big, @username small beside the pronouns (displayNames.js). An Ember server's own name for them wins there.
-  const handle = plain ? username : p?.username || vname;
+  const handle = plain ? shownUser(p?.handle || username) : p?.username || vname;
   const serverName = who?.inst && who?.display_name && who.display_name !== who.username ? who.display_name : '';
   const bigName = (plain ? who?.display_name : serverName || p?.display_name) || handle;
 

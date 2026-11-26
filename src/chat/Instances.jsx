@@ -11,7 +11,7 @@ import { Avatar } from './Profile.jsx';
 import { useChat, go, toast, errorText, ask } from './store.js';
 import { Toggle } from './roles.jsx';
 import { PlatformIcon } from './platforms.jsx';
-import { discover, nookaraSession, localSession, addInstance, loginInstance, instanceConn, refreshInstance, joinCommunity, joinByAddress, hostOf } from './instances.js';
+import { discover, nookaraSession, localSession, addInstance, loginInstance, instanceConn, refreshInstance, joinCommunity, joinByAddress, hostOf, canHomeConnect, homeConnect } from './instances.js';
 import { communityOf, parseAddress } from './addresses.js';
 import { K } from './ids.js';
 import { startSignIn, hasNookara } from './session.js';
@@ -19,6 +19,13 @@ import { useUnsaved, UnsavedBar } from './unsaved.jsx';
 import { PlanGate, planOf } from './PlanGate.jsx';
 import { joinLabel, joinHint } from './Community.jsx';
 import { EMBER_API, INST_REGISTER_NOOKARA, NOOKARA_WIRE, isNookara, accountsMode, nookaraInfo, nookaraUrl, nookaraRegistration, NOOKARA_URL_FIELD, SERVER_ENV } from '../compat.js';
+
+// why another homeserver wouldn't take my account (PROTOCOL 4b)
+const homeConnectText = (code, host) => ({
+  remote_accounts_off: `${host} doesn't take accounts from other homeservers.`, homeserver_not_allowed: `${host} doesn't take accounts from your homeserver.`, homeserver_denied: `${host} doesn't take accounts from your homeserver.`,
+  banned: `You're banned from ${host}.`, homeserver_unreachable: `${host} couldn't reach your homeserver.`, homeserver_rate_limited: `${host} is getting too many sign-ins from your homeserver - try again in a bit.`,
+  account_not_hosted_here: "Your account can't sign in to other homeservers.", signed_out: 'Your sign-in ended - sign in again.',
+}[code] || `Couldn't sign in to ${host} with your account - you can log in there directly instead.`);
 
 function InstanceCard({ origin, info }) {
   const c = info.community;
@@ -59,8 +66,15 @@ export function AddInstance({ url, invite, server, onClose, onSetup, onCreate })
     try {
       const d = await discover(value);
       setFound(d); setText(d.origin);
+      // on a homeserver session: my homeserver, or one that lets other homeservers' accounts in, connects with my account right away
+      if (!instanceConn(d.origin)?.session && canHomeConnect(d.origin, d.info) && d.info.claimed !== false) {
+        try {
+          const c = await homeConnect(d.origin, d.info);
+          if (!d.info.community && c.isAdmin && server == null) onSetup?.(d.origin); else setStep('join');
+        } catch (e) { setErr(homeConnectText(e.message, hostOf(d.origin))); setStep('auth'); }
+      }
       // a server that uses Nookara accounts, while signed in: no Connect step, it connects with this account right away
-      if (!instanceConn(d.origin)?.session && isNookara(d.info.accounts_mode) && hasNookara() && d.info.claimed !== false && (d.info.community || server != null)) {
+      else if (!instanceConn(d.origin)?.session && isNookara(d.info.accounts_mode) && hasNookara() && d.info.claimed !== false && (d.info.community || server != null)) {
         try { await authed(await nookaraSession(d.origin), d); } catch { setStep('auth'); }
       } else setStep(instanceConn(d.origin)?.session ? 'join' : 'auth');
     } catch (e) { setErr(errorText(e.message)); setStep('url'); }
