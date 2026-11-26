@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Signing in to Ember</title>
+    <style>
+      html, body { height: 100%; margin: 0; background: #0b0b0d; color: #a1a1aa; font: 14px/1.5 system-ui, sans-serif; }
+      body { display: grid; place-items: center; text-align: center; padding: 24px; box-sizing: border-box; }
+    </style>
+  </head>
+  <body>
+    <p id="note">Signing in...</p>
+    <script>
+      // Where a homeserver's login page sends the pop-up back to (Ember Protocol v2). It hands the code to the Ember tab that
+      // opened it - only to Ember's own origin - and closes. Nothing else happens here: the tab that asked checks `state`.
+      (function () {
+        var q = new URLSearchParams(location.search);
+        var msg = { type: 'ember-auth', code: q.get('code'), state: q.get('state'), error: q.get('error'), error_description: q.get('error_description') };
+        try { history.replaceState(null, '', location.pathname); } catch (e) { /* fine */ }
+        var sent = false;
+        try { if (window.opener && window.opener !== window) { window.opener.postMessage(msg, location.origin); sent = true; } } catch (e) { /* cut off */ }
+        // the login page may have cut the opener off: a BroadcastChannel reaches the same (same-origin) tab
+        if (!sent) try { var c = new BroadcastChannel('ember-auth'); c.postMessage(msg); c.close(); sent = true; } catch (e) { /* old browser */ }
+        document.getElementById('note').textContent = sent ? 'You can close this window.' : 'Go back to Ember and try signing in again.';
+        setTimeout(function () { try { window.close(); } catch (e) { /* not ours to close */ } }, sent ? 150 : 4000);
+      })();
+    </script>
+  </body>
+</html>
