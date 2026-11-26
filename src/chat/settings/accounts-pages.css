@@ -6,6 +6,9 @@
 .ac-hero-txt b { font-size: 18px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ac-kicker { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .ac-btns { flex: none; display: flex; flex-wrap: wrap; gap: 8px; }
+.ac-hs { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.ac-hs .vc-gate-btns { margin-top: 0; }
+.ac-hs .vc-hs-form { max-width: 420px; margin: 0 auto; }
 .ac-btns.end { justify-content: flex-end; }
 .ac-btns .btn, .ac-acts .btn { display: inline-flex; align-items: center; gap: 6px; }
 

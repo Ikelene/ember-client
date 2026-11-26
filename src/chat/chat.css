@@ -2187,6 +2187,14 @@ a.vc-appdl-opt { text-decoration: none; }
 .vc-gate-link { display: inline-flex; align-items: center; gap: 5px; padding: 2px 0; background: none; border: 0; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
 .vc-gate-link:hover:not(:disabled) { color: var(--text); text-decoration: underline; }
 .vc-gate-link:disabled { cursor: default; opacity: .6; }
+.vc-hs-form { width: 100%; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.vc-hs-form .vc-field, .vc-hs-form .vc-hs-found, .vc-hs-form .vc-err { margin: 0; }
+.vc-hs-form .vc-gate-btns { justify-content: space-between; }
+.vc-hs-form .vc-gate-btns .btn { display: inline-flex; align-items: center; gap: 6px; }
+.vc-hs-form .vc-gate-links { justify-content: flex-start; margin-top: 2px; }
+.vc-hs-looking { display: inline-flex; align-items: center; gap: 8px; }
+.vc-hs-looking .vc-gate-spin { width: 14px; height: 14px; border-width: 2px; flex: none; }
+.vc-hs-foot { text-align: center; }
 .vc-gate-code { width: 100%; margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--border); }
 .vc-gate-spin { width: 30px; height: 30px; border: 3px solid var(--border-2); border-top-color: var(--accent); border-radius: 50%; animation: vc-spin .8s linear infinite; }
 .vc-tip-server .vc-tip-host { display: flex; align-items: center; gap: 4px; font-style: normal; color: var(--muted); font-size: 11.5px; margin-top: -2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 240px; }

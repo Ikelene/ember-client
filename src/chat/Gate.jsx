@@ -6,7 +6,8 @@ import { useChat, go, toast, errorText, ask, RESTRICTED_TEXT } from './store.js'
 import { initials } from './Parts.jsx';
 import { reconnect, joinCommunity, removeInstance } from './instances.js';
 import { joinLabel, joinHint } from './Community.jsx';
-import { startSignIn } from './session.js';
+import { startSignIn, signOutHome } from './session.js';
+import { HomeserverLogin, useHomeSession } from './HomeserverLogin.jsx';
 import { signOut, savedAccounts, switchTo } from './ProfilePopout.jsx';
 import { siteHref } from './hosts.js';
 import { StatusLink } from './StatusLink.jsx';
@@ -78,12 +79,23 @@ export function RetryIn({ at, busy }) {
   return <small>{busy || !at || !s ? 'Trying again...' : `Retrying in ${s} s`}</small>;
 }
 
+// The login screen: nookara.cc (the default homeserver) or another one. Signed in on a homeserver already (and not with
+// Nookara): that account, and what it can't do yet.
 export function SignInPrompt({ what = 'direct messages, group chats and friends', back }) {
+  const home = useHomeSession();
+  if (home) {
+    return (
+      <Box icon={<ShieldCheck size={34} />} title={`Signed in as ${home.account.handle}`}>
+        <p>Your account is on {home.name}. A Nookara account is still needed for {what}; servers you add work with their own sign-in.</p>
+        <div className="vc-gate-btns"><button type="button" className="btn btn-primary" onClick={() => startSignIn(back)}><ShieldCheck size={15} /> Sign in with Nookara</button></div>
+        <div className="vc-gate-links"><button type="button" className="vc-gate-link" onClick={() => signOutHome(home.origin)}><LogOut size={12} /> Sign out of {home.account.handle}</button></div>
+      </Box>
+    );
+  }
   return (
-    <Box icon={<ShieldCheck size={34} />} title="Sign in with Nookara">
-      <p>Your Nookara account is needed for {what}. Servers with their own accounts work without it.</p>
-      <div className="vc-gate-btns"><button type="button" className="btn btn-primary" onClick={() => startSignIn(back)}><ShieldCheck size={15} /> Sign in with Nookara</button></div>
-      <small>Ember asks you to approve it first and keeps its own sign-in - the website's session isn't used.</small>
+    <Box icon={<ShieldCheck size={34} />} title="Sign in to Ember">
+      <p>Your account lives on a homeserver and is needed for {what}. Servers with their own accounts work without it.</p>
+      <HomeserverLogin back={back} />
     </Box>
   );
 }

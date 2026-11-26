@@ -7,7 +7,8 @@ import { SettingsPage, SCard } from './ui.jsx';
 import { useChat, ask, go, toast } from '../store.js';
 import { getToken, apiFetch } from '../../api.js';
 import { removeInstance, reconnect, dropNookaraSessions } from '../instances.js';
-import { startSignIn } from '../session.js';
+import { startSignIn, nookaraHandle, signOutHome, signOutHomes } from '../session.js';
+import { HomeserverLogin, HomeserverIcon, useHomeSessions } from '../HomeserverLogin.jsx';
 import { signOut, savedAccounts, switchTo } from '../ProfilePopout.jsx';
 import { Avatar } from '../Profile.jsx';
 import { ServerIcon } from '../ServerIcon.jsx';
@@ -37,11 +38,17 @@ export function AccountsPage({ onClose }) {
   const instances = useChat(s => s.instances || NONE);
   const localInstances = instances.filter(i => !isNookara(i.mode) && !i.needsNookara); // (Nookara-linked ones are left out, see Server accounts)
   const [busy, setBusy] = useState('');
+  const homes = useHomeSessions(); // homeserver (v2) sign-ins
   const others = signedIn ? savedAccounts().filter(a => a.username.toLowerCase() !== String(me?.username || '').toLowerCase()) : [];
 
   async function signOutNookara() {
     if (!(await ask({ title: 'Sign out of Nookara?', text: 'Ember signs out on this device. Servers that use Nookara sign-in sign out too.', confirm: 'Sign out', danger: true }))) return;
     await signOut();
+  }
+  async function signOutOfHome(s) {
+    if (!(await ask({ title: `Sign out of ${s.account.handle}?`, text: `Ember forgets its sign-in for ${s.domain} on this device.`, confirm: 'Sign out', danger: true }))) return;
+    signOutHome(s.origin);
+    toast(`Signed out of ${s.account.handle}.`, true);
   }
   async function signOutAll() {
     const own = instances.filter(i => !isNookara(i.mode));
@@ -50,6 +57,7 @@ export function AccountsPage({ onClose }) {
     setBusy('all');
     for (const i of own) await removeInstance(i.origin).catch(() => {}); // (before Nookara: the synced list is saved with this sign-in)
     dropNookaraSessions();
+    signOutHomes();
     if (signedIn) await signOut();
     else setBusy('');
   }
@@ -62,7 +70,7 @@ export function AccountsPage({ onClose }) {
             <Avatar user={me} size={64} />
             <div className="ac-hero-txt">
               <small className="ac-kicker">Nookara account</small>
-              <b>@{me.username}</b>
+              <b>{nookaraHandle(me.username)}</b>
               <span className="ac-state ok">Signed in</span>
             </div>
             <div className="ac-btns">
@@ -71,24 +79,40 @@ export function AccountsPage({ onClose }) {
             </div>
           </div>
         ) : (
-          <div className="ac-hero-in">
-            <span className="ac-hero-blank"><CircleUserRound size={30} /></span>
-            <div className="ac-hero-txt">
-              <small className="ac-kicker">Nookara account</small>
-              <b>Not signed in</b>
-              <span className="ac-state">Sign in to use DMs, friends and servers that use Nookara sign-in.</span>
+          <>
+            <div className="ac-hero-in">
+              <span className="ac-hero-blank"><CircleUserRound size={30} /></span>
+              <div className="ac-hero-txt">
+                <small className="ac-kicker">Nookara account</small>
+                <b>Not signed in</b>
+                <span className="ac-state">Sign in to use DMs, friends and servers that use Nookara sign-in.</span>
+              </div>
             </div>
-            <div className="ac-btns"><button type="button" className="btn btn-primary" onClick={() => startSignIn()}><LogIn size={14} /> Sign in with Nookara</button></div>
-          </div>
+            <div className="ac-hs"><HomeserverLogin /></div>
+          </>
         )}
       </SCard>
+
+      {homes.length > 0 && (
+        <SCard title="Homeserver accounts" sub="Accounts you signed in to on their own homeserver.">
+          {homes.map(s => (
+            <div className="sx-list-row" key={s.origin}>
+              {s.account.avatar_url ? <Avatar user={{ username: s.account.username, pfp: s.account.avatar_url }} size={36} /> : <HomeserverIcon hs={s} className="ac-ico" />}
+              <div className="sx-row-txt"><b>{s.account.handle}</b><span>{s.account.display_name !== s.account.username ? `${s.account.display_name} - ` : ''}{s.name}</span></div>
+              <div className="sx-row-ctl">
+                <button type="button" className="btn btn-surface btn-sm" onClick={() => signOutOfHome(s)}><LogOut size={13} /> Sign out</button>
+              </div>
+            </div>
+          ))}
+        </SCard>
+      )}
 
       {others.length > 0 && (
         <SCard title="Other Nookara accounts on this device" sub="Switch to one without signing in again.">
           {others.map(a => (
             <div className="sx-list-row" key={a.username}>
               <Avatar user={{ username: a.username, pfp: a.pfp }} size={36} />
-              <div className="sx-row-txt"><b>@{a.username}</b><span>Saved on this device</span></div>
+              <div className="sx-row-txt"><b>{nookaraHandle(a.username)}</b><span>Saved on this device</span></div>
               <div className="sx-row-ctl">
                 <button type="button" className="btn btn-surface btn-sm" disabled={!!busy} onClick={() => switchTo(a, setBusy)}><Repeat size={13} /> {busy === a.username ? 'Switching...' : 'Switch'}</button>
               </div>
@@ -105,7 +129,7 @@ export function AccountsPage({ onClose }) {
         )}
       </SCard>
 
-      {(signedIn || instances.length > 0) && (
+      {(signedIn || instances.length > 0 || homes.length > 0) && (
         <SCard title="Sign out of everything" sub="Nookara, and every server on this device.">
           <div className="ac-btns end">
             <button type="button" className="btn btn-danger" disabled={busy === 'all'} onClick={signOutAll}><LogOut size={14} /> {busy === 'all' ? 'Signing out...' : 'Sign out of everything'}</button>

@@ -24,6 +24,7 @@ import { loudUnread, needsChannelCount } from './unread.js';
 import { getLook, subscribeLook } from './look.js';
 import { removeInstance, reorderInstances, reconnect as reconnectInstance, disconnectInstance } from './instances.js';
 import { startSignIn } from './session.js';
+import { useHomeSession } from './HomeserverLogin.jsx';
 import { Avatar, subtitle, RoleChip, STATUS_LABEL, BlockedMark, openProfileEditor } from './Profile.jsx';
 import { hasAccountProfile, accountTarget } from './accountProfileCore.js';
 import { MePopout } from './ProfilePopout.jsx';
@@ -852,6 +853,7 @@ export function UserPanel({ onSettings, onEditProfile }) {
   // the account of the server I'm looking at, when it's one of that server's own (not a Nookara one): that's who I am there
   const view = useChat(s => s.view);
   const here = useChat(s => { const o = view.inst || (view.sid && isInst(view.sid) ? instOf(view.sid) : null); return o ? s.instances.find(i => i.origin === o) : null; });
+  const home = useHomeSession(); // signed in on a homeserver (v2), shown while there's no Nookara account to show
   const [pop, setPop] = useState(null); // the panel's rect while the pop-out is open
   const [custom, setCustomOpen] = useState(false);
   const ref = useRef(null);
@@ -867,6 +869,7 @@ export function UserPanel({ onSettings, onEditProfile }) {
     return (
       <div className="vc-me">
         {u ? (editable ? <button type="button" className="vc-me-who" title="Edit your profile on this server" onClick={() => openProfileEditor(accountTarget(here.origin))}>{who}</button> : <div className="vc-me-who">{who}</div>)
+          : home ? <div className="vc-me-who" title={home.account.handle}><Avatar user={{ username: home.account.username, pfp: home.account.avatar_url }} size={36} /><span className="vc-me-txt"><b>{home.account.display_name}</b><small>{home.account.handle}</small></span></div>
           : <button type="button" className="vc-me-who" onClick={() => startSignIn()} title="Sign in with Nookara"><span className="vc-av vc-sys-av" style={{ width: 36, height: 36 }}><UserRound size={19} /></span><span className="vc-me-txt"><b>Not signed in</b><small>Sign in with Nookara</small></span></button>}
         <QuickVoiceBtns />
         <button type="button" className="vc-ico-btn" onClick={onSettings} title="Settings"><Settings size={17} /></button>
