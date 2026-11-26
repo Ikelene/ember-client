@@ -80,9 +80,11 @@ async function getJson(url) {
   } catch { throw fail('unreachable'); } finally { clearTimeout(timer); }
 }
 // an origin's discovery doc -> { doc } (protocol 2) | { legacy: true } (an older Ember server) | null (nothing there)
+// ember-server keeps `protocol: 1` for old clients and says `protocol_version: 2`; a domain's delegation doc says `protocol: 2`
+const versionOf = doc => Math.max(Number(doc.protocol) || 0, Number(doc.protocol_version) || 0);
 async function wellKnown(origin) {
   const doc = await getJson(`${origin}/.well-known/ember`);
-  if (doc) return Number(doc.protocol) >= 2 ? { doc } : { legacy: true };
+  if (doc) return versionOf(doc) >= 2 ? { doc } : { legacy: true };
   const old = await getJson(`${origin}/.well-known/bonfire`).catch(() => null);
   return old ? { legacy: true } : null;
 }
@@ -120,7 +122,7 @@ export async function resolve(input) {
     if (to !== origin) throw fail('domain_mismatch');
   }
   const methods = (Array.isArray(login.methods) ? login.methods : []).filter(x => x && typeof x === 'object' && str(x.id)).slice(0, 20).map(x => ({ id: str(x.id), kind: str(x.kind), name: str(x.name) || str(x.id) }));
-  return { domain, origin, name: str(info.name) || domain, icon_url: safeUrl(info.icon_url, origin)?.href || null, authorize_url: a.href, token_url: t.href, methods, protocol: Number(doc.protocol) };
+  return { domain, origin, name: str(info.name) || domain, icon_url: safeUrl(info.icon_url, origin)?.href || null, authorize_url: a.href, token_url: t.href, methods, protocol: versionOf(doc) };
 }
 
 // Where a domain's servers live, for an address like slug@domain. Lighter than resolve(): it asks for no login block, so it

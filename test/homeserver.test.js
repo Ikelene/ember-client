@@ -128,6 +128,17 @@ test('resolve: a domain that is its own homeserver', async () => {
   } finally { await m.close(); }
 });
 
+test('resolve: ember-server keeps protocol 1 for old clients and says protocol_version 2', async () => {
+  fresh();
+  const m = await listen((req, send) => (req.url === '/.well-known/ember' ? send(200, { protocol: 1, protocol_version: 2, homeserver: { name: 'Real Shape' }, login: { authorize_url: '/login', token_url: '/api/v2/auth/token', methods: [{ id: 'password', kind: 'password', name: 'Password' }] } }) : send(404, {})));
+  try {
+    const r = await hs.resolve(m.host);
+    assert.equal(r.protocol, 2);
+    assert.equal(r.authorize_url, `${m.origin}/login`);
+    assert.equal(r.token_url, `${m.origin}/api/v2/auth/token`);
+  } finally { await m.close(); }
+});
+
 test('resolve: a domain that points at its homeserver, and the homeserver typed directly', async () => {
   fresh();
   let domainHost = '';
