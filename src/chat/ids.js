@@ -118,7 +118,7 @@ export function unNsBody(inst, body) {
 }
 // a path like /chat/servers/x -> /api/v1/servers/x on an instance (a /chat path is the compatibility layer; nothing else leaves)
 export function instPath(path) {
-  if (/^\/api\/v1\//.test(path)) return path;
+  if (/^\/api\/v[12]\//.test(path)) return path; // (v2: a homeserver's account settings, PROTOCOL 4a)
   if (/^\/chat\//.test(path)) return `/api/v1/${path.slice(6)}`;
   throw Object.assign(new Error('not_on_instances'), { status: 400 });
 }

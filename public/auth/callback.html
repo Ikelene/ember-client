@@ -18,12 +18,15 @@
       (function () {
         var q = new URLSearchParams(location.search);
         var msg = { type: 'ember-auth', code: q.get('code'), state: q.get('state'), error: q.get('error'), error_description: q.get('error_description') };
+        // back from linking a login to the account (Settings > My account): ?linked=<method id> or ?link_error=<code>
+        var link = q.has('linked') || q.has('link_error');
+        if (link) msg = { type: 'ember-link', linked: q.get('linked'), link_error: q.get('link_error') };
         try { history.replaceState(null, '', location.pathname); } catch (e) { /* fine */ }
         var sent = false;
         try { if (window.opener && window.opener !== window) { window.opener.postMessage(msg, location.origin); sent = true; } } catch (e) { /* cut off */ }
         // the login page may have cut the opener off: a BroadcastChannel reaches the same (same-origin) tab
         if (!sent) try { var c = new BroadcastChannel('ember-auth'); c.postMessage(msg); c.close(); sent = true; } catch (e) { /* old browser */ }
-        document.getElementById('note').textContent = sent ? 'You can close this window.' : 'Go back to Ember and try signing in again.';
+        document.getElementById('note').textContent = sent ? 'You can close this window.' : link ? 'Go back to Ember: your sign-in methods are in Settings.' : 'Go back to Ember and try signing in again.';
         setTimeout(function () { try { window.close(); } catch (e) { /* not ours to close */ } }, sent ? 150 : 4000);
       })();
     </script>

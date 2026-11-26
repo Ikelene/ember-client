@@ -70,12 +70,7 @@ export function secretToSend(typed) {
   const t = typeof typed === 'string' ? typed.trim() : '';
   return !t || isMasked(t) ? '' : t;
 }
-// the server has no "forget this secret": a stored one only goes when its method does (methods are matched by id + kind),
-// so clearing = the same method under another id. -> the method to send, or the same one when it has no secret to clear
-export function withSecretCleared(m, methods = []) {
-  if (!hasSecret(m)) return { ...m, client_secret: '' };
-  return { ...m, id: uniqueId(m.id, methods), client_secret: '' };
-}
+// (the server has no "forget this secret": a stored one only goes when its method does)
 
 // ── what is sent ──
 const URLS = ['authorize_url', 'token_url', 'userinfo_url'];
@@ -162,6 +157,7 @@ export function loginErrorText(code, name) {
     case 'unknown_method': return "This homeserver doesn't offer that sign-in any more.";
     case 'invalid_return_to': return "This homeserver doesn't know this copy of Ember, so it can't send you back here. Link it from the homeserver's own account page.";
     case 'access_denied': case 'declined': case 'cancelled': return 'Linking was cancelled.';
+    case 'link_refused': return "This homeserver doesn't let Ember start linking from here yet. Use the homeserver's own account page.";
     case 'blocked': return 'Your browser blocked the pop-up. Allow pop-ups for this site and try again.';
     case 'signed_out': return 'Your sign-in to this homeserver ended. Sign in again.';
     case 'unreachable': return "Couldn't reach the homeserver. Check your connection and try again.";

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PRESETS, presetMethod, presetOf, uniqueId, validId, isMasked, hasSecret, secretToSend, withSecretCleared, methodToSend, methodsToSend, methodIssues, sameMethods,
+import { PRESETS, presetMethod, presetOf, uniqueId, validId, isMasked, hasSecret, secretToSend, methodToSend, methodsToSend, methodIssues, sameMethods,
   callbackUrl, hostList, nameList, adminErrorText, loginErrorText, parseLinkReturn, stripLinkReturn, checkLinkMessage } from '../src/chat/homeAdmin.js';
 
 test('presets: every one the settings offer, with what it fixes', () => {
@@ -59,12 +59,6 @@ test('secrets: the masked one and an empty box keep, a new value replaces', () =
   assert.equal(methodToSend({ id: 'corp', kind: 'oidc', name: 'Corp', issuer: 'https://id.example', client_id: 'c', client_secret: '********WXYZ' }).client_secret, '');
   assert.equal(methodToSend({ id: 'corp', kind: 'oidc', name: 'Corp', issuer: 'https://id.example', client_id: 'c', client_secret: 's3cret' }).client_secret, 's3cret');
 });
-test('secrets: clearing means the method under a new id (the server matches by id + kind)', () => {
-  const all = [{ id: 'corp', kind: 'oidc', client_secret: '********WXYZ' }, { id: 'hub', kind: 'oauth2', client_secret: null }];
-  assert.deepEqual(withSecretCleared(all[0], all), { id: 'corp-2', kind: 'oidc', client_secret: '' });
-  assert.deepEqual(withSecretCleared(all[1], all), { id: 'hub', kind: 'oauth2', client_secret: '' });
-});
-
 test('what is sent: only what the server takes from a request', () => {
   assert.deepEqual(methodToSend({ id: 'password', kind: 'password', name: ' Password ', enabled: false, callback_url: 'x' }), { id: 'password', kind: 'password', name: 'Password', enabled: false });
   assert.deepEqual(methodToSend({ id: 'Corp', kind: 'oidc', name: 'Corp', enabled: true, issuer: 'https://id.example/', client_id: ' abc ', client_secret: null, scopes: 'openid   profile', authorize_url: 'https://id.example/a', token_url: 'https://id.example/t', userinfo_url: 'https://id.example/u', jwks_url: 'https://id.example/k', callback_url: 'https://hs/login/callback/corp', username_field: 'nick', id_field: 'sub', token_auth: 'basic' }),
@@ -136,7 +130,7 @@ test('errors: linking and unlinking your own sign-ins', () => {
   assert.match(loginErrorText('invalid_return_to'), /account page/);
   assert.match(loginErrorText('access_denied'), /cancelled/);
   assert.match(loginErrorText('mystery', 'Google'), /Couldn't link Google/);
-  for (const c of ['last_login_method', 'cannot_remove_password', 'not_linked', 'login_already_linked', 'unknown_method', 'invalid_return_to', 'blocked']) assert.notEqual(loginErrorText(c), loginErrorText('mystery'), c);
+  for (const c of ['last_login_method', 'cannot_remove_password', 'not_linked', 'login_already_linked', 'unknown_method', 'invalid_return_to', 'blocked', 'link_refused']) assert.notEqual(loginErrorText(c), loginErrorText('mystery'), c);
 });
 
 test('link return: ?linked= and ?link_error=, in a query or a whole address', () => {
