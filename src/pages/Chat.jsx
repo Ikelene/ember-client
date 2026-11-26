@@ -50,6 +50,7 @@ import { ExportButton } from '../chat/Community.jsx';
 import { isInst, instOf } from '../chat/ids.js';
 import { E2eeHeadLock } from '../chat/E2eeMessage.jsx';
 import { forgetIfEmpty } from '../chat/instances.js';
+import { CreateOnHomeserver, useCreateHosts } from '../chat/CreateOnHomeserver.jsx';
 // a left Ember server goes off the list (the server list is updated by the leave's own event, or in a moment)
 const forgetLeft = sid => { const o = instOf(sid); setTimeout(() => forgetIfEmpty(o), 400); };
 
@@ -528,6 +529,7 @@ function ChatPage() {
   const dmPresence = useChat(s => (view.kind === 'dm' ? s.presence[view.username] : null));
   const dmIsBot = useBotPeer(view.kind === 'dm' ? view.username : null);
   const unreadCount = useTabBadge();
+  const createHosts = useCreateHosts(); // homeservers a server can be made on (none: Create a server is the hosting dialog, as before)
   const gateName = useChat(s => (view.kind === 'instance' ? s.instances.find(i => i.origin === view.inst)?.name : null));
   useEffect(() => { document.title = `${unreadCount ? `(${unreadCount > 999 ? '999+' : unreadCount}) ` : ''}${channel ? `#${channel.name} - ${detail.server.name}` : view.kind === 'instance' ? gateName || 'Server' : view.kind === 'dm' ? `@${view.username}` : view.kind === 'notes' ? 'Personal Notes' : group ? group.name : 'Home'} | Ember`; }, [unreadCount, channel, detail, view, group, gateName]);
   const signedIn = useChat(s => s.signedIn);
@@ -709,7 +711,8 @@ function ChatPage() {
       {dialog?.kind === 'add-instance' && <AddInstance url={dialog.url} invite={dialog.invite} server={dialog.server} onClose={() => setDialog(null)} onSetup={origin => setDialog({ kind: 'setup', origin })} onCreate={dialog.fromCreate ? () => setDialog({ kind: 'create-server' }) : undefined} />}
 
       {dialog?.kind === 'setup' && <SetupWizard origin={dialog.origin} name={dialog.name} onClose={() => setDialog(null)} />}
-      {dialog?.kind === 'create-server' && <CreateServer onClose={() => setDialog(null)} onSetup={(origin, name) => setDialog({ kind: 'setup', origin, name })} onAddByAddress={() => setDialog({ kind: 'add-instance', fromCreate: true })} />}
+      {dialog?.kind === 'create-server' && createHosts.length > 0 && !dialog.own && <CreateOnHomeserver onClose={() => setDialog(null)} onOther={() => setDialog({ kind: 'create-server', own: true })} />}
+      {dialog?.kind === 'create-server' && (!createHosts.length || dialog.own) && <CreateServer onClose={() => setDialog(null)} onSetup={(origin, name) => setDialog({ kind: 'setup', origin, name })} onAddByAddress={() => setDialog({ kind: 'add-instance', fromCreate: true })} />}
 
       {dialog?.kind === 'invite' && <Invite sid={dialog.sid || view.sid} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'invite-join' && <JoinInvite code={dialog.code} inst={dialog.inst} onClose={() => setDialog(null)} />}
