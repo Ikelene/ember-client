@@ -41,6 +41,7 @@ import './SettingsDialog.css';
 import QRCode from 'qrcode';
 import { linkFor } from './store.js';
 import { OperatorTermsNotice } from './OperatorTerms.jsx';
+import { slugIssue, createErrorText } from './addresses.js';
 import { pictureAccept } from './accept.js';
 import { INST_REGISTER_NOOKARA, isNookara, nookaraInfo, nookaraRegistration } from '../compat.js';
 
@@ -233,6 +234,7 @@ function Overview({ sid, origin, instAdmin, onDirty, goTo }) {
       )}
       <OperatorTermsNotice sid={sid} />
       <ServerCard sid={sid} srv={srv} origin={origin} goTo={goTo} />
+      {(srv.address || srv.slug) && <AddressCard sid={sid} srv={srv} />}
       <Card title="Server profile" icon={LayoutGrid}>
         <div className="vc-settings-imgs">
           <div className="vc-field"><span>Icon</span>
@@ -425,6 +427,47 @@ function AdvancedCard({ sid }) {
   );
 }
 
+// Overview > Address: a server on a homeserver with many servers is name@homeserver. Anyone here can copy it; the owner can
+// change the name part (PATCH /servers/:sid { slug }), checked as it's typed and again by the homeserver.
+function AddressCard({ sid, srv }) {
+  const owner = useChat(s => (s.servers.find(x => x.sid === sid)?.role || srv.role) === 'owner');
+  const domain = String(srv.address || '').split('@')[1] || '';
+  const [slug, setSlug] = useState(srv.slug || '');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  useEffect(() => { setSlug(srv.slug || ''); }, [srv.slug]);
+  const address = srv.address || srv.slug;
+  const changed = slug !== (srv.slug || '');
+  const issue = changed ? slugIssue(slug) : null;
+  const copy = () => navigator.clipboard?.writeText(address).then(() => toast('Address copied.', true), () => toast("Couldn't copy that."));
+  async function save(e) {
+    e.preventDefault();
+    if (!changed || issue || busy) return;
+    setBusy(true); setErr('');
+    try { await apiFetch(`/chat/servers/${sid}`, { method: 'PATCH', body: JSON.stringify({ slug }) }); await refreshServer(sid); await loadServersOf(sid); toast('Address changed.', true); }
+    catch (er) { setErr(createErrorText(er)); }
+    setBusy(false);
+  }
+  return (
+    <Card title="Address" icon={Globe} className="bf-ss-address">
+      <div className="vc-field"><span>Server address</span>
+        <div className="vc-row"><input className="form-input vc-info-mono" readOnly value={address} aria-label="Server address" onFocus={e => e.target.select()} />
+          <button type="button" className="btn btn-surface" onClick={copy}><Copy size={14} /> Copy</button></div>
+        <small className="vc-hint">People can join with this address, or with an invite made from it.</small></div>
+      {owner && (
+        <form className="vc-field" onSubmit={save}><span>Change the name</span>
+          <div className="vc-row"><input className="form-input" value={slug} maxLength={32} autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-invalid={!!issue} aria-label="Address name"
+            onChange={e => { setSlug(e.target.value.toLowerCase().replace(/\s+/g, '-')); setErr(''); }} />
+            {domain && <span className="bf-ss-addr-at">@{domain}</span>}
+            <button type="submit" className="btn btn-primary" disabled={!changed || !!issue || busy}>{busy ? 'Saving...' : 'Change'}</button></div>
+          {issue ? <small className="vc-hint bf-ss-addr-bad">{issue}</small> : <small className="vc-hint">3-32 lowercase letters, numbers and dashes. The old address stops working.</small>}
+          {err && <p className="vc-err"><TriangleAlert size={14} /> {err}</p>}
+        </form>
+      )}
+    </Card>
+  );
+}
+
 // Overview (Modern): the server as people see it - banner, icon and name - with its invite link, a QR code of it, and the
 // server's address. Classic keeps just the editing cards below (CSS hides this card there).
 function ServerCard({ sid, srv, origin, goTo }) {
@@ -434,7 +477,7 @@ function ServerCard({ sid, srv, origin, goTo }) {
   useEffect(() => { if (!link) return; QRCode.toString(link, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#111111', light: '#ffffff' } }).then(setQr).catch(() => setQr('')); }, [link]);
   if (!srv) return null;
   const copy = (t, what) => navigator.clipboard?.writeText(t).then(() => toast(`${what} copied.`, true), () => toast("Couldn't copy that."));
-  const address = origin ? origin.replace(/^https?:\/\//, '') : null;
+  const address = srv.address || (origin ? origin.replace(/^https?:\/\//, '') : null); // name@homeserver where the homeserver has many servers
   return (
     <section className="bf-ss-hero">
       <div className="bf-ss-hero-banner">{srv.banner && <img src={srv.banner} alt="" />}</div>

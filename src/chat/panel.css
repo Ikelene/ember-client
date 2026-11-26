@@ -262,6 +262,8 @@ html.vc-rounded .bf-ss-hero { display: block !important; margin-bottom: 16px; ov
 .bf-ss-hero-more { padding: 0; text-decoration: underline; }
 .bf-ss-hero-addr { display: flex; align-items: center; gap: 8px; padding: 0 18px 16px; color: var(--muted); font-size: 13px; }
 .bf-ss-hero-addr code { color: var(--text); }
+.bf-ss-addr-at { align-self: center; color: var(--muted); font-size: 13px; white-space: nowrap; }
+.bf-ss-addr-bad { color: #c26a6a; }
 @media (max-width: 700px) { .bf-ss-hero-invite { flex-direction: column; align-items: center; } .bf-ss-hero-link { align-items: stretch; } }
 .vc-tooltip:has(.vc-tip-via) { max-width: 320px; padding: 10px 12px; text-align: left; font-weight: 400; }
 html.vc-rounded .vc-tooltip:has(.vc-tip-via) { padding: 12px 14px; border-radius: calc(10px * var(--rk, 1)); background: var(--m-raised); box-shadow: var(--sh-3); }

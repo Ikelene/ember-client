@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { pinMenuItems } from './DmPins.jsx';
 import { chanKey } from './dmPinsCore.js';
-import { ChevronRight, Check, Hash, Copy, Link2, BellOff, Bell, CheckCheck, UserPlus, Settings, LogOut, Pencil, Trash2, Reply, User, MessageCircle, ExternalLink, Image as ImageIcon, Code2, Forward, Pin, Download, SmilePlus, BookmarkPlus, Bookmark, BookmarkCheck, Languages, Ellipsis, RefreshCw, LogIn, ShieldCheck, BellRing, Flag, Ban, Info, Users, Unplug, Plug } from 'lucide-react';
+import { ChevronRight, Check, Hash, Copy, Link2, AtSign, BellOff, Bell, CheckCheck, UserPlus, Settings, LogOut, Pencil, Trash2, Reply, User, MessageCircle, ExternalLink, Image as ImageIcon, Code2, Forward, Pin, Download, SmilePlus, BookmarkPlus, Bookmark, BookmarkCheck, Languages, Ellipsis, RefreshCw, LogIn, ShieldCheck, BellRing, Flag, Ban, Info, Users, Unplug, Plug } from 'lucide-react';
 import { openReactionsView } from './ReactionsView.jsx';
 import { apiFetch } from '../api.js';
 import { plainText } from './tokens.js';
@@ -205,6 +205,7 @@ export function instanceMenu(e, inst, srv, { onInvite, onSettings, onLeave, onLo
     here && { label: 'Invite people', icon: UserPlus, onClick: onInvite },
     here && inst.user && canNick(srv.sid, true) && { label: 'Change nickname', icon: Pencil, onClick: () => changeNick(srv.sid, getState().members[srv.sid]?.find(x => x.id === inst.user.id) || { ...inst.user, nick: null }, true) },
     admin && { label: 'Server settings', icon: Settings, onClick: onSettings },
+    srv?.address && { label: 'Copy address', icon: AtSign, onClick: () => copy(srv.address, 'Server address copied') },
     { label: 'Copy URL', icon: Link2, onClick: () => copy(inst.origin, 'Server URL copied') },
     inst.sleep ? { label: 'Connect', icon: Plug, hint: inst.sleep === 'manual' ? 'You disconnected it' : 'Asleep (sleep mode)', onClick: onReconnect }
       : inst.status !== 'connecting' && { label: 'Reconnect', icon: RefreshCw, onClick: onReconnect },
