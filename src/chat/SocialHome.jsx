@@ -13,7 +13,7 @@ import './home.css';
 
 const STATUS = { online: 'Online', idle: 'Idle', dnd: 'Do not disturb', offline: 'Offline' };
 const hourWord = h => (h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening');
-const face = a => ({ username: a.id, pfp: a.avatar_url || null });
+const face = a => ({ username: a.display_name || a.handle || a.id, pfp: a.avatar_url || null }); // (the name gives the letter and colour when there's no picture)
 const useDomain = () => useChat(s => s.home?.domain || '');
 
 // someone's card: what their homeserver says about them (GET /social/profile/:id), and what I can do

@@ -93,3 +93,10 @@ test('discovery docs: v2 and the listed servers', () => {
   assert.equal(communityOf(info, 'zz'), null);
   assert.equal(communityOf({ community: { sid: 'a' } }, 'a').sid, 'a');
 });
+
+test('the rail: a homeserver only there for my account or a DM has no entry until I am in a server on it', () => {
+  const home = { origin: 'https://a.example', v2: true, quiet: true }, other = { origin: 'https://b.example', v2: true };
+  assert.deepEqual(railEntries([home, other], []).map(e => e.id), ['i:https://b.example']);
+  const mine = [{ sid: 'https://a.example|s1', inst: 'https://a.example' }];
+  assert.deepEqual(railEntries([home, other], mine).map(e => e.id), ['i:https://a.example', 'i:https://b.example']);
+});

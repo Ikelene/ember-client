@@ -101,6 +101,7 @@ export function railEntries(instances, servers) {
   const out = [];
   for (const inst of instances || []) {
     const mine = (servers || []).filter(s => s.inst === inst.origin);
+    if (inst.quiet && !mine.length) continue; // (only there for my account or a DM: nothing to show until I'm in a server on it)
     if (inst.v2 && mine.length > 1) for (const server of mine) out.push({ id: `i:${server.sid}`, inst, server });
     else out.push({ id: `i:${inst.origin}`, inst, server: mine[0] || null });
   }
