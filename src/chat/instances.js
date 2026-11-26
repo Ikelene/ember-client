@@ -8,9 +8,11 @@ import { apiFetch, getToken } from '../api.js';
 import { K, acctKey, registry, hooks, normOrigin, instOf, loadSessions, loadSessionTags, tokenTag, saveSession, fromInstance, parseK } from './ids.js';
 import { onInstClientsFrame, rewatchInstClients } from './instClients.js';
 import { SHORT } from '../version.js';
-import { getState, patchState, toast, handleEvent, RESTRICTED_TEXT, instanceVoiceClosed, voiceSocketReady, loadEmojis, go, catchUp, resumeInstanceView, backoff, instanceRestricted, instanceRestored, forgetServerCache } from './store.js';
+import { getState, patchState, toast, handleEvent, socialEvent, homeConnected, RESTRICTED_TEXT, instanceVoiceClosed, voiceSocketReady, loadEmojis, go, catchUp, resumeInstanceView, backoff, instanceRestricted, instanceRestored, forgetServerCache } from './store.js';
 import { isV2, communityOf, parseAddress, createErrorText } from './addresses.js';
-import { locate } from './homeserver.js';
+import { locate, currentOrigin, onSignedOut } from './homeserver.js';
+import { sourceFor, tagFor, openSession } from './homeAuth.js';
+import { SOCIAL_EVENTS } from './social.js';
 import { EMBER_API, INST_AUTH_NOOKARA, WELL_KNOWN, isInstanceSoftware, isNookara, nookaraInfo } from '../compat.js';
 
 export const connections = new Map();
@@ -43,7 +45,9 @@ export const instView = c => ({
   v2: isV2(c.info), communities: Array.isArray(c.info?.communities) ? c.info.communities : [], homeserver: c.info?.homeserver && typeof c.info.homeserver === 'object' ? c.info.homeserver : null,
   community: c.info?.community || null, mode: c.info?.accounts_mode || null, status: c.peeking && c.status !== 'open' ? 'asleep' : c.status, claimed: c.info?.claimed !== false, features: c.info?.features || {},
   registration: c.info?.registration || 'closed', isAdmin: !!c.isAdmin, isOwner: !!c.isOwner, user: c.user || null, error: c.error || null, restricted: c.restricted || null,
-  needsNookara: isNookara(c.info?.accounts_mode) && !getToken(), pending: !!c.pending, failed: !!c.failed,
+  needsNookara: isNookara(c.info?.accounts_mode) && !getToken() && srcOf(c) === 'legacy', pending: !!c.pending, failed: !!c.failed,
+  source: c.source || null, // 'home' (my homeserver, on its own session) | 'remote' (signed in from my homeserver) | null (as before)
+  quiet: !!(c.dmHost || c.source === 'home'), // only there for my account or a DM: no rail entry until I'm in a server on it
   loaded: !!c.loaded, // this account's communities on it have been fetched (so "not in it" is known)
   prefs: c.prefs || null, // Nookara's push consent for it ({ muted, push }), signed in only
   retryAt: c.retryAt || 0, // not connected: when the next try is (it never gives up)
@@ -127,8 +131,28 @@ export async function discover(input) {
 }
 
 // ── sessions ──
+// Which sign-in this server gets (homeAuth.js): 'legacy' = the Nookara instance token or its own login, everything below as it
+// always was. 'home' / 'remote' only happen on a v2 homeserver session with no Nookara sign-in.
+const srcOf = c => sourceFor(c.origin, c.info, !!getToken());
+export const homeHere = () => (!getToken() && currentOrigin() ? normOrigin(currentOrigin()) : null);
+const refused = e => Object.assign(new Error(e?.code || e?.message || 'request_failed'), { status: e?.status ?? 0, refused: e?.status >= 400 && e?.status < 500 });
+function adoptHome(c, r) {
+  c.session = r.session; c.source = r.source;
+  registry.set(c.origin, c);
+  saveSession(c.origin, r.source === 'home' ? null : r.session, r.source === 'home' ? null : r.tag); // (home's token lives with the home session, nowhere else)
+}
+let homeWas = null; // the home homeserver the sessions below were made with
+async function ensureHome(c, source) {
+  homeWas = homeHere();
+  if (c.session && c.source !== source) { c.session = null; registry.delete(c.origin); }
+  if (c.session && source === 'remote' && loadSessionTags()[c.origin] !== tagFor(c.origin, c.info, false)) { c.session = null; registry.delete(c.origin); saveSession(c.origin, null); } // another account's
+  if (source === 'home' || !c.session) { try { adoptHome(c, await openSession(c.origin, c.info)); } catch (e) { throw refused(e); } }
+  else { c.source = source; registry.set(c.origin, c); }
+  await me(c); // (a 401 goes through hooks.refresh below: a refresh, or the trip to home and back, once)
+  return true;
+}
 function adopt(c, { session, user, instance_admin, instance_owner }) {
-  c.session = session;
+  c.session = session; c.source = null;
   if (user) c.user = user;
   if (instance_admin !== undefined) { c.isAdmin = !!instance_admin; c.isOwner = !!instance_owner; }
   registry.set(c.origin, c);
@@ -148,7 +172,7 @@ async function authNookara(c) {
 }
 // forget this instance's session (and tell it)
 function dropSession(c) {
-  if (c.session) fetch(`${c.origin}/api/v1/auth/logout`, { method: 'POST', headers: { Authorization: `Bearer ${c.session}` }, keepalive: true }).catch(() => {});
+  if (c.session && c.source !== 'home') fetch(`${c.origin}/api/v1/auth/logout`, { method: 'POST', headers: { Authorization: `Bearer ${c.session}` }, keepalive: true }).catch(() => {});
   c.session = null; registry.delete(c.origin); saveSession(c.origin, null);
 }
 // Nookara sign-out: Nookara-login instances lose their session (local-account ones keep theirs)
@@ -173,6 +197,17 @@ hooks.refresh = origin => {
   if (!c) return Promise.resolve(false);
   if (!refreshing.has(origin)) {
     const p = (async () => {
+      const source = srcOf(c);
+      if (source !== 'legacy') { // a v2 session: home refreshes its token, another homeserver gets a new one from home
+        try { adoptHome(c, await openSession(origin, c.info, { renew: true })); return true; } catch (e) {
+          c.session = null; registry.delete(origin); saveSession(origin, null);
+          if (e?.code === 'signed_out') { setStatus(c, 'login'); return false; }
+          const err = refused(e);
+          c.failed = true; setStatus(c, err.refused ? 'error' : 'closed', err.message);
+          if (!err.refused) scheduleRetry(c);
+          return false;
+        }
+      }
       c.session = null; registry.delete(origin); saveSession(origin, null);
       if (!isNookara(c.info?.accounts_mode) || !getToken()) { setStatus(c, 'login'); return false; }
       // Nookara rejecting the token signs out (api.js); anything else (Nookara / the instance unreachable) is retried
@@ -183,6 +218,9 @@ hooks.refresh = origin => {
   return refreshing.get(origin);
 };
 async function ensureSession(c) {
+  const source = srcOf(c);
+  if (source !== 'legacy') return ensureHome(c, source);
+  if (c.source) { c.session = null; c.source = null; registry.delete(c.origin); saveSession(c.origin, null); } // (was on a homeserver session that is gone)
   if (isNookara(c.info.accounts_mode) && !getToken()) { dropSession(c); setStatus(c, 'login'); return false; } // Nookara-login instances need the Nookara sign-in
   if (c.session && isNookara(c.info.accounts_mode) && loadSessionTags()[c.origin] !== tokenTag(getToken())) dropSession(c); // from an older Ember sign-in
   if (c.session) {
@@ -378,6 +416,7 @@ setInterval(() => {
   for (const c of connections.values()) {
     if (c.sleep === 'idle' && !sleepOn()) { wakeInstance(c.origin); continue; } // (the setting was turned off)
     if (c.sleep || c.peeking || c.status !== 'open' || !sleepOn()) continue;
+    if (c.source === 'home') { c.activeAt = now; continue; } // (friends, DMs and presence come over it)
     if (onScreen(c.origin) || inVoiceOn(c.origin)) { c.activeAt = now; continue; }
     if (now - (c.activeAt || now) > SLEEP_AFTER) sleepInstance(c, 'idle');
   }
@@ -415,6 +454,9 @@ function onFrame(c, m) {
     case 'chat_clients': // a watched member's live clients (instClients.js)
       onInstClientsFrame(c.origin, m);
       return;
+    case 'social_friends_update': case 'social_presence': case 'social_dm_update': case 'social_dm_remove': case 'social_dm_activity':
+      socialEvent(c.origin, m); // (as sent: these are not a server's events, nothing in them is namespaced)
+      return;
     case 'chat_ready':
       if (held) return; // (the account is locked: holdInstances(false) says hello again)
       c.restricted = null;
@@ -424,6 +466,7 @@ function onFrame(c, m) {
       voiceSocketReady(c.origin);
       rewatchInstClients(c.origin); // (open profile cards: the new socket doesn't know what the old one watched)
       c.activeAt = Date.now();
+      if (c.source === 'home') homeConnected(c.origin);
       loadInstanceData(c.origin).then(() => { catchUp(c.origin); if (autoJoin.has(c.origin)) joinOnce(c); if (c.peeking) { clearTimeout(c.peekT); c.peekT = setTimeout(() => endPeek(c), PEEK_FOR); } });
 
       // its own accounts, and my profile there follows my Nookara one: bring over what changed while I was away (accountProfile.js)
@@ -460,7 +503,7 @@ export async function loadInstanceData(origin) {
     for (const [key] of Object.entries(getState().detail)) if (parseK(key).inst === origin && !srv.servers.some(x => x.sid === key)) { forgetServerCache(key); patchState(s => { const detail = { ...s.detail }; delete detail[key]; return { detail }; }); }
     if (srv.servers.length && c.pending) { c.pending = false; mirror(); }
     // in nothing there, nothing asked for, anyone could join (so no request is waiting) and not on screen: a server you left. Off the list
-    if (!srv.servers.length && !c.pending && !autoJoin.has(origin) && c.info?.community?.join_policy === 'open' && !onScreen(origin)) { removeInstance(origin); return; }
+    if (!srv.servers.length && !c.pending && !autoJoin.has(origin) && c.info?.community?.join_policy === 'open' && !onScreen(origin) && !c.dmHost && c.source !== 'home') { removeInstance(origin); return; }
     resumeInstanceView(origin);
   } catch (e) { if (e.status === 401) hooks.refresh(origin); }
 }
@@ -469,7 +512,8 @@ export async function loadInstanceData(origin) {
 const onScreen = origin => { const v = getState().view; return v.inst === origin || (!!v.sid && instOf(v.sid) === origin); };
 // you're in no server there any more (left, kicked, banned, it was deleted): it leaves the list on every device
 export function forgetIfEmpty(origin) {
-  if (connections.has(origin) && !getState().servers.some(x => x.inst === origin)) removeInstance(origin);
+  const c = connections.get(origin);
+  if (c && !c.dmHost && c.source !== 'home' && !getState().servers.some(x => x.inst === origin)) removeInstance(origin);
 }
 const newConn = (origin, info) => {
   const off = readManual().has(origin); // (disconnected by hand: stays off, even after a reload, until it's opened or reconnected)
@@ -503,8 +547,8 @@ export async function connect(origin) {
     if (c.sleep) { c.status = 'asleep'; mirror(); return; } // (disconnected while this try was running)
     if (c.peeking) { sleepInstance(c, 'idle'); return; }
     c.failed = true;
-    setStatus(c, e.message === 'insufficient_scope' ? 'error' : 'closed', e.message);
-    scheduleRetry(c, e.restricted ? RESTRICTED_RETRY : 0);
+    setStatus(c, e.message === 'insufficient_scope' || e.refused ? 'error' : 'closed', e.message);
+    if (!e.refused) scheduleRetry(c, e.restricted ? RESTRICTED_RETRY : 0);
   } finally { c.busy = false; if (movedTo) moveInstance(origin, movedTo); }
 }
 // A server moved to a new address: the rail entry, its session (same server, same database) and the saved list follow, and the
@@ -584,8 +628,9 @@ const readAdds = () => { try { const v = JSON.parse(localStorage.getItem(ADDS())
 const writeAdds = set => { try { if (set.size) localStorage.setItem(ADDS(), JSON.stringify([...set])); else localStorage.removeItem(ADDS()); } catch { /* fine */ } };
 const readList = () => { try { const v = JSON.parse(localStorage.getItem(LIST_CACHE()) || '[]'); return Array.isArray(v) ? v.map(normOrigin).filter(Boolean) : []; } catch { return []; } };
 // always saved here; signed in with Nookara it goes there too (the same list on every device)
+const listed = () => [...connections.values()].filter(c => !c.dmHost).map(c => c.origin);
 const saveList = () => {
-  const urls = [...connections.keys()];
+  const urls = listed();
   try { localStorage.setItem(LIST_CACHE(), JSON.stringify(urls)); } catch { /* fine */ }
   return getToken() ? apiFetch(`${EMBER_API}/instances`, { method: 'PUT', body: JSON.stringify({ instances: urls.map(url => ({ url })) }) }).then(d => { writeAdds(new Set()); applyPrefs(d); followMoves(d); }).catch(() => {}) : Promise.resolve();
 };
@@ -634,6 +679,8 @@ async function joinOnce(c) {
 // on start: this device's list connects right away, then (signed in) Nookara's list is merged in
 export function startInstances() {
   readList().forEach(o => { if (!connections.has(o)) connections.set(o, newConn(o)); }); // (not on the rail yet: see below)
+  const home = homeHere(); // a v2 homeserver session: my homeserver is always connected (my account, friends and DMs are on it)
+  if (home && !connections.has(home)) connections.set(home, newConn(home));
   const off = readManual();
   for (const c of connections.values()) if (off.has(c.origin)) { c.sleep = 'manual'; c.status = 'asleep'; }
   const go_ = () => { mirror(); [...connections.keys()].forEach(o => connect(o)); }; // (connect skips one already connecting / open)
@@ -650,6 +697,7 @@ export async function addInstance(origin, info, got) {
   const c = addConnection(origin, info);
   { const a = readAdds(); a.add(normOrigin(origin)); writeAdds(a); } // (until Nookara's list has it)
   c.info = info || c.info;
+  c.dmHost = false;
   if (got) adopt(c, got);
   await saveList();
   if (c.session) { await me(c).catch(() => {}); if (!c.ws) openSocket(c); } else await connect(origin);
@@ -663,7 +711,7 @@ export async function removeInstance(origin, { sync = true } = {}) {
   { const a = readAdds(); if (a.delete(origin)) writeAdds(a); }
   writeManual(origin, false); clearTimeout(c.peekT); clearInterval(c.wakeT); c.wakeT = null;
   if (c.session && c.sleep) await fetch(`${origin}/api/v1/wake`, { method: 'DELETE', headers: { Authorization: `Bearer ${c.session}` } }).catch(() => {}); // (not "here" any more)
-  if (c.session) await fetch(`${origin}/api/v1/auth/logout`, { method: 'POST', headers: { Authorization: `Bearer ${c.session}` } }).catch(() => {});
+  if (c.session && c.source !== 'home') await fetch(`${origin}/api/v1/auth/logout`, { method: 'POST', headers: { Authorization: `Bearer ${c.session}` } }).catch(() => {});
   clearTimeout(c.timer);
   connections.delete(origin);
   registry.delete(origin);
@@ -682,7 +730,7 @@ export async function removeInstance(origin, { sync = true } = {}) {
   });
   if ((view.sid && gone(view.sid)) || view.inst === origin) go({ kind: 'home' });
   if (sync) await saveList();
-  else try { localStorage.setItem(LIST_CACHE(), JSON.stringify([...connections.keys()])); } catch { /* fine */ }
+  else try { localStorage.setItem(LIST_CACHE(), JSON.stringify(listed())); } catch { /* fine */ }
   loadEmojis();
 }
 // drag and drop on the rail: `from` goes before / after `to`
@@ -710,6 +758,47 @@ export async function joinCommunity(origin, code, password, which) {
   return { sid: d.server.sid };
 }
 export const instanceConn = origin => connections.get(origin);
+
+// ── a v2 homeserver session (no Nookara sign-in): servers connect with it ──
+// can this server be connected without asking for a login: it is my homeserver, or it lets other homeservers' accounts in
+export const canHomeConnect = (origin, info) => sourceFor(origin, info, !!getToken()) !== 'legacy';
+// put it on the rail and sign in there with the homeserver session. -> the connection; throws Error(code) when it says no
+export async function homeConnect(origin, info) {
+  if (!canHomeConnect(origin, info)) throw new Error('instance_not_connected');
+  const c = addConnection(origin, info);
+  c.info = info || c.info; c.dmHost = false;
+  if (!c.session) { try { await ensureHome(c, srcOf(c)); } catch (e) { if (!getState().servers.some(x => x.inst === origin)) removeInstance(origin, { sync: false }); throw e; } }
+  await saveList();
+  if (!c.ws && !c.sleep) openSocket(c);
+  mirror();
+  return c;
+}
+// A DM that lives on another homeserver: connect there (no rail entry, not kept in the list) and wait until it is up.
+// -> true when its socket is open; false when it can't be reached or won't let me in (the connection says why)
+export async function ensureHost(input) {
+  const origin = normOrigin(input);
+  if (!origin) return false;
+  let c = connections.get(origin);
+  if (!c) { c = newConn(origin); c.dmHost = true; connections.set(origin, c); mirror(); }
+  if (c.sleep || c.peeking) wakeInstance(origin);
+  else if (c.status !== 'open') { clearTimeout(c.timer); c.retry = 0; connect(origin); }
+  for (let i = 0; i < 100; i++) {
+    if (connections.get(origin) !== c) return false;
+    if (c.status === 'open') return true;
+    if (['login', 'error', 'banned', 'restricted'].includes(c.status) && !c.busy) return false;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  return c.status === 'open';
+}
+// the home session ended (signed out, or the homeserver refused it): its connection and the ones made with it go
+onSignedOut(origin => {
+  const o = normOrigin(origin);
+  if (o !== homeWas || homeHere() === o) return; // (another homeserver's session, not the one in use)
+  for (const c of [...connections.values()]) {
+    if (c.source === 'remote' || c.dmHost) { c.session = null; registry.delete(c.origin); saveSession(c.origin, null); if (c.dmHost) removeInstance(c.origin, { sync: false }); else { const ws = c.ws; c.ws = null; try { ws?.close(); } catch { /* gone */ } setStatus(c, 'login'); } }
+    else if (c.origin === o && c.source === 'home') { c.session = null; registry.delete(o); const ws = c.ws; c.ws = null; try { ws?.close(); } catch { /* gone */ } if (getState().servers.some(x => x.inst === o)) setStatus(c, 'login'); else removeInstance(o, { sync: false }); }
+  }
+});
 // my account on an instance changed (its own accounts: I edited my profile there, here or on another device)
 export function setInstanceUser(origin, user) {
   const c = connections.get(origin);
@@ -741,14 +830,16 @@ export async function refreshInstance(origin) {
 // with its own accounts, one nobody has set up, or one that wants a join password / approval and no invite code was given.
 // sid: which server, on a homeserver with several (an address, a Discover card)
 export async function quickJoin(input, code, sid) {
-  if (!getToken()) return null;
+  if (!getToken() && !homeHere()) return null;
   const d = await discover(input);
   const info = d.info || {};
   const com = communityOf(info, sid);
-  if (!isNookara(info.accounts_mode) || info.claimed === false || !(sid != null ? isV2(info) || com : info.community)) return null;
+  const viaHome = canHomeConnect(d.origin, info); // (a v2 session: my homeserver's own token, or one it signs for that homeserver)
+  if (!(viaHome || (getToken() && isNookara(info.accounts_mode))) || info.claimed === false || !(sid != null ? isV2(info) || com : info.community)) return null;
   if (!code && com && com.join_policy !== 'open') return null; // (a server it doesn't list: only asking tells)
   let c = connections.get(d.origin);
-  if (!c?.session) c = await addInstance(d.origin, info, await nookaraSession(d.origin));
+  if (!c?.session && viaHome) c = await homeConnect(d.origin, info);
+  else if (!c?.session) c = await addInstance(d.origin, info, await nookaraSession(d.origin));
   else if (c.status !== 'open') await connect(d.origin);
   // in it already (with several servers there, an invite or an address is for one of them: being in another doesn't count)
   const already = getState().servers.find(x => x.inst === d.origin && (sid != null ? x.sid === K(d.origin, sid) : !(isV2(info) && code)));

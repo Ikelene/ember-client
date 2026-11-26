@@ -20,7 +20,10 @@ import { NOOKARA, K, parseK, instOf, bare, isInst, normOrigin, acctKey } from '.
 import { parseAddress, addressHash } from './addresses.js';
 import { myIdOn } from './tokens.js';
 import { readChannel as readMsgCache, writeChannel as writeMsgCache, dropChannels as dropMsgCache } from './msgCache.js';
-import { connections, sendTo, startInstances, loadInstanceData, retryInstances, resumeInstances, renewNookaraSession, holdInstances, forgetIfEmpty, wakeInstance, instanceWoke, recheckSleepers, joinByAddress } from './instances.js';
+import { connections, sendTo, startInstances, loadInstanceData, retryInstances, resumeInstances, renewNookaraSession, holdInstances, forgetIfEmpty, wakeInstance, instanceWoke, recheckSleepers, joinByAddress, ensureHost } from './instances.js';
+import { homeFetch, onSignedOut, currentSession } from './homeserver.js';
+import { social as socialApi, socialBase, createDm } from './socialApi.js';
+import { emptySocial, friendLists, mergeDms, cleanDm, socialReduce, socialRefetch, dmTitle, splitHandle, stableId, cleanHandle, accountName } from './social.js';
 import { attachmentRefs } from './signing-payload.js';
 import { spoilerName } from './spoiler.js';
 import { prepareInstanceAttachments } from './attachment-preparation.js';
@@ -35,6 +38,8 @@ let state = {
   e2eeKeyChanged: {},      // username (lower) -> their key changed since I last saw it
   botPeers: {},            // username (lower) -> true: a bot account. DMs with bots are never encrypted (bots can't hold keys)
   signedIn: false,         // signed in with Nookara: DMs, groups, friends, modmail, legacy servers, Nookara-login instances
+  home: null,              // signed in on a v2 homeserver instead (no Nookara sign-in): { origin, domain, id, account }. `me` is that account
+  social: emptySocial(),   // the home homeserver's friends and DMs (social.js): { loaded, friends, incoming, outgoing, blocked, dms, presence }
   conn: 'connecting',      // connecting | open | closed
   connected: false,        // the home socket has been open at least once since the page loaded
   connRetryAt: 0,          // closed: when the next try is (it never gives up)
@@ -842,6 +847,8 @@ function addMessage(key, msg) {
   // A new message in the visible-but-inactive window should still notify.
   const open = keyOf(state.view) === key && pageFocused();
   const n = key.startsWith('c:') ? effectiveNotify(msg.channel, msg.server) : null;
+  const sdm = state.home && key.startsWith('c:') ? dmOfChannel(msg.channel) : null; // a DM on a homeserver: its one channel
+  if (sdm) dmMessage(sdm, msg, mine, open);
   if (!mine && open && key.startsWith('d:')) markDmRead(state.view.username);
   if (!mine && !open && !n?.muted) {
     set(s => ({ unread: { ...s.unread, [key]: true } }));
@@ -849,7 +856,7 @@ function addMessage(key, msg) {
       const sid = msg.server;
       set(s => ({ servers: s.servers.map(x => (x.sid === sid ? { ...x, unread: true } : x)), unreadN: { ...s.unreadN, [msg.channel]: { sid, n: (s.unreadN[msg.channel]?.n || 0) + 1 } } }));
     }
-    if (!n || n.level !== 'none') ping(key, msg, n?.level === 'all', packActive());
+    if (!n || n.level !== 'none') ping(key, msg, n?.level === 'all' || !!sdm, packActive());
     // a red count on the channel + server for mentions (replies to you count)
     if (key.startsWith('c:') && mentionsMe(msg)) {
       set(s => ({ mentions: { ...s.mentions, [msg.channel]: (s.mentions[msg.channel] || 0) + 1 }, srvMentions: { ...s.srvMentions, [msg.server]: (s.srvMentions[msg.server] || 0) + 1 } }));
@@ -1820,7 +1827,7 @@ function readServerCache() {
 let serverCacheT = null, serverCacheSeen = null;
 function saveServerCache() {
   const all = { ...readServerCache() };
-  for (const [sid, d] of Object.entries(state.detail)) if (d && !d.cached && d.server) all[sid] = { server: d.server, categories: d.categories || [], channels: d.channels || [], at: Date.now() };
+  for (const [sid, d] of Object.entries(state.detail)) if (d && !d.cached && d.server && !d.server.dm) all[sid] = { server: d.server, categories: d.categories || [], channels: d.channels || [], at: Date.now() };
   const keys = Object.keys(all).sort((a, b) => (all[b].at || 0) - (all[a].at || 0));
   for (const k of keys.slice(80)) delete all[k];
   serverCache = all;
@@ -1913,11 +1920,13 @@ async function wakeServer(sid, tries = 0) {
   return null;
 }
 export async function refreshServer(sid) {
+  if (state.detail[sid]?.server?.dm) return state.detail[sid]; // a DM: what the DM list says is all there is (seedDm)
   const d = await apiFetch(`/chat/servers/${sid}`).catch(e => { refreshFail.set(sid, e?.status || 0); return null; });
   if (d) set(s => ({ detail: { ...s.detail, [sid]: d }, voiceStates: { ...s.voiceStates, ...(d.voice || {}) }, unreadN: Object.fromEntries(Object.entries(s.unreadN).filter(([, u]) => u.sid !== sid)) }));
   return d;
 }
 export async function loadMembers(sid) {
+  if (state.detail[sid]?.server?.dm) return;
   const d = await apiFetch(`/chat/servers/${sid}/members`).catch(() => null);
   if (!d) return;
   if (isInst(sid)) { // instances don't relay presence: Nookara accounts' status comes from the home socket, the rest has none
@@ -2122,6 +2131,7 @@ export async function toggleBlock(username, blocked) {
 export function hashFor(v) {
   const at = k => { const p = parseK(k); return p.inst === NOOKARA ? '' : `#/i/${encodeURIComponent(p.inst)}`; };
   const mid = v.kind === 'channel' && v.mid ? `/${v.mid}` : ''; // a message link: #/s/<sid>/<cid>/<message id>
+  if (v.kind === 'sdm' || (v.kind === 'channel' && v.dm)) return `#/dm/${encodeURIComponent(v.kind === 'sdm' ? v.id : v.dm)}`; // a DM on a homeserver, by its id
   if (v.kind === 'channel') return at(v.sid) ? `${at(v.sid)}/s/${bare(v.sid)}/${bare(v.cid)}${mid}` : `#/s/${v.sid}/${v.cid}${mid}`;
   if (v.kind === 'server') return at(v.sid) ? `${at(v.sid)}/s/${bare(v.sid)}` : `#/s/${v.sid}`;
   if (v.kind === 'instance') return `#/i/${encodeURIComponent(v.inst)}`;
@@ -2156,6 +2166,7 @@ export function readHash() {
   }
   const [, a, b, c, d] = parts;
   if (a === 's' && b) return { kind: c ? 'channel' : 'server', sid: b, cid: c, ...(c && /^\d{1,20}$/.test(d || '') ? { mid: d } : {}) };
+  if (a === 'dm' && b && state.home) { try { return { kind: 'sdm', id: decodeURIComponent(b) }; } catch { return { kind: 'home' }; } } // (<dm id>@<host>, PROTOCOL 4c)
   if (a === 'dm' && b) return { kind: 'dm', username: decodeURIComponent(b) };
   if (a === 'g' && b) return { kind: 'group', room: b };
   if (a === 'invite' && b) return { kind: 'invite', code: b };
@@ -2194,12 +2205,14 @@ export function resumeInstanceView(origin) {
 }
 // the Home button in the rail goes back to what was last open under Home (a DM, a group, Personal Notes or Home itself), until a reload
 const HOME_KINDS = new Set(['home', 'dm', 'group', 'notes', 'modmail']);
+const isHomeView = v => HOME_KINDS.has(v.kind) || (v.kind === 'channel' && !!v.dm);
 let lastHome = { kind: 'home' };
 export const lastHomeView = () => lastHome;
 export async function open(v) {
   if (state.signedIn || connections.size) restoreOutbox(); // (unsent messages from before a reload, even while nothing is connected)
   // a message link: open its channel and scroll to the message
   if (v.kind === 'channel' && v.mid) { const { mid, ...at } = v; return jumpToMessage(at, mid); }
+  if (v.kind === 'sdm') return openSocialDm(v.id);
   // Nookara-only places (DMs, groups, modmail, Nookara's own servers) need the Nookara sign-in
   if (!state.signedIn && (['dm', 'group', 'modmail', 'notes'].includes(v.kind) || ((v.kind === 'server' || v.kind === 'channel') && !isInst(v.sid)))) { set({ view: { kind: 'home' } }); return; }
   const io = (v.kind === 'server' || v.kind === 'channel') && isInst(v.sid) ? instOf(v.sid) : v.kind === 'instance' ? v.inst : null;
@@ -2250,7 +2263,7 @@ export async function open(v) {
     if (cid) go({ kind: 'channel', sid: v.sid, cid }, { replace: true });
     return;
   }
-  if (HOME_KINDS.has(v.kind)) lastHome = v;
+  if (isHomeView(v)) lastHome = v;
   set(s => ({ view: v, unread: { ...s.unread, [keyOf(v)]: false }, lastCid: v.kind === 'channel' ? { ...s.lastCid, [v.sid]: v.cid } : s.lastCid }));
   if (v.kind === 'channel') rememberChannel(v.sid, v.cid);
   try { localStorage.setItem('nookara_chat_last', location.hash); } catch { /* fine */ }
@@ -2270,6 +2283,7 @@ export async function open(v) {
     // still here? (clicking through channels quickly: a later one is open now, and this one's read is done above)
     if (keyOf(state.view) === keyOf(v)) clearMentions(v.sid, [v.cid]); // pings that came in while the messages loaded
     channelSeen(v.sid, v.cid, last?.id);
+    if (v.dm) readSocialDm(v.dm);
   } else if (v.kind === 'dm') {
     if (v.username !== 'System') { wantPresence(v.username); lookup(v.username).catch(() => {}); }
     const n = state.dms.find(c => c.username.toLowerCase() === v.username.toLowerCase())?.unread || 0;
@@ -2569,17 +2583,203 @@ export function instanceRestricted() {
 }
 export function instanceRestored() { if (state.locked) askNookara(); }
 
+// ── a v2 homeserver session runs the app (PROTOCOL 4a-4c): my account, friends and DMs are on my homeserver ──
+// (only without a Nookara sign-in: with one, everything above stays as it is)
+const absUrl = (origin, u) => (typeof u === 'string' && u ? (u.startsWith('/') && !u.startsWith('//') ? origin + u : /^https?:\/\//i.test(u) ? u : null) : null);
+export const meFromHome = a => ({ id: a.id != null ? String(a.id) : undefined, username: a.username, display_name: a.display_name || a.username, pfp: a.avatar_url || null, color: null, rank: null, handle: a.handle, domain: a.domain, home: true });
+export const homeFrom = sess => (sess?.account ? { origin: normOrigin(sess.origin), domain: sess.domain, id: stableId(sess.account.id, sess.domain), account: sess.account } : null);
+const socialCtx = extra => ({ home: state.home?.origin, me: state.home?.id, domain: state.home?.domain, open: state.view?.dm && pageFocused() ? state.view.dm : null, now: Date.now(), ...extra });
+function startHome() {
+  refreshHomeMe(); loadSocial();
+  onSignedOut(() => { // the homeserver ended the session (or Sign out): back to signed out
+    if (!state.home) return;
+    if (currentSession() && normOrigin(currentSession().origin) === state.home.origin) return;
+    set({ me: null, home: null, social: emptySocial(), homeRequests: 0 });
+    if (isHomeView(state.view) && state.view.kind !== 'home') go({ kind: 'home' }, { replace: true });
+  });
+}
+// who I am, as my homeserver has it now (GET /api/v1/me): the name and picture may have changed on another device
+async function refreshHomeMe() {
+  const h = state.home;
+  if (!h) return;
+  try {
+    const r = await homeFetch('/api/v1/me', { credentials: 'omit', headers: { Accept: 'application/json' } });
+    const u = r.ok ? (await r.json().catch(() => null))?.user : null;
+    if (u && state.home) set(st => ({ me: { ...st.me, username: u.username || st.me.username, display_name: u.display_name || st.me.display_name, pfp: absUrl(h.origin, u.pfp) ?? st.me.pfp } }));
+  } catch { /* offline: what the sign-in said stays */ }
+}
+// the home homeserver's socket is up (instances.js): what changed while it was down
+export function homeConnected(origin) { if (state.home?.origin === origin) { refreshHomeMe(); loadSocial(); dispatchEvent(new CustomEvent('ember-home-ready')); } }
+export async function loadSocialFriends() {
+  const h = state.home;
+  if (!h) return;
+  const d = await socialApi.friends().catch(() => null);
+  if (!d || !state.home) return;
+  const lists = friendLists(d, h.domain);
+  set(st => ({ social: { ...st.social, ...lists, loaded: true }, homeRequests: lists.incoming.length }));
+}
+export async function loadSocialDms() {
+  const h = state.home;
+  if (!h) return;
+  const d = await socialApi.dms().catch(() => null);
+  if (!d || !state.home) return;
+  let from = h.origin;
+  try { from = new URL(await socialBase()).origin; } catch { /* the homeserver itself */ }
+  const dms = mergeDms([{ origin: from === h.origin ? h.origin : from, dms: d.dms }], socialCtx());
+  const open = state.view?.dm;
+  set(st => ({ social: { ...st.social, dms: dms.map(x => (x.id === open ? { ...x, unread: 0, mention: false } : x)) } }));
+}
+export function loadSocial() { return Promise.all([loadSocialFriends(), loadSocialDms()]); }
+// a social_* frame from a homeserver's gateway (not a server's event: it comes as sent)
+export function socialEvent(origin, m) {
+  if (!state.home) return;
+  const fromHome = origin === state.home.origin;
+  if (socialRefetch(m) === 'friends') { if (fromHome) loadSocialFriends(); return; }
+  if (m.type === 'social_presence' && !fromHome) return;
+  const before = state.social;
+  const next = socialReduce(before, m, socialCtx({ from: origin }));
+  if (next === before) return;
+  set({ social: next });
+  const id = typeof m.dm === 'string' ? m.dm : m.dm?.id || m.id;
+  if (m.type === 'social_dm_remove' && state.view.dm === id) { go({ kind: 'home' }, { replace: true }); toast("You're not in that conversation any more."); }
+  if (m.type === 'social_dm_update' && state.view.dm === id) { const dm = next.dms.find(x => x.id === id); if (dm?.sid && dm.channel && dm.host_origin) seedDm(dm); }
+  if (m.type === 'social_dm_activity') {
+    if (state.view.dm === id && pageFocused()) readSocialDm(id);
+    else if (state.settings.sounds && state.presence[state.me?.username]?.status !== 'dnd') { try { playSound('message'); } catch { /* no sound */ } }
+  }
+}
+const dmHostOf = dm => normOrigin(dm?.host_origin);
+// the DM a channel belongs to (a message came in on it), or null
+function dmOfChannel(cid) {
+  for (const dm of state.social.dms) if (dm.channel && dm.host_origin && K(dmHostOf(dm), dm.channel) === cid) return dm;
+  return null;
+}
+// a message in a DM's channel: the list follows (a DM my homeserver hosts counts its own unread; one hosted elsewhere is
+// counted by the pointer, which the homeserver reports with social_dm_activity)
+function dmMessage(dm, msg, mine, open) {
+  set(st => ({ social: { ...st.social, dms: mergeLocal(st.social.dms, { ...dm, updated_at: Date.now(), last_message_id: msg.id != null ? String(msg.id) : dm.last_message_id, unread: open || mine ? (open ? 0 : dm.unread) : dm.hosted_here ? dm.unread + 1 : dm.unread }) } }));
+  if (open && !mine) readSocialDm(dm.id);
+}
+const mergeLocal = (list, dm) => [dm, ...list.filter(x => x.id !== dm.id)].sort((a, b) => (b.updated_at - a.updated_at) || (a.id < b.id ? -1 : 1));
+// a DM as the channel view wants it: a server with one channel and its members (nothing is asked of the host: DMs are in no server list)
+function seedDm(dm) {
+  const host = dmHostOf(dm), sid = K(host, dm.sid), cid = K(host, dm.channel), title = dmTitle(dm, state.home?.domain);
+  const members = dm.members.map(m => {
+    const { name, domain } = splitHandle(m.id);
+    const local = domain === dm.host; // on the host its own accounts go by the short id, everyone else by the whole one
+    return { id: local ? name : m.id, username: local ? splitHandle(m.handle || '').name || name : m.handle || m.id, display_name: m.display_name || '', pfp: m.avatar_url || null, kind: local ? 'local' : 'remote', handle: m.handle || null, account: m.id, inst: host };
+  });
+  const old = state.detail[sid];
+  const server = { ...(old?.server || {}), sid, inst: host, name: title, dm: dm.id, group: dm.group, owner_account: dm.owner, perms: 0, icon: null };
+  const channel = { ...(old?.channels?.[0] || {}), cid, server: sid, inst: host, name: title, type: 'text', topic: '', can_post: true };
+  set(st => ({ detail: { ...st.detail, [sid]: { server, categories: [], channels: [channel] } }, members: { ...st.members, [sid]: members } }));
+  return { sid, cid };
+}
+async function openSocialDm(id) {
+  if (!state.home) { set({ view: { kind: 'home' } }); return; }
+  let dm = state.social.dms.find(x => x.id === id);
+  if (!dm) {
+    try { dm = cleanDm((await socialApi.dm(id)).dm, socialCtx({ from: state.home.origin })); } catch { dm = null; }
+    if (!dm) { toast("That conversation isn't there any more."); go({ kind: 'home' }, { replace: true }); return; }
+    set(st => ({ social: { ...st.social, dms: mergeLocal(st.social.dms, dm) } }));
+  }
+  const host = dmHostOf(dm);
+  if (!host || !(await ensureHost(host))) { toast(`Couldn't connect to ${dm.host || 'the homeserver this conversation is on'}.`); if (state.view.kind !== 'home' && !state.view.sid) go({ kind: 'home' }, { replace: true }); return; }
+  if (!dm.sid || !dm.channel) { // (a pointer that never said where: the host knows)
+    try { const full = cleanDm((await apiFetch(`/api/v2/social/dms/${encodeURIComponent(id)}`, { inst: host })).dm, socialCtx({ from: host })); if (full) dm = { ...dm, sid: full.sid, channel: full.channel, members: full.members.length ? full.members : dm.members }; } catch { /* below */ }
+    if (!dm.sid || !dm.channel) { toast("Couldn't open that conversation."); return; }
+    set(st => ({ social: { ...st.social, dms: mergeLocal(st.social.dms.filter(x => x.id !== dm.id), dm) } }));
+  }
+  const at = seedDm(dm);
+  return open({ kind: 'channel', sid: at.sid, cid: at.cid, dm: dm.id });
+}
+const readAt = new Map();
+function readSocialDm(id) {
+  const dm = state.social.dms.find(x => x.id === id);
+  if (dm && (dm.unread || dm.mention)) set(st => ({ social: { ...st.social, dms: st.social.dms.map(x => (x.id === id ? { ...x, unread: 0, mention: false } : x)) } }));
+  if (Date.now() - (readAt.get(id) || 0) < 2000) return;
+  readAt.set(id, Date.now());
+  socialApi.readDm(id).catch(() => {});
+}
+const SOCIAL_TEXT = {
+  cannot_friend_yourself: "That's you!", user_not_found: "Couldn't find anyone with that name.", wrong_homeserver: "Couldn't find anyone with that name.", blocked: "You can't send them a request.", user_blocked: 'You blocked them - unblock them first.',
+  too_many_friends: 'Your friends list is full.', rate_limited: "You're doing that a lot - try again in a bit.", homeserver_rate_limited: 'Their homeserver is busy - try again in a bit.', no_request: 'That request is gone.', not_friends: "You're not friends any more.",
+  remote_accounts_off: "Your homeserver doesn't talk to other homeservers.", homeserver_denied: "Your homeserver doesn't talk to that homeserver.", homeserver_not_allowed: "Your homeserver doesn't talk to that homeserver.", homeserver_unreachable: "Couldn't reach their homeserver.",
+  dm_not_allowed: "They don't take messages from you.", invalid_members: "That won't work - pick up to 9 other people.", too_many_dms: 'They have too many conversations.', not_a_group: 'Only group chats can do that.', owner_only: 'Only the group owner can do that.',
+  dm_not_found: "That conversation isn't there any more.", local_accounts_only: 'Friends and DMs need an account on this homeserver.', unreachable: "Couldn't reach your homeserver.", signed_out: 'Your sign-in ended - sign in again.',
+};
+export const socialErrorText = e => SOCIAL_TEXT[e?.error || e?.message] || "That didn't work - try again in a bit.";
+export async function addSocialFriend(input, message) {
+  const h = state.home, handle = cleanHandle(input, h?.domain);
+  if (!h) return false;
+  if (!handle) { toast('Type a name like alice or alice@example.org.'); return false; }
+  try {
+    const d = await socialApi.addFriend({ handle }, message);
+    toast(d.status === 'friends' ? `You and ${accountName(d.friend, h.domain) || handle} are friends now!` : `Friend request sent to ${handle}.`, true);
+    loadSocialFriends();
+    return true;
+  } catch (e) { toast(socialErrorText(e)); return false; }
+}
+// accept | remove (unfriend, take a request back, turn one down) | block | unblock
+export async function socialFriendAction(what, id) {
+  const h = state.home;
+  if (!h) return false;
+  try {
+    const d = await (what === 'accept' ? socialApi.accept(id) : what === 'remove' ? socialApi.removeFriend(id) : what === 'block' ? socialApi.block(id) : socialApi.unblock(id));
+    if (d && Array.isArray(d.friends)) { const lists = friendLists(d, h.domain); set(st => ({ social: { ...st.social, ...lists, loaded: true }, homeRequests: lists.incoming.length })); } else await loadSocialFriends();
+    return true;
+  } catch (e) { toast(socialErrorText(e)); loadSocialFriends(); return false; }
+}
+// start (or find) a DM: handles typed in and / or ids picked from the friends list; more than one other person makes a group
+export async function startSocialDm({ handles = [], ids = [], name, group } = {}) {
+  const h = state.home;
+  if (!h) return null;
+  const members = handles.map(x => cleanHandle(x, h.domain)).filter(Boolean);
+  if (!members.length && !ids.length) { toast('Pick someone to talk to.'); return null; }
+  try {
+    const d = await createDm({ members, ...(ids.length ? { member_ids: ids } : {}), ...(name ? { name } : {}), ...(group ? { group: true } : {}) });
+    const dm = cleanDm(d.dm, socialCtx({ from: h.origin }));
+    if (!dm) throw new Error('request_failed');
+    set(st => ({ social: { ...st.social, dms: mergeLocal(st.social.dms, { ...(st.social.dms.find(x => x.id === dm.id) || {}), ...dm }) } }));
+    go({ kind: 'sdm', id: dm.id });
+    return dm;
+  } catch (e) { toast(socialErrorText(e)); return null; }
+}
+// rename a group, remove someone from it, or leave it: asked of the homeserver the DM is on
+export async function socialDmAction(what, id, arg) {
+  const dm = state.social.dms.find(x => x.id === id), host = dmHostOf(dm);
+  if (!dm || !state.home) return false;
+  const at = `/api/v2/social/dms/${encodeURIComponent(id)}`;
+  try {
+    const up = host && (await ensureHost(host));
+    if (what === 'leave') {
+      if (up) await apiFetch(`${at}/leave`, { method: 'POST', inst: host });
+      if (!up || !dm.hosted_here) await socialApi.leaveDm(id).catch(() => {}); // (my homeserver's pointer goes now, not when the host gets round to saying so)
+      set(st => ({ social: { ...st.social, dms: st.social.dms.filter(x => x.id !== id) } }));
+      if (state.view.dm === id) go({ kind: 'home' }, { replace: true });
+      return true;
+    }
+    if (!up) throw Object.assign(new Error('unreachable'), { error: 'unreachable' });
+    const d = what === 'rename' ? await apiFetch(at, { method: 'PATCH', inst: host, body: JSON.stringify({ name: arg }) }) : await apiFetch(`${at}/members/${encodeURIComponent(arg)}`, { method: 'DELETE', inst: host });
+    if (d?.dm) socialEvent(host, { type: 'social_dm_update', dm: d.dm });
+    return true;
+  } catch (e) { toast(socialErrorText(e)); return false; }
+}
+
 // me = null: signed out of Nookara (web Ember without a token) - only local-account instances work then
-export function init(me) {
-  set({ me, signedIn: !!me });
-  if (me) { try { const was = localStorage.getItem(LOCK_KEY()); if (was) { if (LOCK_REASONS.includes(was)) set({ lockReason: was }); lockAccount(); } } catch { /* fine */ } } // (locked last time: no flash of the app before /bonfire/session answers)
+// home: a v2 homeserver session instead of the Nookara sign-in (homeFrom): `me` is that account, the Nookara-only parts stay off
+export function init(me, home = null) {
+  const nk = !!me && !home;
+  set({ me, signedIn: nk, home });
+  if (nk) { try { const was = localStorage.getItem(LOCK_KEY()); if (was) { if (LOCK_REASONS.includes(was)) set({ lockReason: was }); lockAccount(); } } catch { /* fine */ } } // (locked last time: no flash of the app before /bonfire/session answers)
   desktopBridge()?.onSignIn?.(s => set({ reauth: s.state === 'failed' ? { state: 'failed', error: s.error } : { state: 'working' } }));
-  if (me) { checkPermissions(); loadSettings(); loadNotify(); loadEmojis(); loadPersonalEmojis(); connect(); }
+  if (nk) { checkPermissions(); loadSettings(); loadNotify(); loadEmojis(); loadPersonalEmojis(); connect(); }
   desktopBridge()?.isFocused?.().then(v => { desktopFocused = !!v; }).catch(() => {});
   desktopBridge()?.onWindowFocus?.(v => { desktopFocused = v; if (v) markViewRead(); });
   startInstances(); // (held while locked: nothing connects until it's lifted)
-  if (me) setupSigning();
-  if (me && !state.locked) loadAccount();
+  if (nk) setupSigning();
+  if (nk && !state.locked) loadAccount();
+  if (home) startHome();
   window.addEventListener('popstate', () => open(readHash()));
   const markFocusedViewRead = () => {
     if (pageFocused()) markViewRead();
