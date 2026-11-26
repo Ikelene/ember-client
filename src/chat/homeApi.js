@@ -73,24 +73,26 @@ export const loadLogins = origin => homeJson('/api/v2/account/logins', { origin 
 export const unlinkLogin = (origin, id) => homeJson(`/api/v2/account/logins/${encodeURIComponent(id)}`, { origin, method: 'DELETE' }).then(d => (Array.isArray(d.logins) ? d.logins : []));
 // Link a login to the account: the homeserver hands out a one-time address that goes through the provider and comes back
 // to auth/callback.html with ?linked= / ?link_error=. Call it straight from a click (the pop-up opens before anything is
-// awaited). -> the method id; throws an Error whose `error` is the code ('blocked', 'cancelled', the server's own)
+// awaited; a blocked pop-up turns into a full-page trip). -> the method id; throws an Error whose `error` is the code
+// ('cancelled', 'link_refused', the server's own)
 export async function linkLogin(origin, id) {
   const w = 480, h = 680;
   let win = null;
   try { win = window.open('', 'ember-link', `popup=yes,width=${w},height=${h},left=${Math.max(0, Math.round(screenX + (outerWidth - w) / 2))},top=${Math.max(0, Math.round(screenY + (outerHeight - h) / 2))}`); } catch { /* blocked */ }
   const fail = code => Object.assign(new Error(code), { error: code });
-  if (!win) throw fail('blocked');
   let url;
   try {
-    const d = await homeJson(`/login/link/${encodeURIComponent(id)}`, { origin, method: 'POST', body: { return_to: popupRedirectUri() } });
+    // no pop-up: the whole page makes the trip and comes back to this address (Chat.jsx reads the answer on load)
+    const d = await homeJson(`/login/link/${encodeURIComponent(id)}`, { origin, method: 'POST', body: { return_to: win ? popupRedirectUri() : `${location.origin}${location.pathname}${location.hash}` } });
     const u = new URL(String(d.url || ''));
     if (u.origin !== origin) throw fail('failed'); // the trip starts on the homeserver itself, nowhere else
     url = u.href;
   } catch (e) {
-    try { win.close(); } catch { /* fine */ }
+    try { win?.close(); } catch { /* fine */ }
     // the list loaded a moment ago, so a request that never arrives is the homeserver refusing this origin (CORS on /login/*), not the network
     throw e.error === 'unreachable' ? fail('link_refused') : e.error ? e : fail('failed');
   }
+  if (!win) { location.assign(url); return new Promise(() => {}); } // (the page is leaving)
   try { win.location.replace(url); } catch { try { win.close(); } catch { /* fine */ } throw fail('failed'); }
   return new Promise((done, reject) => {
     let chan = null, poll = null, giveUp = null, settled = false;
