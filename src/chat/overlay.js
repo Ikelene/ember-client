@@ -1,4 +1,4 @@
-// Ember desktop: feeds the in-game overlay (the app's transparent window over your game, see bonfire-desktop
+// Ember desktop: feeds the in-game overlay (the app's transparent window over your game, see ember-desktop
 // lib/overlay.js). Does nothing in a normal browser. Only works while the app says the overlay is up (`active`):
 //   - every 150 ms a small snapshot of the call (who's in it, speaking / muted / deafened, LIVE), the video tiles,
 //     streams you aren't watching and incoming calls -> sent only when it changed,
@@ -13,8 +13,9 @@ import { getState, onOverlayToast } from './store.js';
 import { pollLevels, levelOf } from './levels.js';
 import { inviteSummary } from './gameInvite.js';
 import { shownName, shownPfp } from './aliases.js';
+import { desktopBridge } from '../compat.js';
 
-const D = typeof window !== 'undefined' ? window.bonfireDesktop?.overlay : null;
+const D = typeof window !== 'undefined' ? desktopBridge()?.overlay : null;
 let voiceApi = null; // voice.js hands us its mute / deafen / watch functions
 export function registerOverlayVoice(api) { voiceApi = api; }
 

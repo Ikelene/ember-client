@@ -75,7 +75,7 @@ function LastOnlineRow({ online, at }) {
     </>
   );
 }
-// an instance's members (their member row carries last_online + online; presence is Velora's)
+// an instance's members (their member row carries last_online + online; presence is Nookara's)
 export function LastOnlineFact({ member }) {
   if (!member) return null;
   return <LastOnlineRow online={!!member.online} at={Number(member.last_online) || 0} />;

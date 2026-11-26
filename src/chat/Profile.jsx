@@ -21,6 +21,7 @@ import { PlatformIcon, PLATFORM_NAMES } from './platforms.jsx';
 import StatusReply from './StatusReply.jsx';
 import { ManageFacts, useInstClients } from './ClientVia.jsx';
 import { MaskIcon } from './Alias.jsx';
+import { EMBER_API, isNookara, nookaraId, nookaraProfileBadges } from '../compat.js';
 
 export const STATUS_LABEL = { online: 'Online', idle: 'Idle', dnd: 'Do not disturb', invisible: 'Invisible', offline: 'Offline' };
 const CONN_HOVER = { discord: '#5865F2', fluxer: '#7c78ee', github: '#ffffff', spotify: '#1DB954' };
@@ -51,7 +52,7 @@ export function PhoneMark({ sq }) {
     </svg>
   );
 }
-// console (3DS Velora Arcade): a gamepad in the status colour; wins over the phone mark and the plain dot
+// console (3DS Nookara Arcade): a gamepad in the status colour; wins over the phone mark and the plain dot
 export function ConsoleMark() {
   // the Community Developer badge's blocky gamepad (public/assets/badges/community_developer.svg): solid, no outline
   return (
@@ -77,7 +78,7 @@ export function StatusSq({ status, username }) {
   const ghost = useChat(s => !!s.presence[username]?.invisible); // seen by Manage users: really online, but set to invisible
   return <i title={ghost ? 'Invisible' : undefined} className={`vc-st-sq ${status === 'invisible' ? 'offline' : status}${consoleOn ? ' console' : mobile ? ' mobile' : ''}${ghost ? ' ghost' : ''}`}>{consoleOn ? <ConsoleMark /> : mobile && <PhoneMark sq />}</i>;
 }
-// `ghost`: pass it when the presence is not stored under user.username (an instance's Velora members); otherwise it is looked up
+// `ghost`: pass it when the presence is not stored under user.username (an instance's Nookara members); otherwise it is looked up
 export function Avatar({ user, size = 32, status, className = '', ghost: ghostProp }) {
   const [bad, setBad] = useState(false);
   const consoleOn = useChat(s => !!s.presence[user?.username]?.console) && PHONE_OK.has(status);
@@ -148,18 +149,18 @@ export function ActivityCard({ a, compact = false }) {
   );
 }
 
-// who = the author / member object when the person was clicked on an instance server: a Velora person (v:) is looked up on
-// Velora by their Velora id (the name Velora knows them by now, checked against the id); a local account or bot there has no
-// Velora profile at all (a Velora account with the same name is somebody else): a plain card from the instance's own data.
-export const plainOn = who => !!who?.inst && who.kind !== 'velora';
+// who = the author / member object when the person was clicked on an instance server: a Nookara person (v:) is looked up on
+// Nookara by their Nookara id (the name Nookara knows them by now, checked against the id); a local account or bot there has no
+// Nookara profile at all (a Nookara account with the same name is somebody else): a plain card from the instance's own data.
+export const plainOn = who => !!who?.inst && !isNookara(who.kind);
 // A bot on an instance server: the instance gives its description / trusted_in / gallery_id; a gallery-linked one is completed from
-// Velora's public gallery detail (avatar, description, owner, approval state). Cached for a minute.
+// Nookara's public gallery detail (avatar, description, owner, approval state). Cached for a minute.
 const galleryCache = new Map();
 function galleryDetail(id) {
   const hit = galleryCache.get(id);
   if (hit && Date.now() - hit.at < 60000) return hit.p;
   const t = getToken();
-  const p = fetch(`/bonfire/bots/gallery/${encodeURIComponent(id)}`, t ? { headers: { Authorization: `Bearer ${t}` } } : undefined).then(r => (r.ok ? r.json() : null)).catch(() => null);
+  const p = fetch(`${EMBER_API}/bots/gallery/${encodeURIComponent(id)}`, t ? { headers: { Authorization: `Bearer ${t}` } } : undefined).then(r => (r.ok ? r.json() : null)).catch(() => null);
   galleryCache.set(id, { at: Date.now(), p });
   return p;
 }
@@ -185,7 +186,7 @@ async function instanceBotInfo(who, username) {
       description: typeof b.description === 'string' ? b.description : '',
       owner: typeof owner === 'string' ? owner : '', trusted_in: Number(b.trusted_in) || 0,
       state: typeof b.state === 'string' ? b.state : undefined };
-    // extra.bot is the same { bot, can_add_to } envelope as a Velora profile.
+    // extra.bot is the same { bot, can_add_to } envelope as a Nookara profile.
     return { bot: { bot, can_add_to: null } };
   } catch { return null; } // sign-in needed / unreachable / odd data: keep the plain card
 }
@@ -218,8 +219,8 @@ function useProfile(username, who, sid) {
   const rawSp = useChat(s => (sid ? s.members[sid]?.find(m => m.username === username)?.profile : null)) || null;
   const sp = useMemo(() => cleanServerProfile(rawSp), [rawSp]);
   const [extra, setExtra] = useState(null);
-  const vid = who?.inst && who.kind === 'velora' ? String(who.velora_id || '') : '';
-  const vname = useChat(s => (vid ? s.veloraNames[vid] : null)) || username;
+  const vid = who?.inst && isNookara(who.kind) ? String(nookaraId(who) || '') : '';
+  const vname = useChat(s => (vid ? s.nookaraNames[vid] : null)) || username;
   useEffect(() => {
     let gone = false;
     setP(null); setExtra(null);
@@ -234,7 +235,7 @@ function useProfile(username, who, sid) {
     wantPresence(vname);
     return () => { gone = true; };
   }, [username, vname, plainOn(who)]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Velora says this person changed their profile: re-read it in place (no blanking)
+  // Nookara says this person changed their profile: re-read it in place (no blanking)
   useEffect(() => onUserUpdate(m => {
     if (!p || p.plain || p.missing || String(p.id) !== String(m.user.id)) return;
     lookup(m.user.username).then(d => { if (d && String(d.id) === String(m.user.id)) setP(d); }).catch(() => {});
@@ -242,17 +243,17 @@ function useProfile(username, who, sid) {
   const shown = useMemo(() => (p && sp ? { ...p, pfp_url: sp.pfp || p.pfp_url, banner_url: sp.banner ? viaProxy(sp.banner) : p.banner_url, color: sp.color || p.color, bio: sp.bio || p.bio, pronouns: sp.pronouns || p.pronouns, server_profile: true } : p), [p, sp]);
   return [shown, extra, vname];
 }
-// servers we both are in: Velora's own (the server says) plus the ones on Ember instances (only this browser knows who is in those:
-// a Velora account is matched by its Velora id, an instance's own account by its id on that instance)
+// servers we both are in: Nookara's own (the server says) plus the ones on Ember instances (only this browser knows who is in those:
+// a Nookara account is matched by its Nookara id, an instance's own account by its id on that instance)
 function useMutualServers(extra, who, vid) {
   const servers = useChat(s => s.servers);
   const members = useChat(s => s.members);
   const instServers = servers.filter(s => s.inst && isInst(s.sid));
   useEffect(() => { instServers.forEach(s => { if (!members[s.sid]) loadMembers(s.sid); }); }, [instServers.map(s => s.sid).join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
-  const veloraId = String(who?.kind === 'velora' ? who.velora_id || '' : vid || '');
+  const accountId = String(isNookara(who?.kind) ? nookaraId(who) || '' : vid || '');
   const here = [];
   for (const s of instServers) {
-    const hit = (members[s.sid] || []).find(m => (m.kind === 'velora' && veloraId && String(m.velora_id) === veloraId) || (who?.inst === s.inst && who.kind !== 'velora' && who.id != null && String(m.id) === String(who.id)));
+    const hit = (members[s.sid] || []).find(m => (isNookara(m.kind) && accountId && String(nookaraId(m)) === accountId) || (who?.inst === s.inst && !isNookara(who.kind) && who.id != null && String(m.id) === String(who.id)));
     if (hit) here.push({ sid: s.sid, name: s.name, icon: s.icon || s.icon_url || null, role: hit.role });
   }
   const seen = new Set();
@@ -263,17 +264,17 @@ const isHex = c => /^#[0-9a-f]{6}$/i.test(c || '');
 // Badge Arcade badges placed on someone's mini profile (their own board, same as the editor preview)
 function useArcadeBoard(cardRef, username, kind = 'mini') {
   useEffect(() => {
-    if (!username) return undefined; // (an instance's own account: no Velora profile, no board)
+    if (!username) return undefined; // (an instance's own account: no Nookara profile, no board)
     let board = null, gone = false;
-    const ready = window.VeloraProfileBadges ? Promise.resolve() : new Promise(res => {
+    const ready = nookaraProfileBadges() ? Promise.resolve() : new Promise(res => {
       let sc = document.getElementById('vpb-js');
       if (!sc) { sc = document.createElement('script'); sc.id = 'vpb-js'; sc.src = '/assets/js/profile-badges.js?v=6'; document.head.appendChild(sc); }
       sc.addEventListener('load', res);
     });
     Promise.all([ready, fetch(`/arcade/profile/${encodeURIComponent(username)}`, { headers: { Authorization: `Bearer ${getToken()}` } }).then(r => r.json()).catch(() => null)])
       .then(([, a]) => {
-        if (gone || !a || a.error || !cardRef.current || !window.VeloraProfileBadges) return;
-        board = window.VeloraProfileBadges.mount(cardRef.current, a, { isMe: false, kind });
+        if (gone || !a || a.error || !cardRef.current || !nookaraProfileBadges()) return;
+        board = nookaraProfileBadges().mount(cardRef.current, a, { isMe: false, kind });
       });
     return () => { gone = true; board?.destroy(); };
   }, [username]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -294,7 +295,7 @@ export function HandleLine({ name, handle, pronouns, cls = 'vc-pronouns' }) {
 }
 export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: outerRef }) {
   const [p, extra, vname] = useProfile(username, who, sid);
-  const plain = plainOn(who); // an instance's own account / bot: name, roles, joined - nothing from Velora
+  const plain = plainOn(who); // an instance's own account / bot: name, roles, joined - nothing from Nookara
   const [, tick] = useState(0);
   useEffect(() => { const t = setInterval(() => tick(x => x + 1), 30000); return () => clearInterval(t); }, []);
   const localTime = localTimeOf(p);
@@ -450,7 +451,7 @@ export function MiniProfile({ username, anchor, side = 'right', sid, who, onClos
 
 // the large profile: grows out of the mini card it was opened from
 export function ProfileModal({ username: shown, from, sid, who, onClose }) {
-  const [p, extra, username] = useProfile(shown, who, sid); // (username: their Velora name - on an instance it can differ from the one it shows)
+  const [p, extra, username] = useProfile(shown, who, sid); // (username: their Nookara name - on an instance it can differ from the one it shows)
   const bigName = (who?.inst && who?.display_name && who.display_name !== who.username ? who.display_name : p?.display_name) || p?.username || username; // (display names: see ProfileCard)
   const me = useChat(s => s.me);
   const presence = useChat(s => s.presence[username]) || extra?.presence;
@@ -612,7 +613,7 @@ export function useProfiles() {
   const [big, setBig] = useState(null);
   const view = useChat(s => s.view);
   const sid = view.kind === 'channel' ? view.sid : null;
-  // who: the author / member object when it's someone on an instance server (decides Velora profile vs plain card)
+  // who: the author / member object when it's someone on an instance server (decides Nookara profile vs plain card)
   const openMini = (username, el, side = 'right', who) => setMini({ username, anchor: el?.getBoundingClientRect?.() || el, side, sid, who, k: Date.now() + Math.random() });
   const ui = (
     <>

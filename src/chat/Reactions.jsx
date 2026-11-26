@@ -13,13 +13,14 @@ import { ReactorFaces, openReactionsView } from './ReactionsView.jsx';
 import { openMenu } from './Menu.jsx';
 import { Users } from 'lucide-react';
 import './Reactions.css';
+import { NOOKARA_INST } from '../compat.js';
 
 const CUSTOM = /^<(a?):(\w+):(e[0-9a-f]{10})>$/;
 const customId = emoji => /^c:(e[0-9a-f]{10})$/.exec(emoji)?.[1] || CUSTOM.exec(emoji)?.[3];
 const stableKey = emoji => customId(emoji) ? `c:${customId(emoji)}` : emoji;
 function accountOf(inst) {
   const s = getState(), user = inst ? s.instances.find(i => i.origin === inst)?.user : s.me;
-  return `${inst || 'velora'}|${user?.id || user?.username || 'anonymous'}`;
+  return `${inst || NOOKARA_INST}|${user?.id || user?.username || 'anonymous'}`;
 }
 function communityOf(id, inst) {
   for (const b of Object.values(getState().msgs)) {
@@ -38,7 +39,7 @@ const ERR = { too_many_reactions: 'That message has as many different reactions 
 export async function setReaction(id, emoji, on, inst) {
   const account = accountOf(inst);
   const c = CUSTOM.exec(emoji);
-  // id: a channel message id, dm:<id> for a DM, g:<room>:<id> for a group message; inst: the instance a message lives on (none = Velora)
+  // id: a channel message id, dm:<id> for a DM, g:<room>:<id> for a group message; inst: the instance a message lives on (none = Nookara)
   const base = reactionBase(id);
   const nookaraOnly = /^(dm|g):/.test(String(id)); // these keep a custom emoji's whole token, like a DM message does
   const out = on && inst && timedOutIn(getState().servers.find(x => x.inst === inst)?.sid); // (one instance = one server)

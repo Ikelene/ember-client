@@ -1,6 +1,6 @@
 // Where a file sent in a DM / group chat goes (pure, no imports, so it can be tested on its own).
-//   'account' = Velora account storage, 'temp' = Velora's temporary storage, null = ask (the picker in UploadDest.jsx)
-// The account's chat setting dm_upload_dest is the real answer once it has loaded; until then (or on a Velora without the
+//   'account' = Nookara account storage, 'temp' = Nookara's temporary storage, null = ask (the picker in UploadDest.jsx)
+// The account's chat setting dm_upload_dest is the real answer once it has loaded; until then (or on a Nookara without the
 // setting) this device's copy in localStorage counts.
 export const DESTS = ['account', 'temp'];
 export function rememberedDest({ fromServer, setting, local }) {

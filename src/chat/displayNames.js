@@ -9,6 +9,7 @@
 //     `user_update` event (Nookara sends display_name with every profile change).
 // Webhooks, bridged people and bot aliases only ever have the name they came with.
 import { useEffect, useState } from 'react';
+import { isNookara, NOOKARA_WIRE } from '../compat.js';
 // (store.js is loaded lazily: this file is also used by pure helpers that the node tests import, aliases.js)
 const store = () => import('./store.js');
 
@@ -46,7 +47,7 @@ function pump() {
       .finally(() => { running--; ks.forEach(k => pending.delete(k)); pump(); });
   }, 25);
 }
-const SKIP = new Set(['system', 'nookara', 'unknown', '']);
+const SKIP = new Set(['system', 'nookara', NOOKARA_WIRE, 'unknown', '']); // (the system account's name, old and new)
 function want(k) {
   if (!k || SKIP.has(k) || pending.has(k)) return;
   pending.add(k); queue.push(k); pump();
@@ -98,14 +99,14 @@ export function useDisplayNamesVersion() {
 // what's known right now, no lookup ('' = none / not known)
 export const displayNameOf = username => vals.get(key(username)) || '';
 
-// an Ember server's person object: members carry inst, message authors a kind (velora | local | bot); Nookara's own carry neither
+// an Ember server's person object: members carry inst, message authors a kind (nookara | local | bot); Nookara's own carry neither
 const onServer = u => !!(u.inst || u.kind);
 // Is this someone whose name belongs to an Ember server rather than Nookara? (a server-made account, a bot there, a webhook,
 // a bridged person, an alias) - those never get a Nookara lookup by name.
 export function serverOwnName(u) {
   if (!u) return true;
   if (u.webhook || u.name_only || u.bridge || u.alias_name) return true;
-  if (onServer(u) && u.kind !== 'velora') return true;
+  if (onServer(u) && !isNookara(u.kind)) return true;
   return false;
 }
 // the name to show. live = the Nookara display name ('' if none / not known)

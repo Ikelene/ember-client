@@ -1,11 +1,12 @@
+import { OLD_HOST_SRC } from '../compat.js';
 // Where a Nookara account-storage upload (/uploads/...) can be linked from. Pure, no imports (the node tests load it).
 // cdn.nookara.cc serves /uploads/ (account storage) and /temp/<id>/<name> (temporary files, see upload-dest.js TEMP_LINK) - no /t/, no API.
 // Every pattern is anchored on "https://" and the host is followed straight by "/", so look-alikes (cdn.nookara.cc.evil.example,
 // evilcdn.nookara.cc, cdn.nookara.cc@evil.example, http://) never match.
 const R = String.raw;
 const TEMP_CDN_SRC = R`cdn\.nookara\.cc\/temp`; // a temporary file's copy in the bucket (the id is checked by upload-dest.js TEMP_LINK)
-export const HOME_ORIGIN_SRC = R`(?:ember\.)?nookara\.cc|velora\.ikelene\.net`; // old + current hosts (also serve /t/)
-export const UPLOAD_ORIGIN_SRC = R`(?:ember\.|cdn\.)?nookara\.cc|velora\.ikelene\.net`; // hosts that serve /uploads/
+export const HOME_ORIGIN_SRC = R`(?:ember\.)?nookara\.cc|${OLD_HOST_SRC}`; // old + current hosts (also serve /t/)
+export const UPLOAD_ORIGIN_SRC = R`(?:ember\.|cdn\.)?nookara\.cc|${OLD_HOST_SRC}`; // hosts that serve /uploads/
 const VID_EXT = 'mp4|webm|mov', AUD_EXT = 'mp3|ogg|wav|m4a|aac|flac|weba|opus';
 export const VID = new RegExp(R`^https:\/\/((?:${UPLOAD_ORIGIN_SRC})\/uploads|files\.catbox\.moe)\/\S+\.(${VID_EXT})$`, 'i');
 export const AUD = new RegExp(R`^https:\/\/((?:${UPLOAD_ORIGIN_SRC})\/uploads|files\.catbox\.moe)\/\S+\.(${AUD_EXT})$`, 'i');

@@ -1,4 +1,4 @@
-// Ember bots: the BOT tag, "Add to server" on a bot's profile, and managing bots: your own on Velora (My Account > Chat), or an
+// Ember bots: the BOT tag, "Add to server" on a bot's profile, and managing bots: your own on Nookara (My Account > Chat), or an
 // instance's (Server settings > Bots; its own b: accounts, its own bot API).
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -14,6 +14,7 @@ import { BotGallerySection } from './BotGalleryDev.jsx';
 import { usePlan, PlanGate, PlanNotice, PlanUsage } from './PlanGate.jsx';
 import './Bots.css';
 import { pictureAccept } from './accept.js';
+import { EMBER_API, legacyToNew } from '../compat.js';
 
 export function BotTag({ small, verified }) {
   const z = small ? 13 : 15;
@@ -40,20 +41,20 @@ export const errText = e => ({
   bot_is_private: 'This bot is private.', not_allowed: 'You need Manage server there.', forbidden: 'You need Manage server for that.',
   gallery_banned: 'This bot was banned from the gallery.', bot_not_found: "That bot doesn't exist (any more).",
   invalid_instance: "That server's instance address isn't valid.", unknown_instance: "That server's instance isn't registered with Nookara, so it can't take gallery bots.",
-  instance_banned: "That server's instance is banned from Nookara.", gallery_needs_velora_account: "That instance uses its own accounts, so it can't take gallery bots (they need Nookara sign-in).",
+  instance_banned: "That server's instance is banned from Nookara.", gallery_needs_nookara_account: "That instance uses its own accounts, so it can't take gallery bots (they need Nookara sign-in).",
   ticket_invalid: "Nookara's permission slip wasn't accepted - try again.", ticket_unknown_kid: "The instance doesn't know Nookara's signing key yet - try again in a minute.",
   ticket_bad_signature: "Nookara's permission slip didn't check out - try again.", ticket_wrong_issuer: "That slip didn't come from Nookara.",
   ticket_wrong_audience: 'That slip was made for another instance - try again.', ticket_wrong_user: "That slip isn't yours.", ticket_expired: 'That took too long and the slip expired - try again.',
   ticket_used: 'That slip was already used - try again.', banned_from_server: 'This bot is banned from that server.',
-  token_conflict: 'A different bot with the same token is already in that server.', velora_unreachable: "That instance couldn't reach Nookara - try again in a bit.",
+  token_conflict: 'A different bot with the same token is already in that server.', nookara_unreachable: "That instance couldn't reach Nookara - try again in a bit.",
   instance_unreachable: "Couldn't reach that instance.", instance_not_connected: 'Sign in to that instance first.', inst_scope: 'This login needs a new permission for that instance - log in again.',
   signed_out: 'Sign in to add bots.', message_required: 'Write a message first.', description_required: 'Add a short description of at least 10 characters (the one-line summary shown on the card).', long_description_required: 'Add a long description of at least 20 characters (what the bot does and how to use it).', description_too_long: 'The short description can be 200 characters at most.',
   avatar_required: 'Give the bot a profile picture first (upload one in the bot settings above).', already_pending: "It's already waiting for review.", already_listed: "It's already in the gallery.",
   invalid_tags: 'Tags are 2-20 letters, numbers or dashes, up to 6.', invalid_support_url: 'The support link has to start with https://.', invalid_links: 'Links need a label and an https:// address (up to 5).',
   invalid_permissions: 'One of those permissions is not on the list.', invalid_state: "It can't do that in its current state.",
-}[e?.message] || `Something went wrong - try again.${e?.message ? ` (${e.message})` : ''}`);
+}[legacyToNew(e?.message)] || `Something went wrong - try again.${e?.message ? ` (${e.message})` : ''}`);
 
-// the servers where I may add a bot: Manage server there. Velora's own (legacy) servers and each instance's community.
+// the servers where I may add a bot: Manage server there. Nookara's own (legacy) servers and each instance's community.
 export function useAddTargets() {
   const servers = useChat(s => s.servers);
   const detail = useChat(s => s.detail);
@@ -66,13 +67,13 @@ export function useAddTargets() {
   });
 }
 
-// Add a gallery bot to a server I manage. Velora servers: the old route. Instance servers: Velora hands out a ticket for the
+// Add a gallery bot to a server I manage. Nookara servers: the old route. Instance servers: Nookara hands out a ticket for the
 // instance, the instance checks it. Resolves to { test } or throws an Error whose message is the code.
 export async function addBotToServer(bot, s) {
   if (!bot?.username || !s?.sid) throw new Error('not_allowed');
   if (!s.inst) { await apiFetch(`/chat/bots/by-name/${encodeURIComponent(bot.username)}/add`, { method: 'POST', body: JSON.stringify({ sid: s.sid }) }); return { test: false }; }
   if (!bot?.id) throw new Error('bot_not_found');
-  const t = await apiFetch(`/bonfire/bots/gallery/${encodeURIComponent(bot.id)}/ticket`, { method: 'POST', body: JSON.stringify({ instance: s.inst }) });
+  const t = await apiFetch(`${EMBER_API}/bots/gallery/${encodeURIComponent(bot.id)}/ticket`, { method: 'POST', body: JSON.stringify({ instance: s.inst }) });
   if (!t?.ticket) throw new Error('ticket_invalid');
   await apiFetch('/api/v1/bots/gallery/add', { inst: s.inst, method: 'POST', body: JSON.stringify({ ticket: t.ticket, sid: bare(s.sid) }) });
   return { test: !!t.test };
@@ -215,7 +216,7 @@ function CommandAccess({ sid }) {
   );
 }
 
-// ── My Account > Chat > Bots (Velora), or Server settings > Bots (inst = the instance's origin, sid = its community) ──
+// ── My Account > Chat > Bots (Nookara), or Server settings > Bots (inst = the instance's origin, sid = its community) ──
 export function BotsManager({ inst, sid }) {
   const o = inst ? { inst } : {}; // every bot route of an instance goes to that instance
   const api = inst ? `${inst}/bot/v1` : `${location.origin}/chat/api/v1`;

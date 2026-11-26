@@ -1,6 +1,6 @@
-// One-time account notices ("what's new" popups, account-notices.js on Velora). GET /account/notices says which ids this
+// One-time account notices ("what's new" popups, account-notices.js on Nookara). GET /account/notices says which ids this
 // account hasn't dismissed yet; we show the first one we have words for. Either button marks it seen for the account
-// (POST /account/notices/:id/seen), so it never comes back here, in the other Ember apps or on the Velora dashboard.
+// (POST /account/notices/:id/seen), so it never comes back here, in the other Ember apps or on the Nookara dashboard.
 import { useEffect, useState } from 'react';
 import { ShieldCheck, MessageCircle, Ban, Settings, IdCard, AtSign, Pencil } from 'lucide-react';
 import { apiFetch } from '../api.js';

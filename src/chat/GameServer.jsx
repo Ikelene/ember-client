@@ -17,15 +17,16 @@ import { Avatar } from './Profile.jsx';
 import { stampOf } from './text.jsx';
 import { instOf, instOpt, isInst } from './ids.js';
 import { usePlan, PlanGate } from './PlanGate.jsx';
+import { isEmberSource, GAME_CLI, legacyToNew } from '../compat.js';
 
 // ── small helpers ────────────────────────────────────────────────────────────
 export const GAME_ERRORS = {
   instance_not_linked: "That Minecraft server isn't linked to this Ember server.", already_linked: 'That Minecraft server is already linked.',
-  too_many_instances: 'An Ember server can link up to 10 Minecraft servers.', console_needs_bonfire: 'Commands can only be run from Ember itself.',
+  too_many_instances: 'An Ember server can link up to 10 Minecraft servers.', console_needs_ember: 'Commands can only be run from Ember itself.',
   not_a_console: "This isn't a console channel.", claim_not_found: 'That code is gone - get a new one.', empty_command: 'Type a command first.',
   bad_purpose: 'Pick what the channel is for.', not_linked: "That server isn't linked any more.", not_a_game_channel: "That isn't a game server channel.",
 };
-const errText = code => GAME_ERRORS[code] || errorText(code);
+const errText = code => GAME_ERRORS[legacyToNew(code)] || errorText(code);
 const PLATFORM_LABEL = { paper: 'Paper', spigot: 'Spigot', fabric: 'Fabric', velocity: 'Velocity', forge: 'Forge' };
 const PURPOSE_LABEL = { info: 'Join info', console: 'Console', chat: 'Synced chat' };
 const PURPOSE_ICON = { info: Info, console: Terminal, chat: Gamepad2 };
@@ -135,7 +136,7 @@ function GameSetup({ channel, sid }) {
   const [claim, setClaim] = useState(null); // { hint } while the claim dialog is open
   const [downloads, setDownloads] = useState(null);
   const loadLinked = () => apiFetch(`/chat/game/servers/${sid}/instances`).then(d => setLinked(d.instances)).catch(() => setLinked([]));
-  // the plugin builds are Velora's (public), for instances too: an instance doesn't host them
+  // the plugin builds are Nookara's (public), for instances too: an instance doesn't host them
   useEffect(() => { loadLinked(); fetch('/chat/game/downloads').then(r => r.json()).then(setDownloads).catch(() => setDownloads({ files: {} })); }, [sid]); // eslint-disable-line react-hooks/exhaustive-deps
   useGameEvent(m => { if ((m.type === 'game_linked' || m.type === 'game_unlinked') && m.server === sid) loadLinked(); }, [sid]);
   const step = !cfg.instance ? 2 : 3;
@@ -181,7 +182,7 @@ function GameSetup({ channel, sid }) {
               <>
                 {inst ? <>
                   <div className="vc-game-explain"><Info size={16} /><span>Ember Link is a plugin/mod for your Minecraft server. It connects out to this Ember server, so you don't need to open any ports. <b>1.</b> Install it and start the server. <b>2.</b> Run this in the server console. <b>3.</b> Pick it from the list below.</span></div>
-                  <div className="vc-game-cmd"><code>bonfire server {inst}</code><button type="button" className="btn btn-surface" onClick={() => copyText(`bonfire server ${inst}`, 'Command copied')}><Copy size={14} /> Copy</button></div>
+                  <div className="vc-game-cmd"><code>{GAME_CLI} {inst}</code><button type="button" className="btn btn-surface" onClick={() => copyText(`${GAME_CLI} ${inst}`, 'Command copied')}><Copy size={14} /> Copy</button></div>
                 </> : <div className="vc-game-explain"><Info size={16} /><span>Ember Link is a plugin/mod for your Minecraft server. It connects out to Ember, so you don't need to open any ports. Install it, start the server, and it shows up below.</span></div>}
                 <Downloads d={downloads} />
                 <SearchingList sid={sid} onPick={x => (inst ? linkConnected(x) : setClaim({ hint: x }))} />
@@ -277,7 +278,7 @@ function SearchingList({ sid, onPick }) {
   );
 }
 
-// the claim code: run `bonfire link XXXX-XXXX` in the server console
+// the claim code: run `bonfire link XXXX-XXXX` in the server console (the plugin's command, see compat.js GAME_CLI)
 export function ClaimDialog({ sid, cid, hint, onClose }) {
   const [c, setC] = useState(null);
   const [state, setState] = useState('loading'); // loading | pending | linked | expired | error
@@ -547,7 +548,7 @@ function ConsoleView({ channel, sid }) {
     const r = await apiFetch(`/chat/game/channels/${channel.cid}/console`, { method: 'POST', body: JSON.stringify({ command }) }).catch(er => ({ ok: false, error: er.message }));
     setBusy(false);
     // the output shows under my own command line (others just see the server's log)
-    const mine = [...(linesRef.current || [])].reverse().find(x => x.kind === 'command' && x.source === 'bonfire' && x.by === me && x.command === command && !outputsRef.current[x.seq]);
+    const mine = [...(linesRef.current || [])].reverse().find(x => x.kind === 'command' && isEmberSource(x.source) && x.by === me && x.command === command && !outputsRef.current[x.seq]);
     setOutputs(o => ({ ...o, [mine ? mine.seq : `local-${Date.now()}`]: mine ? r : { ...r, command } }));
   }
   function keys(e) {
@@ -578,14 +579,14 @@ function ConsoleView({ channel, sid }) {
             <span className="t">{hhmmss(l.t)}</span>
             <ChevronRight size={13} className="chev" />
             <b className="c">{l.command}</b>
-            <span className="who">{l.source === 'bonfire' ? <><Avatar user={{ username: l.by, pfp: l.pfp || people[l.by]?.pfp }} size={16} />{l.by}</> : l.source === 'rcon' ? <><Network size={12} />{l.by || 'RCON'}</> : <><Terminal size={12} />{l.by || 'CONSOLE'}</>}</span>
-            {l.source === 'bonfire' && <span className={`st st-${l.status}`} title={l.status}>{l.status === 'sent' ? <span className="vc-game-spin sm" /> : l.status === 'ok' ? <Check size={13} /> : l.status === 'timeout' ? <Clock size={13} /> : <X size={13} />}</span>}
+            <span className="who">{isEmberSource(l.source) ? <><Avatar user={{ username: l.by, pfp: l.pfp || people[l.by]?.pfp }} size={16} />{l.by}</> : l.source === 'rcon' ? <><Network size={12} />{l.by || 'RCON'}</> : <><Terminal size={12} />{l.by || 'CONSOLE'}</>}</span>
+            {isEmberSource(l.source) && <span className={`st st-${l.status}`} title={l.status}>{l.status === 'sent' ? <span className="vc-game-spin sm" /> : l.status === 'ok' ? <Check size={13} /> : l.status === 'timeout' ? <Clock size={13} /> : <X size={13} />}</span>}
             {outputs[l.seq] && <Output r={outputs[l.seq]} />}
           </div>
         ) : (
           <div key={l.seq} className={`vc-game-cl lv-${String(l.level || 'INFO').toLowerCase()}`}><span className="t">{hhmmss(l.t)}</span><span className="lv">{l.level}</span><span className="m">{l.msg}</span></div>
         )))}
-        {loose.map(([k, r]) => <div key={k} className="vc-game-cl cmd src-bonfire"><ChevronRight size={13} className="chev" /><b className="c">{r.command}</b><Output r={r} /></div>)}
+        {loose.map(([k, r]) => <div key={k} className="vc-game-cl cmd src-ember"><ChevronRight size={13} className="chev" /><b className="c">{r.command}</b><Output r={r} /></div>)}
       </div>
       {!stick && <button type="button" className="vc-game-jump" onClick={() => { setStick(true); if (box.current) box.current.scrollTop = box.current.scrollHeight; }}><ArrowDown size={14} /> Jump to latest</button>}
       {execOff ? <div className="vc-game-con-note"><Info size={14} /> Running commands is turned off in this server's Ember Link config.</div> : (

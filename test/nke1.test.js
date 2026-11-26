@@ -112,7 +112,7 @@ test('files show as what they are', () => {
   assert.equal(fileKindOfMime('image/png', 'x.mp4'), 'image'); // (a real type wins)
 });
 
-// what the server's test checks its side against (VELORA tests/e2ee.test.js). Written when NKE1_VECTORS says where.
+// what the server's test checks its side against (NOOKARA tests/e2ee.test.js). Written when NKE1_VECTORS says where.
 test('vectors for the server side', { skip: !process.env.NKE1_VECTORS }, async () => {
   const [a, b] = await Promise.all([person(), person()]);
   const enc = await N.encryptMessage({ t: 'from the browser side' }, { from: 11, to: 22, recipients: [{ kid: a.kid, enc_pub: a.enc_pub }, { kid: b.kid, enc_pub: b.enc_pub }], signer: { kid: a.kid, sigPriv: a.sigPriv } });

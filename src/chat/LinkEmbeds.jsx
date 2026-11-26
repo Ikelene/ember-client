@@ -1,7 +1,7 @@
 import { siteHref } from './hosts.js';
-// Link previews under messages. The server makes them (GET /chat/unfurl: Velora, or the instance a message is on) - the
+// Link previews under messages. The server makes them (GET /chat/unfurl: Nookara, or the instance a message is on) - the
 // browser never visits the linked site; pictures come from that server too. YouTube gets Ember's own player (YouTube's
-// embed, or streamed through the instance / Velora), Ember invites + Velora profiles get their own cards.
+// embed, or streamed through the instance / Nookara), Ember invites + Nookara profiles get their own cards.
 import { VideoPlayer, fmtTime } from './MediaPlayer.jsx';
 import { viewPicture } from './MediaViewer.jsx';
 import { useEffect, useRef, useState } from 'react';
@@ -13,6 +13,7 @@ import { K } from './ids.js';
 import { inviteRef, paymentRef, glintRef, driveRef, forumRef, siteRef, loadSiteHosts, onSiteHosts } from './inviteLink.js';
 import { GlintMark, GLINT_DOWNLOAD, clipLikes, setClipLike, openOutside } from './glint.jsx';
 import { fmtSize, RISKY, KIND_OF } from './fileKinds.js';
+import { NOOKARA_WIRE, isNookara, NOOKARA_INST, desktopBridge } from '../compat.js';
 
 const cache = new Map(); // inst|url -> promise of the embed
 // a Drive or Forums card can stop being true (link turned off, post removed), so those are only trusted for a little while. maxAge: 0 = for good
@@ -29,7 +30,7 @@ function useUnfurl(url, inst, maxAge = 0, priv = false) {
     let live = true;
     if (!cachedEntry(k, maxAge)) {
       const entry = { done: false };
-      // Velora takes the link in the body, which keeps it out of web server logs. Instances only have the GET
+      // Nookara takes the link in the body, which keeps it out of web server logs. Instances only have the GET
       const asked = inst ? apiFetch(`/chat/unfurl?url=${encodeURIComponent(url)}`, { inst }) : apiFetch('/chat/unfurl', { method: 'POST', body: JSON.stringify({ url, private: priv }) });
       entry.p = asked.then(d => d.embed).catch(() => null)
         .then(v => { entry.done = true; entry.at = Date.now(); entry.value = v; return v; });
@@ -41,7 +42,7 @@ function useUnfurl(url, inst, maxAge = 0, priv = false) {
   return e;
 }
 
-// inst: the instance a message is on (its previews come from there), undefined for Velora's own. priv: from a DM or group chat, so Velora doesn't store the link
+// inst: the instance a message is on (its previews come from there), undefined for Nookara's own. priv: from a DM or group chat, so Nookara doesn't store the link
 // custom site addresses: Nookara's list, asked for the first time a link preview is drawn (and now and then after)
 const askSiteHosts = () => loadSiteHosts(() => apiFetch('/sites/api/hosts'));
 function useSiteHosts() {
@@ -56,7 +57,7 @@ export function LinkEmbeds({ urls, inst, priv }) {
 function OneEmbed({ url, inst, priv }) {
   const service = driveRef(url) || forumRef(url) || siteRef(url);
   const ref = service || inviteRef(url) || paymentRef(url) || glintRef(url);
-  // invite + payment + Glint + Drive + Forums cards are made by Velora even for a message on an instance (an invite asks the invited instance, see unfurl.js)
+  // invite + payment + Glint + Drive + Forums cards are made by Nookara even for a message on an instance (an invite asks the invited instance, see unfurl.js)
   const e = useUnfurl(url, ref ? undefined : inst, service ? LIVE_CARD_MS : 0, priv);
   if (!e) return e === null && ref?.sure ? <a className="vc-invite-fallback" href={url} target="_blank" rel="noopener noreferrer nofollow">{url}</a> : null; // (its link hides in the text, so show it if there is no card)
   // these two only ever show for the real hosts, whatever an instance answers for some other link
@@ -84,13 +85,13 @@ function OneEmbed({ url, inst, priv }) {
 
 // ── YouTube ──
 const isPro = () => !!getState().me?.pro; // membership, not rank: being staff doesn't include Pro
-// who streams it: the instance (when its yt-dlp player works), else Velora (signed in), else nobody (YouTube's own player only)
+// who streams it: the instance (when its yt-dlp player works), else Nookara (signed in), else nobody (YouTube's own player only)
 function useYtVia(inst) {
   const instYt = useChat(s => !!inst && !!s.instances.find(i => i.origin === inst)?.features?.youtube);
   const signedIn = useChat(s => s.signedIn);
-  return instYt ? inst : signedIn ? 'velora' : null;
+  return instYt ? inst : signedIn ? NOOKARA_INST : null;
 }
-const viaOpt = via => (via && via !== 'velora' ? { inst: via } : {});
+const viaOpt = via => (via && !isNookara(via) ? { inst: via } : {});
 async function prepare(id, via, onProgress) {
   for (let i = 0; i < 400; i++) {
     const d = await apiFetch(i ? `/chat/yt/${id}/status` : `/chat/yt/${id}/prepare`, i ? viaOpt(via) : { method: 'POST', ...viaOpt(via) });
@@ -105,10 +106,10 @@ const YT_ERR = { too_long: 'That video is too long to stream here (2 hours max) 
 
 function YouTubeEmbed({ e, inst }) {
   const via = useYtVia(inst);
-  const onInst = !!via && via !== 'velora';
+  const onInst = !!via && !isNookara(via);
   const mode0 = useChat(s => s.settings.yt_mode || 'ask');
   const mode = !via ? 'youtube' : mode0;
-  const [playing, setPlaying] = useState(null); // null | 'ask' | 'youtube' | 'velora'
+  const [playing, setPlaying] = useState(null); // null | 'ask' | 'youtube' | NOOKARA_WIRE
   const [remember, setRemember] = useState(false);
   const [dl, setDl] = useState(null); // download progress
   const [sv, setSv] = useState(null); // saving to Saved Media: null | { progress } | 'done'
@@ -117,7 +118,7 @@ function YouTubeEmbed({ e, inst }) {
     setSv({ progress: 0 });
     try {
       for (let i = 0; i < 400; i++) {
-        const d = await apiFetch(`/chat/yt/${e.id}/save`, { method: 'POST', body: JSON.stringify({ title: e.title || '' }) }); // (Velora only: an instance's copy wouldn't be in Saved Media)
+        const d = await apiFetch(`/chat/yt/${e.id}/save`, { method: 'POST', body: JSON.stringify({ title: e.title || '' }) }); // (Nookara only: an instance's copy wouldn't be in Saved Media)
         if (d.status === 'saved') { setSv('done'); loadMedia(); toast('Saved to Saved Media.', true); return; }
         if (d.status === 'error') throw new Error(d.error);
         setSv({ progress: d.progress || 0 });
@@ -149,10 +150,10 @@ function YouTubeEmbed({ e, inst }) {
           <span className="vc-yt-channel">{e.channel || 'YouTube'}</span>
           <a className="vc-yt-title" href={e.url} target="_blank" rel="noopener noreferrer nofollow">{e.title || 'YouTube video'}</a>
         </div>
-        {via === 'velora' && <button type="button" className={`vc-yt-dl${sv === 'done' ? ' done' : ''}`} title={sv === 'done' ? 'Saved to Saved Media' : 'Save to Saved Media (a copy in your Nookara storage)'} onClick={saveToMedia} disabled={!!sv}>
+        {isNookara(via) && <button type="button" className={`vc-yt-dl${sv === 'done' ? ' done' : ''}`} title={sv === 'done' ? 'Saved to Saved Media' : 'Save to Saved Media (a copy in your Nookara storage)'} onClick={saveToMedia} disabled={!!sv}>
           {sv === 'done' ? <BookmarkCheck size={16} /> : sv ? <><Loader2 size={15} className="vc-spin" />{sv.progress ? ` ${sv.progress}%` : ''}</> : <BookmarkPlus size={16} />}
         </button>}
-        {(onInst || (via === 'velora' && isPro())) && (
+        {(onInst || (isNookara(via) && isPro())) && (
           <button type="button" className="vc-yt-dl" title={onInst ? 'Download' : 'Download (Nookara Pro)'} onClick={download} disabled={!!dl}>
             {dl ? <><Loader2 size={15} className="vc-spin" />{dl.progress ? ` ${dl.progress}%` : ''}</> : <Download size={16} />}
           </button>
@@ -162,14 +163,14 @@ function YouTubeEmbed({ e, inst }) {
         {playing === 'youtube' && (
           <iframe title={e.title || 'YouTube'} src={`https://www.youtube-nocookie.com/embed/${e.id}?autoplay=1&rel=0`} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />
         )}
-        {playing === 'velora' && <VeloraPlayer id={e.id} via={via} />}
+        {isNookara(playing) && <NookaraPlayer id={e.id} via={via} />}
         {!playing || playing === 'ask' ? (
           <>
             {e.image && <img src={e.image} alt="" loading="lazy" />}
             {playing === 'ask' ? (
               <div className="vc-yt-ask">
                 <b>How do you want to watch?</b>
-                <button type="button" className="vc-yt-opt good" onClick={() => choose('velora')}>
+                <button type="button" className="vc-yt-opt good" onClick={() => choose(NOOKARA_WIRE)}>
                   <ShieldCheck size={18} /><span><b>{onInst ? 'Through this server' : 'Through Nookara'}</b><small>{onInst ? 'This server' : 'Nookara'} streams it for you - no ads, no trackers. Can take a moment to start.</small></span>
                 </button>
                 <button type="button" className="vc-yt-opt" onClick={() => choose('youtube')}>
@@ -186,7 +187,7 @@ function YouTubeEmbed({ e, inst }) {
     </div>
   );
 }
-function VeloraPlayer({ id, via }) {
+function NookaraPlayer({ id, via }) {
   const [src, setSrc] = useState(null);
   const [p, setP] = useState(null);
   const [err, setErr] = useState(null);
@@ -200,7 +201,7 @@ function VeloraPlayer({ id, via }) {
     return (
       <div className="vc-yt-wait">
         <Loader2 size={26} className="vc-spin" />
-        <b>{via && via !== 'velora' ? 'The server' : 'Nookara'} is getting the video ready</b>
+        <b>{via && !isNookara(via) ? 'The server' : 'Nookara'} is getting the video ready</b>
         <span>{p?.status === 'queued' ? 'Waiting for a free slot...' : `${p?.progress || 0}%${p?.part > 1 ? ' (audio)' : ''}`}</span>
         <i className="vc-yt-bar"><i style={{ width: `${p?.progress || 0}%` }} /></i>
       </div>
@@ -210,12 +211,12 @@ function VeloraPlayer({ id, via }) {
 }
 
 // ── Glint clips (clips.nookara.cc/c/<id>) ──
-// Velora reads the clip page (its glint:* meta, or just its OpenGraph video) and re-hosts the pictures; the video itself is a
-// file on Velora / ikelene.net and plays in Ember's player only after a click (nothing loads before that). Likes go to
+// Nookara reads the clip page (its glint:* meta, or just its OpenGraph video) and re-hosts the pictures; the video itself is a
+// file on Nookara / ikelene.net and plays in Ember's player only after a click (nothing loads before that). Likes go to
 // Glint's API with Ember's token; whether I liked it is asked once the card scrolls into view.
 const GLINT_MEDIA = /^https:\/\/((?:(?:ember\.)?nookara\.cc|velora\.ikelene\.net)|(www\.)?ikelene\.net)\//i;
 const compact = n => (n >= 1e6 ? `${(n / 1e6).toFixed(n < 1e7 ? 1 : 0).replace(/\.0$/, '')}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n < 1e4 ? 1 : 0).replace(/\.0$/, '')}K` : String(n));
-const outside = url => ev => { if (window.bonfireDesktop?.openExternal) { ev.preventDefault(); openOutside(url); } }; // the desktop app opens https links in the browser
+const outside = url => ev => { if (desktopBridge()?.openExternal) { ev.preventDefault(); openOutside(url); } }; // the desktop app opens https links in the browser
 function GlintLike({ id, initial }) {
   const box = useRef(null);
   const [st, setSt] = useState({ liked: false, likes: initial ?? 0, known: false });
@@ -349,7 +350,7 @@ function ProfileEmbed({ e }) {
 }
 
 // ── Nookara Drive share links + Nookara Forums links ──
-// Velora makes the data (service-embeds.js) and says no more than opening the link would. An unavailable card has nothing in it to show: no name, no owner, no way to tell why.
+// Nookara makes the data (service-embeds.js) and says no more than opening the link would. An unavailable card has nothing in it to show: no name, no owner, no way to tell why.
 const safeColor = c => (/^#[0-9a-f]{6}$/i.test(c || '') ? c : undefined);
 const fmtDay = v => { const d = new Date(v); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); };
 const plural = (n, word, many = `${word}s`) => `${Number(n).toLocaleString()} ${n === 1 ? word : many}`;
@@ -400,7 +401,7 @@ function DriveEmbed({ e, url }) {
       const fresh = d.embed;
       if (!fresh || fresh.unavailable || !fresh.download) { toast('That file is not available any more.'); return; }
       if (RISKY.test(extOf(fresh.name)) && !(await ask({ title: 'Download this program?', text: `${fresh.name} can run code on your computer. Only open files from people you trust.`, confirm: 'Download' }))) return;
-      if (window.bonfireDesktop?.openExternal) { openOutside(fresh.download); return; }
+      if (desktopBridge()?.openExternal) { openOutside(fresh.download); return; }
       const a = document.createElement('a');
       a.href = fresh.download; a.download = fresh.name;
       document.body.appendChild(a); a.click(); a.remove();
@@ -551,7 +552,7 @@ function SiteEmbed({ e, url }) {
   );
 }
 
-// ── Velora payment links (user pay links, payment requests, bot payment requests) ──
+// ── Nookara payment links (user pay links, payment requests, bot payment requests) ──
 const PAY_STATE = { pending: 'Waiting for payment', paid: 'Paid', cancelled: 'Cancelled', expired: 'Expired', failed: 'Failed' };
 function PaymentEmbed({ e, url }) {
   if (e.invalid) return <div className="vc-invite-card bad vl-rise"><b>Payment link</b><span>This payment link doesn't work any more.</span></div>;

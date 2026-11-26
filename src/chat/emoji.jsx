@@ -1,4 +1,4 @@
-// Standard emojis: Discord-style names (:sob:, :joy:...) and Twemoji pictures (served from Velora, /assets/twemoji).
+// Standard emojis: Discord-style names (:sob:, :joy:...) and Twemoji pictures (served from Nookara, /assets/twemoji).
 // emoji.json rows are [char, label, group, tags, names] - names[0] is the Discord/GitHub-style short name.
 
 // a whole emoji: flag pair, keycap, or a pictograph with its variation selector / skin tone / ZWJ joins

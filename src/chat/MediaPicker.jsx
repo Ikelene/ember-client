@@ -1,5 +1,5 @@
 // The media picker (the GIF button by Send, and "Attach a Glint clip" in the + menu): search Klipy GIFs, star them into Saved
-// Media, Saved Media = starred GIFs + every picture / video / audio file on your Velora account (minus Glint clip videos), and
+// Media, Saved Media = starred GIFs + every picture / video / audio file on your Nookara account (minus Glint clip videos), and
 // Game Clips = your Glint clips (only when you have some) - picking one sends its link, which shows as the Glint clip card.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { viaProxy } from './mediaProxy.js';
@@ -10,6 +10,7 @@ import { useMyClips, liveClips, glintMediaMatcher, glintLink, loadMyClips, Glint
 import { fmtTime } from './MediaPlayer.jsx';
 import { StatusLink } from './StatusLink.jsx';
 import { pictureAccept } from './accept.js';
+import { desktopBridge } from '../compat.js';
 
 export function GifBadge() { return <span className="vc-gif-badge">GIF</span>; }
 
@@ -31,7 +32,7 @@ export default function MediaPicker({ onPick, onSendLink, onClose, tab: tab0, do
   const clips = useMyClips();
   const hasClips = liveClips(clips).length > 0;
   const box = useRef(null);
-  // a file dragged onto the picker is saved to Saved Media (your Velora account), not sent to the conversation: the picker lights up
+  // a file dragged onto the picker is saved to Saved Media (your Nookara account), not sent to the conversation: the picker lights up
   // as the target and the window-wide "Drop to upload" overlay (Messages.jsx) stays out of the way because of data-drop-own.
   const [hot, setHot] = useState(false);
   const [uploading, setUploading] = useState(0);
@@ -176,7 +177,7 @@ function Clips({ clips, onSendLink }) {
       <div className="vc-picker-bar vc-clips-bar">
         <span className="vc-clips-title"><GlintMark size={14} />Your Glint clips</span>
         <span className="grow" />
-        <a className="vc-picker-up" href={GLINT_BROWSE} target="_blank" rel="noopener noreferrer" onClick={e => { if (window.bonfireDesktop?.openExternal) { e.preventDefault(); openOutside(GLINT_BROWSE); } }}><ExternalLink size={14} /> Open Glint</a>
+        <a className="vc-picker-up" href={GLINT_BROWSE} target="_blank" rel="noopener noreferrer" onClick={e => { if (desktopBridge()?.openExternal) { e.preventDefault(); openOutside(GLINT_BROWSE); } }}><ExternalLink size={14} /> Open Glint</a>
       </div>
       <div className="vc-picker-scroll">
         {clips === undefined && <div className="vc-loading"><i /><i /><i /></div>}

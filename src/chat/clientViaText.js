@@ -1,5 +1,5 @@
 // Plain text for the client info shown to people with Manage users (no React, so it can be tested).
-// via: { official?, kind?, name?, token?, url?, app? } from Velora (client-via.js) or an Ember server ({ url, kind? }).
+// via: { official?, kind?, name?, token?, url?, app? } from Nookara (client-via.js) or an Ember server ({ url, kind? }).
 // lookup = the App registry lookup (appClients.js appInfo).
 import { describeVia } from './appClients.js';
 

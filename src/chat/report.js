@@ -1,27 +1,28 @@
 // Reporting a message or a member: to the Ember server's moderators (they see it in Server settings > Reports), or to
-// Velora's staff (/api/report/submit, the same as nookara.cc/report) when it breaks Velora's rules. Velora can
-// only act on Velora accounts, so that choice is off on servers that don't sign in with Velora.
+// Nookara's staff (/api/report/submit, the same as nookara.cc/report) when it breaks Nookara's rules. Nookara can
+// only act on Nookara accounts, so that choice is off on servers that don't sign in with Nookara.
 import { apiFetch, uploadFetch } from '../api.js';
 import { ask, toast, errorText, getState, linkFor } from './store.js';
 import { instOf } from './ids.js';
-import { hasVelora } from './session.js';
+import { hasNookara } from './session.js';
 import { DM_REPORT_REASONS, dmReportNote, dmReportBody, dmReportError } from './dm-report.js';
 import { revealWindow } from './e2ee/session.js';
+import { isNookara, nookaraId } from '../compat.js';
 
-const VELORA_CATEGORIES = ['Underage', 'NSFW / Explicit Content', 'Graphic Violence / Gore', 'Hate Speech / Harassment', 'Threats or Real-World Harm',
+const NOOKARA_CATEGORIES = ['Underage', 'NSFW / Explicit Content', 'Graphic Violence / Gore', 'Hate Speech / Harassment', 'Threats or Real-World Harm',
   'Spam or Bot Activity', 'Malware / Phishing / Scam', 'Copyright / Intellectual Property Violation', 'Other'];
 
-// why Velora can't take this report ('' = it can)
-function veloraBlocked(sid, target) {
+// why Nookara can't take this report ('' = it can)
+function nookaraBlocked(sid, target) {
   const st = getState(), origin = instOf(sid);
   const inst = st.instances.find(i => i.origin === origin);
-  if (inst?.mode !== 'velora') return "This server doesn't use Nookara sign-in, so Nookara can't act on its accounts.";
-  if (!target?.velora_id) return "They don't have a Nookara account.";
-  if (!hasVelora()) return 'Sign in with Nookara to report to Nookara.';
+  if (!isNookara(inst?.mode)) return "This server doesn't use Nookara sign-in, so Nookara can't act on its accounts.";
+  if (!nookaraId(target)) return "They don't have a Nookara account.";
+  if (!hasNookara()) return 'Sign in with Nookara to report to Nookara.';
   return '';
 }
 
-async function toVelora(sid, target, message, a) {
+async function toNookara(sid, target, message, a) {
   const st = getState(), srv = st.detail[sid]?.server, host = st.instances.find(i => i.origin === instOf(sid))?.host || instOf(sid);
   const lines = [a.text || '(no details given)', '', `Ember server: ${srv?.name || 'unknown'} (${host})`];
   if (message) {
@@ -30,7 +31,7 @@ async function toVelora(sid, target, message, a) {
     lines.push(message.signature ? 'Has their Nookara signature: yes' : 'Has their Nookara signature: no');
   }
   const fd = new FormData();
-  fd.append('reported_id', String(target.velora_id));
+  fd.append('reported_id', String(nookaraId(target)));
   fd.append('category', a.category);
   fd.append('location', `Ember server: ${host}`);
   fd.append('description', lines.join('\n'));
@@ -38,23 +39,23 @@ async function toVelora(sid, target, message, a) {
 }
 
 // what: { message_id } or { user_id }; label: what the question names ("this message", "@nat");
-// ctx: { target: the author / member (with velora_id), message: the message when it's a message }
+// ctx: { target: the author / member (with nookara_id), message: the message when it's a message }
 export async function reportTo(sid, what, label, ctx = {}) {
-  const blocked = veloraBlocked(sid, ctx.target);
+  const blocked = nookaraBlocked(sid, ctx.target);
   const a = await ask({
     title: `Report ${label}`,
     text: 'Who should see this report?',
     choices: [
       { id: 'server', label: 'Report to this server', hint: "Breaks this server's rules. Its moderators see it and who sent it, and can delete messages, time people out or remove them from this server." },
-      { id: 'velora', label: 'Report to Nookara', hint: "Breaks Nookara's Terms of Service, or is serious (threats, abuse, illegal content). Nookara's staff can act on the Nookara account everywhere.", disabled: !!blocked, why: blocked, categories: VELORA_CATEGORIES },
+      { id: 'nookara', label: 'Report to Nookara', hint: "Breaks Nookara's Terms of Service, or is serious (threats, abuse, illegal content). Nookara's staff can act on the Nookara account everywhere.", disabled: !!blocked, why: blocked, categories: NOOKARA_CATEGORIES },
     ],
     input: { placeholder: 'What happened? (optional)', value: '', optional: true, multiline: true, max: 500 },
     confirm: 'Send report',
   });
   if (!a) return;
   try {
-    if (a.choice === 'velora') {
-      await toVelora(sid, ctx.target, ctx.message, a);
+    if (a.choice === 'nookara') {
+      await toNookara(sid, ctx.target, ctx.message, a);
       toast("Thanks - Nookara's staff will take a look.", true);
       return;
     }
@@ -92,7 +93,7 @@ export async function reportDmUser(username) {
   const a = await ask({
     title: `Report @${username}`,
     text: 'Goes to Nookara staff. To report something they sent, right-click the message and pick Report message instead, so staff see it in context.',
-    select: { label: "What's wrong?", options: VELORA_CATEGORIES.map(c => [c, c]) },
+    select: { label: "What's wrong?", options: NOOKARA_CATEGORIES.map(c => [c, c]) },
     input: { placeholder: 'What happened?', value: '', multiline: true, max: 1000 },
     confirm: 'Send report', danger: true,
   });

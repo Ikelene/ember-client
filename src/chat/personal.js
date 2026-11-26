@@ -7,6 +7,7 @@ import { getState, patchState, toast, errorText, customEmoji, signingInfo, askSe
 import { isInst, instOf, bare } from './ids.js';
 import { signMessage, refreshSigningKey } from './signing.js';
 import { connections } from './instances.js';
+import { nookaraId } from '../compat.js';
 
 // clone locks (cloneLock.js): the owner locked them / the server doesn't allow copying
 export const LOCK_TOAST = {
@@ -109,7 +110,7 @@ export async function sendSticker(cid, tid, replyTo) {
     let signature;
     if (sid && isInst(sid) && signingInfo(sid).can) {
       try {
-        signature = await signMessage({ instance: instOf(sid), community: bare(sid), channel: bare(cid), author: connections.get(instOf(sid)).user.velora_id, body: '', attachments: [], reply_to: replyTo?.id ?? null, edit_of: null, sticker: tid }, connections.get(instOf(sid)).info);
+        signature = await signMessage({ instance: instOf(sid), community: bare(sid), channel: bare(cid), author: nookaraId(connections.get(instOf(sid)).user), body: '', attachments: [], reply_to: replyTo?.id ?? null, edit_of: null, sticker: tid }, connections.get(instOf(sid)).info);
       } catch { if (!(await askSendUnsigned())) return; }
     }
     try { await post(signature); }

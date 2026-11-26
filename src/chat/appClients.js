@@ -5,11 +5,12 @@
 // An Ember server can write any `via` it likes, so there a verified mark also needs the message's address to be the App's own site.
 // describeVia is pure (lookup passed in) so the node tests can load it.
 import { NOOKARA_ORIGIN } from './hosts.js';
+import { OLD_HOST } from '../compat.js';
 
 export const EMBER_APP_ID = 'app_e3be4c1d7a9f02b65c88';
 const APP_ID = /^app_[0-9a-f]{8,40}$/;
 
-const EMBER_SITES = new Set(['ember.nookara.cc', 'nookara.cc', 'velora.ikelene.net']); // where Ember (web, desktop, Android) runs
+const EMBER_SITES = new Set(['ember.nookara.cc', 'nookara.cc', OLD_HOST]); // where Ember (web, desktop, Android) runs
 const hostOf = u => { try { return new URL(String(u)).host.toLowerCase(); } catch { return ''; } };
 const baseHost = h => String(h || '').replace(/^www\./, '');
 // same site: equal hosts, or one a subdomain of the other's site (ember.nookara.cc and nookara.cc)

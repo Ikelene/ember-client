@@ -1,3 +1,4 @@
+import { nookaraId } from '../compat.js';
 // Account profiles on Ember servers with their own accounts (ember-server PROTOCOL 4.1): what a Nookara profile becomes when it is
 // copied to such a server, and the stamp that says which copy the server holds. No store / network here (tested in node).
 
@@ -48,7 +49,7 @@ export const hasAccountProfile = inst => !!inst && inst.mode === 'local' && !!in
 export const accountTarget = origin => `acct:${origin}`;
 export const targetOrigin = t => (typeof t === 'string' && t.startsWith('acct:') ? t.slice(5) : null);
 // does this server profile follow the Nookara account that is signed in here?
-export const follows = (sync, veloraId) => !!sync && veloraId != null && String(sync.velora_id) === String(veloraId);
+export const follows = (sync, accountId) => !!sync && accountId != null && String(nookaraId(sync)) === String(accountId);
 
 // where to read a Nookara picture from as bytes: its own link, then the same file on nookara.cc (the CDN copy has no CORS promise)
 export function pictureSources(url, origin = 'https://nookara.cc') {

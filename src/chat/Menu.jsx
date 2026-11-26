@@ -27,6 +27,7 @@ import { QuickReactions } from './Reactions.jsx';
 import { userScrolled } from './userscroll.js';
 import { appsItems } from './commands.js';
 import { emojiMenuItems } from './cloneEmoji.js';
+import { isNookara, mobileBridge } from '../compat.js';
 
 // Track the full press, rather than timing out while the finger is still down.
 let menuTouch = null;
@@ -130,7 +131,7 @@ export function MenuHost() {
   useEffect(() => {
     if (!m) return undefined;
     // a long-press menu: the same press's trailing mousedown / native contextmenu must not close it again
-    const own = () => window.bonfireMobile?.holdingMenu?.() || (m.touch && (m.press?.down || Date.now() - Math.max(m.k, m.press?.ended || 0) < 600));
+    const own = () => mobileBridge()?.holdingMenu?.() || (m.touch && (m.press?.down || Date.now() - Math.max(m.k, m.press?.ended || 0) < 600));
     const close = e => {
       // Android may retarget its trailing native contextmenu onto the backdrop
       // inserted during this same hold. Only an outside press bypasses own().
@@ -195,7 +196,7 @@ export function instanceMenu(e, inst, srv, { onInvite, onSettings, onLeave, onLo
     here && { label: 'Mark as read', icon: CheckCheck, onClick: () => markServerRead(srv.sid) },
     srv && 'sep',
     ...(srv ? notifyItems(srv.sid, false) : []),
-    // Velora's push consent for this server (it pushes to me through Velora only while it's in my list, unmuted, push on)
+    // Nookara's push consent for this server (it pushes to me through Nookara only while it's in my list, unmuted, push on)
     getState().signedIn && inst.prefs && { label: 'Push through Nookara', icon: BellRing, sub: [
       { label: 'Push notifications from this server', hint: 'When Ember is closed', checked: inst.prefs.push, onClick: () => setInstancePrefs(inst.origin, { push: !inst.prefs.push }) },
       { label: 'Mute this server', hint: 'No pushes from it at all', checked: inst.prefs.muted, onClick: () => setInstancePrefs(inst.origin, { muted: !inst.prefs.muted }) },
@@ -208,8 +209,8 @@ export function instanceMenu(e, inst, srv, { onInvite, onSettings, onLeave, onLo
     inst.sleep ? { label: 'Connect', icon: Plug, hint: inst.sleep === 'manual' ? 'You disconnected it' : 'Asleep (sleep mode)', onClick: onReconnect }
       : inst.status !== 'connecting' && { label: 'Reconnect', icon: RefreshCw, onClick: onReconnect },
     !inst.sleep && onDisconnect && { label: 'Disconnect', icon: Unplug, hint: 'Stays off until you open it', onClick: onDisconnect },
-    inst.status === 'login' && inst.needsVelora && { label: 'Sign in with Nookara', icon: ShieldCheck, onClick: onLogin },
-    inst.status === 'login' && !inst.needsVelora && inst.mode === 'local' && { label: 'Log in', icon: LogIn, onClick: onLogin },
+    inst.status === 'login' && inst.needsNookara && { label: 'Sign in with Nookara', icon: ShieldCheck, onClick: onLogin },
+    inst.status === 'login' && !inst.needsNookara && inst.mode === 'local' && { label: 'Log in', icon: LogIn, onClick: onLogin },
     'sep',
     here && srv.role !== 'owner' && { label: 'Leave server', icon: LogOut, danger: true, onClick: onLeave },
     { label: 'Remove from list', icon: Trash2, danger: true, onClick: onRemove },
@@ -237,7 +238,7 @@ export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, 
   const sel = String(getSelection?.() || '').trim();
   const link = e.target.closest?.('a[href]');
   const img = e.target.closest?.('img');
-  // a picture / video / sound kept on Velora (or a Klipy GIF): Save to Saved Media
+  // a picture / video / sound kept on Nookara (or a Klipy GIF): Save to Saved Media
   const mediaEl = e.target.closest?.('[data-media-url]');
   const mediaUrl = mediaEl?.dataset.mediaUrl || null;
   const mediaName = mediaEl?.dataset.mediaName || '';
@@ -295,7 +296,7 @@ export function userMenu(e, username, { onProfile, sid, extra = [] } = {}) {
   const friend = st.friends.some(f => f.friend_username === username);
   const uid = member?.id || st.people[username]?.id;
   const blocked = !!st.blocks?.some(b => b.username === username);
-  const local = !!member?.kind && member.kind !== 'velora'; // an account that only exists on a self-hosted instance (a person or a bot): no Velora profile, DM or friend request
+  const local = !!member?.kind && !isNookara(member.kind); // an account that only exists on a self-hosted instance (a person or a bot): no Nookara profile, DM or friend request
   openMenu(e, [
     onProfile && { label: 'Profile', icon: User, onClick: onProfile },
     !isMe && !local && { label: 'Message', icon: MessageCircle, onClick: () => go({ kind: 'dm', username }) },

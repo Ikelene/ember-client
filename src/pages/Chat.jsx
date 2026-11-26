@@ -16,7 +16,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { initSheets } from '../chat/sheets.js';
 import { Hash, Lock, Users, Menu, ChevronLeft, Search, X, AtSign, UsersRound, LogOut, Megaphone, PanelRight, ExternalLink, ShieldCheck, ShieldAlert, Bell, Ban, Flag, NotebookPen } from 'lucide-react';
 import { reportDmUser } from '../chat/report.js';
-import { api, getToken, cachedMe, apiFetch, isWebBonfire } from '../api.js';
+import { api, getToken, cachedMe, apiFetch, isWebEmber } from '../api.js';
 import { applyAccentColor } from '../theme.js';
 import { jumpToMessage, loginAgain, retryNow, useBotPeer, isMobileDevice, cachedMessages } from '../chat/store.js';
 import { BotTag } from '../chat/Bots.jsx';
@@ -76,6 +76,7 @@ import '../chat/light.css';
 import '../chat/boot.css';
 import { MaskIcon } from '../chat/Alias.jsx';
 import { aliasOf, shownName } from '../chat/aliases.js';
+import { EMBER_ASSETS, desktopBridge, NOTIF_DISMISSED_COOKIE, notifDismissed } from '../compat.js';
 
 function meFrom(d) {
   return { id: d.account.id != null ? String(d.account.id) : undefined, username: d.account.username, pfp: d.profile.pfp || null, color: d.profile.color || null, rank: d.account.rank, pro: !!d.account.pro };
@@ -132,9 +133,9 @@ function DesktopTitle() {
         : view.kind === 'modmail' ? 'Nookara Moderator Chat'
           : view.kind === 'notes' ? 'Personal Notes'
           : view.kind === 'home' ? 'Home' : '';
-  const raw = view.kind === 'channel' || view.kind === 'server' ? srvIcon : view.kind === 'dm' ? (view.username === 'System' ? '/assets/bonfire/logo-256.png' : pfp) : view.kind === 'modmail' ? '/assets/bonfire/logo-256.png' : null;
+  const raw = view.kind === 'channel' || view.kind === 'server' ? srvIcon : view.kind === 'dm' ? (view.username === 'System' ? `${EMBER_ASSETS}/logo-256.png` : pfp) : view.kind === 'modmail' ? `${EMBER_ASSETS}/logo-256.png` : null;
   const icon = raw ? new URL(raw, location.origin).href : '';
-  useEffect(() => { window.bonfireDesktop?.setTitle?.(text, icon); }, [text, icon]);
+  useEffect(() => { desktopBridge()?.setTitle?.(text, icon); }, [text, icon]);
   return null;
 }
 // desktop app: Discord holds the RPC connection while it runs, so games' status can't reach Ember
@@ -163,15 +164,15 @@ function NotificationBanner() {
   const [error, setError] = useState('');
   const macDesktop = useDesktopMac(); // the Mac app: say macOS, not Windows
   useEffect(() => {
-    if (/(?:^|; )bonfire_notifications_dismissed=1(?:;|$)/.test(document.cookie)) return;
+    if (notifDismissed()) return;
     // no desktop pop-ups (2026-11-13): only a phone's browser is offered push; the desktop app and computers never ask
-    if (window.bonfireDesktop?.isDesktop || !isMobileDevice()) return;
+    if (desktopBridge()?.isDesktop || !isMobileDevice()) return;
     // Old desktop shells do not have Ember's notification bridge yet. Put
     // the update call-to-action in the chat app itself, not account settings.
-    if (window.bonfireDesktop?.isDesktop) {
-      if (!window.bonfireDesktop.notify) { setDesktopUpdate(true); setShow(true); return; }
-      if (!window.bonfireDesktop.notificationStatus) { setDesktopUpdate(true); setShow(true); return; }
-      window.bonfireDesktop.notificationStatus().then(s => {
+    if (desktopBridge()?.isDesktop) {
+      if (!desktopBridge().notify) { setDesktopUpdate(true); setShow(true); return; }
+      if (!desktopBridge().notificationStatus) { setDesktopUpdate(true); setShow(true); return; }
+      desktopBridge().notificationStatus().then(s => {
         setDesktop(true); setUnsupported(!s?.supported); setShow(!s?.enabled || !s?.supported);
       }).catch(() => { setDesktop(true); setShow(true); });
       return;
@@ -186,7 +187,7 @@ function NotificationBanner() {
     if (blocked) { setError('Notifications are blocked in this browser. Allow notifications for ' + location.hostname + ' in your browser settings, then reload Ember.'); return; }
     setBusy(true); setError('');
     try {
-      if (desktop) await window.bonfireDesktop.enableNotifications();
+      if (desktop) await desktopBridge().enableNotifications();
       else await enablePush();
       setShow(false);
     }
@@ -198,23 +199,23 @@ function NotificationBanner() {
       <Bell size={18} />
       <span><b>{desktopUpdate ? 'Enable desktop notifications' : unsupported ? 'Notifications unavailable' : blocked ? 'Notifications are blocked' : desktop ? 'Enable desktop notifications' : 'Turn on notifications?'}</b> {desktopUpdate ? 'Update Ember, then restart it to receive DMs and incoming-call actions.' : unsupported ? (desktop ? `Enable ${macDesktop ? 'macOS' : 'Windows'} notifications for Ember, then restart the app.` : "This browser can't receive background push notifications.") : blocked ? 'Allow notifications for Nookara in your browser settings, then reload Ember.' : desktop ? 'Get DM reply boxes and incoming-call actions while Ember is inactive.' : 'Get DMs, calls and mentions even when Ember is closed.'}</span>
       {error && <small>{error}</small>}
-      {!blocked && !unsupported && <button type="button" onClick={() => desktopUpdate ? window.bonfireDesktop?.checkForUpdates?.() : turnOn()} disabled={busy}>{desktopUpdate ? 'Check for update' : busy ? 'Turning on…' : desktop ? 'Enable & test' : 'Turn on'}</button>}
-      <button type="button" className="dismiss" title="Not now" onClick={() => { document.cookie = 'bonfire_notifications_dismissed=1; Max-Age=2592000; Path=/; SameSite=Lax'; setShow(false); }}><X size={15} /></button>
+      {!blocked && !unsupported && <button type="button" onClick={() => desktopUpdate ? desktopBridge()?.checkForUpdates?.() : turnOn()} disabled={busy}>{desktopUpdate ? 'Check for update' : busy ? 'Turning on…' : desktop ? 'Enable & test' : 'Turn on'}</button>}
+      <button type="button" className="dismiss" title="Not now" onClick={() => { document.cookie = `${NOTIF_DISMISSED_COOKIE}=1; Max-Age=2592000; Path=/; SameSite=Lax`; setShow(false); }}><X size={15} /></button>
     </div>
   );
 }
-// Signed in to Velora but this login can't sign messages: people on other servers can't verify them (chat/signing.js).
+// Signed in to Nookara but this login can't sign messages: people on other servers can't verify them (chat/signing.js).
 // Dismissing hides it for this browser session only.
 function SigningBanner() {
   const state = useChat(s => s.signing?.state);
-  const [hidden, setHidden] = useState(() => { try { return sessionStorage.getItem('bonfire_sign_banner_off') === '1'; } catch { return false; } });
+  const [hidden, setHidden] = useState(() => { try { return sessionStorage.getItem('ember_sign_banner_off') === '1'; } catch { return false; } });
   if (state !== 'no_scope' || hidden) return null;
   return (
     <div className="vc-sign-banner" role="status">
       <ShieldAlert size={16} />
       <span>Your messages aren't being signed. People on other servers can't verify they came from you.</span>
       <button type="button" onClick={loginAgain}>Sign in again to allow</button>
-      <button type="button" className="dismiss" title="Dismiss for now" aria-label="Dismiss" onClick={() => { try { sessionStorage.setItem('bonfire_sign_banner_off', '1'); } catch { /* fine */ } setHidden(true); }}><X size={15} /></button>
+      <button type="button" className="dismiss" title="Dismiss for now" aria-label="Dismiss" onClick={() => { try { sessionStorage.setItem('ember_sign_banner_off', '1'); } catch { /* fine */ } setHidden(true); }}><X size={15} /></button>
     </div>
   );
 }
@@ -224,13 +225,13 @@ function RestrictedBar() {
   if (!note) return null;
   return <div className="vc-sign-banner" role="status"><Ban size={14} /><span>{note} Contact Nookara support if you think this is a mistake.</span><a className="vc-sign-link" href={SUPPORT_URL} target="_blank" rel="noopener noreferrer">Nookara support</a></div>;
 }
-// a server hosted by Velora whose paid time ran out is read-only for everyone until its owner buys more time
+// a server hosted by Nookara whose paid time ran out is read-only for everyone until its owner buys more time
 function ReadOnlyBar() {
   const ro = useChat(s => { const v = s.view; const o = v.kind === 'channel' && v.sid && isInst(v.sid) ? instOf(v.sid) : null; return !!(o && s.instances.find(i => i.origin === o)?.readOnly); });
   if (!ro) return null;
   return <div className="vc-sign-banner vc-reconnect-bar" role="status"><Lock size={14} /><span>This server is read-only for now - its owner needs to renew it.</span></div>;
 }
-// a server hosted inside Velora itself (the old kind) is read-only now: where it went, and its owner's way out
+// a server hosted inside Nookara itself (the old kind) is read-only now: where it went, and its owner's way out
 function LegacyReadOnlyBar() {
   const view = useChat(s => s.view);
   const srv = useChat(s => (s.view.kind === 'channel' && s.view.sid && !isInst(s.view.sid) ? s.detail[s.view.sid]?.server : null));
@@ -317,11 +318,11 @@ function GifPauseGate() {
       document.querySelectorAll('img[data-vc-gif-src]').forEach(img => { img.src = img.dataset.vcGifSrc; delete img.dataset.vcGifSrc; img.classList.remove('vc-gif-paused'); });
       document.querySelectorAll('img[data-vc-gif-pending]').forEach(img => { delete img.dataset.vcGifPending; });
     };
-    const inactive = () => document.visibilityState !== 'visible' || (window.bonfireDesktop?.isDesktop ? !desktopFocused : !document.hasFocus());
+    const inactive = () => document.visibilityState !== 'visible' || (desktopBridge()?.isDesktop ? !desktopFocused : !document.hasFocus());
     const sync = () => { if (inactive()) freeze(document); else resume(); };
     const observer = new MutationObserver(list => { if (inactive()) list.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1) { if (n.matches?.('img')) freeze(n.parentElement || document); else freeze(n); } })); });
     observer.observe(document.body, { childList: true, subtree: true });
-    const off = window.bonfireDesktop?.onWindowFocus?.(v => { desktopFocused = v; sync(); });
+    const off = desktopBridge()?.onWindowFocus?.(v => { desktopFocused = v; sync(); });
     document.addEventListener('visibilitychange', sync); window.addEventListener('blur', sync); window.addEventListener('focus', sync); sync();
     return () => { observer.disconnect(); off?.(); document.removeEventListener('visibilitychange', sync); window.removeEventListener('blur', sync); window.removeEventListener('focus', sync); resume(); };
   }, []);
@@ -330,12 +331,12 @@ function GifPauseGate() {
 // a crash anywhere in Ember shows the crash screen (reload / report) instead of a blank page
 export default function Chat() {
   useLayoutEffect(() => { applyDesign(); return clearDesign; }, []); // rounded / square (chat/design.js)
-  // Ember's own tab title + icon while you're here (the rest of Velora keeps Velora's)
+  // Ember's own tab title + icon while you're here (the rest of Nookara keeps Nookara's)
   useEffect(() => {
     const link = document.querySelector('link[rel~="icon"]');
     const old = { title: document.title, href: link?.href };
     document.title = 'Ember';
-    if (link) link.href = '/assets/bonfire/favicon-circle-64.png?v=2';
+    if (link) link.href = `${EMBER_ASSETS}/favicon-circle-64.png?v=2`;
     return () => { document.title = old.title; if (link && old.href) link.href = old.href; };
   }, []);
   return <CrashGuard><ChatPage /></CrashGuard>;
@@ -345,7 +346,7 @@ let faceImg = null;
 function drawTabIcon(count, pings) {
   const link = document.querySelector('link[rel~="icon"]');
   if (!link) return;
-  if (!count && !pings) { link.href = '/assets/bonfire/favicon-circle-64.png?v=2'; return; }
+  if (!count && !pings) { link.href = `${EMBER_ASSETS}/favicon-circle-64.png?v=2`; return; }
   const paint = () => {
     const c = document.createElement('canvas');
     c.width = c.height = 64;
@@ -371,7 +372,7 @@ function drawTabIcon(count, pings) {
     try { link.href = c.toDataURL('image/png'); } catch { /* fine */ }
   };
   if (faceImg?.complete && faceImg.naturalWidth) { paint(); return; }
-  if (!faceImg) { faceImg = new Image(); faceImg.src = '/assets/bonfire/favicon-circle-64.png?v=2'; }
+  if (!faceImg) { faceImg = new Image(); faceImg.src = `${EMBER_ASSETS}/favicon-circle-64.png?v=2`; }
   faceImg.addEventListener('load', () => { const t = drawTabIcon.want; if (t) drawTabIcon(t[0], t[1]); }, { once: true });
 }
 function useTabBadge() {
@@ -397,7 +398,7 @@ function ChatPage() {
   const [dialog, setDialog] = useState(null); // { kind, ... }
   const [discover, setDiscover] = useState(false); // the full-page Discovery (DiscoverPage.jsx) instead of the conversation
   const [discoverTab, setDiscoverTab] = useState('servers'); // its section (Servers / Bots), picked in the sidebar or under its header
-  const [showMembers, setShowMembers] = useState(() => { try { return innerWidth >= 1100 && localStorage.getItem('velora_chat_members') !== '0'; } catch { return innerWidth >= 1100; } });
+  const [showMembers, setShowMembers] = useState(() => { try { return innerWidth >= 1100 && localStorage.getItem('nookara_chat_members') !== '0'; } catch { return innerWidth >= 1100; } });
   const [drawer, setDrawer] = useState(false);
   useEffect(() => initSheets(), []); // phones: pop-ups and menus open as bottom sheets
   // phones: the menu drawer is a history entry, so the browser / Android back button closes it, and going back from a chat shows the chat list again
@@ -423,29 +424,29 @@ function ChatPage() {
   }, []);
   const [replyTo, setReplyTo] = useState(null);
   useEffect(() => { const f = () => setShowMembers(true); addEventListener('vc-open-pins', f); addEventListener('vc-panel-tab', f); return () => { removeEventListener('vc-open-pins', f); removeEventListener('vc-panel-tab', f); }; }, []);
-  const staff = useChat(s => s.staff); // Velora staff: Moderator chat button in DMs
+  const staff = useChat(s => s.staff); // Nookara staff: Moderator chat button in DMs
   const { openMini, ui: profileUI } = useProfiles();
 
   const signin = useRef(null);
   useEffect(() => {
     document.title = 'Ember';
     document.documentElement.classList.add('vc-page');
-    const web = isWebBonfire(); // in a browser Ember works without a Velora sign-in; the desktop / Android apps always have one
+    const web = isWebEmber(); // in a browser Ember works without a Nookara sign-in; the desktop / Android apps always have one
     (async () => {
-      signin.current = await finishSignIn(); // back from Velora's approve-this-app screen (#/signin?code=...)
+      signin.current = await finishSignIn(); // back from Nookara's approve-this-app screen (#/signin?code=...)
       if (!getToken()) {
         if (!web) { location.href = '/login'; return; }
         init(null); setReady(true);
         return;
       }
       const cached = cachedMe();
-      if (web && cached?.account?.username) try { localStorage.setItem('bonfire_user', cached.account.username); } catch { /* fine */ } // (the per-account storage keys follow it)
+      if (web && cached?.account?.username) try { localStorage.setItem('ember_user', cached.account.username); } catch { /* fine */ } // (the per-account storage keys follow it)
       if (cached) { applyAccentColor(cached.profile?.color); init(meFrom(cached)); setReady(true); }
       api.getMe().then(d => {
         applyAccentColor(d.profile?.color);
         if (!getState().me) { init(meFrom(d)); setReady(true); }
       }).catch(e => {
-        if (web) { if (e.status !== 401 && !getState().me) { init({ username: localStorage.getItem('bonfire_user') || 'you' }); setReady(true); } return; } // (a 401 already dropped to signed-out mode)
+        if (web) { if (e.status !== 401 && !getState().me) { init({ username: localStorage.getItem('ember_user') || 'you' }); setReady(true); } return; } // (a 401 already dropped to signed-out mode)
         if (e.status === 401 || e.status === 403) location.href = '/login';
       });
     })();
@@ -456,7 +457,7 @@ function ChatPage() {
     if (!ready) return;
     const r = signin.current;
     if (r) { if (r.ok) toast('Signed in with Nookara.', true); else toast(SIGNIN_TEXT[r.error]); if (r.back?.add) setDialog({ kind: 'add-instance', url: r.back.add }); else if (r.back?.create) setDialog({ kind: 'create-server' }); }
-    try { if (sessionStorage.getItem('bonfire_notice')) { sessionStorage.removeItem('bonfire_notice'); toast('Your Nookara sign-in ended - sign in again to get your messages back.'); } } catch { /* fine */ }
+    try { if (sessionStorage.getItem('ember_notice')) { sessionStorage.removeItem('ember_notice'); toast('Your Nookara sign-in ended - sign in again to get your messages back.'); } } catch { /* fine */ }
   }, [ready]);
 
   // where to start: the address, or where you were last time
@@ -467,7 +468,7 @@ function ChatPage() {
     let v = readHash();
     if (v.kind === 'invite') { setDialog({ kind: 'invite-join', code: v.code, inst: v.inst }); history.replaceState(null, '', clientUrl('#/home')); open({ kind: 'home' }); return; }
     if (v.kind === 'home' && !location.hash) {
-      try { const last = localStorage.getItem('velora_chat_last'); if (last) { history.replaceState(null, '', clientUrl(last)); v = readHash(); } } catch { /* fine */ }
+      try { const last = localStorage.getItem('nookara_chat_last'); if (last) { history.replaceState(null, '', clientUrl(last)); v = readHash(); } } catch { /* fine */ }
     }
     open(v);
   }, [ready]);
@@ -515,7 +516,7 @@ function ChatPage() {
     const t = setInterval(() => loadMembers(view.sid), 90000);
     return () => clearInterval(t);
   }, [view.kind, view.sid]);
-  useEffect(() => { if (innerWidth >= 1100) try { localStorage.setItem('velora_chat_members', showMembers ? '1' : '0'); } catch { /* fine */ } }, [showMembers]);
+  useEffect(() => { if (innerWidth >= 1100) try { localStorage.setItem('nookara_chat_members', showMembers ? '1' : '0'); } catch { /* fine */ } }, [showMembers]);
 
   const detail = useChat(s => (view.sid ? s.detail[view.sid] : null));
   const channel = detail?.channels.find(c => c.cid === view.cid);

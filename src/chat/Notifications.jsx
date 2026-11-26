@@ -1,5 +1,5 @@
 import { siteHref } from './hosts.js';
-// The bell next to your name (bottom left): Velora's account notifications, which replaced the DMs from "System".
+// The bell next to your name (bottom left): Nookara's account notifications, which replaced the DMs from "System".
 // The badge is notifUnread (loaded at start, kept live by the home socket). The popup lists only UNREAD ones, newest first;
 // clicking one marks it read and follows its link. Everything else (history, settings) lives on the site under /me.
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -7,7 +7,7 @@ import { createPortal } from 'react-dom';
 import { Bell, Settings, Megaphone, ShieldAlert, Coins, UserPlus, ShoppingBag, Gem, Award, Server, LifeBuoy, UserCheck, MessageCircle, Gift, Info, Star, Heart, CheckCheck } from 'lucide-react';
 import { useChat, getState, loadNotifs, closeNotifs, readNotifs, seeNotifs, followNotifLink } from './store.js';
 
-// the category icon names Velora sends (lucide names) -> the components; anything else is a bell
+// the category icon names Nookara sends (lucide names) -> the components; anything else is a bell
 const ICONS = {
   megaphone: Megaphone, 'shield-alert': ShieldAlert, coins: Coins, 'user-plus': UserPlus, 'shopping-bag': ShoppingBag, gem: Gem, award: Award,
   server: Server, 'life-buoy': LifeBuoy, 'user-check': UserCheck, 'message-circle': MessageCircle, gift: Gift, info: Info, star: Star, heart: Heart, bell: Bell,

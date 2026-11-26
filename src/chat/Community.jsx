@@ -1,5 +1,5 @@
 // Server settings pages that only exist for communities on an instance (join policy + requests + invites, uploads),
-// and the Export button (instances and Velora's own servers).
+// and the Export button (instances and Nookara's own servers).
 import { useEffect, useState } from 'react';
 import { Check, Copy, Download, Trash2, UserCheck, UserX, Plus } from 'lucide-react';
 import { apiFetch, downloadFetch } from '../api.js';
@@ -93,7 +93,7 @@ export function UploadsTab({ sid }) {
   const admin = useChat(s => !!s.instances.find(i => i.origin === instOf(sid))?.isAdmin);
   const [mb, setMb] = useState(String(srv?.upload_max_mb ?? 25));
   // one number for people: the server's own limit and the instance's ceiling are the same server now (one community per
-  // instance), so its admins set both together; a plan from Velora hosting can cap it lower
+  // instance), so its admins set both together; a plan from Nookara hosting can cap it lower
   const [cfg, setCfg] = useState(null);
   const plan = usePlan('max_upload_mb');
   useEffect(() => { if (admin) apiFetch('/api/v1/instance/settings', { inst: instOf(sid) }).then(setCfg).catch(() => {}); }, [admin, sid]);
@@ -121,7 +121,7 @@ export function UploadsTab({ sid }) {
   );
 }
 
-// the owner's copy of a whole server (bonfire-export-v1 zip): instance communities and Velora's own servers
+// the owner's copy of a whole server (bonfire-export-v1 zip): instance communities and Nookara's own servers
 export function ExportButton({ sid }) {
   const [busy, setBusy] = useState(false);
   async function run() {

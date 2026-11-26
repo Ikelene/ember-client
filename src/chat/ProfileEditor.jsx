@@ -1,5 +1,5 @@
 import { siteHref } from './hosts.js';
-// Settings > Profile in Ember: the Velora profile editor (same fields + endpoints as /me#profile,
+// Settings > Profile in Ember: the Nookara profile editor (same fields + endpoints as /me#profile,
 // components/tabs/ProfileTab.jsx) laid out like Fluxer: fields on the left, live "Profile preview" on the
 // right (the same card as your bottom-left pop-out). Saving goes through the unsaved-changes bar.
 import { useEffect, useRef, useState } from 'react';

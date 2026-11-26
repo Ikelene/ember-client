@@ -1,6 +1,6 @@
 // Apply account changes only to matching IDs. An old name can belong to somebody
 // else after a rename; it must never be used as an identity key for old messages.
-// instance = true: an event from an Ember instance, whose ids are principals ("v:12"); Velora's own people / me are left alone
+// instance = true: an event from an Ember instance, whose ids are principals ("v:12"); Nookara's own people / me are left alone
 export function applyIdentity(state, user, instance = false) {
   // instance = the origin string of the instance that sent the event (or true): b:16 / u:3 are only unique INSIDE one instance,
   // so an event may only touch that instance own members / messages, never another instance that has a b:16 too

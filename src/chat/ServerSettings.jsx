@@ -1,6 +1,6 @@
 // Server settings: the same dialog as Ember's own settings (SettingsDialog: sidebar of grouped pages + the page with its
 // title and a close X; on phones the list first, then a page slides in). Server / Members / Integrations, and for an
-// instance's admins its own pages (Instance). Velora-hosted servers use the same shell with the pages they have.
+// instance's admins its own pages (Instance). Nookara-hosted servers use the same shell with the pages they have.
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ImageCropper from '../components/ImageCropper.jsx';
@@ -42,6 +42,7 @@ import QRCode from 'qrcode';
 import { linkFor } from './store.js';
 import { OperatorTermsNotice } from './OperatorTerms.jsx';
 import { pictureAccept } from './accept.js';
+import { INST_REGISTER_NOOKARA, isNookara, nookaraInfo, nookaraRegistration } from '../compat.js';
 
 // [id, label, icon, words the search box answers to]
 function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, owner, legacyDefault, hosted }) {
@@ -78,12 +79,12 @@ function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, 
       uploads,
       ['backups', 'Backups', Archive, ['Backup', 'Restore', 'Download', 'Save to Nookara', 'Export']],
       ['voice', 'Voice', Mic, ['Cloudflare', 'Realtime', 'TURN']],
-      ['velora', 'Nookara', Globe, ['Registration', 'Register', 'Payouts', 'Push', 'Directory', 'Voice minutes']],
+      ['nookara', 'Nookara', Globe, ['Registration', 'Register', 'Payouts', 'Push', 'Directory', 'Voice minutes']],
       ['admins', 'Admins', UserCog, ['Instance admins', 'Owner']],
       ['serverinfo', 'Server info', Info, ['Version', 'Commit', 'Build', 'Update', 'Outdated', 'Uptime', 'Node', 'Stats', 'Database', 'Uploads']],
       danger,
     ] : []],
-    ['Owner', onInst ? [] : [danger]], // (Velora-hosted servers: no Instance pages)
+    ['Owner', onInst ? [] : [danger]], // (Nookara-hosted servers: no Instance pages)
   ].map(([g, items]) => [g, items.filter(Boolean)]).filter(([, items]) => items.length);
 }
 
@@ -98,7 +99,7 @@ export function ServerSettings({ sid, onClose, tab: startTab, autoUpdate = false
   const canMod = has(srv?.perms, P.KICK) || has(srv?.perms, P.BAN);
   const canReports = canMod || canServer || has(srv?.perms, P.MANAGE_MESSAGES);
   const owner = srv?.role === 'owner';
-  const hosted = !!inst?.managed && !!inst?.isOwner; // hosted by Velora: its owner manages the plan here
+  const hosted = !!inst?.managed && !!inst?.isOwner; // hosted by Nookara: its owner manages the plan here
   const groups = useMemo(() => pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, owner, legacyDefault: !!srv?.is_default, hosted }), [onInst, canServer, canRoles, canMod, canReports, instAdmin, owner, srv?.is_default, hosted]);
 
   return (
@@ -124,7 +125,7 @@ export function ServerSettings({ sid, onClose, tab: startTab, autoUpdate = false
         {page === 'bots' && <BotsManager inst={origin} sid={sid} />}
         {page === 'bridge' && <BridgePage sid={sid} origin={origin} instAdmin={instAdmin} canServer={canServer} />}
         {page === 'game' && <GameServersSettings sid={sid} />}
-        {['accounts', 'voice', 'velora', 'admins'].includes(page) && <InstanceTab key={page} origin={origin} tab={page} onDirty={onDirty} />}
+        {['accounts', 'voice', 'nookara', 'admins'].includes(page) && <InstanceTab key={page} origin={origin} tab={page} onDirty={onDirty} />}
         {page === 'hosting' && <HostingPage origin={origin} />}
         {page === 'serverinfo' && <ServerInfoPage origin={origin} autoUpdate={autoUpdate && startTab === 'serverinfo'} />}
         {page === 'backups' && <BackupsPage origin={origin} />}
@@ -214,12 +215,12 @@ function Overview({ sid, origin, instAdmin, onDirty, goTo }) {
   }
   async function register() {
     setBusy('register');
-    try { const c = await call('/instance/velora/register', { method: 'POST' }); setCfg(c); toast(c.velora?.registered ? 'Registered with Nookara.' : "Nookara said no - see below.", !!c.velora?.registered); if (c.listed) recheck(); }
+    try { const c = await call(INST_REGISTER_NOOKARA, { method: 'POST' }); setCfg(c); toast(nookaraInfo(c)?.registered ? 'Registered with Nookara.' : "Nookara said no - see below.", !!nookaraInfo(c)?.registered); if (c.listed) recheck(); }
     catch (e) { toast(errorText(e.message)); }
     setBusy('');
   }
-  const v = cfg?.velora || {};
-  const off = cfg && (cfg.velora_registration || 'auto') === 'off';
+  const v = nookaraInfo(cfg) || {};
+  const off = cfg && (nookaraRegistration(cfg) || 'auto') === 'off';
   const dir = v.directory || {};
   return (
     <div className="bf-ss-page">
@@ -255,7 +256,7 @@ function Overview({ sid, origin, instAdmin, onDirty, goTo }) {
                 <button type="button" role="switch" aria-label="Show in Discover" aria-checked={!!cfg.listed} className={`cs-switch${cfg.listed ? ' on' : ''}`} disabled={off || busy === 'listed'} onClick={() => setListed(!cfg.listed)}><i /></button>
               </div>
               <div className={`bf-ss-reg${off || !v.registered ? ' warn' : ' ok'}`}>
-                {off ? <><TriangleAlert size={14} /><span>Nookara's services are off for this server, so it can't be listed.</span><button type="button" className="btn btn-surface btn-sm" onClick={() => goTo('velora')}>Nookara settings</button></>
+                {off ? <><TriangleAlert size={14} /><span>Nookara's services are off for this server, so it can't be listed.</span><button type="button" className="btn btn-surface btn-sm" onClick={() => goTo('nookara')}>Nookara settings</button></>
                   : !v.registered ? <><TriangleAlert size={14} /><span><b>Not registered with Nookara yet.</b> Discover lists only registered servers.{v.last_error ? ` (${errorText(v.last_error) === 'Something went wrong.' ? v.last_error : errorText(v.last_error)})` : ''}</span><button type="button" className="btn btn-primary btn-sm" disabled={!!busy} onClick={register}><RefreshCw size={13} /> {busy === 'register' ? 'Registering...' : 'Register now'}</button></>
                   : <><Check size={14} /><span><b>Registered with Nookara</b>{v.trusted ? ' - trusted' : ''}. {dir.hidden_by_staff ? "Nookara's staff have hidden the listing." : cfg.listed ? (dir.last_error ? `The listing didn't update: ${dir.last_error}` : dir.pushed_at ? `Listed - updated ${stampOf(dir.pushed_at)}.` : 'Listing it now...') : 'Not listed.'}</span></>}
               </div>
@@ -322,7 +323,7 @@ function MembersPage({ sid }) {
           <div className="vc-rows">
             {(bans || []).map(b => (
               <div key={b.user?.id} className="vc-list-row">
-                <Avatar user={{ username: b.user?.username, pfp: b.user?.kind === 'velora' ? b.user?.pfp : null }} size={32} />
+                <Avatar user={{ username: b.user?.username, pfp: isNookara(b.user?.kind) ? b.user?.pfp : null }} size={32} />
                 <span className="vc-list-txt"><b>{b.user?.username || 'Unknown'}</b><small>Banned {stampOf(b.created_at)}{b.banned_by?.username ? ` by ${b.banned_by.username}` : ''}</small></span>
                 <span className="grow" />
                 <button type="button" className="btn btn-surface btn-sm" onClick={() => moderate(sid, b.user?.username, 'unban', b.user).then(ok => ok && loadBans())}>Unban</button>

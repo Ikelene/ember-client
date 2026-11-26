@@ -93,7 +93,7 @@ a:hover {
   color:var(--text);
   text-decoration:none
 }
-/* "Velora Pro": Pro, bold, in a box of the accent colour (pro / admin / mod / owner) */
+/* "Nookara Pro": Pro, bold, in a box of the accent colour (pro / admin / mod / owner) */
 .nav-pro {
   display:inline-flex;
   align-items:center;
@@ -2045,7 +2045,7 @@ a:hover {
 .vis-text { display:flex; flex-direction:column; gap:2px }
 .vis-text b { font-size:14px; color:var(--text) }
 .vis-text span { font-size:13px; color:var(--muted) }
-/* â”€â”€ homepage: galaxy background, Hyperfocus, the people behind Velora â”€â”€ */
+/* â”€â”€ homepage: galaxy background, Hyperfocus, the people behind Nookara â”€â”€ */
 .home-galaxy { position:fixed; inset:0; width:100%; height:100%; z-index:0; pointer-events:none }
 .home-content { position:relative; z-index:1 }
 /* full width (edge to edge), the content stays in the page column */
@@ -2073,7 +2073,7 @@ a:hover {
 
 .home-people .features-sub { margin-left:auto; margin-right:auto }
 html, body { overflow-x:hidden }
-/* â”€â”€ homepage: Velora Embed â”€â”€ */
+/* â”€â”€ homepage: Nookara Embed â”€â”€ */
 .home-embed { display:grid; grid-template-columns:1fr 1fr; gap:32px; align-items:center; margin:80px 0; padding:32px; border:1px solid var(--border); background:var(--surface) }
 @media (max-width: 860px) { .home-embed { grid-template-columns:1fr; padding:22px } }
 .home-embed-title { font-size:26px; letter-spacing:-.5px; margin:8px 0 10px }
@@ -2085,7 +2085,7 @@ html, body { overflow-x:hidden }
 
 /* â”€â”€ Account + admin pages, new look (2026-10): the side menu becomes a boxed panel with an accent bar on the
    current item, headings get an accent underline, cards get a soft top-lit gradient. Square corners only:
-   no rounded anything (Velora's core rule). Scoped to .acct-shell. â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   no rounded anything (Nookara's core rule). Scoped to .acct-shell. â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .acct-shell {
   --radius: 0;
   --radius-sm: 0;
@@ -2368,7 +2368,7 @@ a.acct-nav-item { text-decoration: none }
 .arcade-tabs { flex-wrap: wrap; margin-bottom: 14px }
 
 /* the arcade panel's frame is dark-mode inside; marking the frame dark too lets it stay see-through
-   (when the two differ the browser paints the frame a solid colour instead of the Velora box) */
+   (when the two differ the browser paints the frame a solid colour instead of the Nookara box) */
 .arcade-embed { color-scheme: dark }
 
 /* storage > media > video: a gallery like the pictures (hover plays a muted preview) */
@@ -2381,7 +2381,7 @@ a.acct-nav-item { text-decoration: none }
 .vid-tile .vid-name { flex: 1; min-width: 0; font-size: 10.5px; color: #ddd; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .vid-tile .vid-size { font-size: 9.5px; color: #aaa; white-space: nowrap }
 
-/* My Account > Chat (Velora Chat settings) */
+/* My Account > Chat (Nookara Chat settings) */
 .cs-wrap { display: flex; flex-direction: column; gap: 14px }
 .cs-open .card-body { display: flex; align-items: center; gap: 14px; flex-wrap: wrap }
 .cs-open svg { color: var(--accent); flex: none }
@@ -2404,7 +2404,7 @@ a.acct-nav-item { text-decoration: none }
 .cs-seg button.on { background: var(--accent-dim); color: var(--text) }
 @media (max-width: 600px) { .cs-row { flex-wrap: wrap } }
 
-/* Velora's confirm box (components/confirmBox.jsx) - instead of the browser's pop-up */
+/* Nookara's confirm box (components/confirmBox.jsx) - instead of the browser's pop-up */
 .vl-ask-back { position: fixed; inset: 0; z-index: 4000; display: grid; place-items: center; padding: 20px; background: rgba(5, 5, 7, .72); backdrop-filter: blur(3px); animation: vl-ask-fade .2s ease-out }
 .vl-ask-back.out { animation: vl-ask-fade-out .17s ease-in forwards }
 .vl-ask { width: min(440px, 100%); padding: 22px; background: linear-gradient(180deg, #1a1a1d, #151517); border: 1px solid var(--border-2); box-shadow: 0 30px 80px rgba(0, 0, 0, .6); animation: vl-ask-pop .22s cubic-bezier(.2,.8,.2,1) }
@@ -2451,7 +2451,7 @@ a.acct-nav-item { text-decoration: none }
   }
 }
 
-/* Native account elements on the Velora homepage. */
+/* Native account elements on the Nookara homepage. */
 .home-maker > velora-card { width:340px;max-width:100% }
 .home-contributors > velora-card { width:auto;max-width:100% }
 .cs-beta-note { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; }

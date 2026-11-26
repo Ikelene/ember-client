@@ -7,7 +7,7 @@ import { apiFetch } from '../api.js';
 import { useChat, go, loadFriends, toast, errorText, ask, toggleBlock, setHomeRequests } from './store.js';
 import { NameText, displayNameOf } from './displayNames.js';
 import { Avatar, subtitle } from './Profile.jsx';
-import { VeloraConnNote } from './Parts.jsx';
+import { NookaraConnNote } from './Parts.jsx';
 import Dashboard from './Dashboard.jsx';
 import { SavedList } from './SidePanel.jsx';
 import { HomeShortcuts, PinnedHome } from './PinItems.jsx';
@@ -120,7 +120,7 @@ export default function Home({ onUser }) {
       <div className="vc-home-main">
         <div className="vc-head"><House size={20} className="vc-head-ico" /><b className="vc-head-name">Home</b></div>
         <div className="vc-home-body hm">
-          <VeloraConnNote className="wide" />
+          <NookaraConnNote className="wide" />
           <div className="hm-wrap">
             <header className="hm-hello vl-rise">
               {me && <Avatar user={me} size={46} status={presence[me.username]?.status || 'online'} />}

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import './RockEgg.css';
+import { EMBER_ASSETS, desktopBridge } from '../compat.js';
 
-const SOUND = '/assets/bonfire/the-rock-sus.wav';
-const IMAGE = '/assets/bonfire/the-rock.png';
+const SOUND = `${EMBER_ASSETS}/the-rock-sus.wav`;
+const IMAGE = `${EMBER_ASSETS}/the-rock.png`;
 const randomWait = () => 60000 + Math.random() * 120000;
 
 // Runs in Ember's shared web UI, including browsers and the desktop/Android shells.
@@ -13,7 +14,7 @@ export default function RockEgg({ enabled }) {
   useEffect(() => {
     // Older desktop builds have their own local timer. Turn it off so the shared
     // account setting remains the only source of Rock appearances.
-    window.bonfireDesktop?.setRockEnabled?.(false)?.catch?.(() => {});
+    desktopBridge()?.setRockEnabled?.(false)?.catch?.(() => {});
   }, []);
 
   useEffect(() => {

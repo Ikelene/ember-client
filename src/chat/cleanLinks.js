@@ -1,3 +1,4 @@
+import { OLD_HOST } from '../compat.js';
 // Removes tracking junk from links (?utm_source=..., ?si=..., fbclid, ...). Pure functions, no imports.
 //   cleanUrl(url)   -> the url without tracking (the same string if nothing was there / it can't be parsed)
 //   cleanText(text) -> every http(s) link inside the text cleaned
@@ -11,7 +12,7 @@ const isHost = (h, d) => h === d || h.endsWith(`.${d}`);
 const anyHost = (h, list) => list.some(d => isHost(h, d));
 
 // our own links (invites, signed / uploaded files, /t/ temporary files, old catbox #n= names): only the utm_* junk may go
-const OWN_HOSTS = ['nookara.cc', 'velora.ikelene.net', 'ikelene.net', 'ikelene.dev', 'catbox.moe'];
+const OWN_HOSTS = ['nookara.cc', OLD_HOST, 'ikelene.net', 'ikelene.dev', 'catbox.moe'];
 
 // per site: extra parameter names (regex on the lower-cased name) that are junk there
 const SITE_RULES = [

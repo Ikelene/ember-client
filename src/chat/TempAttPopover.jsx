@@ -1,5 +1,5 @@
 // The little settings popover on a file waiting in the composer (the clock / drive badge on it, see Composer in
-// Messages.jsx). For temporary storage it shows how long the file will last; Velora Pro members can pick a fixed expiry
+// Messages.jsx). For temporary storage it shows how long the file will last; Nookara Pro members can pick a fixed expiry
 // (sent as expires_in_days, see store.uploadTemp), everyone else gets a short note about Pro. Either way the file can be
 // moved to account storage instead (or back), the same two places the "Where should this go?" picker offers.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -9,7 +9,7 @@ import { loadUploadDestinations } from './store.js';
 import { normalDays, daysText, expiryChoices, pickedDays } from './temp-pick.js';
 
 const MB = 1024 * 1024;
-const VELORA = 'https://nookara.cc';
+const NOOKARA_SITE = 'https://nookara.cc';
 const fmt = b => (b >= 1024 * MB ? `${(b / 1024 / MB).toFixed(1)} GB` : `${Math.max(0, Math.round(b / MB))} MB`);
 const dateIn = days => new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', ...(days > 300 ? { year: 'numeric' } : {}) }).format(Date.now() + days * 864e5);
 
@@ -95,7 +95,7 @@ export function TempAttPopover({ att, rect, onExpires, onDest, onClose }) {
               <Sparkles size={15} />
               <span>
                 <b>Nookara Pro</b> keeps it {proNormal ? `${daysText(proNormal)}` : 'twice as long'} and lets you pick when it expires, up to {daysText(tmp?.pro_days?.max || 120)}.
-                <a href={`${VELORA}/upgrade`} target="_blank" rel="noopener noreferrer">Get Pro <ArrowRight size={12} /></a>
+                <a href={`${NOOKARA_SITE}/upgrade`} target="_blank" rel="noopener noreferrer">Get Pro <ArrowRight size={12} /></a>
               </span>
             </div>
           </>
@@ -109,7 +109,7 @@ export function TempAttPopover({ att, rect, onExpires, onDest, onClose }) {
   return createPortal(
     <div ref={box} className="vc-tpop" role="dialog" aria-label="File storage" style={{ left: pos.left, top: pos.top, visibility: pos.hidden ? 'hidden' : 'visible' }}>
       {body}
-      <a className="vc-tpop-help" href={`${VELORA}/temp-files`} target="_blank" rel="noopener noreferrer"><HelpCircle size={13} />How temporary files work</a>
+      <a className="vc-tpop-help" href={`${NOOKARA_SITE}/temp-files`} target="_blank" rel="noopener noreferrer"><HelpCircle size={13} />How temporary files work</a>
     </div>,
     document.body,
   );

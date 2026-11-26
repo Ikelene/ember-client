@@ -1,4 +1,4 @@
-// Ember's state + its connection (one Velora socket when signed in with Velora, the /chat, /im and /groups APIs, and one socket per server instance).
+// Ember's state + its connection (one Nookara socket when signed in with Nookara, the /chat, /im and /groups APIs, and one socket per server instance).
 // Components read it with useChat(selector) and change it through the actions below.
 import { shareLink, clientUrl, notifLinkUrl, EMBER_ORIGIN } from './hosts.js';
 import { serverUnreadCount } from './unread.js';
@@ -7,7 +7,7 @@ import { loadPersonalEmojis, setStickers } from './personal.js';
 import { packActive, playPackSound } from './messageSounds.js';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import serverCreationPolicy from '../server-creation-policy.json';
-import { apiFetch, getToken, onScopeError, onAuthLost, isWebBonfire, uploadFetch, uploadInPieces, PIECES_OVER } from '../api.js';
+import { apiFetch, getToken, onScopeError, onAuthLost, isWebEmber, uploadFetch, uploadInPieces, PIECES_OVER } from '../api.js';
 import { endSession, startSignIn } from './session.js';
 import * as E2EE from './e2ee/session.js';
 import { fileKindOfMime } from './e2ee/files.js';
@@ -16,30 +16,31 @@ import { callLinePlain } from './callText.js';
 import { applyIdentity, applyNick } from './identity.js';
 import { applyUserUpdate, instancesWithAccount } from './userUpdate.js';
 import { findPending, dropSettled, wireText, settle } from './pending.js';
-import { VELORA, K, parseK, instOf, bare, isInst, normOrigin, acctKey } from './ids.js';
+import { NOOKARA, K, parseK, instOf, bare, isInst, normOrigin, acctKey } from './ids.js';
 import { myIdOn } from './tokens.js';
 import { readChannel as readMsgCache, writeChannel as writeMsgCache, dropChannels as dropMsgCache } from './msgCache.js';
-import { connections, sendTo, startInstances, loadInstanceData, retryInstances, resumeInstances, renewVeloraSession, holdInstances, forgetIfEmpty, wakeInstance, instanceWoke, recheckSleepers } from './instances.js';
+import { connections, sendTo, startInstances, loadInstanceData, retryInstances, resumeInstances, renewNookaraSession, holdInstances, forgetIfEmpty, wakeInstance, instanceWoke, recheckSleepers } from './instances.js';
 import { attachmentRefs } from './signing-payload.js';
 import { spoilerName } from './spoiler.js';
 import { prepareInstanceAttachments } from './attachment-preparation.js';
 import { setupSigning, signMessage, canSign, watchSignature, normBody, refreshSigningKey } from './signing.js';
 import { SHORT } from '../version.js';
+import { EMBER_API, NOOKARA_WIRE, isNookara, nookaraId, NOOKARA_ID_FIELD, OLD_EMBER_UPDATE, legacyToNew, desktopBridge, NOTIFICATION_ACTION_EVENT, SITE_SAVED } from '../compat.js';
 
 let state = {
-  me: null,                // { username, pfp, color, rank } - null while signed out of Velora (web Ember works without it)
+  me: null,                // { username, pfp, color, rank } - null while signed out of Nookara (web Ember works without it)
   e2eeStatus: 'loading',   // end-to-end encrypted DMs on this device: loading | none (no keys yet) | locked | ready
   e2eeGate: null,          // the set up / unlock popup is open
   e2eeKeyChanged: {},      // username (lower) -> their key changed since I last saw it
   botPeers: {},            // username (lower) -> true: a bot account. DMs with bots are never encrypted (bots can't hold keys)
-  signedIn: false,         // signed in with Velora: DMs, groups, friends, modmail, legacy servers, Velora-login instances
+  signedIn: false,         // signed in with Nookara: DMs, groups, friends, modmail, legacy servers, Nookara-login instances
   conn: 'connecting',      // connecting | open | closed
   connected: false,        // the home socket has been open at least once since the page loaded
   connRetryAt: 0,          // closed: when the next try is (it never gives up)
   servers: [],             // my servers
   detail: {},              // sid -> { server, channels }
   members: {},             // sid -> [member]
-  membersMore: {},         // sid -> next offset, for a big Velora-hosted server whose member list comes in pages (absent: all loaded)
+  membersMore: {},         // sid -> next offset, for a big Nookara-hosted server whose member list comes in pages (absent: all loaded)
   presence: {},            // username -> { status, custom, activities }
   presenceReady: false,    // the first presence_bulk came in
   people: {},              // username -> { username, pfp, color, rank }
@@ -52,8 +53,8 @@ let state = {
   friendsLoaded: false,     // /friends answered once (Home shows "No friends yet" only after)
   blocks: null, // people I blocked ({username, ...}); null until loaded
   unread: {},              // key -> true
-  modmail: { messages: [], unread: 0 }, // Velora Moderator Chat (to me)
-  staff: false,            // Velora owner / admin: can write as Velora Administrator
+  modmail: { messages: [], unread: 0 }, // Nookara Moderator Chat (to me)
+  staff: false,            // Nookara owner / admin: can write as Nookara Administrator
   view: { kind: 'home' },  // home | channel {sid, cid} | dm {username} | group {room} | instance {inst, then?} (a server that isn't connected yet)
   menu: null,              // the open right-click menu
   commands: {},            // sid -> { bots, commands, cid }: bot slash commands I can run
@@ -86,13 +87,13 @@ let state = {
   sigs: {},                // signed message -> 'ok' | 'bad' (checked here, never taken from the instance)
   joinRequests: {},        // sid -> people waiting to be let in (live count)
   reports: {},             // sid -> open reports (live count, moderators of an instance)
-  veloraNames: {},         // Velora id -> current username (instance members are v:<id>; their presence comes from the home socket by name)
-  veloraFaces: {},         // Velora id -> their live public face on Velora { id, username, pfp, color, rank } (v: people on instances)
+  nookaraNames: {},         // Nookara id -> current username (instance members are v:<id>; their presence comes from the home socket by name)
+  nookaraFaces: {},         // Nookara id -> their live public face on Nookara { id, username, pfp, color, rank } (v: people on instances)
   emojiUrls: {},
   personalEmojis: null,    // { list, max, pro_max }: my personal emojis (personal.js)
   personalStickers: null,  // { list, max, pro_max }: my personal stickers (personal.js)
   stickers: {},            // sid -> { list, max }: an Ember server's stickers (personal.js)           // eid -> picture of an instance's custom emoji
-  notifUnread: 0,          // Velora notifications not read yet (the bell's badge)
+  notifUnread: 0,          // Nookara notifications not read yet (the bell's badge)
   homeRequests: 0,         // friend requests + message requests waiting for me (the Home button's count)
   notifs: null,            // the bell's popup while it's open: { list (unread only, newest first), cursor, loading, error }
 };
@@ -107,29 +108,29 @@ function onceDesktopAction(action) {
   desktopActions.set(key, now);
   return true;
 }
-const pageFocused = () => document.visibilityState === 'visible' && (window.bonfireDesktop?.isDesktop ? desktopFocused : document.hasFocus());
+const pageFocused = () => document.visibilityState === 'visible' && (desktopBridge()?.isDesktop ? desktopFocused : document.hasFocus());
 function set(patch) {
   state = { ...state, ...(typeof patch === 'function' ? patch(state) : patch) };
   subs.forEach(f => f());
 }
 const subscribe = f => { subs.add(f); return () => subs.delete(f); };
 export const getState = () => state;
-// a custom emoji's picture: an instance's own (from its emoji list), else Velora's
+// a custom emoji's picture: an instance's own (from its emoji list), else Nookara's
 // an emoji Ember doesn't know yet is looked for on Nookara (personal emojis and Nookara servers' emojis live there);
 // CustomEmojiImg (text.jsx) then tries the Ember server the message is on (emojis a bridge brought in from Discord / Fluxer)
 export const customEmoji = (eid, animated) => state.emojiUrls[eid] || `/uploads/emojis/${eid}.${animated ? 'gif' : 'png'}`;
 export const patchState = p => set(p);
 // Ember desktop: games' Discord rich presence (captured by the app) becomes your status, tied to this socket
 let rpcNow = null;
-if (typeof window !== 'undefined' && window.bonfireDesktop?.onRpcActivity) {
+if (typeof window !== 'undefined' && desktopBridge()?.onRpcActivity) {
   const apply = a => {
     rpcNow = a || null;
     if (rpcNow) send({ type: 'set_rich_presence', activity: { ...rpcNow, app: rpcNow.app || 'Discord RPC' } });
     else send({ type: 'clear_rich_presence' });
   };
-  window.bonfireDesktop.onRpcActivity(apply);
-  window.bonfireDesktop.onRpcStatus(s => set({ rpcStatus: s }));
-  window.bonfireDesktop.rpcState?.().then(s => { set({ rpcStatus: s }); if (s.activity) apply(s.activity); }).catch(() => {});
+  desktopBridge().onRpcActivity(apply);
+  desktopBridge().onRpcStatus(s => set({ rpcStatus: s }));
+  desktopBridge().rpcState?.().then(s => { set({ rpcStatus: s }); if (s.activity) apply(s.activity); }).catch(() => {});
 }
 export function useChat(sel = s => s) {
   return useSyncExternalStore(subscribe, () => sel(state));
@@ -156,9 +157,9 @@ export function remember(list) {
   if (Object.keys(add).length) set(s => ({ people: { ...s.people, ...add } }));
 }
 const lookups = new Map();
-// public profiles are cached for 5 minutes: an edit still shows at once (Velora sends user_update, which clears this)
+// public profiles are cached for 5 minutes: an edit still shows at once (Nookara sends user_update, which clears this)
 const LOOKUP_MS = 5 * 60 * 1000, LOOKUP_BATCH = 100;
-// a public Velora endpoint (no token): what signed-out Ember may still ask Velora for (public profiles)
+// a public Nookara endpoint (no token): what signed-out Ember may still ask Nookara for (public profiles)
 const publicJson = path => fetch(path).then(r => r.json().then(d => (r.ok ? d : Promise.reject(Object.assign(new Error(d.error || 'request_failed'), { status: r.status })))));
 const faceOfProfile = d => ({ id: d.id != null ? String(d.id) : undefined, username: d.username, pfp: d.pfp_url || null, color: d.color || null, rank: d.rank });
 export function lookup(username) { // the public profile (cached for 5 minutes)
@@ -202,15 +203,15 @@ export async function lookupMany(usernames) {
   await Promise.all([...out].map(([k, p]) => p.then(d => { done.set(k, d); }, () => {})));
   return done;
 }
-// Velora people on an instance server (v:<id>) show their live Velora face - picture, accent colour, rank - like on Velora's own
+// Nookara people on an instance server (v:<id>) show their live Nookara face - picture, accent colour, rank - like on Nookara's own
 // servers. By id when signed in (/chat/identities), else by the name the instance knows, through the public profile (kept
-// only if Velora says it's the same id). The instance's stored picture is only the fallback. Local accounts never get one.
+// only if Nookara says it's the same id). The instance's stored picture is only the fallback. Local accounts never get one.
 const faceAsked = new Map(); // id -> when
 let faceQueue = new Map(), faceTimer = null;
-export function wantVeloraFaces(people) {
+export function wantNookaraFaces(people) {
   for (const u of people || []) {
-    const id = String(u?.velora_id || '');
-    if (u?.kind !== 'velora' || !/^[1-9]\d{0,19}$/.test(id) || Date.now() - (faceAsked.get(id) || 0) < 300000) continue;
+    const id = String(nookaraId(u) || '');
+    if (!isNookara(u?.kind) || !/^[1-9]\d{0,19}$/.test(id) || Date.now() - (faceAsked.get(id) || 0) < 300000) continue;
     faceAsked.set(id, Date.now()); faceQueue.set(id, u.username);
   }
   if (faceQueue.size && !faceTimer) faceTimer = setTimeout(flushFaces, 60);
@@ -229,10 +230,10 @@ async function flushFaces() {
     for (const id of ids.slice(0, 100)) { const d = found.get(String(q.get(id) || '').toLowerCase()); if (d && String(d.id) === id) got[id] = { id, username: d.username, pfp: d.pfp_url || null, color: d.color || null, rank: d.rank }; }
   }
   for (const id of ids) if (!got[id]) got[id] = { id, miss: true }; // nobody to show: stop holding their name colour back
-  if (Object.keys(got).length) set(s => ({ veloraFaces: { ...s.veloraFaces, ...got }, veloraNames: { ...s.veloraNames, ...Object.fromEntries(Object.entries(got).filter(([, u]) => !u.miss).map(([id, u]) => [id, u.username])) } }));
+  if (Object.keys(got).length) set(s => ({ nookaraFaces: { ...s.nookaraFaces, ...got }, nookaraNames: { ...s.nookaraNames, ...Object.fromEntries(Object.entries(got).filter(([, u]) => !u.miss).map(([id, u]) => [id, u.username])) } }));
 }
-// someone as shown in an instance server: a Velora person with their Velora face, a local account with the picture it set on that
-// server (account profiles), a bot as plain. Velora's own servers already carry the live face.
+// someone as shown in an instance server: a Nookara person with their Nookara face, a local account with the picture it set on that
+// server (account profiles), a bot as plain. Nookara's own servers already carry the live face.
 // what Ember uses of a server profile: a #rrggbb colour, http(s) pictures, plain text (the server should send just that; this makes sure)
 const httpUrl = v => (typeof v === 'string' && /^https?:\/\//i.test(v) ? v : null);
 export function cleanServerProfile(p) {
@@ -245,7 +246,7 @@ export function cleanServerProfile(p) {
 const serverProfiles = new WeakMap();
 const instMembers = (inst, s) => { const sid = (s.servers || []).find(x => x.inst === inst)?.sid; return sid ? s.members?.[sid] || null : null; }; // (some callers pass a partial state)
 export function serverProfileOf(u, s = state) {
-  if (!u?.inst || u.inst === VELORA || u.id == null) return null;
+  if (!u?.inst || u.inst === NOOKARA || u.id == null) return null;
   const list = instMembers(u.inst, s);
   if (!list) return null;
   let idx = serverProfiles.get(list);
@@ -253,22 +254,22 @@ export function serverProfileOf(u, s = state) {
   return idx.get(String(u.id)) || null;
 }
 export function faceOf(u, s = state) {
-  if (!u || !u.inst || u.inst === VELORA) return u;
+  if (!u || !u.inst || u.inst === NOOKARA) return u;
   const sp = serverProfileOf(u, s);
   let out;
   if (u.kind === 'local') out = { ...u, pfp: httpUrl(u.pfp), color: null }; // (its picture is the one it set on that server: account profiles)
   else {
-    const f = u.kind === 'velora' ? s.veloraFaces[String(u.velora_id)] : null;
+    const f = isNookara(u.kind) ? s.nookaraFaces[String(nookaraId(u))] : null;
     out = f && !f.miss ? { ...u, pfp: f.pfp || u.pfp || null, color: f.color || null, rank: f.rank } : u;
   }
   return sp ? { ...out, pfp: sp.pfp || out.pfp, color: sp.color || out.color } : out;
 }
 export const useFace = u => {
-  const f = useChat(s => (u?.inst && u.kind === 'velora' ? s.veloraFaces[String(u.velora_id)] : null));
-  const ml = useChat(s => (u?.inst && u.inst !== VELORA ? instMembers(u.inst, s) : null)); // (their server profile can change)
+  const f = useChat(s => (u?.inst && isNookara(u.kind) ? s.nookaraFaces[String(nookaraId(u))] : null));
+  const ml = useChat(s => (u?.inst && u.inst !== NOOKARA ? instMembers(u.inst, s) : null)); // (their server profile can change)
   return useMemo(() => faceOf(u), [u, f, ml]); // eslint-disable-line react-hooks/exhaustive-deps
 };
-// a profile card / page that is open re-reads its person when Velora says they changed (user_update); fn(event) -> unsubscribe
+// a profile card / page that is open re-reads its person when Nookara says they changed (user_update); fn(event) -> unsubscribe
 export const onUserUpdate = fn => { const h = e => fn(e.detail); addEventListener('vc-user-update', h); return () => removeEventListener('vc-user-update', h); };
 // drop the cached public profile (after you edit your own), so the next lookup is fresh
 export function forgetProfile(username) { lookups.delete(String(username || '').toLowerCase()); }
@@ -277,7 +278,7 @@ export function wantPresence(username) {
   if (!username || state.presence[username]) return;
   send({ type: 'chat_presence', username });
 }
-// Velora only sends presence to the people who can see it (friends, DMs, groups, small shared servers) and to the
+// Nookara only sends presence to the people who can see it (friends, DMs, groups, small shared servers) and to the
 // sockets that asked about someone: ask for a whole list at once (one chat_presence_watch per 200, answered by one
 // presence_bulk), and again after every reconnect so the lists we show stay live.
 const watched = new Set();
@@ -305,14 +306,14 @@ function localizePresence(presence) {
 // ── the socket ──
 let sock = null, retry = 0, nonce = 0;
 const pendingAcks = new Map(); // nonce -> key
-let lastBonfireActivity = 0;
+let lastEmberActivity = 0;
 // Keep other devices quiet for ten minutes after actual use of Ember.  This
 // is intentionally not the socket's 25-second keepalive: a suspended or
 // backgrounded tab must not pretend that the user is still here.
-function noteBonfireActivity() {
+function noteEmberActivity() {
   const now = Date.now();
-  if (now - lastBonfireActivity < 30000) return;
-  if (send({ type: 'chat_active' })) lastBonfireActivity = now;
+  if (now - lastEmberActivity < 30000) return;
+  if (send({ type: 'chat_active' })) lastEmberActivity = now;
 }
 // a frame about an instance's community / channel / voice room goes to that instance's socket, with the bare ids
 function routeFrame(obj) {
@@ -322,17 +323,17 @@ function routeFrame(obj) {
     if (typeof v !== 'string') continue;
     const bf = f === 'room' && v.startsWith('bf_');
     const p = parseK(bf ? v.slice(3) : v);
-    if (p.inst === VELORA) continue;
+    if (p.inst === NOOKARA) continue;
     if (inst && inst !== p.inst) return null;
     inst = p.inst;
     out = { ...out, [f]: bf ? `bf_${p.id}` : p.id };
   }
-  return { inst: inst || VELORA, obj: out };
+  return { inst: inst || NOOKARA, obj: out };
 }
 export function send(obj) {
   const r = routeFrame(obj);
   if (!r) return false;
-  if (r.inst !== VELORA) return sendTo(r.inst, r.obj);
+  if (r.inst !== NOOKARA) return sendTo(r.inst, r.obj);
   if (sock && sock.readyState === 1) { sock.send(JSON.stringify(obj)); return true; }
   return false;
 }
@@ -352,7 +353,7 @@ const VOICE_EVENTS = new Set(['voice', 'voice_open', 'voice_closed', 'voice_call
 // The Android app (a WebView) is detected by the same rules.
 export function isMobileDevice() {
   try {
-    if (window.bonfireDesktop?.isDesktop) return false;
+    if (desktopBridge()?.isDesktop) return false;
     if (navigator.userAgentData?.mobile === true) return true;
     const ua = navigator.userAgent || '';
     if (/iPhone|iPod|Android.*Mobile|Mobi|Windows Phone/i.test(ua)) return true;
@@ -361,7 +362,7 @@ export function isMobileDevice() {
   } catch { return false; }
 }
 // never gives up: backoff to ~30 s (with jitter), and straight away when the network / tab comes back. A dropped
-// connection never signs anyone out - only Velora rejecting the token does (auth_error invalid_token, a 401, `kicked`).
+// connection never signs anyone out - only Nookara rejecting the token does (auth_error invalid_token, a 401, `kicked`).
 export const backoff = n => Math.min(30000, 1000 * 2 ** Math.min(n, 5)) * (0.8 + Math.random() * 0.4);
 let sockTimer = null;
 // Phones (Ikelene 2026-11-22): after a while in another app the socket is often stuck - still "connecting" (started while the app
@@ -435,11 +436,11 @@ if (typeof window !== 'undefined') {
 }
 setInterval(() => send({ type: 'ping' }), 25000);
 
-// one event from the home socket (inst = velora) or from an instance's (already in Ember's shapes, ids namespaced)
-// an instance may only say what PROTOCOL.md §7 lets it: nothing that is Velora's own (DMs, kicks, presence, calls...)
+// one event from the home socket (inst = nookara) or from an instance's (already in Ember's shapes, ids namespaced)
+// an instance may only say what PROTOCOL.md §7 lets it: nothing that is Nookara's own (DMs, kicks, presence, calls...)
 const INSTANCE_EVENTS = new Set(['chat_message', 'chat_message_update', 'chat_message_delete', 'chat_reactions', 'chat_typing', 'chat_pins_update', 'chat_server_update', 'chat_server_removed', 'chat_roles_update', 'chat_perms_changed', 'chat_channels_update', 'chat_member_update', 'chat_presence', 'chat_members_stale', 'chat_emojis_update', 'chat_stickers_update', 'chat_identity_update', 'chat_ack', 'chat_error', 'chat_ephemeral', 'chat_join_request', 'chat_join_result', 'chat_report', 'chat_timeout', 'chat_server_added', 'chat_starboard', 'chat_shop_update', 'chat_commands_update', 'chat_interaction_message', 'chat_interaction_modal', 'game_status', 'game_console', 'game_linked', 'game_unlinked', 'voice_sound', 'voice_sound_failed']);
 const INSTANCE_VOICE = /^(chat_rtc_|chat_voice_state$)/;
-const LOCKED_EVENTS = new Set(['auth_success', 'auth_error', 'restrictions', 'error', 'kicked', 'bonfire_update', 'web_build']); // (what still matters while locked)
+const LOCKED_EVENTS = new Set(['auth_success', 'auth_error', 'restrictions', 'error', 'kicked', 'ember_update', OLD_EMBER_UPDATE, 'web_build']); // (what still matters while locked)
 // "who posted recently" (channel list, Modern): people who posted in a channel lately, newest first. The server's list comes
 // with the channels (recent); this adds what arrives live.
 function notePoster(msg) {
@@ -451,11 +452,11 @@ function notePoster(msg) {
     return { recentPosts: { ...(s.recentPosts || {}), [msg.channel]: next } };
   });
 }
-export function handleEvent(m, inst = VELORA) {
-  if (inst !== VELORA && !INSTANCE_EVENTS.has(m?.type) && !INSTANCE_VOICE.test(String(m?.type))) return;
-  if (inst !== VELORA && m.type === 'chat_error' && String(m.request || '').startsWith('chat_rtc')) { voiceHook?.({ ...m, inst }); return; }
-  if (inst === VELORA && (m.type === 'chat_error' || m.type === 'error') && (m.error === 'insufficient_scope' || m.error === 'scope_disabled')) scopeDenied(m); // before anything else, voice errors included
-  if (state.locked && (inst !== VELORA || !LOCKED_EVENTS.has(m?.type))) return; // Ember is switched off: only what can switch it back on (or sign out) gets in
+export function handleEvent(m, inst = NOOKARA) {
+  if (inst !== NOOKARA && !INSTANCE_EVENTS.has(m?.type) && !INSTANCE_VOICE.test(String(m?.type))) return;
+  if (inst !== NOOKARA && m.type === 'chat_error' && String(m.request || '').startsWith('chat_rtc')) { voiceHook?.({ ...m, inst }); return; }
+  if (inst === NOOKARA && (m.type === 'chat_error' || m.type === 'error') && (m.error === 'insufficient_scope' || m.error === 'scope_disabled')) scopeDenied(m); // before anything else, voice errors included
+  if (state.locked && (inst !== NOOKARA || !LOCKED_EVENTS.has(m?.type))) return; // Ember is switched off: only what can switch it back on (or sign out) gets in
   if (VOICE_EVENTS.has(m.type) || (m.type === 'chat_error' && String(m.request || '').startsWith('chat_rtc'))) { voiceHook?.({ ...m, inst }); return; }
   onEvent(m, inst);
 }
@@ -463,18 +464,18 @@ export function handleEvent(m, inst = VELORA) {
 // dropped = the socket just went (a call can resume on the next one); otherwise the call is over for good
 export function instanceVoiceClosed(origin, { dropped = false } = {}) { voiceHook?.({ type: 'voice_closed', inst: origin, dropped }); }
 // a socket is (back) up and said chat_ready: a call held over a drop can resume now
-export function voiceSocketReady(inst = VELORA) { voiceHook?.({ type: 'voice_socket_ready', inst }); }
+export function voiceSocketReady(inst = NOOKARA) { voiceHook?.({ type: 'voice_socket_ready', inst }); }
 // me, as that instance knows me
-const meOn = inst => (inst === VELORA || !inst ? state.me : connections.get(inst)?.user) || state.me;
+const meOn = inst => (inst === NOOKARA || !inst ? state.me : connections.get(inst)?.user) || state.me;
 export const isMineMsg = msg => isMine(msg);
 const isMine = msg => {
   const inst = msg.inst || instOf(msg.channel || '');
-  if (inst === VELORA) return msg.author?.username === state.me?.username;
+  if (inst === NOOKARA) return msg.author?.username === state.me?.username;
   const u = connections.get(inst)?.user;
   return !!u && !!msg.author && msg.author.id === u.id;
 };
 
-function onEvent(m, inst = VELORA) {
+function onEvent(m, inst = NOOKARA) {
   switch (m.type) {
     case 'auth_success': {
       retry = 0;
@@ -482,8 +483,8 @@ function onEvent(m, inst = VELORA) {
       if (m.disabled_scopes !== undefined) applyDisabled(m.disabled_scopes, m.restriction_reason);
       if (state.locked) break; // (nothing to say hello for: the socket only waits to hear it's switched back on)
       if (!was) send({ type: 'chat_hello' }); // (just unlocked: unlockAccount said it)
-      lastBonfireActivity = 0; // (a new socket: the server hasn't heard about this one yet)
-      if (pageFocused()) noteBonfireActivity(); // a window nobody is looking at reconnecting isn't someone using Ember
+      lastEmberActivity = 0; // (a new socket: the server hasn't heard about this one yet)
+      if (pageFocused()) noteEmberActivity(); // a window nobody is looking at reconnecting isn't someone using Ember
       if (rpcNow) send({ type: 'set_rich_presence', activity: { ...rpcNow, app: rpcNow.app || 'Discord RPC' } }); // a game status from the desktop app, again after a reconnect
       break;
     }
@@ -493,32 +494,32 @@ function onEvent(m, inst = VELORA) {
       break;
     case 'error': break; // (scope errors were handled above)
     case 'auth_error':
-      if (m.error === 'invalid_token' || m.error === 'banned') { if (isWebBonfire()) authLost(); else location.href = '/login?next=/chat'; }
+      if (m.error === 'invalid_token' || m.error === 'banned') { if (isWebEmber()) authLost(); else location.href = '/login?next=/chat'; }
       break;
     case 'chat_ready':
-      if (inst === VELORA && state.e2eeStatus === 'loading' && state.signedIn) E2EE.init().catch(() => {});
-      else if (inst === VELORA) E2EE.flushOutbox();
+      if (inst === NOOKARA && state.e2eeStatus === 'loading' && state.signedIn) E2EE.init().catch(() => {});
+      else if (inst === NOOKARA) E2EE.flushOutbox();
       set(s => ({ conn: 'open', connected: true, presence: { ...s.presence, [m.you.username]: localizePresence(m.you.presence) } }));
       rewatchPresence(); // (a new socket: the server forgot what this one was watching)
-      if (inst === VELORA) voiceSocketReady(VELORA);
+      if (inst === NOOKARA) voiceSocketReady(NOOKARA);
       catchUp();
       loadNotifCount(); // (anything that happened while the socket was down)
       break;
     case 'chat_message': addMessage(`c:${m.message.channel}`, m.message); notePoster(m.message); break;
-    // Velora: somebody I can see changed their profile (picture, colour, name, bio ...): patch every cache that holds them, refresh any open
+    // Nookara: somebody I can see changed their profile (picture, colour, name, bio ...): patch every cache that holds them, refresh any open
     // profile card, and ask the instances they are on to re-read it too (instances otherwise pick it up on their own 10-15 min schedule)
     case 'user_update':
-      if (inst !== VELORA || !m.user?.id) break;
+      if (inst !== NOOKARA || !m.user?.id) break;
       lookups.clear();
       set(s => applyUserUpdate(s, m));
       dispatchEvent(new CustomEvent('vc-user-update', { detail: m }));
       if (m.previous_username && m.previous_username !== m.user.username) { loadDMs(); loadGroups(); loadFriends(); } // (name-keyed lists + conversations)
-      for (const o of instancesWithAccount(state, m.user.id)) sendTo(o, { type: 'chat_profile_refresh', velora_id: String(m.user.id) });
+      for (const o of instancesWithAccount(state, m.user.id)) sendTo(o, { type: 'chat_profile_refresh', [NOOKARA_ID_FIELD]: String(m.user.id) });
       // my own profile: the servers with their own accounts where my profile follows it get the new one (accountProfile.js)
       if (state.me && [m.user.username, m.previous_username].includes(state.me.username)) import('./accountProfile.js').then(x => x.syncAllAccountProfiles()).catch(() => {});
       break;
     case 'chat_identity_update':
-      if (inst !== VELORA) { if (m.user?.id) { set(s => applyIdentity(s, m.user, inst)); loadMembersOf(inst); } break; }
+      if (inst !== NOOKARA) { if (m.user?.id) { set(s => applyIdentity(s, m.user, inst)); loadMembersOf(inst); } break; }
       lookups.clear();
       set(s => applyIdentity(s, m.user));
       break;
@@ -578,9 +579,10 @@ function onEvent(m, inst = VELORA) {
     case 'im_reactions': // a reaction in a DM (m.with = the other person)
       set(s => ({ msgs: upd(s.msgs, `d:${String(m.with).toLowerCase()}`, b => b && { ...b, list: b.list.map(x => (x.imId === m.id ? { ...x, reactions: m.reactions.length ? m.reactions : undefined } : x)) }) }));
       break;
-    // Velora says something new is out: the desktop app checks + downloads now, the website offers a reload
-    case 'bonfire_update':
-      window.bonfireDesktop?.checkForUpdates?.();
+    // Nookara says something new is out: the desktop app checks + downloads now, the website offers a reload
+    case 'ember_update':
+    case OLD_EMBER_UPDATE: // (servers that haven't moved yet)
+      desktopBridge()?.checkForUpdates?.();
       break;
     case 'web_build':
       dispatchEvent(new CustomEvent('vc-web-build', { detail: m.build }));
@@ -620,8 +622,8 @@ function onEvent(m, inst = VELORA) {
         break;
       }
       // an instance session from before "Sign messages" (or uploads / voice) was approved: get a fresh one, then say what to do
-      if (inst !== VELORA && m.error === 'insufficient_scope') {
-        renewVeloraSession(inst).then(scopes => toast(scopes?.includes('sign') && scopes.includes('chat') ? 'Your login on this server was out of date - it is updated now, send it again.' : errorText('inst_scope')));
+      if (inst !== NOOKARA && m.error === 'insufficient_scope') {
+        renewNookaraSession(inst).then(scopes => toast(scopes?.includes('sign') && scopes.includes('chat') ? 'Your login on this server was out of date - it is updated now, send it again.' : errorText('inst_scope')));
         const key = pendingAcks.get(m.nonce);
         if (key) { pendingAcks.delete(m.nonce); set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === m.nonce ? { ...x, failed: m.error } : x)) }) })); }
         break;
@@ -632,7 +634,7 @@ function onEvent(m, inst = VELORA) {
         pendingAcks.delete(m.nonce);
         set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === m.nonce ? { ...x, failed: m.error } : x)) }) }));
         if (['automod_blocked', 'timed_out', 'slow_down', 'message_too_long'].includes(m.error)) toast(errorText(m.error)); // (the server's rules: say why)
-      } else if (!['chat_typing', 'chat_presence', 'chat_read'].includes(m.request)) toast(inst !== VELORA && m.error === 'insufficient_scope' ? errorText('inst_scope') : errorText(m.error));
+      } else if (!['chat_typing', 'chat_presence', 'chat_read'].includes(m.request)) toast(inst !== NOOKARA && m.error === 'insufficient_scope' ? errorText('inst_scope') : errorText(m.error));
       break;
     }
     case 'chat_typing': typingFrom(`c:${m.channel}`, m.bridged?.name ? noteBridgedTyper(m.bridged) : m.username, m.typing, inst); break;
@@ -689,42 +691,42 @@ function onEvent(m, inst = VELORA) {
       break;
     case 'chat_perms_changed': // someone changed my roles there
       if (state.commands[m.server]) loadCommands(m.server);
-      refreshServer(m.server); if (inst === VELORA) { loadServers(); loadMembers(m.server); } else loadInstanceData(inst); // (Manage users changes what the member list shows)
+      refreshServer(m.server); if (inst === NOOKARA) { loadServers(); loadMembers(m.server); } else loadInstanceData(inst); // (Manage users changes what the member list shows)
       break;
     case 'chat_members_stale':
       loadMembers(m.server);
       break;
     case 'chat_presence': // someone on an Ember server (a bot, or a person on servers with member_presence) connected / left it. Matched by server (instance-namespaced) + principal id
-      if (inst === VELORA || (m.presence !== 'online' && m.presence !== 'offline') || m.user_id == null) break;
+      if (inst === NOOKARA || (m.presence !== 'online' && m.presence !== 'offline') || m.user_id == null) break;
       set(s => ({
         members: upd(s.members, m.server, list => (list ? list.map(x => (String(x.id) === String(m.user_id) ? { ...x, presence: m.presence } : x)) : list)),
         commands: s.commands[m.server] ? { ...s.commands, [m.server]: { ...s.commands[m.server], bots: s.commands[m.server].bots.map(b => (String(b.id) === String(m.user_id) ? { ...b, online: m.presence === 'online' } : b)) } } : s.commands,
       }));
       break;
     case 'instance_wake': // (from Nookara) a server that's asleep here has something new: unread on the rail
-      if (inst === VELORA && m.instance) instanceWoke(m.instance);
+      if (inst === NOOKARA && m.instance) instanceWoke(m.instance);
       break;
     case 'chat_server_removed':
       forgetServerCache(m.server);
       set(s => ({ servers: s.servers.filter(x => x.sid !== m.server), detail: Object.fromEntries(Object.entries(s.detail).filter(([k]) => k !== m.server)) }));
       if (state.view.sid === m.server) { go({ kind: 'home' }); toast(m.reason === 'deleted' ? 'That server was deleted.' : m.reason === 'left' ? 'You left the server.' : `You were ${m.reason === 'banned' ? 'banned' : 'removed'} from that server.`); }
-      if (inst !== VELORA) forgetIfEmpty(inst); // (an Ember server you're no longer in leaves the list, so it doesn't come back on reconnect)
+      if (inst !== NOOKARA) forgetIfEmpty(inst); // (an Ember server you're no longer in leaves the list, so it doesn't come back on reconnect)
       break;
     case 'chat_member_update':
-      if (inst !== VELORA && state.commands[m.server] && String(m.user_id || '').startsWith('b:')) loadCommands(m.server);
+      if (inst !== NOOKARA && state.commands[m.server] && String(m.user_id || '').startsWith('b:')) loadCommands(m.server);
       set(s => ({
         servers: s.servers.map(x => (x.sid === m.server ? { ...x, member_count: m.member_count } : x)),
         members: upd(s.members, m.server, list => {
           if (!list) return list;
           const rest = list.filter(x => m.member?.id != null ? String(x.id) !== String(m.member.id) : m.user_id != null ? String(x.id) !== String(m.user_id) : x.username !== m.username);
           const old = list.find(x => !rest.includes(x));
-          const nu = inst === VELORA || !m.member ? m.member : { ...m.member, inst, joined_at: m.member.joined_at ?? old?.joined_at ?? (m.change === 'joined' ? Date.now() : undefined) };
+          const nu = inst === NOOKARA || !m.member ? m.member : { ...m.member, inst, joined_at: m.member.joined_at ?? old?.joined_at ?? (m.change === 'joined' ? Date.now() : undefined) };
           return m.change === 'joined' || m.change === 'role' ? [...rest, nu] : rest;
         }),
       }));
-      if (m.member && inst !== VELORA && 'nick' in m.member) set(s => applyNick(s, m.member, (s.detail[m.server]?.channels || []).map(c => c.cid))); // (a server nickname: the names on loaded messages too)
-      if (m.member && inst === VELORA) remember([m.member]);
-      else if (m.member) wantVeloraFaces([m.member]);
+      if (m.member && inst !== NOOKARA && 'nick' in m.member) set(s => applyNick(s, m.member, (s.detail[m.server]?.channels || []).map(c => c.cid))); // (a server nickname: the names on loaded messages too)
+      if (m.member && inst === NOOKARA) remember([m.member]);
+      else if (m.member) wantNookaraFaces([m.member]);
       break;
     case 'presence_update':
       set(s => ({ presence: { ...s.presence, [m.username]: localizePresence(m.presence) } }));
@@ -813,7 +815,7 @@ function onEvent(m, inst = VELORA) {
     // read on another device (desktop app, phone, another tab): the red counts here go too
     case 'im_read_sync': if (m.with) { const u = String(m.with).toLowerCase(); set(s => ({ dms: s.dms.map(c => (c.username.toLowerCase() === u ? { ...c, unread: 0 } : c)), unread: { ...s.unread, [`d:${u}`]: false } })); } break;
     case 'chat_read_sync': if (m.cid && m.sid) { clearMentions(m.sid, [m.cid]); channelSeen(m.sid, m.cid, m.id); } break;
-    case 'kicked': if (isWebBonfire()) authLost(); else location.href = '/login'; break;
+    case 'kicked': if (isWebEmber()) authLost(); else location.href = '/login'; break;
     default: break;
   }
 }
@@ -833,7 +835,7 @@ function addMessage(key, msg) {
     if (p >= 0) { sentOk(list[p].nonce); list = list.map((x, i) => (i === p ? msg : x)); } else list = [...list, msg];
     set(s => ({ msgs: { ...s.msgs, [key]: { ...b, list: ordered(list) } } }));
   }
-  if (msg.author) typingFrom(key, msg.author.bridge ? bridgedToken(msg.author.bridge, msg.author.username) : msg.author.username, false, msg.inst || VELORA);
+  if (msg.author) typingFrom(key, msg.author.bridge ? bridgedToken(msg.author.bridge, msg.author.username) : msg.author.username, false, msg.inst || NOOKARA);
   // The conversation only counts as "open" when Ember itself has focus.
   // A new message in the visible-but-inactive window should still notify.
   const open = keyOf(state.view) === key && pageFocused();
@@ -882,7 +884,7 @@ function channelSeen(sid, cid, lastId) {
 }
 // the window came back into focus on a conversation: whatever came in while it was in the background is read now
 function markViewRead() {
-  noteBonfireActivity();
+  noteEmberActivity();
   const v = state.view;
   const key = keyOf(v);
   const wasUnread = !!state.unread[key];
@@ -920,7 +922,7 @@ export function unreadTotals(s = state) {
 // is this message for me? @me, a reply to my message, @everyone / @here, or one of my roles
 export function mentionsMe(msg) {
   const inst = msg.inst || instOf(msg.channel || '');
-  const me = (inst === VELORA ? state.me : connections.get(inst)?.user)?.username;
+  const me = (inst === NOOKARA ? state.me : connections.get(inst)?.user)?.username;
   const myId = myIdOn(inst);
   if (!me || isMine(msg)) return false;
   if (msg.reply?.author?.username === me) return true;
@@ -993,7 +995,7 @@ function noteBridgedTyper(b) {
   return token;
 }
 const typingTimers = {};
-function typingFrom(key, username, on = true, inst = VELORA) {
+function typingFrom(key, username, on = true, inst = NOOKARA) {
   if (!username || username === meOn(inst)?.username) return;
   const t = { ...(state.typing[key] || {}) };
   if (on === false) delete t[username]; else t[username] = Date.now() + 7000;
@@ -1102,23 +1104,23 @@ export async function loadMessages(v, { older = false } = {}) {
   }
 }
 // after a reconnect: what came in while we were gone (inst: which socket it was)
-export async function catchUp(inst = VELORA) {
+export async function catchUp(inst = NOOKARA) {
   restoreOutbox(); // (once: the first socket that's up)
   flushOutbox(inst);
-  if (inst === VELORA) recheckSleepers(); // (a wake ping may have been missed while Nookara's socket was down)
+  if (inst === NOOKARA) recheckSleepers(); // (a wake ping may have been missed while Nookara's socket was down)
   // the open server was showing its kept channel list: the real one, and its members, now that it's connected
   const cv = state.view;
-  if (cv.kind === 'channel' && (isInst(cv.sid) ? instOf(cv.sid) === inst : inst === VELORA) && state.detail[cv.sid]?.cached) {
+  if (cv.kind === 'channel' && (isInst(cv.sid) ? instOf(cv.sid) === inst : inst === NOOKARA) && state.detail[cv.sid]?.cached) {
     wakeServer(cv.sid).then(d => { if (d && keyOf(state.view) === keyOf(cv)) open(state.view); });
   }
   // bot slash commands of this socket's servers (bots may have changed them while it was down / asleep), and the open one's
-  if (inst !== VELORA) {
+  if (inst !== NOOKARA) {
     const want = new Set(Object.keys(state.commands).filter(sid => isInst(sid) && instOf(sid) === inst));
     if (cv.kind === 'channel' && isInst(cv.sid) && instOf(cv.sid) === inst) want.add(cv.sid);
     for (const sid of want) loadCommands(sid, cv.kind === 'channel' && cv.sid === sid ? cv.cid : undefined);
   }
   const mine = key => instOf(key.slice(2)) === inst;
-  if (inst === VELORA) {
+  if (inst === NOOKARA) {
     // A rename may have happened while this socket was offline. Refresh the IDs
     // already present in cached channel history, including members who have left.
     const identityIds = new Set();
@@ -1135,7 +1137,7 @@ export async function catchUp(inst = VELORA) {
     }
   }
   for (const [key, b] of Object.entries(state.msgs)) {
-    if (!key.startsWith('c:')) { if (inst === VELORA && b.loaded) set(s => ({ msgs: { ...s.msgs, [key]: { ...b, loaded: false } } })); continue; }
+    if (!key.startsWith('c:')) { if (inst === NOOKARA && b.loaded) set(s => ({ msgs: { ...s.msgs, [key]: { ...b, loaded: false } } })); continue; }
     if (b.error && mine(key)) { set(s => ({ msgs: { ...s.msgs, [key]: { ...b, loaded: false, error: undefined } } })); continue; } // (it couldn't load while offline: again now)
     if (!mine(key)) continue;
     if (!b.loaded) continue;
@@ -1144,22 +1146,22 @@ export async function catchUp(inst = VELORA) {
     apiFetch(`/chat/channels/${key.slice(2)}/messages?after=${last.id}&limit=100`).then(d => d.messages.forEach(m => addMessage(key, m))).catch(() => {});
   }
   const v = state.view;
-  if (v.kind !== 'home' && (v.kind !== 'channel' ? inst === VELORA : instOf(v.cid) === inst)) loadMessages(v);
-  if (inst !== VELORA) return;
+  if (v.kind !== 'home' && (v.kind !== 'channel' ? inst === NOOKARA : instOf(v.cid) === inst)) loadMessages(v);
+  if (inst !== NOOKARA) return;
   loadServers();
   // presence for the people on your home page (asked before the socket was ready, or stale after a reconnect)
   const names = new Set([...state.friends.map(f => f.friend_username), ...state.dms.map(c => c.username).filter(n => n !== 'System')]);
   [...names].slice(0, 150).forEach(username => send({ type: 'chat_presence', username }));
 }
 
-// an attachment as a link (DMs / group chats are plain text). Files in Velora account storage (and old catbox ones) keep
+// an attachment as a link (DMs / group chats are plain text). Files in Nookara account storage (and old catbox ones) keep
 // their real name as #n=<name>; a temporary-storage link (/t/<id>/<name>) already carries it in the path.
 // my own accent colour is known right now: put it in the face cache an instance reads names through, so a message that is still
-// sending shows the accent straight away (not the role colour until my Velora face loads, then a flip)
+// sending shows the accent straight away (not the role colour until my Nookara face loads, then a flip)
 function seedMyFace(instUser) {
-  if (!instUser?.velora_id || !state.me) return;
-  const fid = String(instUser.velora_id), f = state.veloraFaces[fid];
-  if (!f || f.miss) set(s => ({ veloraFaces: { ...s.veloraFaces, [fid]: { id: fid, username: state.me.username, pfp: state.me.pfp || null, color: state.me.color || null, rank: state.me.rank } } }));
+  if (!nookaraId(instUser) || !state.me) return;
+  const fid = String(nookaraId(instUser)), f = state.nookaraFaces[fid];
+  if (!f || f.miss) set(s => ({ nookaraFaces: { ...s.nookaraFaces, [fid]: { id: fid, username: state.me.username, pfp: state.me.pfp || null, color: state.me.color || null, rank: state.me.rank } } }));
 }
 // ── messages sent while offline: they stay (greyed) and keep trying, then go red with Try again / Delete. Kept on this device
 // (per account) until they go, so a reload doesn't lose them. Files still uploading aren't kept: only ones already uploaded.
@@ -1172,16 +1174,16 @@ const slimReply = r => (r ? { id: r.id, imId: r.imId, gid: r.gid, alias: r.alias
 function saveOutbox() {
   try { if (outbox.size) localStorage.setItem(OUTBOX(), JSON.stringify([...outbox.values()])); else localStorage.removeItem(OUTBOX()); } catch { /* storage full / private mode */ }
 }
-const outboxInst = item => (item.v.kind === 'channel' ? instOf(item.v.cid) : VELORA);
+const outboxInst = item => (item.v.kind === 'channel' ? instOf(item.v.cid) : NOOKARA);
 function showQueued(item) {
   const key = keyOf(item.v);
   const look = { pending: true, queued: !item.failed, inflight: !!item.sending, failed: item.failed ? 'offline' : undefined };
   set(s => ({ msgs: upd(s.msgs, key, b => {
     const list = b?.list || [];
     if (list.some(x => x.nonce === item.nonce)) return { ...b, list: list.map(x => (x.nonce === item.nonce ? { ...x, ...look } : x)) };
-    const inst = outboxInst(item), me = inst === VELORA ? state.me : connections.get(inst)?.user || state.me;
+    const inst = outboxInst(item), me = inst === NOOKARA ? state.me : connections.get(inst)?.user || state.me;
     const temp = { id: item.nonce, nonce: item.nonce, ...look, body: item.text, wire: item.v.kind !== 'channel' ? wireText(item.text, item.attachments) : undefined, attachments: item.attachments || [], system: false,
-      ...(inst !== VELORA ? { inst } : {}), author: { ...(me?.id ? { id: me.id } : {}), username: me?.username, pfp: me?.pfp, color: me?.color, rank: me?.rank, ...(me?.velora_id ? { kind: me.kind || 'velora', velora_id: me.velora_id } : {}) },
+      ...(inst !== NOOKARA ? { inst } : {}), author: { ...(me?.id ? { id: me.id } : {}), username: me?.username, pfp: me?.pfp, color: me?.color, rank: me?.rank, ...(nookaraId(me) ? { kind: me.kind || NOOKARA_WIRE, [NOOKARA_ID_FIELD]: nookaraId(me) } : {}) },
       created_at: item.at, reply: item.replyTo };
     return { list: [], hasMore: false, ...(b || {}), list: [...list, temp] };
   }) }));
@@ -1283,13 +1285,13 @@ export function sendMessage(v, text, { replyTo, attachments, uploads, noStatusRe
   }
   const instUser = v.kind === 'channel' && isInst(v.cid) ? connections.get(instOf(v.cid))?.user : null;
   const me = instUser || state.me; // an instance knows me by its own account
-  // on an instance the pending copy carries the same author data (id / kind / velora_id) and inst as the real message will, so
+  // on an instance the pending copy carries the same author data (id / kind / nookara_id) and inst as the real message will, so
   // the picture and name colour resolve exactly the same way before and after the ack (no flash)
   seedMyFace(instUser);
   const temp = {
     id: n, nonce: n, pending: true, body: text, wire: v.kind !== 'channel' ? wireText(text, attachments) : undefined, attachments: attachments || [], system: false,
-    ...(instUser ? { inst: instOf(v.cid), unsigned: !!instUser.velora_id && !signingInfo(v.sid).can } : {}),
-    author: instUser ? { id: instUser.id, username: me.username, pfp: me.pfp, color: instUser.velora_id ? (state.me?.color || me.color) : me.color, rank: me.rank, kind: instUser.kind || (instUser.velora_id ? 'velora' : 'local'), velora_id: instUser.velora_id } : { username: me.username, pfp: me.pfp, color: me.color, rank: me.rank }, created_at: retry?.at || Date.now(),
+    ...(instUser ? { inst: instOf(v.cid), unsigned: !!nookaraId(instUser) && !signingInfo(v.sid).can } : {}),
+    author: instUser ? { id: instUser.id, username: me.username, pfp: me.pfp, color: nookaraId(instUser) ? (state.me?.color || me.color) : me.color, rank: me.rank, kind: instUser.kind || (nookaraId(instUser) ? NOOKARA_WIRE : 'local'), [NOOKARA_ID_FIELD]: nookaraId(instUser) } : { username: me.username, pfp: me.pfp, color: me.color, rank: me.rank }, created_at: retry?.at || Date.now(),
     reply: replyTo ? { id: replyTo.id, author: replyTo.author, alias: replyTo.alias || null, body: String(replyTo.body || '').slice(0, 200) } : null,
     ...(retry ? { queued: true, inflight: true } : {}), // (going again: it stays on screen, greyed, until it's in)
   };
@@ -1309,7 +1311,7 @@ export function sendMessage(v, text, { replyTo, attachments, uploads, noStatusRe
       .catch(e => { if (isNetworkError(e) && queueOffline(n)) return; set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? { ...x, failed: e.message } : x)) }) })); });
     return n;
   }
-  if (v.kind === 'modmail') { // staff writing as Velora Administrator
+  if (v.kind === 'modmail') { // staff writing as Nookara Administrator
     apiFetch(`/chat/modmail/with/${encodeURIComponent(v.username)}`, { method: 'POST', body: JSON.stringify({ body: text }) })
       .then(d => set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: ordered(b.list.map(x => (x.nonce === n ? mmToMsg(d.message) : x))) }) })))
       .catch(e => set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? { ...x, failed: e.message } : x)) }) })));
@@ -1324,7 +1326,7 @@ export function sendMessage(v, text, { replyTo, attachments, uploads, noStatusRe
         attachments = await prepareAttachments(v, attachments || []);
         let signature;
         if (info.can) {
-          try { signature = await signMessage({ instance: instOf(v.sid), community: bare(v.sid), channel: bare(v.cid), author: connections.get(instOf(v.sid)).user.velora_id, body: normBody(text), attachments: attachmentRefs(attachments), reply_to: replyTo?.id ?? null, edit_of: null }, connections.get(instOf(v.sid)).info); }
+          try { signature = await signMessage({ instance: instOf(v.sid), community: bare(v.sid), channel: bare(v.cid), author: nookaraId(connections.get(instOf(v.sid)).user), body: normBody(text), attachments: attachmentRefs(attachments), reply_to: replyTo?.id ?? null, edit_of: null }, connections.get(instOf(v.sid)).info); }
           catch { if (!(await askSendUnsigned())) throw new Error('sign_failed'); }
         }
         if (signature) signedSends.set(n, () => frame(undefined));
@@ -1418,7 +1420,7 @@ E2EE.onChange(st => {
     if (state.view?.kind === 'dm') loadMessages(state.view);
     loadDMs();
     showHeld();
-    flushOutbox(VELORA); // (queued DMs waited for the keys)
+    flushOutbox(NOOKARA); // (queued DMs waited for the keys)
   }
   if (st === 'none' || st === 'locked') { // says so once a visit, and "Later" is always there
     let seen = true; try { seen = !!sessionStorage.getItem('ember.e2eeAsked'); sessionStorage.setItem('ember.e2eeAsked', '1'); } catch { /* private mode: ask each load */ seen = false; }
@@ -1457,7 +1459,7 @@ function sendAfterUpload(v, text, { replyTo, attachments = [], uploads }) {
   const temp = {
     id: n, nonce: n, pending: true, uploading: { sent: 0, total }, uploads, ready: attachments, body: text, attachments: [...attachments, ...previews], system: false,
     ...(instUser ? { inst: instOf(v.cid) } : {}),
-    author: instUser ? { id: instUser.id, username: me.username, pfp: me.pfp, color: instUser.velora_id ? (state.me?.color || me.color) : me.color, rank: me.rank, kind: instUser.kind || (instUser.velora_id ? 'velora' : 'local'), velora_id: instUser.velora_id } : { username: me.username, pfp: me.pfp, color: me.color, rank: me.rank }, created_at: Date.now(),
+    author: instUser ? { id: instUser.id, username: me.username, pfp: me.pfp, color: nookaraId(instUser) ? (state.me?.color || me.color) : me.color, rank: me.rank, kind: instUser.kind || (nookaraId(instUser) ? NOOKARA_WIRE : 'local'), [NOOKARA_ID_FIELD]: nookaraId(instUser) } : { username: me.username, pfp: me.pfp, color: me.color, rank: me.rank }, created_at: Date.now(),
     reply: replyTo ? { id: replyTo.id, author: replyTo.author, alias: replyTo.alias || null, body: String(replyTo.body || '').slice(0, 200) } : null, replyTo,
   };
   const patch = f => set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? f(x) : x)) }) }));
@@ -1472,7 +1474,7 @@ function sendAfterUpload(v, text, { replyTo, attachments = [], uploads }) {
       const file = u.spoiler ? new File([u.file], spoilerName(u.file.name, true), { type: u.file.type }) : u.file;
       const a = await uploadAttachment(v, file, {
         dest: u.dest,
-        expires: u.expires, // a Velora Pro member's picked expiry (days or 'max'), temporary storage only
+        expires: u.expires, // a Nookara Pro member's picked expiry (days or 'max'), temporary storage only
         signal: ctrl.signal,
         onProgress: sent => {
           const pct = Math.floor(((before + Math.min(sent, u.file.size)) / total) * 100);
@@ -1512,12 +1514,12 @@ export const askSendUnsigned = (edit = false) => ask({
   text: `Signing shows people it really came from your Nookara account, and it didn't work this time. You can ${edit ? 'save it' : 'send it'} without a signature, but people here will see it marked as unsigned.`,
   confirm: edit ? 'Save unsigned' : 'Send unsigned',
 }).then(Boolean);
-// can this device sign in that community? (instances in Velora mode: signing is always allowed there, never required)
+// can this device sign in that community? (instances in Nookara mode: signing is always allowed there, never required)
 export function signingInfo(sid) {
   const inst = instOf(sid || '');
-  const c = inst === VELORA ? null : connections.get(inst);
-  const allow = c?.info?.accounts_mode === 'velora';
-  return { allow, can: allow && canSign() && !!c.user?.velora_id };
+  const c = inst === NOOKARA ? null : connections.get(inst);
+  const allow = isNookara(c?.info?.accounts_mode);
+  return { allow, can: allow && canSign() && !!nookaraId(c.user) };
 }
 // a conversation's pin list changed: an open panel loads it again (a channel by its cid, a DM by d:<name>, a group by g:<room>)
 function bumpPins(key) { set(s => ({ pinsVersion: { ...s.pinsVersion, [key]: (s.pinsVersion[key] || 0) + 1 } })); }
@@ -1539,14 +1541,14 @@ export async function editMessage(id, text, m) {
     await apiFetch(`/im/${String(id).slice(2)}/edit`, { method: 'PATCH', body: JSON.stringify({ enc }) });
     return;
   }
-  const inst = m?.channel ? instOf(m.channel) : VELORA;
+  const inst = m?.channel ? instOf(m.channel) : NOOKARA;
   let signature;
   const info = m?.channel ? signingInfo(m.server) : null;
   if (info?.can) {
-    try { signature = await signMessage({ instance: inst, community: bare(m.server), channel: bare(m.channel), author: connections.get(inst).user.velora_id, body: normBody(text), attachments: attachmentRefs(m.attachments || []), reply_to: m.reply_to ?? m.reply?.id ?? null, edit_of: id, sticker: m.sticker?.tid ?? null }, connections.get(inst).info); }
+    try { signature = await signMessage({ instance: inst, community: bare(m.server), channel: bare(m.channel), author: nookaraId(connections.get(inst).user), body: normBody(text), attachments: attachmentRefs(m.attachments || []), reply_to: m.reply_to ?? m.reply?.id ?? null, edit_of: id, sticker: m.sticker?.tid ?? null }, connections.get(inst).info); }
     catch { if (!(await askSendUnsigned(true))) throw new Error('sign_failed'); }
   }
-  const patch = sig => apiFetch(`/chat/messages/${id}`, { method: 'PATCH', body: JSON.stringify({ message: text, signature: sig }), inst: inst === VELORA ? undefined : inst });
+  const patch = sig => apiFetch(`/chat/messages/${id}`, { method: 'PATCH', body: JSON.stringify({ message: text, signature: sig }), inst: inst === NOOKARA ? undefined : inst });
   try { await patch(signature); } catch (e) {
     if (!signature || !SIGN_REFUSED.has(e.message)) throw e;
     refreshSigningKey();
@@ -1575,7 +1577,7 @@ function dropGroupMessage(room, gid) {
   const id = `g${gid}`;
   set(s => ({ msgs: upd(s.msgs, `g:${room}`, b => b && { ...b, list: b.list.filter(x => x.id !== id).map(x => (x.reply?.id === id ? { ...x, reply: null } : x)) }) }));
 }
-// a picture / video / audio file -> your Velora storage (it shows up in Saved Media too)
+// a picture / video / audio file -> your Nookara storage (it shows up in Saved Media too)
 export async function uploadMedia(file) {
   if (file.size > PIECES_OVER) { const d = await uploadInPieces('account', file); if (state.savedMedia) loadMedia(); return d.attachment; } // (same storage: Saved Media)
   const fd = new FormData();
@@ -1585,7 +1587,7 @@ export async function uploadMedia(file) {
   return d.attachment;
 }
 export const upload = uploadMedia;
-// the real upload limits (MB), asked from Velora once: a file sent in a conversation / a file kept on your Velora account
+// the real upload limits (MB), asked from Nookara once: a file sent in a conversation / a file kept on your Nookara account
 let uploadLimits = { server_mb: 200, saved_mb: 100 };
 let limitsAsked = null;
 export const getUploadLimits = () => uploadLimits;
@@ -1594,7 +1596,7 @@ export function loadUploadLimits() {
     .then(d => { if (d?.server_mb) uploadLimits = { server_mb: d.server_mb, saved_mb: d.saved_mb || uploadLimits.saved_mb }; return uploadLimits; })
     .catch(() => { limitsAsked = null; return uploadLimits; }));
 }
-// files straight into Saved Media (your Velora storage), not into a message
+// files straight into Saved Media (your Nookara storage), not into a message
 export async function saveFilesToMedia(files) {
   const cap = uploadLimits.saved_mb;
   let n = 0;
@@ -1605,7 +1607,7 @@ export async function saveFilesToMedia(files) {
   if (n) { toast(n === 1 ? 'Saved to Saved Media.' : `Saved ${n} files to Saved Media.`, true); loadMedia(); }
   return n;
 }
-// any picture / GIF / video / sound in a message -> Saved Media (Klipy GIFs as a link, Velora files as your own copy)
+// any picture / GIF / video / sound in a message -> Saved Media (Klipy GIFs as a link, Nookara files as your own copy)
 const SAVE_ERR = { cant_save_that: "That can't be saved - only pictures, videos and sounds sent in Ember can.", storage_limit_exceeded: "That doesn't fit in your Nookara storage." };
 export async function saveToMedia(url, name) {
   try {
@@ -1618,12 +1620,12 @@ export async function saveToMedia(url, name) {
     loadMedia();
   } catch (e) { toast(SAVE_ERR[e.message] || errorText(e.message)); }
 }
-// A file sent in a DM / group chat (anything not on an Ember instance) goes to one of two places on Velora:
-//   'temp'    Velora's temporary storage (/t/<id>/<name>): free, deleted on a fixed date (opening it never moves it)
-//   'account' your Velora account storage: counts toward your storage, stays until you delete it
+// A file sent in a DM / group chat (anything not on an Ember instance) goes to one of two places on Nookara:
+//   'temp'    Nookara's temporary storage (/t/<id>/<name>): free, deleted on a fixed date (opening it never moves it)
+//   'account' your Nookara account storage: counts toward your storage, stays until you delete it
 // (pictures / videos / sounds show inline, the rest is a download card). Which one: the chat setting dm_upload_dest
 // ('ask' | 'account' | 'temp', synced to the account) with a copy in localStorage, or the picker below when it's 'ask'.
-// opts.expires: a picked expiry (days, or 'max') - Velora Pro only, the server refuses it otherwise (pro_required).
+// opts.expires: a picked expiry (days, or 'max') - Nookara Pro only, the server refuses it otherwise (pro_required).
 // Every file's date is fixed when it is sent and opening it never moves it. Left out = the normal lifetime for the file.
 export async function uploadTemp(file, opts = {}) {
   if (file.size > PIECES_OVER) return (await uploadInPieces('temp', file, opts)).attachment; // (too big for one request through Cloudflare)
@@ -1725,7 +1727,7 @@ async function prepareAttachments(v, attachments) {
       method: 'POST', body: JSON.stringify({ url: a.url, name: a.name || 'attachment' }),
     }));
 }
-// a file for the conversation you're in: an instance community keeps it on that instance (and hashes it for signing), the rest goes through Velora
+// a file for the conversation you're in: an instance community keeps it on that instance (and hashes it for signing), the rest goes through Nookara
 // opts: { onProgress(sent, total), signal }
 export async function uploadAttachment(v, file, opts = {}) {
   if (v.kind === 'channel' && isInst(v.sid)) {
@@ -1744,7 +1746,7 @@ export async function uploadAttachment(v, file, opts = {}) {
   }
   return dest === 'account' ? uploadAccount(file, opts) : uploadTemp(file, opts);
 }
-// custom emojis of my Velora servers + every instance's (each listed under its own namespaced sid). A server that isn't connected
+// custom emojis of my Nookara servers + every instance's (each listed under its own namespaced sid). A server that isn't connected
 // right now (asleep, disconnected, still connecting) keeps the list it had last time, also kept on this device, so its emojis can
 // still be picked and sent from anywhere. Only a server you're not in any more (instances.js drops it) loses them.
 const EMOJI_CACHE = () => acctKey('ember_emoji_cache');
@@ -1799,7 +1801,7 @@ export async function deleteMedia(m) {
 export async function loadServers() {
   const d = await apiFetch('/chat/servers').catch(() => null);
   // a fresh count for a server whose channels aren't loaded already has what came in live
-  if (d) set(s => ({ servers: [...d.servers.map(x => ({ ...x, inst: VELORA })), ...s.servers.filter(x => x.inst && x.inst !== VELORA)], unreadN: Object.fromEntries(Object.entries(s.unreadN).filter(([, u]) => s.detail[u.sid] || !d.servers.some(x => x.sid === u.sid))) }));
+  if (d) set(s => ({ servers: [...d.servers.map(x => ({ ...x, inst: NOOKARA })), ...s.servers.filter(x => x.inst && x.inst !== NOOKARA)], unreadN: Object.fromEntries(Object.entries(s.unreadN).filter(([, u]) => s.detail[u.sid] || !d.servers.some(x => x.sid === u.sid))) }));
   return d?.servers || [];
 }
 // my communities on one instance (or everywhere): after joining / creating one
@@ -1916,15 +1918,15 @@ export async function refreshServer(sid) {
 export async function loadMembers(sid) {
   const d = await apiFetch(`/chat/servers/${sid}/members`).catch(() => null);
   if (!d) return;
-  if (isInst(sid)) { // instances don't relay presence: Velora accounts' status comes from the home socket, the rest has none
+  if (isInst(sid)) { // instances don't relay presence: Nookara accounts' status comes from the home socket, the rest has none
     d.members = d.members.map(m => ({ ...m, inst: instOf(sid) }));
     set(s => ({ members: { ...s.members, [sid]: d.members } }));
-    wantVeloraFaces(d.members);
+    wantNookaraFaces(d.members);
     if (!state.signedIn) return;
-    const ids = [...new Set(d.members.filter(m => m.kind === 'velora' && /^[1-9]\d*$/.test(String(m.velora_id))).map(m => String(m.velora_id)))].slice(0, 200);
+    const ids = [...new Set(d.members.filter(m => isNookara(m.kind) && /^[1-9]\d*$/.test(String(nookaraId(m)))).map(m => String(nookaraId(m))))].slice(0, 200);
     const names = await apiFetch(`/chat/identities?ids=${ids.join(',')}`).then(r => Object.fromEntries(r.users.map(u => [String(u.id), u.username]))).catch(() => ({})); // their name now (the instance knows the one from their last login)
-    if (Object.keys(names).length) set(s => ({ veloraNames: { ...s.veloraNames, ...names } }));
-    watchPresence(d.members.filter(m => m.kind === 'velora').slice(0, 400).map(m => names[m.velora_id] || m.username));
+    if (Object.keys(names).length) set(s => ({ nookaraNames: { ...s.nookaraNames, ...names } }));
+    watchPresence(d.members.filter(m => isNookara(m.kind)).slice(0, 400).map(m => names[nookaraId(m)] || m.username));
     return;
   }
   remember(d.members);
@@ -1933,7 +1935,7 @@ export async function loadMembers(sid) {
   if (d.next_offset != null) watchPresence(d.members.map(m => m.username)); // a big server: its members' presence isn't pushed to everyone
 }
 const pagedMore = (all, sid, d) => { const next = { ...all }; if (d.next_offset != null) next[sid] = d.next_offset; else delete next[sid]; return next; };
-// a big Velora-hosted server answers its member list in pages (Velora chat.js memberList): the next one, as you scroll
+// a big Nookara-hosted server answers its member list in pages (Nookara chat.js memberList): the next one, as you scroll
 const loadingMore = new Set();
 export async function loadMoreMembers(sid) {
   const from = state.membersMore[sid];
@@ -1976,7 +1978,7 @@ export function dismissEphemeral(view, m) {
   apiFetch(`/chat/servers/${view.sid}/interactions/messages/${m.id}`, { method: 'DELETE' }).catch(() => {});
 }
 export const closeInteractionModal = () => set({ interactionModal: null });
-// online / idle / dnd / offline for a member list row; null = this account has no presence (an instance's own accounts and bots, or signed out of Velora)
+// online / idle / dnd / offline for a member list row; null = this account has no presence (an instance's own accounts and bots, or signed out of Nookara)
 // an instance bot's presence ('online' | 'offline', set by the instance from its bot gateway connections); null when the instance doesn't say
 export const botPresenceOf = m => (m?.kind === 'bot' && (m.presence === 'online' || m.presence === 'offline') ? m.presence : null);
 // on an Ember server that says who is connected to it (member `presence` 'online' / 'offline' for people, features.member_presence):
@@ -1987,8 +1989,8 @@ export function statusOf(sid, m, s = state) {
   if (m.kind === 'bot') return botPresenceOf(m);
   const here = hereConnected(m);
   if (here === false) return 'offline';
-  if (m.kind !== 'velora' || !s.signedIn) return here ? 'online' : null;
-  const p = s.presence[s.veloraNames[m.velora_id] || m.username];
+  if (!isNookara(m.kind) || !s.signedIn) return here ? 'online' : null;
+  const p = s.presence[s.nookaraNames[nookaraId(m)] || m.username];
   if (here) return p && p.status !== 'offline' ? p.status : p ? 'offline' : 'online'; // (offline on Nookara while connected here = invisible)
   return p?.status || 'offline';
 }
@@ -1997,12 +1999,12 @@ export const presenceFor = (sid, m, s = state) => {
   if (m.kind === 'bot') return botPresenceOf(m) ? { status: botPresenceOf(m) } : null;
   const here = hereConnected(m);
   if (here === false) return { status: 'offline' };
-  const p = m.kind === 'velora' && s.signedIn ? s.presence[s.veloraNames[m.velora_id] || m.username] : null;
+  const p = isNookara(m.kind) && s.signedIn ? s.presence[s.nookaraNames[nookaraId(m)] || m.username] : null;
   if (here && (!p || p.status === 'offline')) return p ? { status: 'offline' } : { status: 'online' };
   return p || null;
 };
 function loadMembersOf(inst) { Object.keys(state.members).filter(k => instOf(k) === inst).forEach(loadMembers); }
-// the id a member route wants: an instance names people by their principal (v:2), Velora by username
+// the id a member route wants: an instance names people by their principal (v:2), Nookara by username
 export function memberRef(sid, username) {
   if (!isInst(sid)) return encodeURIComponent(username);
   const m = state.members[sid]?.find(x => x.username === username);
@@ -2062,7 +2064,7 @@ export async function loadBlocks() {
   const d = await apiFetch('/account/blocks').catch(() => null);
   if (d?.blocks) set({ blocks: d.blocks });
 }
-// the people I blocked as { ids, names } (names lowercased), built once per loaded list. Velora gives their ids (older servers only names).
+// the people I blocked as { ids, names } (names lowercased), built once per loaded list. Nookara gives their ids (older servers only names).
 const blockSetCache = new WeakMap();
 function blockSets(list) {
   let b = blockSetCache.get(list);
@@ -2073,15 +2075,15 @@ function blockSets(list) {
   return b;
 }
 // Is this person (a message / reply author, a member) somebody I blocked? Only for people I blocked, never the other way round.
-// inst: the instance the person is shown on (falsy / VELORA = Velora's own servers). On an instance only its Velora people count,
-// by their Velora id (a local account or bot there with the same name is somebody else). Webhooks / bridged names never count.
+// inst: the instance the person is shown on (falsy / NOOKARA = Nookara's own servers). On an instance only its Nookara people count,
+// by their Nookara id (a local account or bot there with the same name is somebody else). Webhooks / bridged names never count.
 export function isBlockedPerson(u, inst, s = state) {
   if (!u || !s.blocks?.length || u.webhook || u.bridge) return false;
   const b = blockSets(s.blocks);
-  if (inst && inst !== VELORA) {
-    if (u.kind !== 'velora' || !u.velora_id) return false;
-    const vid = String(u.velora_id);
-    return b.ids.has(vid) || b.names.has(String(s.veloraNames[vid] || '').toLowerCase());
+  if (inst && inst !== NOOKARA) {
+    if (!isNookara(u.kind) || !nookaraId(u)) return false;
+    const vid = String(nookaraId(u));
+    return b.ids.has(vid) || b.names.has(String(s.nookaraNames[vid] || '').toLowerCase());
   }
   if (u.id != null && b.ids.size) return b.ids.has(String(u.id));
   return b.names.has(String(u.username || '').toLowerCase());
@@ -2089,16 +2091,16 @@ export function isBlockedPerson(u, inst, s = state) {
 // the same for a bare name in a server (typing, @mentions): looked up among that server's members, so an instance's names work
 export function isBlockedName(sid, username, s = state) {
   if (!username || !s.blocks?.length) return false;
-  const inst = sid && isInst(sid) ? instOf(sid) : VELORA;
+  const inst = sid && isInst(sid) ? instOf(sid) : NOOKARA;
   const m = sid ? s.members[sid]?.find(x => x.username === username) : null;
   if (m) return isBlockedPerson(m, inst, s);
-  return inst === VELORA && blockSets(s.blocks).names.has(String(username).toLowerCase());
+  return inst === NOOKARA && blockSets(s.blocks).names.has(String(username).toLowerCase());
 }
 export const useBlocked = (u, inst) => useChat(s => isBlockedPerson(u, inst, s));
 // how somebody I blocked is shown in a server: no name, no picture (the default letter one), no colour
 export const BLOCKED_NAME = 'Blocked User';
 export const blockedFace = u => ({ ...u, username: BLOCKED_NAME, pfp: null, pfp_url: null, color: null });
-// Block / unblock a Velora account, asking first; returns true when it went through
+// Block / unblock a Nookara account, asking first; returns true when it went through
 export async function toggleBlock(username, blocked) {
   const ok = await ask(blocked
     ? { title: `Unblock ${username}?`, text: 'They will be able to message you, send you credits and send friend requests again.', confirm: 'Unblock' }
@@ -2114,14 +2116,14 @@ export async function toggleBlock(username, blocked) {
 }
 
 // ── where you are (also in the address: /chat#/s/<sid>/<cid>, #/dm/<name>, #/g/<room>) ──
-// #/s/<sid>/<cid> for Velora's own servers, #/i/<instance>/s/<sid>/<cid> and #/i/<instance>/invite/<code> for instances
+// #/s/<sid>/<cid> for Nookara's own servers, #/i/<instance>/s/<sid>/<cid> and #/i/<instance>/invite/<code> for instances
 export function hashFor(v) {
-  const at = k => { const p = parseK(k); return p.inst === VELORA ? '' : `#/i/${encodeURIComponent(p.inst)}`; };
+  const at = k => { const p = parseK(k); return p.inst === NOOKARA ? '' : `#/i/${encodeURIComponent(p.inst)}`; };
   const mid = v.kind === 'channel' && v.mid ? `/${v.mid}` : ''; // a message link: #/s/<sid>/<cid>/<message id>
   if (v.kind === 'channel') return at(v.sid) ? `${at(v.sid)}/s/${bare(v.sid)}/${bare(v.cid)}${mid}` : `#/s/${v.sid}/${v.cid}${mid}`;
   if (v.kind === 'server') return at(v.sid) ? `${at(v.sid)}/s/${bare(v.sid)}` : `#/s/${v.sid}`;
   if (v.kind === 'instance') return `#/i/${encodeURIComponent(v.inst)}`;
-  if (v.kind === 'invite') return v.inst && v.inst !== VELORA ? `#/i/${encodeURIComponent(v.inst)}/invite/${v.code}` : `#/invite/${v.code}`;
+  if (v.kind === 'invite') return v.inst && v.inst !== NOOKARA ? `#/i/${encodeURIComponent(v.inst)}/invite/${v.code}` : `#/invite/${v.code}`;
   if (v.kind === 'dm') return `#/dm/${encodeURIComponent(v.username)}`;
   if (v.kind === 'group') return `#/g/${v.room}`;
   if (v.kind === 'notes') return '#/notes';
@@ -2193,7 +2195,7 @@ export async function open(v) {
   if (state.signedIn || connections.size) restoreOutbox(); // (unsent messages from before a reload, even while nothing is connected)
   // a message link: open its channel and scroll to the message
   if (v.kind === 'channel' && v.mid) { const { mid, ...at } = v; return jumpToMessage(at, mid); }
-  // Velora-only places (DMs, groups, modmail, Velora's own servers) need the Velora sign-in
+  // Nookara-only places (DMs, groups, modmail, Nookara's own servers) need the Nookara sign-in
   if (!state.signedIn && (['dm', 'group', 'modmail', 'notes'].includes(v.kind) || ((v.kind === 'server' || v.kind === 'channel') && !isInst(v.sid)))) { set({ view: { kind: 'home' } }); return; }
   const io = (v.kind === 'server' || v.kind === 'channel') && isInst(v.sid) ? instOf(v.sid) : v.kind === 'instance' ? v.inst : null;
   if (io) {
@@ -2214,7 +2216,7 @@ export async function open(v) {
     // not connected (yet): the sidebar and channels stay out of it until the instance's socket is up and signed in
     if (v.kind === 'instance' || (c.status !== 'open' && !(passing && detailOrCached(v.sid)))) {
       set({ view: v.kind === 'instance' ? v : { kind: 'instance', inst: io, then: v } });
-      try { localStorage.setItem('velora_chat_last', location.hash); } catch { /* fine */ }
+      try { localStorage.setItem('nookara_chat_last', location.hash); } catch { /* fine */ }
       resumeInstanceView(io);
       return;
     }
@@ -2238,7 +2240,7 @@ export async function open(v) {
   if (HOME_KINDS.has(v.kind)) lastHome = v;
   set(s => ({ view: v, unread: { ...s.unread, [keyOf(v)]: false }, lastCid: v.kind === 'channel' ? { ...s.lastCid, [v.sid]: v.cid } : s.lastCid }));
   if (v.kind === 'channel') rememberChannel(v.sid, v.cid);
-  try { localStorage.setItem('velora_chat_last', location.hash); } catch { /* fine */ }
+  try { localStorage.setItem('nookara_chat_last', location.hash); } catch { /* fine */ }
   if (v.kind === 'channel') {
     const have = detailOrCached(v.sid);
     if (!have) await refreshServer(v.sid);
@@ -2339,11 +2341,11 @@ export function errorText(code) {
     cl_bad_url: 'That CloudLink address needs to start with wss:// (or ws://).', cl_bad_port: 'CloudLink bridges can only use the normal ports (80 / 443).', cl_private_address: "That address is on a private network - Ember can't connect to it.", too_many_cloudlink_bridges: 'A server can have up to 3 CloudLink bridges.', not_a_cloudlink_bridge: "That channel isn't a CloudLink bridge.",
     sign_failed: "Not sent - it couldn't be signed.", bad_signature: "This server turned down the message's signature.",
     voice_unavailable: "Voice isn't set up on this server yet - ask its admins.", voice_cap_reached: 'This server used up its free voice minutes for the month - ask its admins.', sound_too_long: 'Sounds can be up to 5 seconds long.', not_in_voice: 'Join a voice channel first.', too_fast: 'Slow down a little!',
-    velora_required: 'Paid roles need a Nookara account - this account only exists on this server.', payment_unavailable: "This server can't take credit payments right now.", not_subscribed: 'Add this server to your Ember list (signed in with Nookara) to pay for roles.', payee_unavailable: "The server owner can't receive credits right now.", too_many_requests: 'You have too many payments waiting - finish or cancel one first.',
-    youtube_unavailable: "This server can't play YouTube videos.", invalid_token: "That bot token didn't work.", platform_unreachable: "Couldn't reach that platform - try again in a bit.", owner_not_velora: 'The owner has to be a Nookara account for that.', not_owner: "Nookara says you aren't this server's owner.", not_registered: "This server isn't registered with Nookara yet.", invalid_attestation: "That proof didn't check out - try again.", unknown_instance: "Nookara doesn't know this server yet - register it first.", instance_banned: 'Nookara has blocked this server.', not_connected: "That game server isn't connected any more.", bad_signature: "Your message's signature didn't check out - try again.", signing_unavailable: "Signing isn't available on this instance.", uploads_disabled: 'Uploads are turned off in this server.',
+    nookara_required: 'Paid roles need a Nookara account - this account only exists on this server.', payment_unavailable: "This server can't take credit payments right now.", not_subscribed: 'Add this server to your Ember list (signed in with Nookara) to pay for roles.', payee_unavailable: "The server owner can't receive credits right now.", too_many_requests: 'You have too many payments waiting - finish or cancel one first.',
+    youtube_unavailable: "This server can't play YouTube videos.", invalid_token: "That bot token didn't work.", platform_unreachable: "Couldn't reach that platform - try again in a bit.", owner_not_nookara: 'The owner has to be a Nookara account for that.', not_owner: "Nookara says you aren't this server's owner.", not_registered: "This server isn't registered with Nookara yet.", invalid_attestation: "That proof didn't check out - try again.", unknown_instance: "Nookara doesn't know this server yet - register it first.", instance_banned: 'Nookara has blocked this server.', not_connected: "That game server isn't connected any more.", bad_signature: "Your message's signature didn't check out - try again.", signing_unavailable: "Signing isn't available on this instance.", uploads_disabled: 'Uploads are turned off in this server.',
     inst_scope: "This instance login is missing a permission (uploads, voice or signing). Log in to Ember again to approve it.", instance_unreachable: "Couldn't reach that instance.", instance_not_connected: "You're not connected to that instance.", not_an_instance: "That address isn't an Ember instance.", bad_instance_url: "That doesn't look like an address.", invalid_code: "That setup code isn't right.", already_claimed: 'This instance already has an owner.',
-    invalid_credentials: 'Wrong username or password.', invalid_username: 'Usernames are 2-32 letters, numbers, _ or .', invalid_password: 'Passwords are 8-200 characters.', username_taken: 'That username is taken.', registration_closed: 'This instance is closed for new accounts.', velora_unreachable: "The instance couldn't reach Nookara.", wrong_accounts_mode: "That doesn't work in this instance's account mode.", request_not_found: 'That request is gone.', server_full: 'That server is full.', invalid_join_policy: "That isn't a join setting.", invalid_upload_max_mb: 'Upload size must be 1-500 MB.', cannot_remove_owner: "The owner can't be removed.", mixed_instances: "That mixes two instances' servers.", not_on_instances: "That isn't something instances do.", invalid_export: "That isn't an Ember export.", payload_too_large: 'That is too big.', server_not_found: 'That server is gone.', banned: "You're banned from this instance.",
-    console_needs_bonfire: 'Commands can only be run from Ember itself.', bad_purpose: 'Pick what the channel is for.', not_linked: "That server isn't linked any more.", claim_not_found: 'That code is gone - get a new one.',
+    invalid_credentials: 'Wrong username or password.', invalid_username: 'Usernames are 2-32 letters, numbers, _ or .', invalid_password: 'Passwords are 8-200 characters.', username_taken: 'That username is taken.', registration_closed: 'This instance is closed for new accounts.', nookara_unreachable: "The instance couldn't reach Nookara.", wrong_accounts_mode: "That doesn't work in this instance's account mode.", request_not_found: 'That request is gone.', server_full: 'That server is full.', invalid_join_policy: "That isn't a join setting.", invalid_upload_max_mb: 'Upload size must be 1-500 MB.', cannot_remove_owner: "The owner can't be removed.", mixed_instances: "That mixes two instances' servers.", not_on_instances: "That isn't something instances do.", invalid_export: "That isn't an Ember export.", payload_too_large: 'That is too big.', server_not_found: 'That server is gone.', banned: "You're banned from this instance.",
+    console_needs_ember: 'Commands can only be run from Ember itself.', bad_purpose: 'Pick what the channel is for.', not_linked: "That server isn't linked any more.", claim_not_found: 'That code is gone - get a new one.',
     plan_feature: "Not included in this server's plan - upgrade the plan or self-host to get it.", plan_limit: "This server's plan limit is reached - upgrade the plan or self-host for more.", member_cap_reached: "This server is full for its plan.", read_only: 'This server is read-only right now.',
     password_required: 'This server needs a password to join.', wrong_password: "That password isn't right.", invite_only: 'This server only lets people in with an invite link.', not_on_allowlist: "You're not on this server's list of people who can join.", server_full: 'This server is full.',
     bot_offline: "That bot isn't online right now.", unknown_command: "That command isn't available here (any more).", unknown_component: "That button doesn't work any more.", unknown_interaction: 'That form expired - run the command again.',
@@ -2353,14 +2355,14 @@ export function errorText(code) {
     invalid_allowlist: 'Allowlist names are up to 64 letters, numbers, _ . : or -.', invalid_max_members: 'Pick a member limit from 1 up.', invalid_roles: "One of those roles doesn't exist any more.", invalid_max_length: 'Pick a message length from 1 to 4000.', invalid_search_results: 'Pick 1 to 100 search results.', invalid_max_reactions: 'Pick 1 to 50 reactions.',
     invalid_preview_proxy: 'The preview proxy needs an http:// or https:// address.', invalid_words: 'Blocked words are up to 64 characters (1000 at most).', invalid_word_file: 'The word list file has to be inside the server\'s data folder.', invalid_timeout: 'Timeouts are 0 seconds to 28 days.', invalid_spam_limits: "Those spam limits don't look right.",
     invalid_retention: 'Keep entries for 1 to 3650 days.', invalid_uploads_per_minute: 'Pick 1 to 600 uploads a minute.', invalid_files_per_member: 'Pick how many files each member can keep (1 up).', invalid_file_types: 'Pick at least one kind of file.', invalid_expire_days: 'Files expire after 1 to 3650 days.', invalid_plans: 'Plan names are letters, numbers, _ or -.', invalid_storage_mb: 'Pick a storage limit from 1 MB up.', invalid_image_size: "Those picture sizes don't look right.", invalid_jpeg_quality: 'JPEG quality is 1 to 100.', local_admin_required: 'Make a local admin account first, or you could lock yourself out.',
-  })[code] || 'Something went wrong.';
+  })[legacyToNew(code)] || 'Something went wrong.';
 }
 
 export async function loadSettings() {
   const d = await apiFetch('/chat/settings').catch(() => null);
   if (!d) return;
   // the account's upload destination is the real one; this device's copy follows it (it only counts while the account
-  // can't say, e.g. before the settings load or on a Velora that doesn't have the setting)
+  // can't say, e.g. before the settings load or on a Nookara that doesn't have the setting)
   const dest = d.settings?.dm_upload_dest;
   if (dest !== undefined) { try { if (dest === 'account' || dest === 'temp') localStorage.setItem(DEST_KEY, dest); else localStorage.removeItem(DEST_KEY); } catch { /* private mode */ } }
   set({ settings: d.settings, settingsFromServer: dest !== undefined });
@@ -2396,7 +2398,7 @@ export function openLink(hash) {
   open(readHash());
 }
 
-// ── Velora notifications (the bell next to your name; they replaced the DMs from "System") ──
+// ── Nookara notifications (the bell next to your name; they replaced the DMs from "System") ──
 // GET /account/notifications(?unread=1) + /unread-count, POST /account/notifications/read; live over the home socket as
 // notification_new / notifications_updated. The popup only ever lists unread ones: the full history is /me#notifications.
 const notifKey = id => String(id);
@@ -2464,7 +2466,7 @@ export function followNotifLink(link) {
   if (l.startsWith('/chat#')) { openLink(l.slice(5)); return; }
   const url = notifLinkUrl(l);
   if (!url) return;
-  const d = window.bonfireDesktop;
+  const d = desktopBridge();
   if (d?.openExternal) Promise.resolve(d.openExternal(url)).catch(() => {});
   else window.open(url, '_blank', 'noopener,noreferrer');
 }
@@ -2496,9 +2498,9 @@ function notifPing() {
   if (packActive()) { if (state.settings.sounds) playPackSound('receive'); } else playSound('message');
 }
 
-// Velora's token is no good any more (web Ember): start over signed out, with a note about it
+// Nookara's token is no good any more (web Ember): start over signed out, with a note about it
 export function authLost() {
-  if (!isWebBonfire() || authLost.done) return;
+  if (!isWebEmber() || authLost.done) return;
   authLost.done = true;
   endSession('ended');
 }
@@ -2516,7 +2518,7 @@ function loadAccount() { loadServers(); loadDMs(); loadGroups(); loadFriends(); 
 // auth_success, `restrictions`, a 403 scope_disabled) settles it; an instance's account_restricted locks at once and is
 // then checked with Nookara - if Nookara says it's on, only that server keeps its per-server notice (InstanceGate).
 export const LOCK_BITS = 64 | 128 | 2048;
-const LOCK_KEY = () => acctKey('bonfire_locked');
+const LOCK_KEY = () => acctKey('ember_locked');
 function lockAccount() {
   if (state.locked) return;
   set({ locked: true, error: null, scopePrompt: null, permUpdate: null });
@@ -2546,7 +2548,7 @@ export function applyDisabled(disabled, reason) {
 }
 // an instance said account_restricted / account_restored: lock now (restriction is account-wide), and ask Nookara
 let lockCheck = null;
-const askNookara = () => (lockCheck ||= apiFetch('/bonfire/session').then(d => { if (d?.disabled !== undefined) applyDisabled(d.disabled, d.restriction_reason); }).catch(() => {}).finally(() => { lockCheck = null; }));
+const askNookara = () => (lockCheck ||= apiFetch(`${EMBER_API}/session`).then(d => { if (d?.disabled !== undefined) applyDisabled(d.disabled, d.restriction_reason); }).catch(() => {}).finally(() => { lockCheck = null; }));
 export function instanceRestricted() {
   if (!state.signedIn) return; // (signed out: only that server's own notice)
   lockAccount();
@@ -2554,14 +2556,14 @@ export function instanceRestricted() {
 }
 export function instanceRestored() { if (state.locked) askNookara(); }
 
-// me = null: signed out of Velora (web Ember without a token) - only local-account instances work then
+// me = null: signed out of Nookara (web Ember without a token) - only local-account instances work then
 export function init(me) {
   set({ me, signedIn: !!me });
   if (me) { try { const was = localStorage.getItem(LOCK_KEY()); if (was) { if (LOCK_REASONS.includes(was)) set({ lockReason: was }); lockAccount(); } } catch { /* fine */ } } // (locked last time: no flash of the app before /bonfire/session answers)
-  window.bonfireDesktop?.onSignIn?.(s => set({ reauth: s.state === 'failed' ? { state: 'failed', error: s.error } : { state: 'working' } }));
+  desktopBridge()?.onSignIn?.(s => set({ reauth: s.state === 'failed' ? { state: 'failed', error: s.error } : { state: 'working' } }));
   if (me) { checkPermissions(); loadSettings(); loadNotify(); loadEmojis(); loadPersonalEmojis(); connect(); }
-  window.bonfireDesktop?.isFocused?.().then(v => { desktopFocused = !!v; }).catch(() => {});
-  window.bonfireDesktop?.onWindowFocus?.(v => { desktopFocused = v; if (v) markViewRead(); });
+  desktopBridge()?.isFocused?.().then(v => { desktopFocused = !!v; }).catch(() => {});
+  desktopBridge()?.onWindowFocus?.(v => { desktopFocused = v; if (v) markViewRead(); });
   startInstances(); // (held while locked: nothing connects until it's lifted)
   if (me) setupSigning();
   if (me && !state.locked) loadAccount();
@@ -2583,13 +2585,13 @@ export function init(me) {
   document.addEventListener('visibilitychange', refreshSettings);
   window.addEventListener('focus', refreshSettings);
   // Interaction refreshes the ten-minute active period.  The 30-second rate
-  // limit in noteBonfireActivity makes pointer movement inexpensive.
-  const reportBonfireActivity = () => {
-    if (document.visibilityState === 'visible' && pageFocused()) noteBonfireActivity();
+  // limit in noteEmberActivity makes pointer movement inexpensive.
+  const reportEmberActivity = () => {
+    if (document.visibilityState === 'visible' && pageFocused()) noteEmberActivity();
   };
-  ['pointerdown', 'pointermove', 'keydown', 'input', 'wheel', 'touchstart'].forEach(type => window.addEventListener(type, reportBonfireActivity, { passive: true, capture: true }));
-  reportBonfireActivity();
-  window.bonfireDesktop?.onNotificationAction?.(action => {
+  ['pointerdown', 'pointermove', 'keydown', 'input', 'wheel', 'touchstart'].forEach(type => window.addEventListener(type, reportEmberActivity, { passive: true, capture: true }));
+  reportEmberActivity();
+  desktopBridge()?.onNotificationAction?.(action => {
     if (!action || !onceDesktopAction(action)) return;
     if (action?.type === 'dm') {
       const username = String(action.to || '');
@@ -2597,18 +2599,18 @@ export function init(me) {
       go({ kind: 'dm', username });
       if (action.action === 'reply' && String(action.text || '').trim()) sendMessage({ kind: 'dm', username }, String(action.text).trim());
     } else if (action?.type === 'call') {
-      dispatchEvent(new CustomEvent('bonfire:notification-action', { detail: action }));
+      dispatchEvent(new CustomEvent(NOTIFICATION_ACTION_EVENT, { detail: action }));
     }
   });
 }
 
-// ── permissions: the apps sign in with a scoped token (Velora's approve-this-app screen) ──
+// ── permissions: the apps sign in with a scoped token (Nookara's approve-this-app screen) ──
 // /bonfire/scopes.json = what Ember asks for (versioned, one list on the server); /bonfire/session = which of those
 // THIS token is missing. Website sessions have everything, so only the apps ever see these prompts.
 //  - permUpdate: "New permission updates" dialog (on start / page load, when a required permission is missing)
 //  - scopePrompt: a feature was refused for a missing permission ("This needs a new permission - log in again")
 let scopeCatalog = null;
-const getCatalog = () => (scopeCatalog ||= fetch('/bonfire/scopes.json', { cache: 'no-store' }).then(r => r.json()).catch(() => ({ scopes: [] })));
+const getCatalog = () => (scopeCatalog ||= fetch(`${EMBER_API}/scopes.json`, { cache: 'no-store' }).then(r => r.json()).catch(() => ({ scopes: [] })));
 let scopeAt = 0;
 function markLack(id, how) {
   if (!id || state.scopeLack?.[id] === how) return;
@@ -2662,17 +2664,17 @@ async function afterReauth() {
   try { prev = localStorage.getItem('bf_prev_token'); localStorage.removeItem('bf_prev_token'); } catch { /* fine */ }
   const cur = getToken();
   if (!prev || !cur || prev === cur) return;
-  try { // the saved-accounts list: the website's velora_saved, or web Ember's own bonfire_saved
-    const key = isWebBonfire() ? 'bonfire_saved' : 'velora_saved';
+  try { // the saved-accounts list: the website's velora_saved, or web Ember's own ember_saved
+    const key = isWebEmber() ? 'ember_saved' : SITE_SAVED;
     const saved = JSON.parse(localStorage.getItem(key) || '[]');
     if (Array.isArray(saved) && saved.some(a => a && a.token === prev)) localStorage.setItem(key, JSON.stringify(saved.map(a => (a && a.token === prev ? { ...a, token: cur } : a))));
   } catch { /* fine */ }
-  await apiFetch('/bonfire/replace-token', { method: 'POST', body: JSON.stringify({ old: prev }) }).catch(() => {});
+  await apiFetch(`${EMBER_API}/replace-token`, { method: 'POST', body: JSON.stringify({ old: prev }) }).catch(() => {});
 }
 export async function checkPermissions() {
   try {
     await afterReauth();
-    const d = await apiFetch('/bonfire/session');
+    const d = await apiFetch(`${EMBER_API}/session`);
     if (d?.disabled !== undefined) applyDisabled(d.disabled, d.restriction_reason); // (website sessions too: the lockout is the account's, not the token's)
     if (!d?.app) { set({ permUpdate: null, scopeLack: null }); return; }
     try { // which scopes this token lacks (granted) or an admin switched off (disabled), by id
@@ -2696,12 +2698,12 @@ export function permLater() {
   set({ permUpdate: null });
 }
 export function dismissScopePrompt() { set({ scopePrompt: null }); }
-// "Log in again": the apps open Velora's approve-this-app page in the browser; the old login keeps working until the new one is approved
+// "Log in again": the apps open Nookara's approve-this-app page in the browser; the old login keeps working until the new one is approved
 export function loginAgain() {
   try { const t = getToken(); if (t) localStorage.setItem('bf_prev_token', t); } catch { /* fine */ }
   set({ permUpdate: null, scopePrompt: null, reauth: { state: 'waiting' } });
-  if (window.bonfireDesktop?.signIn) { window.bonfireDesktop.signIn(); return; }
-  if (isWebBonfire()) { startSignIn(); return; } // the web has its own sign-in (a token of its own, not the website's session)
+  if (desktopBridge()?.signIn) { desktopBridge().signIn(); return; }
+  if (isWebEmber()) { startSignIn(); return; } // the web has its own sign-in (a token of its own, not the website's session)
   location.href = '/login?next=%2Fchat'; // (apps only) the Android app turns this into its own browser sign-in screen
 }
 export function clearReauth() { set({ reauth: null }); }

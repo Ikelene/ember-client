@@ -1,6 +1,6 @@
 // Server settings pages backed by an instance's /servers/:sid/settings (PROTOCOL §6.4): Dashboard, Joining, Message rules,
 // Reports, AutoMod, Audit log and the upload rules. Each page edits a draft of its sections and saves with the unsaved bar;
-// numbers a Velora hosting plan caps show the plan's number and a lock.
+// numbers a Nookara hosting plan caps show the plan's number and a lock.
 import { useEffect, useMemo, useState } from 'react';
 import {
   DoorOpen, MessageSquare, Flag, ShieldAlert, ScrollText, Upload, Users, Ban, HardDrive, Hash, Lock, X, Plus,

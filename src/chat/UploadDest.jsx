@@ -1,5 +1,5 @@
 // "Where should this go?": the first time files are added in a DM / group chat (chat setting dm_upload_dest = ask), pick
-// Velora account storage or Velora's temporary storage, and maybe remember it. store.chooseUploadDest opens this.
+// Nookara account storage or Nookara's temporary storage, and maybe remember it. store.chooseUploadDest opens this.
 import { useEffect, useState } from 'react';
 import { HardDrive, Clock } from 'lucide-react';
 import { Dialog } from './Dialogs.jsx';

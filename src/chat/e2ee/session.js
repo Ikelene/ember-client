@@ -5,6 +5,7 @@ import * as N from './nke1.js';
 import { mimeOf } from './files.js';
 import * as KS from './keystore.js';
 import { acctKey } from '../ids.js';
+import { notifBridge } from '../../compat.js';
 
 // what stretches a DM passcode. 64 MB makes guessing expensive, on a phone it takes a second or two.
 const ARGON = { m: 65536, t: 3, p: 1 };
@@ -33,7 +34,7 @@ const changed = () => { const st = status(); rememberUnlocked(st); listeners.for
 
 // the Android app shows notifications from its own native connection, so it needs the key too (it keeps it in its Keystore-locked storage)
 function shareWithNative(enc_priv) {
-  try { window.BonfireNotifications?.postMessage(JSON.stringify({ type: 'dm_key', kid: keys?.kid, jwk: enc_priv })); } catch { /* an older app: names only */ }
+  try { notifBridge()?.postMessage(JSON.stringify({ type: 'dm_key', kid: keys?.kid, jwk: enc_priv })); } catch { /* an older app: names only */ }
 }
 
 export async function init() {
@@ -48,10 +49,10 @@ export async function init() {
   return status();
 }
 async function shareOnce() {
-  if (!window.BonfireNotifications) return;
+  if (!notifBridge()) return;
   shareWithNative((await privateKeys()).enc_priv);
 }
-export const signOut = async () => { if (me) await KS.dropKeys(me.id).catch(() => {}); keys = null; try { window.BonfireNotifications?.postMessage(JSON.stringify({ type: 'dm_key', kid: '', jwk: null })); } catch { /* */ } changed(); };
+export const signOut = async () => { if (me) await KS.dropKeys(me.id).catch(() => {}); keys = null; try { notifBridge()?.postMessage(JSON.stringify({ type: 'dm_key', kid: '', jwk: null })); } catch { /* */ } changed(); };
 
 // ── keeping keys on this device ──
 async function holdKeys(secret) {

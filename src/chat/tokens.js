@@ -4,7 +4,7 @@
 // Channel ids are the bare cid ("c" + 10 hex) on both, so a token means the same thing wherever it's read.
 import { getState } from './store.js';
 import { connections } from './instances.js';
-import { VELORA, K, bare, instOf } from './ids.js';
+import { NOOKARA, K, bare, instOf } from './ids.js';
 import { EMBER_HOST } from './hosts.js';
 import { personName, displayNameOf } from './displayNames.js';
 
@@ -30,10 +30,10 @@ function index() {
   if (built && built.members === st.members && built.msgs === st.msgs && built.people === st.people && built.me === st.me && built.conns === connections.size) return built.map;
   const map = new Map();
   const add = (inst, u) => { if (u?.id != null && u.username && !map.has(`${inst}|${u.id}`)) map.set(`${inst}|${u.id}`, u); };
-  add(VELORA, st.me);
+  add(NOOKARA, st.me);
   for (const [origin, c] of connections) add(origin, c.user);
   for (const [sid, list] of Object.entries(st.members || {})) { const inst = instOf(sid); for (const u of list || []) add(inst, u); }
-  for (const u of Object.values(st.people || {})) add(VELORA, u);
+  for (const u of Object.values(st.people || {})) add(NOOKARA, u);
   for (const [key, box] of Object.entries(st.msgs || {})) {
     for (const m of box?.list || []) {
       const inst = instOf(m.channel || key.replace(/^c:/, ''));
@@ -44,23 +44,23 @@ function index() {
   built = { members: st.members, msgs: st.msgs, people: st.people, me: st.me, conns: connections.size, map };
   return map;
 }
-// the person a <@id> means on this server (inst = VELORA or an instance origin); sid narrows it to that server's members first
-export function userById(id, inst = VELORA, sid = null) {
+// the person a <@id> means on this server (inst = NOOKARA or an instance origin); sid narrows it to that server's members first
+export function userById(id, inst = NOOKARA, sid = null) {
   id = String(id);
   const st = getState();
   if (sid) { const u = (st.members[sid] || []).find(x => String(x.id) === id); if (u) return u; }
-  return index().get(`${inst || VELORA}|${id}`) || null;
+  return index().get(`${inst || NOOKARA}|${id}`) || null;
 }
 // my own id where a message lives (for "does this ping me")
 export function myIdOn(inst) {
-  return inst && inst !== VELORA ? connections.get(inst)?.user?.id ?? null : getState().me?.id ?? null;
+  return inst && inst !== NOOKARA ? connections.get(inst)?.user?.id ?? null : getState().me?.id ?? null;
 }
 // a <#cid> -> the channel (any server I'm in on that instance), with its server
-export function channelById(cid, inst = VELORA) {
+export function channelById(cid, inst = NOOKARA) {
   const st = getState();
   const want = String(cid);
   for (const [sid, d] of Object.entries(st.detail || {})) {
-    if (instOf(sid) !== (inst || VELORA)) continue;
+    if (instOf(sid) !== (inst || NOOKARA)) continue;
     const c = d?.channels?.find(x => bare(x.cid) === want);
     if (c) return { channel: c, server: d.server, sid };
   }
@@ -68,7 +68,7 @@ export function channelById(cid, inst = VELORA) {
 }
 
 // message text -> plain text for one-line previews (notifications, inbox rows, the overlay)
-export function plainText(body, inst = VELORA, sid = null) {
+export function plainText(body, inst = NOOKARA, sid = null) {
   return String(body || '')
     .replace(/<@!?((?:[vlb]:)?\d{1,20})>/g, (_, id) => { const u = userById(id, inst, sid); return `@${u ? nameOf(u) : 'unknown-user'}`; })
     .replace(/<#(c[0-9a-f]{10})>/g, (_, cid) => `#${channelById(cid, inst)?.channel.name || 'unknown'}`);
@@ -84,7 +84,7 @@ export function parseEmberLink(href) {
   if (!ours) return null;
   if (!(u.pathname === '/' || u.pathname === '/chat' || u.pathname === '/chat/')) return null;
   const parts = u.hash.split('/');
-  let inst = VELORA, rest = parts.slice(1);
+  let inst = NOOKARA, rest = parts.slice(1);
   if (rest[0] === 'i') {
     try { inst = decodeURIComponent(rest[1] || ''); } catch { return null; }
     if (!/^https?:\/\/[^/|]+$/.test(inst)) return null;

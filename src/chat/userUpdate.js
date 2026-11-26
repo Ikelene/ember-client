@@ -1,4 +1,4 @@
-// Velora's live `user_update` event (somebody changed their picture / colour / name ...): patch EVERY cached copy of that account.
+// Nookara's live `user_update` event (somebody changed their picture / colour / name ...): patch EVERY cached copy of that account.
 // Pure: (state, event) -> new state, so it is tested without a browser (test/user-update.test.js).
 //
 // event = { user: { id, username, pfp_url, color, rank, banner_url, bio, pronouns ... }, changed: ['pfp', ...], previous_username?, v }
@@ -7,12 +7,13 @@
 //   me                         id, else the (old or new) username
 //   people (by username)       moved to the new username key
 //   friends / dms / groups     by (old or new) username - those lists are keyed by name
-//   members[sid]               Velora servers: member.id === id. Instance servers: member.id === 'v:<id>' / velora_id === id
+//   members[sid]               Nookara servers: member.id === id. Instance servers: member.id === 'v:<id>' / nookara_id === id
 //   msgs[key] authors + replies  channel messages carry the id (same rule as members); DM / group messages only a username
-//   presence / voiceStates / veloraFaces / veloraNames   by name / id
-// Images: Velora gives every upload a new URL, so the cache never serves the old picture. If the SAME url comes back with
+//   presence / voiceStates / nookaraFaces / nookaraNames   by name / id
+// Images: Nookara gives every upload a new URL, so the cache never serves the old picture. If the SAME url comes back with
 // changed: ['pfp'] (a replaced file), `?v=<v>` is added so the browser refetches it.
 import { isInst } from './ids.js';
+import { nookaraId } from '../compat.js';
 
 const origin = u => String(u || '').replace(/^https?:\/\/[^/]+/i, '');
 const stripV = u => String(u || '').replace(/[?&]v=\d+$/, '');
@@ -48,7 +49,7 @@ export function applyUserUpdate(state, ev) {
     if (u.rank !== undefined) out.rank = u.rank;
     return out;
   };
-  const sameAcc = x => !!x && ((x.id != null && (String(x.id) === id || x.id === vid)) || (x.velora_id != null && String(x.velora_id) === id));
+  const sameAcc = x => !!x && ((x.id != null && (String(x.id) === id || x.id === vid)) || (nookaraId(x) != null && String(nookaraId(x)) === id));
   const person = x => (sameAcc(x) ? face(x) : x);
   // a message author: channel messages have ids; DM / group ones only a username
   const author = (x, nameKeyed) => (!x ? x : x.id != null ? person(x) : nameKeyed && byName(x.username) ? face(x) : x);
@@ -102,19 +103,19 @@ export function applyUserUpdate(state, ev) {
     if (state.voiceStates) next.voiceStates = Object.fromEntries(Object.entries(state.voiceStates).map(([cid, users]) => [cid, Array.isArray(users) ? users.map(x => (lc(x?.username) === lc(prev) ? { ...x, username: u.username } : x)) : users]));
   }
 
-  // Velora people on instance servers: their live face + current name
-  if (state.veloraFaces) next.veloraFaces = state.veloraFaces[id] && !state.veloraFaces[id].miss ? { ...state.veloraFaces, [id]: { ...face(state.veloraFaces[id]), id } } : { ...state.veloraFaces, [id]: { ...face({ id }), id } };
-  if (state.veloraNames && state.veloraNames[id] !== undefined) next.veloraNames = { ...state.veloraNames, [id]: u.username };
+  // Nookara people on instance servers: their live face + current name
+  if (state.nookaraFaces) next.nookaraFaces = state.nookaraFaces[id] && !state.nookaraFaces[id].miss ? { ...state.nookaraFaces, [id]: { ...face(state.nookaraFaces[id]), id } } : { ...state.nookaraFaces, [id]: { ...face({ id }), id } };
+  if (state.nookaraNames && state.nookaraNames[id] !== undefined) next.nookaraNames = { ...state.nookaraNames, [id]: u.username };
 
   return next;
 }
 
-// the instances (origins) where this Velora account is a member of a loaded server - they get a `chat_profile_refresh` nudge
+// the instances (origins) where this Nookara account is a member of a loaded server - they get a `chat_profile_refresh` nudge
 export function instancesWithAccount(state, id) {
   const out = new Set();
   for (const [sid, list] of Object.entries(state.members || {})) {
     if (!isInst(sid) || !Array.isArray(list)) continue;
-    if (list.some(m => String(m.velora_id) === String(id) || m.id === `v:${id}`)) out.add(sid.slice(0, sid.indexOf('|')));
+    if (list.some(m => String(nookaraId(m)) === String(id) || m.id === `v:${id}`)) out.add(sid.slice(0, sid.indexOf('|')));
   }
   return [...out];
 }

@@ -1,4 +1,4 @@
-// The apps sign in through Velora's approve-this-app screen and keep a scoped token. These are the two places it shows:
+// The apps sign in through Nookara's approve-this-app screen and keep a scoped token. These are the two places it shows:
 //  - "New permission updates": a permission Ember needs isn't on this login yet (a new feature, or an old login from before
 //    the approve screen existed) -> Log in again / Later
 //  - a small card when something you tried needs a permission this login doesn't have -> Log in again

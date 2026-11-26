@@ -4,7 +4,7 @@
 const DAY = 86400000;
 const dayStart = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
 
-// when a file dies: Velora's /t/info gives seconds left (expires_in) as of the moment we asked
+// when a file dies: Nookara's /t/info gives seconds left (expires_in) as of the moment we asked
 export const expiryAt = (info, now = Date.now()) => {
   if (!info || info === 'gone') return info || null;
   const t = Number.isFinite(info.expires_at ? Date.parse(info.expires_at) : NaN) ? Date.parse(info.expires_at) : (info.at ?? now) + Number(info.expires_in) * 1000;

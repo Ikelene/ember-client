@@ -33,7 +33,7 @@ function SoundboardPicker({ rect, onClose }) {
   const [data, setData] = useState(null);
   const [q, setQ] = useState('');
   const box = useRef(null);
-  // sounds from every server you're in (Velora's and each instance you're signed in to). The call's own server plays by id; another
+  // sounds from every server you're in (Nookara's and each instance you're signed in to). The call's own server plays by id; another
   // server's sound is sent as its public view and the call's server relays the URL (see "Cross-server sounds" in the Ember protocol)
   const room = useChat(st => st.voice?.room);
   const here = /^bf_/.test(room || '') ? instOpt(room.slice(3)) : undefined;

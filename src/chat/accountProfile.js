@@ -7,6 +7,7 @@ import { NOOKARA_ORIGIN } from './hosts.js';
 import { getState, lookup, forgetProfile } from './store.js';
 import { setInstanceUser, instanceConn } from './instances.js';
 import { LIMITS, copyFields, stampOf, stampParts, joinStamp, changedParts, follows, pictureSources, hasAccountProfile } from './accountProfileCore.js';
+import { NOOKARA_ID_FIELD } from '../compat.js';
 
 const PATH = '/api/v1/me/profile';
 const took = (origin, r) => { if (r?.user) setInstanceUser(origin, r.user); return r; };
@@ -63,7 +64,7 @@ export async function copyFromNookara(origin, { sync, before = '', profile } = {
     skipped.push(kind);
     if (!blob) next[kind === 'pfp' ? 'p' : 'b'] = held[kind === 'pfp' ? 'p' : 'b']; // not read this time: the stamp stays behind, so the next sync tries again
   }
-  if (sync !== undefined) r = await saveAccountProfile(origin, { sync: sync ? { velora_id: String(g.id), stamp: joinStamp(next) } : null });
+  if (sync !== undefined) r = await saveAccountProfile(origin, { sync: sync ? { [NOOKARA_ID_FIELD]: String(g.id), stamp: joinStamp(next) } : null });
   if (!r) r = await getAccountProfile(origin);
   return { ...r, skipped };
 }

@@ -1,6 +1,6 @@
-// A file waiting in the composer to go to Velora's temporary storage: how long it will last, and the expiry a Velora Pro
+// A file waiting in the composer to go to Nookara's temporary storage: how long it will last, and the expiry a Nookara Pro
 // member can pick for it (TempAttPopover.jsx). Pure, no imports, so it can be tested on its own (test/temp-pick.test.js).
-// The rules themselves live on Velora (temp-files-policy.js); /chat/media/destinations hands us `temp` with the numbers.
+// The rules themselves live on Nookara (temp-files-policy.js); /chat/media/destinations hands us `temp` with the numbers.
 const MB = 1024 * 1024;
 
 // days the file lasts from the day it is sent (the normal lifetime; opening it never moves it).

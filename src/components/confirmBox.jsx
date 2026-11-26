@@ -1,4 +1,4 @@
-// Velora's own "are you sure?" box, instead of the browser's confirm(): await confirmBox('Remove X?', { confirm: 'Remove', danger: true })
+// Nookara's own "are you sure?" box, instead of the browser's confirm(): await confirmBox('Remove X?', { confirm: 'Remove', danger: true })
 // <ConfirmHost /> is mounted once in App.jsx.
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';

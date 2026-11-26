@@ -1,4 +1,4 @@
-/* Velora Chat (/chat). Velora's look: dark, thin borders, top-lit gradient boxes, square corners. */
+/* Nookara Chat (/chat). Nookara's look: dark, thin borders, top-lit gradient boxes, square corners. */
 html.vc-page, html.vc-page body { height: 100%; overflow: hidden; }
 .vc { --st-online: #5bb37a; --st-idle: #d6a64c; --st-dnd: #d45c5c; --st-offline: #6b6b75; --box: linear-gradient(180deg, #1a1a1d, #151517); --panel: linear-gradient(180deg, #141416, #111113);
   display: flex; height: 100vh; height: 100dvh; height: var(--vc-vh, 100dvh); background: var(--bg); color: var(--text); overflow: hidden; }
@@ -625,7 +625,7 @@ a.vc-chip.vc-conn:hover { border-color: var(--cc, var(--accent)); background: #1
   .vc-row { flex-wrap: wrap; }
 }
 
-/* the profile editor's card rounds its picture; Velora Chat keeps everything square */
+/* the profile editor's card rounds its picture; Nookara Chat keeps everything square */
 .vc-card .pe-avatar img, .vc-card .vc-av, .vc-card .vc-av > img { border-radius: 0; }
 .vc-pop { max-height: calc(100vh - 20px); overflow-y: auto; scrollbar-width: none; }
 
@@ -1487,7 +1487,7 @@ img.vc-sug-emoji { width: 20px; height: 20px; object-fit: contain; }
 .vc-new-line { position: relative; display: flex; align-items: center; margin: 8px 16px 4px 16px; height: 0; border-top: 1px solid #e05858; }
 .vc-new-line span { position: absolute; right: 0; top: -9px; padding: 0 6px; background: #e05858; color: #fff; font-size: 10px; font-weight: 700; letter-spacing: .05em; line-height: 17px; text-transform: uppercase; }
 
-/* file cards (DM files in Velora storage, old catbox links, instance files) */
+/* file cards (DM files in Nookara storage, old catbox links, instance files) */
 .vc-filecard { display: flex; align-items: center; gap: 12px; width: 100%; max-width: 420px; margin-top: 4px; padding: 10px 12px; background: #111113; border: 1px solid var(--border); border-left: 3px solid var(--accent); }
 .vc-att-expiry { display: flex; align-items: center; gap: 5px; width: fit-content; margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--muted); text-decoration: none; }
 .vc-att-expiry svg { flex: none; }
@@ -2176,7 +2176,7 @@ a.vc-appdl-opt { text-decoration: none; }
 .bf-sd-sec { display: flex; flex-direction: column; gap: 10px; }
 @media (max-width: 600px) { .vc-steps li span { display: none; } .vc-steps li { justify-content: center; } }
 
-/* the box that stands in for a server that isn't connected yet (and for Velora-only places while signed out) */
+/* the box that stands in for a server that isn't connected yet (and for Nookara-only places while signed out) */
 .vc-gate { flex: 1; min-height: 0; display: grid; place-items: center; padding: 24px; }
 .vc-gate-box { width: min(420px, 100%); display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 28px 24px; text-align: center; background: var(--panel); border: 1px solid var(--border-2); color: var(--accent); }
 .vc-gate-box h2 { margin: 4px 0 0; font-size: 18px; color: #fff; overflow-wrap: anywhere; }
@@ -2203,7 +2203,7 @@ a.vc-appdl-opt { text-decoration: none; }
 .vc-reconnect-pop .vc-gate-spin { width: 20px; height: 20px; border-width: 2px; }
 .vc-reconnect-pop small { font-size: 12.5px; white-space: nowrap; }
 
-/* Velora's connection is down: a note on the DM list and Friends (Parts.jsx VeloraConnNote) */
+/* Nookara's connection is down: a note on the DM list and Friends (Parts.jsx NookaraConnNote) */
 .vc-conn-note { display: flex; align-items: center; gap: 8px; margin: 4px 6px 8px; padding: 8px 10px; border: 1px solid var(--border-2); background: rgba(255, 255, 255, .03); color: var(--dim); font-size: 12.5px; }
 .vc-conn-note .vc-gate-spin { width: 14px; height: 14px; border-width: 2px; flex: none; }
 .vc-conn-note span { display: flex; flex-direction: column; min-width: 0; flex: 1; }
@@ -2230,7 +2230,7 @@ a.vc-appdl-opt { text-decoration: none; }
 .vc-quota-x { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 22px; height: 22px; border: 0; background: none; color: var(--muted); cursor: pointer; }
 .vc-quota-x:hover { background: rgba(255, 255, 255, .06); color: var(--text); }
 
-/* Velora hosting (Hosting.jsx): plan cards, the address field, the setup steps, Add a server's "Create your own" */
+/* Nookara hosting (Hosting.jsx): plan cards, the address field, the setup steps, Add a server's "Create your own" */
 .bf-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin-bottom: 12px; }
 .bf-plan { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--border); background: #0f0f11; color: var(--dim); text-align: left; font: inherit; cursor: pointer; transition: border-color .15s, background .15s; }
 .bf-plan:hover:not(:disabled) { border-color: var(--border-2); background: #131316; }
@@ -2297,7 +2297,7 @@ html.bf-mobile #bf-sheet-scrim { display: none !important; }
   .vc-quick-reactions > button { height: 44px; }
 }
 
-/* a Velora-hosted (legacy) server that is read-only now (pages/Chat.jsx LegacyReadOnlyBar) */
+/* a Nookara-hosted (legacy) server that is read-only now (pages/Chat.jsx LegacyReadOnlyBar) */
 .vc-legacy-bar { flex-wrap: wrap; gap: 8px; background: rgba(250, 204, 21, .06); border-bottom-color: rgba(250, 204, 21, .3); color: var(--dim); }
 .vc-legacy-bar > svg { color: #facc15; flex: none; }
 .vc-legacy-bar > span { flex: 1; min-width: 200px; }
@@ -2312,7 +2312,7 @@ html.bf-mobile #bf-sheet-scrim { display: none !important; }
 .vc-info-val { margin-left: auto; color: var(--text); font-size: 13px; text-align: right; word-break: break-word; }
 .vc-info-mono { font-family: Consolas, 'Cascadia Code', monospace; font-size: 12.5px; }
 
-/* ── plan limits on Velora-hosted servers (PlanGate.jsx): "Not included in your plan", "You've used N of M", the usage chip ── */
+/* ── plan limits on Nookara-hosted servers (PlanGate.jsx): "Not included in your plan", "You've used N of M", the usage chip ── */
 .bf-pg .card-title svg { color: var(--accent); }
 .bf-pg-text { margin: 0; color: var(--dim); font-size: 14px; line-height: 1.5; }
 .bf-pg-text b { color: var(--text, #fff); }

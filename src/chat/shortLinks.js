@@ -5,6 +5,7 @@
 // The website serves Ember's page for these paths (ember-host.js SHORT_LINK); on load Ember swaps the path for its #/ route.
 // Only https servers get a short link (an http:// dev server keeps the long #/i/ form). No React, so it can be tested.
 import { EMBER_ORIGIN } from './hosts.js';
+import { isNookara } from '../compat.js';
 
 const HOST = '[a-z0-9.-]{1,253}(?::\\d{1,5})?';
 const INVITE = new RegExp(`^/invite/(?:(${HOST})/)?([A-Za-z0-9_-]{1,64})/?$`, 'i');
@@ -30,7 +31,7 @@ function hostOf(inst) {
 export function shortLinkFor(v, base = EMBER_ORIGIN) {
   if (!v) return null;
   if (v.kind === 'invite' && /^[A-Za-z0-9_-]{1,64}$/.test(String(v.code || ''))) {
-    if (!v.inst || v.inst === 'velora') return `${base}/invite/${v.code}`;
+    if (!v.inst || isNookara(v.inst)) return `${base}/invite/${v.code}`;
     const h = hostOf(v.inst);
     return h ? `${base}/invite/${h}/${v.code}` : null;
   }

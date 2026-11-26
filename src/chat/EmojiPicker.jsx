@@ -26,13 +26,13 @@ export const emojiDataSync = () => dataSync;
 export const emojiToken = e => `<${e.animated ? 'a' : ''}:${e.name}:${e.eid}>`;
 export const emojiUrl = customEmoji;
 
-function recents() { try { return JSON.parse(localStorage.getItem('velora_chat_emoji_recent') || '[]'); } catch { return []; } }
+function recents() { try { return JSON.parse(localStorage.getItem('nookara_chat_emoji_recent') || '[]'); } catch { return []; } }
 // a custom emoji you deleted from your personal emojis leaves Recent for good (personal.js deletePersonalEmoji)
 export function forgetRecent(eid) {
-  try { localStorage.setItem('velora_chat_emoji_recent', JSON.stringify(recents().filter(r => !r.c || r.c.eid !== eid))); } catch { /* fine */ }
+  try { localStorage.setItem('nookara_chat_emoji_recent', JSON.stringify(recents().filter(r => !r.c || r.c.eid !== eid))); } catch { /* fine */ }
 }
 function addRecent(item) {
-  try { localStorage.setItem('velora_chat_emoji_recent', JSON.stringify([item, ...recents().filter(x => x.k !== item.k)].slice(0, 24))); } catch { /* fine */ }
+  try { localStorage.setItem('nookara_chat_emoji_recent', JSON.stringify([item, ...recents().filter(x => x.k !== item.k)].slice(0, 24))); } catch { /* fine */ }
 }
 
 // a section of the grid that only draws its emojis once it's near the visible part (opening the picker stays instant)

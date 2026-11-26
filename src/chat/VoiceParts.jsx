@@ -12,6 +12,7 @@ import { openMenu } from './Menu.jsx';
 import { Dialog } from './Dialogs.jsx';
 import { SoundboardButton } from './Soundboard.jsx';
 import { PlatformIcon, PLATFORM_NAMES } from './platforms.jsx';
+import { desktopBridge } from '../compat.js';
 
 const roomOf = cid => `bf_${cid}`;
 // your own picture comes from `me` (nothing puts you in `people` until a message of yours is seen, e.g. right after a reload);
@@ -152,7 +153,7 @@ export function VoicePanel() {
   const v = useChat(s => s.voice);
   const [callIn, setCallIn] = useState(false);
   const [shareSources, setShareSources] = useState(null);
-  const startShare = async () => { if (v.screen) return toggleScreen().catch(() => {}); if (!window.bonfireDesktop?.isDesktop) return toggleScreen().catch(() => {}); try { setShareSources(await desktopScreenSources()); } catch { setShareSources([]); } };
+  const startShare = async () => { if (v.screen) return toggleScreen().catch(() => {}); if (!desktopBridge()?.isDesktop) return toggleScreen().catch(() => {}); try { setShareSources(await desktopScreenSources()); } catch { setShareSources([]); } };
   if (!v) return null;
   const where = v.info.kind === 'call' ? `Call with ${v.info.with}` : `${v.info.name}${v.info.server ? ` / ${v.info.server}` : ''}`;
   return (
@@ -236,7 +237,7 @@ function useScreenShare(v) {
   const [sources, setSources] = useState(null);
   const start = async () => {
     if (v?.screen) return toggleScreen().catch(() => {});
-    if (!window.bonfireDesktop?.isDesktop) return toggleScreen().catch(() => {});
+    if (!desktopBridge()?.isDesktop) return toggleScreen().catch(() => {});
     try { setSources(await desktopScreenSources()); } catch { setSources([]); }
   };
   const picker = sources && <ScreenSharePicker sources={sources} onClose={() => setSources(null)} onChoose={source => { setSources(null); toggleScreen(source).catch(() => {}); }} />;

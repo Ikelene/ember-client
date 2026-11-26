@@ -9,7 +9,7 @@ import { BotGallery } from './BotGallery.jsx';
 import { apiFetch } from '../api.js';
 import { getState, useChat, go, loadServersOf, refreshServer, loadGroups, toast, errorText, ask, answerAsk, loadFriends, sendMessage, linkFor } from './store.js';
 import { NameText, displayNameOf } from './displayNames.js';
-import { VELORA, instOf, isInst, fromInstance, normOrigin } from './ids.js';
+import { NOOKARA, instOf, isInst, fromInstance, normOrigin } from './ids.js';
 import { imgHint, warnImage } from './imgHints.js';
 import { SignInPrompt } from './Gate.jsx';
 import { Avatar } from './Profile.jsx';
@@ -18,6 +18,7 @@ import { P, has, CHANNEL_ICONS, ChannelIcon } from './roles.jsx';
 import { ChannelBridge } from './Bridge.jsx';
 import { ChannelPerms } from './ChannelPerms.jsx';
 import { pictureAccept } from './accept.js';
+import { EMBER_API } from '../compat.js';
 
 export function Dialog({ title, sub, onClose, children, wide, className = '' }) {
   const [closing, setClosing] = useState(false);
@@ -39,7 +40,7 @@ export function Dialog({ title, sub, onClose, children, wide, className = '' }) 
   );
 }
 
-// Discover: every Ember server listed in Velora's public directory, in one list (works signed out; a card opens Add a server
+// Discover: every Ember server listed in Nookara's public directory, in one list (works signed out; a card opens Add a server
 // for its address)
 export function Discover({ onClose }) {
   const [tab, setTab] = useState('servers');
@@ -65,7 +66,7 @@ function Directory({ close }) {
   const [err, setErr] = useState(false);
   const mine = useChat(s => s.instances);
   useEffect(() => { const t = setTimeout(() => setDeb(q.trim()), 300); return () => clearTimeout(t); }, [q]);
-  const load = (page = 1) => fetch(`/bonfire/directory?q=${encodeURIComponent(deb)}&page=${page}`).then(r => (r.ok ? r.json() : Promise.reject()))
+  const load = (page = 1) => fetch(`${EMBER_API}/directory?q=${encodeURIComponent(deb)}&page=${page}`).then(r => (r.ok ? r.json() : Promise.reject()))
     .then(x => { setErr(false); setD(cur => ({ ...x, results: page > 1 && cur ? [...cur.results, ...x.results] : x.results })); }).catch(() => setErr(true));
   useEffect(() => { setD(null); load(1); }, [deb]); // eslint-disable-line react-hooks/exhaustive-deps
   const pick = r => {
@@ -106,8 +107,8 @@ function Directory({ close }) {
     </>
   );
 }
-// (Create a server: Hosting.jsx - Velora hosts it; Add a server by its address is Instances.jsx)
-// creating a server hosted inside Velora itself is paused (server-creation-policy.json): legacy entry points show why
+// (Create a server: Hosting.jsx - Nookara hosts it; Add a server by its address is Instances.jsx)
+// creating a server hosted inside Nookara itself is paused (server-creation-policy.json): legacy entry points show why
 export function ServerCreationNotice({ onClose }) {
   return <Dialog title={serverCreationPolicy.title} onClose={onClose}>
     {close => <><div className="vc-br-note" role="status">{serverCreationPolicy.notice.map(text => <p key={text}>{text}</p>)}</div><div className="vc-dialog-btns"><span className="grow" /><button type="button" className="btn btn-surface" onClick={close}>Got it</button></div></>}
@@ -122,7 +123,7 @@ export function Invite({ sid, onClose }) {
   const link = code ? linkFor({ kind: 'invite', code, inst }) : '';
   const copy = (t, what) => { navigator.clipboard?.writeText(t); setCopied(what); setTimeout(() => setCopied(''), 1500); };
   return (
-    <Dialog title={`Invite people to ${d?.server.name || 'this server'}`} sub={inst === VELORA ? "Send them this link. They'll need a Nookara account." : `Send them this link. They'll need an account on ${inst.replace(/^https?:\/\//, '')}.`} onClose={onClose}>
+    <Dialog title={`Invite people to ${d?.server.name || 'this server'}`} sub={inst === NOOKARA ? "Send them this link. They'll need a Nookara account." : `Send them this link. They'll need an account on ${inst.replace(/^https?:\/\//, '')}.`} onClose={onClose}>
       {code ? (
         <>
           <div className="vc-row"><input className="form-input" readOnly value={link} onFocus={e => e.target.select()} /><button type="button" className="btn btn-primary" onClick={() => copy(link, 'link')}>{copied === 'link' ? <Check size={15} /> : <Copy size={15} />} Copy</button></div>
@@ -177,7 +178,7 @@ export function JoinInvite({ code, inst, onClose }) {
   const conn = useChat(x => (inst ? x.instances.find(i => i.origin === inst) : null));
   const ready = !inst || conn?.status === 'open';
   useEffect(() => {
-    if (!inst && !signedIn) return; // a Velora-hosted server's invite needs the Velora sign-in first
+    if (!inst && !signedIn) return; // a Nookara-hosted server's invite needs the Nookara sign-in first
     // an instance I haven't added yet: its invite page is public, so look at it without an account
     const look = inst && !conn
       ? fetch(`${inst}/api/v1/invite/${encodeURIComponent(code)}`).then(r => (r.ok ? r.json() : Promise.reject())).then(d => fromInstance(inst, d, '/invite'))

@@ -39,7 +39,7 @@ try {
   // a socket that is always open and keeps what Ember sends
   await page.addInitScript(() => {
     window.__sent = [];
-    try { localStorage.setItem('velora_token', 'test'); localStorage.setItem('bonfire_token', 'test'); } catch { /* fine */ }
+    try { localStorage.setItem('velora_token', 'test'); localStorage.setItem('ember_token', 'test'); } catch { /* fine */ }
     window.WebSocket = class { constructor() { this.readyState = 1; window.__ws = this; } send(d) { window.__sent.push(JSON.parse(d)); } close() {} };
   });
   await page.goto(`http://127.0.0.1:${server.address().port}/`);

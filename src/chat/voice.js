@@ -1,12 +1,13 @@
-// Ember voice uses Cloudflare Realtime SFU. Media never travels over Velora's WebSocket.
+// Ember voice uses Cloudflare Realtime SFU. Media never travels over Nookara's WebSocket.
 import { apiFetch } from '../api.js';
 import { getState, patchState, send, onVoiceEvent, playSound, toast, errorText, dmErrorText, timedOutIn, untilText } from './store.js';
-import { VELORA, instOf, isInst, registry } from './ids.js';
+import { NOOKARA, instOf, isInst, registry } from './ids.js';
 import { connections } from './instances.js';
 import { registerOverlayVoice } from './overlay.js';
 import { sharedAudioContext, startLevels, stopLevels, registerLevelSource, levelKey } from './levels.js';
+import { OLD_ORIGIN, desktopBridge } from '../compat.js';
 
-const PREFS_KEY = 'bonfire_voice_prefs';
+const PREFS_KEY = 'ember_voice_prefs';
 // input/output/camera = deviceId ('' = system default), inVol 0-200 %, outVol 0-100 %, sens = mic sensitivity 0-100
 // muted / deafened = the always-visible buttons by the settings cog: remembered, and applied when you join
 // (0 = off; the old engine's `gate` key is ignored on purpose), board = soundboard volume, volumes = per person
@@ -89,9 +90,9 @@ const micOutTrack = () => (mic ? mic.track : micStream?.getAudioTracks()[0]);
 export const micProcessing = () => !!mic;
 // your mic level on the sensitivity slider's 0..1 scale (before the gate), null when not measurable
 export function micMeter() { if (!mic || !micStream) return null; const db = micRms > 0 ? 20 * Math.log10(micRms) : -100; return clamp((db + 70) / 60, 0, 1); }
-// a voice room is bf_<cid> (an instance's channel id carries its origin, so the room can only be on that instance's socket); DM calls (bfc_...) stay on Velora
-const roomInst = r => (/^bf_/.test(r || '') ? instOf(String(r).slice(3)) : VELORA);
-const meFor = r => (roomInst(r) === VELORA ? getState().me : connections.get(roomInst(r))?.user) || getState().me;
+// a voice room is bf_<cid> (an instance's channel id carries its origin, so the room can only be on that instance's socket); DM calls (bfc_...) stay on Nookara
+const roomInst = r => (/^bf_/.test(r || '') ? instOf(String(r).slice(3)) : NOOKARA);
+const meFor = r => (roomInst(r) === NOOKARA ? getState().me : connections.get(roomInst(r))?.user) || getState().me;
 const roomInfo = room => { const st = getState(), m = /^bf_(.+)$/.exec(room || ''); if (m) for (const [sid, d] of Object.entries(st.detail)) { const c = d?.channels.find(x => x.cid === m[1]); if (c) return { kind: 'channel', sid, cid: c.cid, name: c.name, server: d.server.name, allowCallIn: !!c.config?.allow_call_in }; } return /^bfc_/.test(room || '') ? { kind: 'call', with: st.dmCallWith?.[room] || '' } : { kind: 'channel', name: 'voice channel', server: '' }; };
 let senders = {}, watching = new Set(), streamMuted = new Set(), appliedSig = '', pubSerial = Promise.resolve(), producer, consumer, micStream, cameraStream, screenStream, iceServers = [], room = null, serial = Promise.resolve(), turnRefresh, recoveryTimer, recovering = false, recoveryAttempts = 0, lastPeople = [], announcedConnection = false, resumeToken = null, holding = null;
 const pending = new Map(), receiveMids = new Map(), media = new Map();
@@ -116,7 +117,7 @@ function peopleSounds(people) {
   else if ([...before.keys()].some(k => !now.has(k))) playSound('leave', .5);
 }
 function setPeople(people) { const ids = new Set(streamsOf(people).map(x => uid(x.userId))); for (const id of [...watching]) if (!ids.has(id)) watching.delete(id); for (const id of [...streamMuted]) if (!watching.has(id)) streamMuted.delete(id); setVoice({ users: usersFor(people), streams: streamsOf(people), watching: [...watching], streamMuted: [...streamMuted] }); }
-const uid = x => (/^\d+$/.test(String(x)) ? Number(x) : String(x)); // Velora's user ids are numbers, an instance's are principals (v:2)
+const uid = x => (/^\d+$/.test(String(x)) ? Number(x) : String(x)); // Nookara's user ids are numbers, an instance's are principals (v:2)
 const usersFor = people => { const users = (people || []).map(p => ({ id: p.userId, name: p.username, ext: p.platform ? { platform: p.platform, name: p.name || 'Someone', avatar: p.avatar || null } : undefined, muted: false, deafened: false, speaking: false })), me = meFor(room); if (me?.username && !users.some(u => String(u.name).toLowerCase() === String(me.username).toLowerCase())) users.push({ id: me.id, name: me.username, muted: false, deafened: false, speaking: false }); return users; };
 const trackName = t => t === micOutTrack() || t === micStream?.getAudioTracks()[0] ? 'audio' : t === cameraStream?.getVideoTracks()[0] ? 'camera' : screenStream?.getAudioTracks().includes(t) ? 'screen_audio' : 'screen';
 async function microphone() { if (micStream) return micStream; const got = await openDevice(micConstraints, prefs().input); if (!room) { got.getTracks().forEach(t => t.stop()); throw new Error('left'); } micStream = got; { const t = got.getAudioTracks()[0]; if (t) t.enabled = !getState().voice?.muted; } watchMicTrack(); void refreshDevices(); return micStream; }
@@ -236,8 +237,8 @@ export function watchStream(userId) { userId = uid(userId); if (!room || watchin
 export function unwatchStream(userId) { userId = uid(userId); if (!watching.delete(userId)) return; streamMuted.delete(userId); setVoice({ watching: [...watching], streamMuted: [...streamMuted] }); discardUnavailableMedia(lastPeople); queueSubscribe(lastPeople); }
 // mute a stream's sound for you while you keep watching it (its video keeps going; nobody else is affected)
 export function muteStream(userId, muted = !streamMuted.has(uid(userId))) { userId = uid(userId); if (muted) streamMuted.add(userId); else streamMuted.delete(userId); setVoice({ streamMuted: [...streamMuted] }); applyVolumes(); }
-export async function desktopScreenSources() { return window.bonfireDesktop?.screenSources ? window.bonfireDesktop.screenSources() : []; }
-export async function toggleScreen(source = null) { if (!room) return; if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; await request('chat_rtc_close', { room, tracks: ['screen', 'screen_audio'] }); return setVoice({ screen: false, screenVideo: null }); } const video = source ? { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: source.id, maxFrameRate: 15, maxWidth: 1920, maxHeight: 1080 } } : { width: { ideal: 1920, max: 1920 }, height: { ideal: 1080, max: 1080 }, frameRate: { ideal: 15, max: 20 } }; if (source && window.bonfireDesktop?.screenPick) { await window.bonfireDesktop.screenPick(source.id); try { screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 15, max: 15 }, width: { max: 1920 }, height: { max: 1080 } }, audio: { restrictOwnAudio: true } }); } catch { screenStream = null; } } if (!screenStream && source) { const audio = { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: source.id } }; try { screenStream = await navigator.mediaDevices.getUserMedia({ video, audio }); } catch { screenStream = await navigator.mediaDevices.getUserMedia({ video, audio: false }); } } if (!screenStream) screenStream = await navigator.mediaDevices.getDisplayMedia({ video, audio: true }); screenStream.getVideoTracks()[0].onended = () => { if (screenStream) toggleScreen().catch(() => {}); }; await queuePublish(screenStream.getTracks()); setVoice({ screen: true, screenVideo: screenStream }); }
+export async function desktopScreenSources() { return desktopBridge()?.screenSources ? desktopBridge().screenSources() : []; }
+export async function toggleScreen(source = null) { if (!room) return; if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; await request('chat_rtc_close', { room, tracks: ['screen', 'screen_audio'] }); return setVoice({ screen: false, screenVideo: null }); } const video = source ? { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: source.id, maxFrameRate: 15, maxWidth: 1920, maxHeight: 1080 } } : { width: { ideal: 1920, max: 1920 }, height: { ideal: 1080, max: 1080 }, frameRate: { ideal: 15, max: 20 } }; if (source && desktopBridge()?.screenPick) { await desktopBridge().screenPick(source.id); try { screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 15, max: 15 }, width: { max: 1920 }, height: { max: 1080 } }, audio: { restrictOwnAudio: true } }); } catch { screenStream = null; } } if (!screenStream && source) { const audio = { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: source.id } }; try { screenStream = await navigator.mediaDevices.getUserMedia({ video, audio }); } catch { screenStream = await navigator.mediaDevices.getUserMedia({ video, audio: false }); } } if (!screenStream) screenStream = await navigator.mediaDevices.getDisplayMedia({ video, audio: true }); screenStream.getVideoTracks()[0].onended = () => { if (screenStream) toggleScreen().catch(() => {}); }; await queuePublish(screenStream.getTracks()); setVoice({ screen: true, screenVideo: screenStream }); }
 export async function callDm(username) { try { const d = await apiFetch('/chat/calls', { method: 'POST', body: JSON.stringify({ to: username }) }); patchState(s => ({ dmCallWith: { ...s.dmCallWith, [d.room]: username } })); await joinVoice(d.room, { kind: 'call', with: username }); if (room === d.room) { pendingRing = { room: d.room, to: username }; ringPending(); } } catch (e) { toast(dmErrorText(e.message)); } }
 let pendingRing = null;
 // the server ends an unanswered ring after 30 s; if that never arrives (server restart, dropped socket) stop ringing anyway
@@ -262,13 +263,13 @@ function updateDmCall(m) {
 } export function callInto(username) { if (room) send({ type: 'voice_call', to: username, room }); } export function cancelCall(callId) { send({ type: 'voice_call_cancel', callId }); } export function answer(call, accept) { send({ type: 'voice_call_answer', callId: call.callId, accept }); patchState(s => ({ incoming: s.incoming.filter(c => c.callId !== call.callId) })); }
 // a sound is its id (one of the room's own server) or, from another server, its public view (the room's instance relays the URL)
 export function playBoardSound(sound) { if (!room) return toast('Join a voice channel first.'); send({ type: 'voice_sound', sound: typeof sound === 'object' ? { name: sound.name, emoji: sound.emoji, volume: sound.volume, duration: sound.duration, url: sound.url } : sound, room }); }
-// a sound another server's soundboard sent into this call is only played from an origin you already use (Velora, an instance you are signed in to, this call's instance)
-const trustedSoundOrigin = url => { try { const o = new URL(url).origin; return o === location.origin || o === 'https://nookara.cc' || o === 'https://velora.ikelene.net' || registry.has(o) || (isInst(String(room).slice(3)) && instOf(String(room).slice(3)) === o); } catch { return false; } };
+// a sound another server's soundboard sent into this call is only played from an origin you already use (Nookara, an instance you are signed in to, this call's instance)
+const trustedSoundOrigin = url => { try { const o = new URL(url).origin; return o === location.origin || o === 'https://nookara.cc' || o === OLD_ORIGIN || registry.has(o) || (isInst(String(room).slice(3)) && instOf(String(room).slice(3)) === o); } catch { return false; } };
 // sounds playing in the call right now: they light the player's avatar blue (levels.js reads them through the level source below)
 const boardNow = new Map(); // n -> { key, audio, gain }
 let boardN = 0;
 // a sound that is sent from this room's instance is fetched from that instance, whatever host it believes it has
-const soundUrl = (sound, by) => { if (by == null || sound.external || !room || roomInst(room) === VELORA) return sound.url; try { const o = roomInst(room); return registry.has(o) ? new URL(new URL(sound.url).pathname, o).href : sound.url; } catch { return sound.url; } };
+const soundUrl = (sound, by) => { if (by == null || sound.external || !room || roomInst(room) === NOOKARA) return sound.url; try { const o = roomInst(room); return registry.has(o) ? new URL(new URL(sound.url).pathname, o).href : sound.url; } catch { return sound.url; } };
 // heard = a sound the call is playing (volume from your soundboard / output settings; deafened = silent but still shown); by = who played it
 export function previewBoardSound(sound, heard = false, by = null) {
   if (heard && sound.external && !trustedSoundOrigin(sound.url)) return;
@@ -283,11 +284,11 @@ export function previewBoardSound(sound, heard = false, by = null) {
   a.play().catch(() => { done(); });
 }
 export function stopBoardSounds() {}
-onVoiceEvent(m => { if (m.type === 'voice_socket_ready') { if (holding && holding.inst === (m.inst || VELORA)) void resumeAfterDrop(); return; } if (m.type === 'chat_error' && String(m.request || '').startsWith('chat_rtc')) return void settle(m, true); if (['chat_rtc_joined', 'chat_rtc_published', 'chat_rtc_offer', 'chat_rtc_ready', 'chat_rtc_resumed'].includes(m.type)) return void settle(m); if (m.type === 'chat_rtc_room' && m.room === room) { peopleSounds(m.people); setPeople(m.people); discardUnavailableMedia(m.people); queueSubscribe(m.people); return; } const v = getState().voice;
+onVoiceEvent(m => { if (m.type === 'voice_socket_ready') { if (holding && holding.inst === (m.inst || NOOKARA)) void resumeAfterDrop(); return; } if (m.type === 'chat_error' && String(m.request || '').startsWith('chat_rtc')) return void settle(m, true); if (['chat_rtc_joined', 'chat_rtc_published', 'chat_rtc_offer', 'chat_rtc_ready', 'chat_rtc_resumed'].includes(m.type)) return void settle(m); if (m.type === 'chat_rtc_room' && m.room === room) { peopleSounds(m.people); setPeople(m.people); discardUnavailableMedia(m.people); queueSubscribe(m.people); return; } const v = getState().voice;
   if (m.type === 'voice_closed') {
-    if (m.inst && m.inst !== VELORA) { if (room && roomInst(room) === m.inst && !(m.dropped && holdForResume(m.inst))) leaveVoice(true); return; } // an instance's socket went: only a call on it ends (or waits to resume)
+    if (m.inst && m.inst !== NOOKARA) { if (room && roomInst(room) === m.inst && !(m.dropped && holdForResume(m.inst))) leaveVoice(true); return; } // an instance's socket went: only a call on it ends (or waits to resume)
     if (room && isInst(String(room).slice(3))) { patchState({ dmCalls: {}, dmCallWith: {}, incoming: [] }); return; } // the home socket going doesn't end a call on an instance
-    if (m.dropped && holdForResume(VELORA)) { patchState({ incoming: [] }); return; } // (the call waits for the next socket)
+    if (m.dropped && holdForResume(NOOKARA)) { patchState({ incoming: [] }); return; } // (the call waits for the next socket)
     leaveVoice(true);
     patchState({ dmCalls: {}, dmCallWith: {}, incoming: [] });
     return;

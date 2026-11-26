@@ -1,4 +1,4 @@
-// Which build this is, which one GitHub says is newest, and which one the host (Velora) is serving right now.
+// Which build this is, which one GitHub says is newest, and which one the host (Nookara) is serving right now.
 // __EMBER_COMMIT__ / __EMBER_REPO__ are injected by vite.config.js at build time.
 export const REPO = __EMBER_REPO__;
 export const COMMIT = __EMBER_COMMIT__;

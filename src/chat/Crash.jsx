@@ -43,6 +43,6 @@ function CrashScreen({ error, info }) {
 export class CrashGuard extends Component {
   constructor(props) { super(props); this.state = { error: null, info: null }; }
   static getDerivedStateFromError(error) { return { error }; }
-  componentDidCatch(error, info) { this.setState({ info }); console.error('[bonfire] crashed:', error, info?.componentStack); }
+  componentDidCatch(error, info) { this.setState({ info }); console.error('[ember] crashed:', error, info?.componentStack); }
   render() { return this.state.error ? <CrashScreen error={this.state.error} info={this.state.info} /> : this.props.children; }
 }

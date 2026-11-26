@@ -8,11 +8,11 @@
     <link rel="icon" type="image/svg+xml" href="/assets/logo.svg" />
     <link rel="alternate icon" href="/assets/icon.png" />
     <script>
-      // Ember in a browser (/chat) keeps its own sign-in (bonfire_token) and never reads the host website's session (velora_token).
-      // The desktop / Android apps are exempt (it is their token).
+      // Ember in a browser (/chat) keeps its own sign-in (ember_token) and never reads the host website's session (velora_token).
+      // The desktop / Android apps are exempt (it is their token). The apps' old names (bonfireDesktop...) still count, see src/compat.js.
       (function () {
         var get = Storage.prototype.getItem;
-        Storage.prototype.getItem = function (k) { return k === 'velora_token' && /^\/chat(\/|$)/.test(location.pathname) && !window.bonfireDesktop && !window.bonfireMobile && !/\bBonfireAndroid\//.test(navigator.userAgent) ? null : get.call(this, k); };
+        Storage.prototype.getItem = function (k) { return k === 'velora_token' && /^\/chat(\/|$)/.test(location.pathname) && !window.emberDesktop && !window.bonfireDesktop && !window.emberMobile && !window.bonfireMobile && !/\b(?:Ember|Bonfire)Android\//.test(navigator.userAgent) ? null : get.call(this, k); };
       })();
     </script>
   </head>

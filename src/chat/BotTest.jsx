@@ -10,6 +10,7 @@ import { useChat, go, loadMembers } from './store.js';
 import { bare, normOrigin } from './ids.js';
 import { moderate } from './roles.jsx';
 import { useAddTargets, errText } from './Bots.jsx';
+import { EMBER_API, ADMIN_EMBER_API } from '../compat.js';
 
 const STATE = { pending: 'Pending', private: 'Private (not submitted)', rejected: 'Rejected', delisted: 'Delisted', approved: 'Approved', banned: 'Banned' };
 const EXTRA = {
@@ -37,7 +38,7 @@ function Advanced({ id }) {
   const origin = (normOrigin(inst) || inst.trim()).replace(/\/+$/, '');
   async function getTicket() {
     setBusy(true); setErr(''); setT(null);
-    try { setT(await apiFetch(`/admin/bonfire/bots/${encodeURIComponent(id)}/test-ticket`, { method: 'POST', body: JSON.stringify({ instance: origin }) })); }
+    try { setT(await apiFetch(`${ADMIN_EMBER_API}/bots/${encodeURIComponent(id)}/test-ticket`, { method: 'POST', body: JSON.stringify({ instance: origin }) })); }
     catch (e) { setErr(why(e)); }
     setBusy(false);
   }
@@ -81,10 +82,10 @@ export function TestBotDialog({ id, onClose }) {
   const targets = useAddTargets();
   useChat(s => s.instances); // (redraw when my instances connect)
 
-  const loadDetail = useCallback(() => apiFetch(`/admin/bonfire/bots/${encodeURIComponent(id)}`).then(setDet).catch(() => {}), [id]);
+  const loadDetail = useCallback(() => apiFetch(`${ADMIN_EMBER_API}/bots/${encodeURIComponent(id)}`).then(setDet).catch(() => {}), [id]);
   useEffect(() => {
     const t = getToken();
-    fetch(`/bonfire/bots/gallery/${encodeURIComponent(id)}`, t ? { headers: { Authorization: `Bearer ${t}` } } : undefined)
+    fetch(`${EMBER_API}/bots/gallery/${encodeURIComponent(id)}`, t ? { headers: { Authorization: `Bearer ${t}` } } : undefined)
       .then(r => (r.ok ? r.json() : Promise.reject(r.status))).then(x => setBot(x.bot || x))
       .catch(() => setLoadErr("Couldn't load that bot. Sign in with an admin account, then try again."));
     loadDetail();
@@ -98,24 +99,24 @@ export function TestBotDialog({ id, onClose }) {
     setMsg(''); setBusy(s.sid);
     try {
       const enc = encodeURIComponent(id);
-      if (!s.inst) await apiFetch(`/admin/bonfire/bots/${enc}/test`, { method: 'POST', body: JSON.stringify({ sid: s.sid }) });
+      if (!s.inst) await apiFetch(`${ADMIN_EMBER_API}/bots/${enc}/test`, { method: 'POST', body: JSON.stringify({ sid: s.sid }) });
       else {
-        const t = await apiFetch(`/admin/bonfire/bots/${enc}/test-ticket`, { method: 'POST', body: JSON.stringify({ instance: s.inst }) });
+        const t = await apiFetch(`${ADMIN_EMBER_API}/bots/${enc}/test-ticket`, { method: 'POST', body: JSON.stringify({ instance: s.inst }) });
         if (!t?.ticket) throw new Error('ticket_invalid');
         await apiFetch('/api/v1/bots/gallery/add', { inst: s.inst, method: 'POST', body: JSON.stringify({ ticket: t.ticket, sid: bare(s.sid) }) });
       }
       setDone(d => ({ ...d, [s.sid]: true }));
-      loadDetail(); setTimeout(loadDetail, 6000); // the instance reports the install to Velora a few seconds later
+      loadDetail(); setTimeout(loadDetail, 6000); // the instance reports the install to Nookara a few seconds later
     } catch (e) { setMsg(why(e)); }
     setBusy('');
   }
 
-  // remove a test install: Velora-native servers have a revoke route; on an instance the bot is simply kicked from the server
+  // remove a test install: Nookara-native servers have a revoke route; on an instance the bot is simply kicked from the server
   async function remove(s) {
     setMsg(''); setBusy(s.sid);
     try {
       if (!s.inst) {
-        await apiFetch(`/admin/bonfire/bots/${encodeURIComponent(id)}/test`, { method: 'DELETE', body: JSON.stringify({ sid: s.sid }) });
+        await apiFetch(`${ADMIN_EMBER_API}/bots/${encodeURIComponent(id)}/test`, { method: 'DELETE', body: JSON.stringify({ sid: s.sid }) });
         setDone(d => ({ ...d, [s.sid]: false })); loadDetail();
       } else {
         const d = await apiFetch(`/chat/servers/${s.sid}/members`);

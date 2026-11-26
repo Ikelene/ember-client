@@ -28,7 +28,7 @@ test('expired and unknown files are left out; all of them gone = no footer', () 
   assert.equal(expiryLabel([null], L), null);
   assert.equal(expiryLabel([], L), null);
 });
-test('expiryAt: seconds left as of the fetch, or expires_at when Velora sends it', () => {
+test('expiryAt: seconds left as of the fetch, or expires_at when Nookara sends it', () => {
   assert.equal(expiryAt({ expires_in: 3600, at: 1000 }), 1000 + 3600000);
   assert.equal(expiryAt({ expires_in: 5, expires_at: '2026-11-29T00:00:00.000Z', at: 1000 }), Date.parse('2026-11-29T00:00:00.000Z'));
   assert.equal(expiryAt('gone'), 'gone');

@@ -1,17 +1,18 @@
-// Servers hosted by Velora: "Create a server" (a plan, an address -> Velora starts an Ember server for you, then the normal
+// Servers hosted by Nookara: "Create a server" (a plan, an address -> Nookara starts an Ember server for you, then the normal
 // setup dialog names it - or a backup is restored into it), Server settings > Hosting (time left, buy weeks, plan, voice
-// minutes, backups, delete) and the "running out" note above you at the bottom left. Like Velora Pro bought with credits,
+// minutes, backups, delete) and the "running out" note above you at the bottom left. Like Nookara Pro bought with credits,
 // Plus is prepaid weeks and never renews by itself: when the time is up the server is overdue for 2 days, then read-only,
-// and a week later Velora keeps a backup in your account and shuts it down. Velora's side: /bonfire/hosting/* (PROTOCOL §19).
+// and a week later Nookara keeps a backup in your account and shuts it down. Nookara's side: /bonfire/hosting/* (PROTOCOL §19).
 import { useEffect, useRef, useState } from 'react';
 import { Check, Plus, Globe, Rocket, Sparkles, Users, Volume2, Upload, Smile, Bot, ArrowLeftRight, KeyRound, TriangleAlert, ScrollText, RefreshCw, Trash2, Coins, Server, ShieldCheck, Archive, Download, CalendarClock, X, Lock, HardDrive, Clock, Pencil } from 'lucide-react';
 import { apiFetch, getToken } from '../api.js';
 import { Dialog } from './Dialogs.jsx';
 import { useChat, patchState, toast, errorText, ask, go } from './store.js';
-import { discover, veloraSession, addInstance, moveInstance } from './instances.js';
+import { discover, nookaraSession, addInstance, moveInstance } from './instances.js';
 import { normOrigin, instOf, isInst } from './ids.js';
-import { hasVelora, startSignIn } from './session.js';
+import { hasNookara, startSignIn } from './session.js';
 import { OperatorTermsCheck, TermsLink } from './OperatorTerms.jsx';
+import { EMBER_API } from '../compat.js';
 
 // a hosted server's address is e-<slug>.nookara.cc (the host template from /bonfire/hosting/plans); choosing <slug> is a Nookara Pro perk
 const DEFAULT_TEMPLATE = 'e-{slug}.nookara.cc';
@@ -50,7 +51,7 @@ let hostedAt = 0;
 export function loadHosted(force) {
   if (!getToken() || (!force && Date.now() - hostedAt < 5 * 60000)) return Promise.resolve();
   hostedAt = Date.now();
-  return apiFetch('/bonfire/hosting/servers').then(d => patchState({ hosted: d.servers || [], hostedYou: d.you || null })).catch(() => {}); // you: { pro, pro_until }
+  return apiFetch(`${EMBER_API}/hosting/servers`).then(d => patchState({ hosted: d.servers || [], hostedYou: d.you || null })).catch(() => {}); // you: { pro, pro_until }
 }
 const NONE = []; // (a selector must return the same empty list every time, or the store re-renders forever)
 export const useHostedFor = origin => useChat(s => (origin ? (s.hosted || NONE).find(h => normOrigin(h.url) === origin) : null));
@@ -60,7 +61,7 @@ export async function deleteHostedServer(h) {
   const word = h.host_slug || h.slug;
   if (!(await ask({ title: `Delete ${h.name || word}?`, text: 'Nookara saves a backup to your account first, then shuts the server down and deletes it, for everyone. Its plan slot is free right away. You can restore the backup later from Create a server.', match: word, confirm: 'Delete server', danger: true }))) return false;
   try {
-    const d = await apiFetch(`/bonfire/hosting/servers/${h.slug}`, { method: 'DELETE', body: JSON.stringify({ confirm: word }) });
+    const d = await apiFetch(`${EMBER_API}/hosting/servers/${h.slug}`, { method: 'DELETE', body: JSON.stringify({ confirm: word }) });
     loadHosted(true);
     toast(d?.pending ? "Deleted. Nookara's hosting box didn't answer, so it finishes shutting the server down by itself in a few minutes." : 'Deleted. A backup is in your account.', true);
     go({ kind: 'home' });
@@ -82,7 +83,7 @@ function limitLines(l = {}) {
     [KeyRound, l.custom_voice_keys ? 'Your own Cloudflare voice keys' : null],
   ].filter(([, t]) => t);
 }
-// Self-hosted isn't a Velora plan: it's the card for running Ember Server yourself (everything, free)
+// Self-hosted isn't a Nookara plan: it's the card for running Ember Server yourself (everything, free)
 const SELF_REPO = 'https://github.com/Nookara-Project/ember-server';
 const selfLines = starterVoice => [
   [Server, 'Runs on your own machine (Docker or Node.js)'],
@@ -92,7 +93,7 @@ const selfLines = starterVoice => [
   [KeyRound, 'Nookara accounts or its own accounts'],
 ];
 function PlanCard({ plan, on, onPick, current, disabled, note, pro }) {
-  const paid = plan.price_credits > 0 && !(pro && plan.free_with_pro); // with Velora Pro, Plus costs nothing
+  const paid = plan.price_credits > 0 && !(pro && plan.free_with_pro); // with Nookara Pro, Plus costs nothing
   return (
     <button type="button" className={`bf-plan${on ? ' on' : ''}${paid ? ' paid' : ''}`} disabled={disabled} onClick={onPick} aria-pressed={on}>
       <span className="bf-plan-head">
@@ -121,7 +122,7 @@ function WeeksPicker({ plan, weeks, setWeeks }) {
   );
 }
 
-// ── Create a server: plan (or a backup) -> address -> Velora starts it -> sign in -> the normal setup (name, icon, import) ──
+// ── Create a server: plan (or a backup) -> address -> Nookara starts it -> sign in -> the normal setup (name, icon, import) ──
 // "Create a server" has two ways in, as tabs at the top: make a new one, or add one that already exists by its address
 export function CreateTabs({ on, onPick }) {
   return (
@@ -148,13 +149,13 @@ export function CreateServer({ onClose, onSetup, onAddByAddress }) {
   const [progress, setProgress] = useState(0); // 0 reserve, 1 start, 2 sign in
   const [err, setErr] = useState('');
   const timer = useRef(null);
-  const signedIn = hasVelora();
+  const signedIn = hasNookara();
   const mine = useChat(s => s.hosted || NONE);
-  const pro = useChat(s => !!s.hostedYou?.pro); // Velora Pro: Plus is free
+  const pro = useChat(s => !!s.hostedYou?.pro); // Nookara Pro: Plus is free
 
   useEffect(() => {
-    apiFetch('/bonfire/hosting/plans').then(setCfg).catch(e => setCfg({ available: false, error: e.message }));
-    if (signedIn) { loadHosted(true); apiFetch('/bonfire/hosting/backups').then(d => setBackups(d.backups || [])).catch(() => {}); }
+    apiFetch(`${EMBER_API}/hosting/plans`).then(setCfg).catch(e => setCfg({ available: false, error: e.message }));
+    if (signedIn) { loadHosted(true); apiFetch(`${EMBER_API}/hosting/backups`).then(d => setBackups(d.backups || [])).catch(() => {}); }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const plans = cfg?.plans || [];
   const selfPlan = { id: 'self', self: true, name: 'Self-hosted', price_credits: 0, lines: selfLines(plans.find(p => p.id === 'starter')?.limits?.voice_minutes) };
@@ -173,7 +174,7 @@ export function CreateServer({ onClose, onSetup, onAddByAddress }) {
     const issue = slugIssue(slug);
     if (issue) { setCheck({ slug, available: false, reason: 'invalid_slug', detail: issue }); return undefined; }
     setCheck({ slug, checking: true });
-    timer.current = setTimeout(() => apiFetch(`/bonfire/hosting/slug/${encodeURIComponent(slug)}`).then(d => setCheck({ slug, ...d, reason: d.reason && ({ invalid: 'invalid_slug', reserved: 'slug_reserved', taken: 'slug_taken' }[d.reason] || d.reason) })).catch(e => setCheck({ slug, available: false, reason: e.message })), 350);
+    timer.current = setTimeout(() => apiFetch(`${EMBER_API}/hosting/slug/${encodeURIComponent(slug)}`).then(d => setCheck({ slug, ...d, reason: d.reason && ({ invalid: 'invalid_slug', reserved: 'slug_reserved', taken: 'slug_taken' }[d.reason] || d.reason) })).catch(e => setCheck({ slug, available: false, reason: e.message })), 350);
     return () => clearTimeout(timer.current);
   }, [slug, pro]);
   function pickBackup(b) { setRestore(b); setName(b.name || b.slug); setTouched(true); setSlug(pro && b.slug && !slugIssue(b.slug) ? b.slug : ''); setStep('address'); }
@@ -182,15 +183,15 @@ export function CreateServer({ onClose, onSetup, onAddByAddress }) {
   async function create() {
     setStep('work'); setErr(''); setProgress(0);
     try {
-      const d = await apiFetch('/bonfire/hosting/servers', { method: 'POST', body: JSON.stringify({ accept_operator_terms: true, ...(pro && slug ? { host_slug: slug } : {}), name: name.trim(), plan, ...(chosen?.price_credits > 0 ? { weeks } : {}), ...(restore ? { restore_backup: restore.id } : {}) }) });
+      const d = await apiFetch(`${EMBER_API}/hosting/servers`, { method: 'POST', body: JSON.stringify({ accept_operator_terms: true, ...(pro && slug ? { host_slug: slug } : {}), name: name.trim(), plan, ...(chosen?.price_credits > 0 ? { weeks } : {}), ...(restore ? { restore_backup: restore.id } : {}) }) });
       const origin = normOrigin(d.url || d.server?.url);
       loadHosted(true);
       setProgress(1);
-      let found = null; // Velora waited for it to answer; it may still be warming up here (a restore takes a little longer)
+      let found = null; // Nookara waited for it to answer; it may still be warming up here (a restore takes a little longer)
       for (let i = 0; i < 45 && !(found && (!restore || found.info.community)); i++) { found = await discover(origin).catch(() => null); if (!(found && (!restore || found.info.community))) await new Promise(r => setTimeout(r, 2000)); }
       if (!found) throw new Error('instance_unreachable');
       setProgress(2);
-      await addInstance(found.origin, found.info, await veloraSession(found.origin));
+      await addInstance(found.origin, found.info, await nookaraSession(found.origin));
       onClose();
       if (found.info.community) setTimeout(() => go({ kind: 'instance', inst: found.origin }), 200); // restored: it's ready
       else setTimeout(() => onSetup?.(found.origin, name.trim()), 200);
@@ -283,7 +284,7 @@ export function CreateServer({ onClose, onSetup, onAddByAddress }) {
 
 // the state of a hosted server's paid time, in words: [level '' | 'near' | 'warn' | 'full', title, text]
 export function billingState(h) {
-  if (!h || h.billing === 'pro' || (h.plan === 'starter' && h.billing === 'active')) return null; // (Velora Pro covers it: nothing runs out)
+  if (!h || h.billing === 'pro' || (h.plan === 'starter' && h.billing === 'active')) return null; // (Nookara Pro covers it: nothing runs out)
   if (h.billing === 'read_only') return ['full', 'Read-only - time ran out', `Nobody can post until you buy more time.${h.archive_at ? ` On ${day(h.archive_at)} Nookara saves a backup to your account and shuts the server down.` : ''}`];
   if (h.billing === 'overdue') return ['warn', 'Plus time ran out', `The server goes read-only${h.read_only_at ? ` on ${day(h.read_only_at)}` : ' soon'} unless you buy more time.`];
   if (h.billing === 'archived') return ['full', 'Shut down', 'Nookara kept a backup in your account - restore it from Create a server.'];
@@ -318,7 +319,7 @@ export function HostingNote() {
 // a backup, saved to a file (it's the owner's data: the same zip Ember's export makes)
 async function downloadBackup(b) {
   try {
-    const r = await fetch(`/bonfire/hosting/backups/${b.id}/download`, { headers: { Authorization: `Bearer ${getToken()}` } });
+    const r = await fetch(`${EMBER_API}/hosting/backups/${b.id}/download`, { headers: { Authorization: `Bearer ${getToken()}` } });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'request_failed');
     const url = URL.createObjectURL(await r.blob());
     const a = Object.assign(document.createElement('a'), { href: url, download: `${b.slug}-${new Date(b.created_at).toISOString().slice(0, 10)}.zip` });
@@ -345,7 +346,7 @@ function AddressCard({ h, cfg, origin }) {
     const issue = slugIssue(val);
     if (issue) { setCheck({ available: false, reason: 'invalid_slug', detail: issue }); return undefined; }
     setCheck({ checking: true });
-    timer.current = setTimeout(() => apiFetch(`/bonfire/hosting/slug/${encodeURIComponent(val)}?server=${encodeURIComponent(h.slug)}`).then(d => setCheck({ ...d, reason: d.reason && ({ invalid: 'invalid_slug', reserved: 'slug_reserved', taken: 'slug_taken' }[d.reason] || d.reason) })).catch(e => setCheck({ available: false, reason: e.message })), 350);
+    timer.current = setTimeout(() => apiFetch(`${EMBER_API}/hosting/slug/${encodeURIComponent(val)}?server=${encodeURIComponent(h.slug)}`).then(d => setCheck({ ...d, reason: d.reason && ({ invalid: 'invalid_slug', reserved: 'slug_reserved', taken: 'slug_taken' }[d.reason] || d.reason) })).catch(e => setCheck({ available: false, reason: e.message })), 350);
     return () => clearTimeout(timer.current);
   }, [val, editing]); // eslint-disable-line react-hooks/exhaustive-deps
   const left = a.next_change_at ? a.next_change_at - Date.now() : 0;
@@ -353,7 +354,7 @@ function AddressCard({ h, cfg, origin }) {
     if (!(await ask({ title: `Move to ${pre}${val}${post}?`, text: `People reach the server at the new address right away. The old one, ${(a.url || '').replace(/^https?:\/\//, '')}, redirects for 14 days, then stops working. You can change it again in 24 hours.`, confirm: 'Change address' }))) return;
     setBusy(true);
     try {
-      const d = await apiFetch(`/bonfire/hosting/servers/${h.slug}/address`, { method: 'PUT', body: JSON.stringify({ host_slug: val }) });
+      const d = await apiFetch(`${EMBER_API}/hosting/servers/${h.slug}/address`, { method: 'PUT', body: JSON.stringify({ host_slug: val }) });
       setEditing(false);
       await loadHosted(true);
       toast('Address changed. The old one redirects for 14 days.', true);
@@ -392,7 +393,7 @@ function AddressCard({ h, cfg, origin }) {
   );
 }
 
-// ── Server settings > Hosting (the owner of a Velora-hosted server) ──
+// ── Server settings > Hosting (the owner of a Nookara-hosted server) ──
 export function HostingPage({ origin }) {
   const h = useHostedFor(origin);
   const you = useChat(s => s.hostedYou);
@@ -402,8 +403,8 @@ export function HostingPage({ origin }) {
   const [weeks, setWeeks] = useState(4);
   const [backups, setBackups] = useState(null);
   const [busy, setBusy] = useState('');
-  const loadBackups = () => apiFetch('/bonfire/hosting/backups').then(d => setBackups(d.backups || [])).catch(() => setBackups([]));
-  useEffect(() => { loadHosted(true).then(() => setLoaded(true)); apiFetch('/bonfire/hosting/plans').then(setCfg).catch(() => {}); loadBackups(); }, [origin]); // eslint-disable-line react-hooks/exhaustive-deps
+  const loadBackups = () => apiFetch(`${EMBER_API}/hosting/backups`).then(d => setBackups(d.backups || [])).catch(() => setBackups([]));
+  useEffect(() => { loadHosted(true).then(() => setLoaded(true)); apiFetch(`${EMBER_API}/hosting/plans`).then(setCfg).catch(() => {}); loadBackups(); }, [origin]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!h && !loaded) return <div className="vc-loading"><i /><i /><i /></div>;
   if (!h) return <div className="bf-ss-page"><p className="vc-hint">Only the server's owner sees its hosting. Sign in to Ember with the owner's Nookara account.</p></div>;
   const plans = cfg?.plans || [];
@@ -418,7 +419,7 @@ export function HostingPage({ origin }) {
   async function proUpgrade() {
     if (!(await ask({ title: `Switch to ${plus.name}?`, text: `It's free with your Nookara Pro, for as long as you have it. ${h.name || h.slug} moves to ${plus.name} right away.`, confirm: `Switch to ${plus.name}` }))) return;
     setBusy('buy');
-    try { await apiFetch(`/bonfire/hosting/servers/${h.slug}/weeks`, { method: 'POST', body: JSON.stringify({ weeks: 1 }) }); await loadHosted(true); toast(`Welcome to ${plus.name}!`, true); }
+    try { await apiFetch(`${EMBER_API}/hosting/servers/${h.slug}/weeks`, { method: 'POST', body: JSON.stringify({ weeks: 1 }) }); await loadHosted(true); toast(`Welcome to ${plus.name}!`, true); }
     catch (e) { toast(hostingError(e)); }
     setBusy('');
   }
@@ -427,7 +428,7 @@ export function HostingPage({ origin }) {
     const cost = weeks * plus.price_credits;
     if (!(await ask({ title: `Buy ${plural(weeks, per(plus))} of ${plus.name}?`, text: `${cost.toLocaleString()} credits from your Nookara credits.${h.plan === 'starter' ? ` ${h.name || h.slug} moves to ${plus.name} right away.` : ''} It doesn't renew by itself.`, confirm: `Pay ${cost.toLocaleString()} credits` }))) return;
     setBusy('buy');
-    try { await apiFetch(`/bonfire/hosting/servers/${h.slug}/weeks`, { method: 'POST', body: JSON.stringify({ weeks }) }); await loadHosted(true); toast(h.billing === 'read_only' ? 'Paid - the server is open again.' : 'Paid. Thank you!', true); }
+    try { await apiFetch(`${EMBER_API}/hosting/servers/${h.slug}/weeks`, { method: 'POST', body: JSON.stringify({ weeks }) }); await loadHosted(true); toast(h.billing === 'read_only' ? 'Paid - the server is open again.' : 'Paid. Thank you!', true); }
     catch (e) { toast(hostingError(e)); }
     setBusy('');
   }
@@ -435,20 +436,20 @@ export function HostingPage({ origin }) {
     const s = plans.find(p => p.price_credits === 0);
     if (!s || !(await ask({ title: `Switch to ${s.name}?`, text: `It's free, and it switches now - any ${cur?.name || 'Plus'} time left is not refunded.${s.limits?.member_cap ? ` Past ${s.limits.member_cap} members, nobody new can join until it's under the limit again.` : ''}`, confirm: `Switch to ${s.name}` }))) return;
     setBusy('plan');
-    try { await apiFetch(`/bonfire/hosting/servers/${h.slug}`, { method: 'PATCH', body: JSON.stringify({ plan: s.id }) }); await loadHosted(true); toast('Saved.', true); }
+    try { await apiFetch(`${EMBER_API}/hosting/servers/${h.slug}`, { method: 'PATCH', body: JSON.stringify({ plan: s.id }) }); await loadHosted(true); toast('Saved.', true); }
     catch (e) { toast(hostingError(e)); }
     setBusy('');
   }
   async function restart() {
     if (!(await ask({ title: 'Restart the server?', text: 'Everyone is disconnected for a moment while it starts again.', confirm: 'Restart' }))) return;
     setBusy('restart');
-    try { await apiFetch(`/bonfire/hosting/servers/${h.slug}/restart`, { method: 'POST' }); toast('Restarting...', true); setTimeout(() => loadHosted(true), 4000); } catch (e) { toast(hostingError(e)); }
+    try { await apiFetch(`${EMBER_API}/hosting/servers/${h.slug}/restart`, { method: 'POST' }); toast('Restarting...', true); setTimeout(() => loadHosted(true), 4000); } catch (e) { toast(hostingError(e)); }
     setBusy('');
   }
   const del = () => deleteHostedServer(h);
   async function dropBackup(b) {
     if (!(await ask({ title: 'Delete this backup?', text: "It's gone for good - download it first if you might want it.", confirm: 'Delete backup', danger: true }))) return;
-    try { await apiFetch(`/bonfire/hosting/backups/${b.id}`, { method: 'DELETE' }); loadBackups(); } catch (e) { toast(hostingError(e)); }
+    try { await apiFetch(`${EMBER_API}/hosting/backups/${b.id}`, { method: 'DELETE' }); loadBackups(); } catch (e) { toast(hostingError(e)); }
   }
   const status = { running: ['ok', 'Running'], provisioning: ['', 'Starting...'], stopped: ['warn', 'Stopped'], suspended: ['warn', "Suspended by Nookara's staff"], error: ['warn', 'Something went wrong'] }[h.status] || ['', h.status];
   return (

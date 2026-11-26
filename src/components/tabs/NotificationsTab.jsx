@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Bell, BellOff, Send } from 'lucide-react';
 import { apiFetch } from '../../api.js';
 import { pushSupported, browserSubscribed, enablePush, disablePush } from '../../push.js';
+import { desktopBridge, SITE_PUSH_PROMPT } from '../../compat.js';
 
 // Settings > Notifications: browser notifications for this device + what they're about.
 export default function NotificationsTab() {
@@ -86,10 +87,10 @@ export function PushPrompt() {
   useEffect(() => {
     // Ember Desktop uses its own notification bridge; browser Push is not
     // available in Electron, so don't show an unusable registration prompt.
-    if (window.bonfireDesktop?.isDesktop) return;
+    if (desktopBridge()?.isDesktop) return;
     (async () => {
       if (!pushSupported() || Notification.permission === 'denied') return;
-      try { if (localStorage.getItem('velora_push_prompt') === 'no') return; } catch {}
+      try { if (localStorage.getItem(SITE_PUSH_PROMPT) === 'no') return; } catch {}
       if (await browserSubscribed()) return;
       const st = await apiFetch('/push/state').catch(() => null);
       // Hyperfocus users may still want a phone or a second computer. A push
@@ -98,7 +99,7 @@ export function PushPrompt() {
     })();
   }, []);
   if (!show) return null;
-  const dismiss = () => { try { localStorage.setItem('velora_push_prompt', 'no'); } catch {} setShow(false); };
+  const dismiss = () => { try { localStorage.setItem(SITE_PUSH_PROMPT, 'no'); } catch {} setShow(false); };
   return (
     <div className="card" style={{ marginBottom: 16 }}>
       <div className="card-body" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>

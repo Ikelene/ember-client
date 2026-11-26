@@ -22,7 +22,7 @@ npm run build   # static bundle in dist/
 npm test
 ```
 
-`npm run dev` proxies the API and `/assets` to a running Nookara (`VELORA_ORIGIN`, default `http://localhost:3100`; Nookara's `scripts/dev-stack.sh` starts one).
+`npm run dev` proxies the API and `/assets` to a running Nookara (`NOOKARA_ORIGIN`, default `http://localhost:3100`; Nookara's `scripts/dev-stack.sh` starts one).
 
 ## Versions and updates
 

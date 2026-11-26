@@ -7,6 +7,7 @@ import { useChat, go } from './store.js';
 import { normOrigin } from './ids.js';
 import { initials } from './Parts.jsx';
 import { BotGallery } from './BotGallery.jsx';
+import { EMBER_API } from '../compat.js';
 
 // While Discovery is open the sidebar lists its sections (Servers, Bots) instead of the last server's channels (Ikelene
 // 2026-11-16); Chat.jsx keeps which one is open, so the sidebar and the tabs under the header stay in step.
@@ -62,7 +63,7 @@ function ServerResults({ q, onClose }) {
   const [err, setErr] = useState(false);
   const mine = useChat(s => s.instances);
   useEffect(() => { const t = setTimeout(() => setDeb(q.trim()), 300); return () => clearTimeout(t); }, [q]);
-  const load = (page = 1) => fetch(`/bonfire/directory?q=${encodeURIComponent(deb)}&page=${page}`).then(r => (r.ok ? r.json() : Promise.reject()))
+  const load = (page = 1) => fetch(`${EMBER_API}/directory?q=${encodeURIComponent(deb)}&page=${page}`).then(r => (r.ok ? r.json() : Promise.reject()))
     .then(x => { setErr(false); setD(cur => ({ ...x, results: page > 1 && cur ? [...cur.results, ...x.results] : x.results })); }).catch(() => setErr(true));
   useEffect(() => { setD(null); load(1); }, [deb]); // eslint-disable-line react-hooks/exhaustive-deps
   const pick = r => {
@@ -110,7 +111,7 @@ const hueOf = name => (Array.from(String(name || '')).reduce((h, c) => h + c.cha
 function HeroTiles() {
   const mine = useChat(s => s.servers);
   const [dir, setDir] = useState([]);
-  useEffect(() => { fetch('/bonfire/directory?q=&page=1').then(r => (r.ok ? r.json() : null)).then(d => setDir(d?.results || [])).catch(() => {}); }, []);
+  useEffect(() => { fetch(`${EMBER_API}/directory?q=&page=1`).then(r => (r.ok ? r.json() : null)).then(d => setDir(d?.results || [])).catch(() => {}); }, []);
   const safe = u => (/^https:\/\//i.test(u || '') || /^\/(uploads|assets)\//.test(u || '') ? u : null);
   const items = [
     ...dir.map(r => ({ k: `d${r.id || r.url}`, name: r.name, icon: safe(r.icon_url), banner: safe(r.banner_url) })),

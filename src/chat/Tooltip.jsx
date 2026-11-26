@@ -117,10 +117,10 @@ function Tip({ tip }) {
 function ServerTip({ sid }) {
   const s = useChat(st => st.servers.find(x => x.sid === sid));
   const members = useChat(st => st.members[sid]);
-  const st = useChat(x => x); // presence, Velora names, signed in
+  const st = useChat(x => x); // presence, Nookara names, signed in
   useEffect(() => { if (s?.inst && !members) loadMembers(sid); }, [sid]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!s) return null;
-  // with the member list loaded, count who's online right now (an instance: its Velora accounts, from the home socket); otherwise what the server said
+  // with the member list loaded, count who's online right now (an instance: its Nookara accounts, from the home socket); otherwise what the server said
   const online = members ? (s.inst && !st.signedIn ? null : members.filter(m => { const v = statusOf(sid, m, st); return v && v !== 'offline'; }).length) : s.online;
   return (
     <div className="vc-tip-server">

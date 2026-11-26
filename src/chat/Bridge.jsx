@@ -1,7 +1,7 @@
 import { siteHref } from './hosts.js';
-// Discord / Fluxer / Matrix: import a server into Ember (Create a server > Import; or, for a new instance, a Velora import
+// Discord / Fluxer / Matrix: import a server into Ember (Create a server > Import; or, for a new instance, a Nookara import
 // bundle - a Matrix space comes over with the instance's own bot instead),
-// and the Bridge tab in Server settings (Velora's bot for Velora-hosted servers, the instance owner's own bot on an instance).
+// and the Bridge tab in Server settings (Nookara's bot for Nookara-hosted servers, the instance owner's own bot on an instance).
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Check, ExternalLink, RefreshCw, Link2, Unlink, Volume2, Hash, Lock, EyeOff, Smile, Shield, Image as ImageIcon, ArrowLeftRight, TriangleAlert } from 'lucide-react';
 import { apiFetch } from '../api.js';
@@ -14,6 +14,7 @@ import { instOpt, bare } from './ids.js';
 // bridge links name channels by the server's own id; Ember keeps an Ember server's ids as origin|id (ids.js)
 const sameCh = (a, b) => String(bare(a)) === String(bare(b));
 import { usePlan, PlanGate, PlanNotice, planOf } from './PlanGate.jsx';
+import { EMBER_API, INST_IMPORT_NOOKARA, legacyToNew } from '../compat.js';
 
 const ERR = {
   not_linked: 'Link that account to Nookara first (Account > Security > Connected accounts).',
@@ -29,7 +30,7 @@ const ERR = {
   text_channels_only: 'Only text channels can be bridged.',
   voice_channels_only: 'A voice channel can only be linked to a voice channel.',
 };
-// an instance's bridge runs on its owner's own bot, not Velora's
+// an instance's bridge runs on its owner's own bot, not Nookara's
 const INST_ERR = {
   bot_not_in_server: "Your bot isn't in that server - add it first.", bridge_not_set_up: "That platform's bot isn't set up on this server yet - its admins add the bot's token in Server settings > Bridge.",
   bot_needs_webhooks: 'Your bot needs the Manage webhooks permission in that channel.', unreachable: "Can't reach the platform right now.",
@@ -46,7 +47,7 @@ const MX_ERR = {
   bot_not_in_server: "The bot isn't in that space any more.", pick_a_channel: 'Pick at least one room.', import_running: 'An import is already running - give it a moment.',
   community_exists: 'This server already has its community.', forbidden: "Only this server's admins can import.", not_allowed: "Only this server's admins can import.",
 };
-const IMPORT_ERR = { not_linked: 'Link that account to Nookara first (Account > Security > Connected accounts).', bot_not_in_server: "Nookara's bot isn't in that server - add it first.", not_your_server: 'You need to own that server, or have Administrator / Manage server there.', import_running: 'An import is already running - give it a moment.', invalid_instance: "Nookara can't make an import for this server's address.", ticket_invalid: 'That import is gone - run it again.', ticket_expired: 'That import ran out - run it again.', ticket_wrong_instance: 'That import was made for another server.', import_failed: "Nookara couldn't build the import - try again.", velora_not_registered: "This server isn't registered with Nookara yet - try again in a minute.", velora_off: 'This server has its Nookara connection turned off.', community_exists: 'This server already has its community.' };
+const IMPORT_ERR = { not_linked: 'Link that account to Nookara first (Account > Security > Connected accounts).', bot_not_in_server: "Nookara's bot isn't in that server - add it first.", not_your_server: 'You need to own that server, or have Administrator / Manage server there.', import_running: 'An import is already running - give it a moment.', invalid_instance: "Nookara can't make an import for this server's address.", ticket_invalid: 'That import is gone - run it again.', ticket_expired: 'That import ran out - run it again.', ticket_wrong_instance: 'That import was made for another server.', import_failed: "Nookara couldn't build the import - try again.", nookara_not_registered: "This server isn't registered with Nookara yet - try again in a minute.", nookara_off: 'This server has its Nookara connection turned off.', community_exists: 'This server already has its community.' };
 
 function useLoad(url, deps, inst) {
   const [v, setV] = useState({ data: null, error: null, loading: true });
@@ -64,7 +65,7 @@ const Loading = () => <div className="vc-loading"><i /><i /><i /></div>;
 
 // step 1 + 2 (shared with the Bridge tab): pick Discord or Fluxer, add the bot, pick one of your servers there.
 // inst: an instance's bridge (its owner's bot: no linked account, every server the bot is in); base: where the routes are
-// ('/chat/bridge' = Velora-hosted bridge / import, '/bonfire/import' = a Velora import bundle for an instance)
+// ('/chat/bridge' = Nookara-hosted bridge / import, `${EMBER_API}/import` = a Nookara import bundle for an instance)
 // extra: more tiles next to the platforms ([{ id, name, sub, onClick }]); they stay when the platforms themselves can't be listed
 function GuildPicker({ onPick, pickLabel = 'Choose', exclude = [], inst, base = '/chat/bridge', extra = [], errorNote }) {
   const [plats] = useLoad(`${base}/platforms`, [], inst);
@@ -125,7 +126,7 @@ function GuildPicker({ onPick, pickLabel = 'Choose', exclude = [], inst, base = 
             <div className="vc-row"><p className="grow"><b>2.</b> Pick the server. {inst ? 'Every server the bot is in shows here.' : 'Only ones you own or manage, with the bot in them, show here.'}</p>
               <button type="button" className="btn btn-surface btn-sm" onClick={reload}><RefreshCw size={13} /> Refresh</button></div>
             {guilds.loading && <Loading />}
-            {guilds.error && <div className="vc-empty-note">{base === '/bonfire/import' ? IMPORT_ERR[guilds.error.message] || why(guilds.error) : why(guilds.error, inst)}</div>}
+            {guilds.error && <div className="vc-empty-note">{base === `${EMBER_API}/import` ? IMPORT_ERR[legacyToNew(guilds.error.message)] || why(guilds.error) : why(guilds.error, inst)}</div>}
             {guilds.data && !guilds.data.guilds.length && <div className="vc-empty-note">None yet - add the bot, then press Refresh.</div>}
             <div className="vc-br-guilds">
               {guilds.data?.guilds.map(g => (
@@ -162,7 +163,7 @@ function ImportServerForm({ onClose }) {
   );
 }
 // the channel / role / extras picker; onImport({ name, channels, roles, opts }) does the import (throws to show an error).
-// base: where the preview comes from; bridge: offer "keep them talking" (only Velora-hosted servers bridge with Velora's bot)
+// base: where the preview comes from; bridge: offer "keep them talking" (only Nookara-hosted servers bridge with Nookara's bot)
 // inst: the preview comes from that instance (a Matrix space); errs: its own words for what can go wrong
 function ImportPicker({ p, g, plat, back, close, onImport, base = '/chat/bridge', bridge = true, label = 'Import server', inst, errs }) {
   const [pv] = useLoad(`${base}/${p}/guilds/${encodeURIComponent(g.id)}`, [], inst);
@@ -186,7 +187,7 @@ function ImportPicker({ p, g, plat, back, close, onImport, base = '/chat/bridge'
     try { await onImport({ name, channels: [...chans], roles: [...roles], opts }); }
     catch (e) { toast(say(e)); setBusy(false); }
   }
-  const say = e => errs?.[e?.message] || (!bridge && IMPORT_ERR[e?.message]) || why(e, inst);
+  const say = e => errs?.[e?.message] || (!bridge && IMPORT_ERR[legacyToNew(e?.message)]) || why(e, inst);
   const canBridge = bridge && d?.can_bridge !== false;
   if (pv.loading) return <Loading />;
   if (pv.error) return <div className="vc-br-step"><button type="button" className="vc-br-back" onClick={back}><ArrowLeft size={14} /> Back</button><div className="vc-empty-note">{say(pv.error)}</div></div>;
@@ -357,11 +358,11 @@ export function ChannelBridge({ sid, channel }) {
   );
 }
 
-// ── a new instance's community from a Discord / Fluxer server (setup wizard): Velora's bot builds a bundle (channels, roles,
-// emojis - no members or messages) with the signed-in Velora account; the instance downloads it with a one-time ticket.
+// ── a new instance's community from a Discord / Fluxer server (setup wizard): Nookara's bot builds a bundle (channels, roles,
+// emojis - no members or messages) with the signed-in Nookara account; the instance downloads it with a one-time ticket.
 // A Matrix space is read by the instance itself, with a bot account its admin gives it (MatrixImport) ──
 const STAGES = { queued: 'Waiting to start...', running: 'Copying the server...', done: 'Bringing it over...' };
-export function VeloraImport({ origin, onDone, onCancel }) {
+export function NookaraImport({ origin, onDone, onCancel }) {
   const [pick, setPick] = useState(null); // { p, g, plat }
   const [job, setJob] = useState(null); // { job_id, ticket }
   const [matrix, setMatrix] = useState(false);
@@ -369,8 +370,8 @@ export function VeloraImport({ origin, onDone, onCancel }) {
   if (job) return <ImportProgress origin={origin} job={job} onDone={onDone} onBack={() => { setJob(null); setPick(null); }} />;
   if (pick) {
     return (
-      <ImportPicker {...pick} base="/bonfire/import" bridge={false} label="Import" back={() => setPick(null)} close={onCancel} onImport={async ({ name, channels, roles, opts }) => {
-        setJob(await apiFetch('/bonfire/import', { method: 'POST', body: JSON.stringify({ platform: pick.p, guild_id: pick.g.id, channels, roles, options: { name, ...opts }, instance: origin }) }));
+      <ImportPicker {...pick} base={`${EMBER_API}/import`} bridge={false} label="Import" back={() => setPick(null)} close={onCancel} onImport={async ({ name, channels, roles, opts }) => {
+        setJob(await apiFetch(`${EMBER_API}/import`, { method: 'POST', body: JSON.stringify({ platform: pick.p, guild_id: pick.g.id, channels, roles, options: { name, ...opts }, instance: origin }) }));
       }} />
     );
   }
@@ -378,7 +379,7 @@ export function VeloraImport({ origin, onDone, onCancel }) {
     <div className="vc-br-step">
       <button type="button" className="vc-br-back" onClick={onCancel}><ArrowLeft size={14} /> Back</button>
       <p className="vc-dialog-sub">Nookara copies the server's channels, categories, roles and emojis into this one with its own bot. Members and messages stay where they are. You need your Discord / Fluxer account linked to Nookara, Nookara's bot in that server, and to own or manage it there. A Matrix space comes over with a bot account of your own instead.</p>
-      <GuildPicker base="/bonfire/import" pickLabel="Import" onPick={(p, g, plat) => setPick({ p, g, plat })} errorNote="Sign in with Nookara to import from Discord or Fluxer."
+      <GuildPicker base={`${EMBER_API}/import`} pickLabel="Import" onPick={(p, g, plat) => setPick({ p, g, plat })} errorNote="Sign in with Nookara to import from Discord or Fluxer."
         extra={[{ id: 'matrix', name: 'Matrix', sub: 'With a bot account you bring', onClick: () => setMatrix(true) }]} />
     </div>
   );
@@ -472,19 +473,19 @@ function ImportProgress({ origin, job, onDone, onBack }) {
     (async () => {
       try {
         for (let i = 0; live; i++) {
-          const j = await apiFetch(`/bonfire/import/${encodeURIComponent(job.job_id)}`);
+          const j = await apiFetch(`${EMBER_API}/import/${encodeURIComponent(job.job_id)}`);
           if (!live) return;
           setSt(j);
           if (j.status === 'failed') throw new Error(j.error || 'import_failed');
           if (j.status === 'done') break;
           await new Promise(r => setTimeout(r, i < 20 ? 1200 : 3000));
         }
-        // the ticket goes to this instance only (Velora bound it to its address); it fetches the bundle from Velora itself
+        // the ticket goes to this instance only (Nookara bound it to its address); it fetches the bundle from Nookara itself
         for (let i = 0; live; i++) {
-          try { const d = await apiFetch('/api/v1/import/velora', { inst: origin, method: 'POST', body: JSON.stringify({ ticket: job.ticket }) }); if (live) onDone(d.sid); return; }
+          try { const d = await apiFetch(INST_IMPORT_NOOKARA, { inst: origin, method: 'POST', body: JSON.stringify({ ticket: job.ticket }) }); if (live) onDone(d.sid); return; }
           catch (e) { if (e.message !== 'not_ready' || i > 20) throw e; await new Promise(r => setTimeout(r, 2000)); }
         }
-      } catch (e) { if (live) setErr(IMPORT_ERR[e.message] || why(e)); }
+      } catch (e) { if (live) setErr(IMPORT_ERR[legacyToNew(e.message)] || why(e)); }
     })();
     return () => { live = false; };
   }, [job.job_id]); // eslint-disable-line react-hooks/exhaustive-deps

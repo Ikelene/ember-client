@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Minimize, PictureInPicture2, Loader2, RotateCcw, Music } from 'lucide-react';
 import { peaksOf, seededPeaks, voiceSeconds } from './voice-note.js';
 
-const VOL_KEY = 'bonfire_media_volume';
+const VOL_KEY = 'ember_media_volume';
 const savedVol = () => { try { const v = JSON.parse(localStorage.getItem(VOL_KEY) || 'null'); return v && typeof v.volume === 'number' ? v : { volume: 0.8, muted: false }; } catch { return { volume: 0.8, muted: false }; } };
 const saveVol = (volume, muted) => { try { localStorage.setItem(VOL_KEY, JSON.stringify({ volume, muted })); } catch { /* fine */ } };
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -27,14 +27,14 @@ function useMedia(ref) {
       ...s, playing: !el.paused, time: el.currentTime, duration: el.duration || 0, rate: el.playbackRate, volume: el.volume, muted: el.muted, ended: el.ended,
       buffered: el.buffered.length ? el.buffered.end(el.buffered.length - 1) : 0,
     }));
-    const onPlay = () => { dispatchEvent(new CustomEvent('bonfire-media-play', { detail: el })); up(); };
+    const onPlay = () => { dispatchEvent(new CustomEvent('ember-media-play', { detail: el })); up(); };
     const others = e => { if (e.detail !== el && !el.paused) el.pause(); };
     const ev = { timeupdate: up, seeked: up, durationchange: up, progress: up, pause: up, ended: up, ratechange: up, loadedmetadata: up, play: onPlay,
       volumechange: () => { saveVol(el.volume, el.muted); up(); }, waiting: () => setSt(s => ({ ...s, waiting: true })), playing: () => setSt(s => ({ ...s, waiting: false })), canplay: () => setSt(s => ({ ...s, waiting: false })) };
     Object.entries(ev).forEach(([k, f]) => el.addEventListener(k, f));
-    addEventListener('bonfire-media-play', others);
+    addEventListener('ember-media-play', others);
     up();
-    return () => { Object.entries(ev).forEach(([k, f]) => el.removeEventListener(k, f)); removeEventListener('bonfire-media-play', others); };
+    return () => { Object.entries(ev).forEach(([k, f]) => el.removeEventListener(k, f)); removeEventListener('ember-media-play', others); };
   }, [ref]);
   const el = () => ref.current;
   return {

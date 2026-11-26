@@ -6,9 +6,10 @@ import { createPortal } from 'react-dom';
 import { Download, Monitor, Laptop, Smartphone, Terminal, Package, Box, Archive } from 'lucide-react';
 import { openSite, siteHref } from './hosts.js';
 import { Dialog } from './Dialogs.jsx';
-import { isDesktopApp } from './BonfireLogo.jsx';
+import { isDesktopApp } from './EmberLogo.jsx';
 import { isMobileDevice } from './store.js';
 import { APP_TARGETS, detectAppTarget, linuxDownloads } from './appDownloadInfo.js';
+import { mobileBridge } from '../compat.js';
 
 const ICONS = { windows: Monitor, mac: Laptop, linux: Terminal, android: Smartphone };
 const PKG_ICONS = { appimage: Package, deb: Box, pacman: Archive };
@@ -86,7 +87,7 @@ export function AppDownloadTip({ onOpen }) {
   const [box, setBox] = useState(null);
   // waits for the rail to be drawn and for any dialog to close, so it never lands on top of one
   useEffect(() => {
-    if (isDesktopApp() || window.bonfireMobile || isMobileDevice() || wasTipSeen()) return undefined;
+    if (isDesktopApp() || mobileBridge() || isMobileDevice() || wasTipSeen()) return undefined;
     const t = setInterval(() => {
       if (!button() || document.querySelector('.vc-modal-back')) return;
       clearInterval(t);

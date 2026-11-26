@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Hash, MessageSquare, ChevronRight } from 'lucide-react';
 import { apiFetch } from '../api.js';
-import { VELORA, instOf } from './ids.js';
+import { NOOKARA, instOf } from './ids.js';
 import { ServerIcon } from './ServerIcon.jsx';
 import { userById, channelById, parseEmberLink } from './tokens.js';
 import { stickerOfBody } from './stickerLink.js';
@@ -16,9 +16,10 @@ import { extractInvites } from './gameInvite.js';
 import { isHiddenInviteLine } from './inviteLink.js';
 import { highlight } from './codeColors.js';
 import { VID, AUD, VUP, NOOKARA_FILE, TEMP_FILE, inLinks } from './uploadLinks.js'; // account uploads also live on cdn.nookara.cc (/uploads/ only)
+import { TEMP_HOST } from '../compat.js';
 
 const IMG = /^https:\/\/\S+\.(png|jpe?g|gif|webp)(\?\S*)?(#\S*)?$/i;
-// Files sent in DMs live on Velora: temporary storage (/t/<id>/<name>, or cdn.nookara.cc/temp/<id>/<name>, the name is in the path) or account storage
+// Files sent in DMs live on Nookara: temporary storage (/t/<id>/<name>, or cdn.nookara.cc/temp/<id>/<name>, the name is in the path) or account storage
 // (/uploads/..., #n=<name> on the end = the real name). Pictures show as pictures, videos / sounds play, the rest is a file card.
 const TMP = TEMP_FILE;
 const isVel = u => TMP.test(u) || VUP.test(u);
@@ -27,9 +28,9 @@ const velItem = full => {
   let name = u.split('/').pop();
   try { name = decodeURIComponent(/^n=(.+)$/.exec(frag || '')?.[1] || name).slice(0, 150); } catch { /* as it is */ }
   const type = /\.(mp4|webm|mov)$/i.test(u) ? 'video' : /\.(mp3|ogg|wav|m4a|aac|flac|weba|opus)$/i.test(u) ? 'audio' : 'file';
-  return { url: u, type, name, ...(TMP.test(u) ? { host: 'velora-temp' } : {}) };
+  return { url: u, type, name, ...(TMP.test(u) ? { host: TEMP_HOST } : {}) };
 };
-// an old catbox link (where Ember's DM uploads went before Velora's own storage): pictures / videos / sounds play in Velora's
+// an old catbox link (where Ember's DM uploads went before Nookara's own storage): pictures / videos / sounds play in Nookara's
 // viewer, anything else is a file card (#n=<name> on the end = the file's real name - catbox only knows its id)
 const CB = /^https:\/\/(files|litter)\.catbox\.moe\/[\w-]+\.[a-z0-9]{1,8}(#n=[^\s#]*)?$/i;
 const cbItem = full => {
@@ -98,7 +99,7 @@ function CustomEmojiImg({ eid, animated, name, inst }) {
   const [tries, setTries] = useState(0);
   // not on Nookara (someone's personal emoji is, so is every Nookara server's): an emoji only the message's Ember server has
   const [onServer, setOnServer] = useState(false);
-  const there = !known && inst && inst !== VELORA;
+  const there = !known && inst && inst !== NOOKARA;
   const src = onServer && there ? `${inst}/uploads/emojis/${eid}.${animated ? 'gif' : 'png'}` : customEmoji(eid, animated);
   // a picture that fails (address not known yet, or a hiccup) asks for the list again and tries a few more times
   const retry = () => {
@@ -111,10 +112,10 @@ function CustomEmojiImg({ eid, animated, name, inst }) {
   return <img className="vc-cemoji" src={tries ? `${src}${src.includes('?') ? '&' : '?'}r=${tries}` : src} onError={retry} alt={`:${name}:`} title={`:${name}:`} draggable={false}
     data-eid={eid} data-name={name} data-animated={animated ? '1' : '0'} onClick={e => emojiInfo(e, { eid, name, animated: !!animated, inst })} />;
 }
-const ctxInst = ctx => ctx?.inst || (ctx?.sid ? instOf(ctx.sid) : VELORA);
+const ctxInst = ctx => ctx?.inst || (ctx?.sid ? instOf(ctx.sid) : NOOKARA);
 const hashOfChannel = (sid, cid) => {
   const inst = instOf(sid), b = x => String(x).split('|').pop();
-  return inst === VELORA ? `/s/${sid}/${cid}` : `/i/${encodeURIComponent(inst)}/s/${b(sid)}/${b(cid)}`;
+  return inst === NOOKARA ? `/s/${sid}/${cid}` : `/i/${encodeURIComponent(inst)}/s/${b(sid)}/${b(cid)}`;
 };
 // <@id> -> @Name (the server's member first, then anyone Ember has seen with that id)
 function UserMention({ id, ctx }) {
@@ -136,7 +137,7 @@ function askLinkInfo(link) {
   const key = `${link.sid}/${link.cid}`;
   if (!linkInfos.has(key)) {
     const b = x => String(x).split('|').pop();
-    const p = apiFetch(`/chat/link-info/${b(link.sid)}/${b(link.cid)}`, link.inst === VELORA ? {} : { inst: link.inst })
+    const p = apiFetch(`/chat/link-info/${b(link.sid)}/${b(link.cid)}`, link.inst === NOOKARA ? {} : { inst: link.inst })
       .then(d => ({ server: d.server || null, channel: d.channel || null }))
       .catch(() => null);
     linkInfos.set(key, p);
@@ -161,7 +162,7 @@ function EmberLinkPill({ href, link, ctx }) {
   const [sName, sIcon, cName] = known ? JSON.parse(known) : [asked?.server?.name, asked?.server?.icon, asked?.channel?.name];
   const same = !!ctx?.sid && link.sid === ctx.sid;
   let host = '';
-  try { host = link.inst === VELORA ? '' : new URL(link.inst).host; } catch { /* none */ }
+  try { host = link.inst === NOOKARA ? '' : new URL(link.inst).host; } catch { /* none */ }
   const server = sName || host || (asked === false ? 'Unknown server' : '');
   const open = e => { e.preventDefault(); ctx?.onLink?.(link.hash); };
   return (
@@ -294,8 +295,8 @@ export function renderBody(body, ctx) {
       if (IMG.test(t) && ctx?.linkImages !== false) { images.push(noFrag(t)); continue; } // a picture on its own line shows as the picture
       if (/^https:\/\/(?:www\.)?klipy\.com\/(gifs|stickers|clips)\/[\w-]{1,160}\/?(?:\?\S*)?$/i.test(t) && ctx?.linkImages !== false) { images.push(t); continue; } // a Klipy GIF page link shows as the GIF
       if (!ctx?.bio && CB.test(t) && !IMG.test(t)) { media.push(cbItem(t)); continue; } // catbox videos / sounds / files (the link hides)
-      if (!ctx?.bio && isVel(t) && !IMG.test(t)) { media.push(velItem(t)); continue; } // Velora-stored videos / sounds / files, the same
-      if (!ctx?.bio && VID.test(t)) { media.push({ url: t, type: 'video' }); continue; } // so do videos / audio files uploaded to Velora
+      if (!ctx?.bio && isVel(t) && !IMG.test(t)) { media.push(velItem(t)); continue; } // Nookara-stored videos / sounds / files, the same
+      if (!ctx?.bio && VID.test(t)) { media.push({ url: t, type: 'video' }); continue; } // so do videos / audio files uploaded to Nookara
       if (!ctx?.bio && AUD.test(t)) { media.push({ url: t, type: 'audio', name: decodeURIComponent(t.split('/').pop()) }); continue; }
       const item = /^(\s*)([-*]|(\d{1,3})[.)])\s+(.+)$/.exec(line);
       if (item) {
@@ -339,7 +340,7 @@ export function renderBody(body, ctx) {
       if (inLinks(images, u)) continue;
       // catbox links in the middle of a sentence keep their text, and still get shown underneath
       if (CB.test(u)) { const it = cbItem(u); if (!images.includes(it.url) && !media.some(x => x.url === it.url)) { if (IMG.test(u)) images.push(it.url); else media.push(it); } continue; }
-      // so do Velora-stored DM files (never unfurled: Velora fetching its own temporary file would count as someone opening it)
+      // so do Nookara-stored DM files (never unfurled: Nookara fetching its own temporary file would count as someone opening it)
       if (isVel(u)) { const it = velItem(u); if (!images.includes(u) && !images.includes(it.url) && !media.some(x => x.url === it.url)) { if (IMG.test(u)) images.push(u); else media.push(it); } continue; }
       if (IMG.test(u) || VID.test(u) || AUD.test(u) || /^https:\/\/([a-z0-9-]+\.)*klipy\.com\//i.test(u) || NOOKARA_FILE.test(u)) continue;
       if (!ctx?.bio && parseEmberLink(u)) continue; // a channel / message in Ember: the pill in the text is enough

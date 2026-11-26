@@ -3,16 +3,17 @@
 // away by itself. Never shown in the Android app, the desktop app, or on a computer.
 import { useEffect, useState } from 'react';
 import { Smartphone, Download, X } from 'lucide-react';
-import { isDesktopApp } from './BonfireLogo.jsx';
+import { isDesktopApp } from './EmberLogo.jsx';
 import { isMobileDevice } from './store.js';
 import { dialog } from './Parts.jsx';
+import { EMBER_ASSETS, mobileBridge, ANDROID_UA } from '../compat.js';
 
 const KEY = 'bf_app_promo';
 const NOTICE_MS = 7000;
 let seenThisSession = false; // when localStorage can't be used the popup still only comes once per page load
 const wasDismissed = () => { try { return localStorage.getItem(KEY) === '1'; } catch { return seenThisSession; } };
 const markDismissed = () => { seenThisSession = true; try { localStorage.setItem(KEY, '1'); } catch { /* private mode */ } };
-const inApp = () => !!window.bonfireMobile || isDesktopApp() || /\bBonfireAndroid\//.test(navigator.userAgent);
+const inApp = () => !!mobileBridge() || isDesktopApp() || ANDROID_UA.test(navigator.userAgent);
 
 export function MobileAppPromo() {
   const [step, setStep] = useState(() => (isMobileDevice() && !inApp() && !wasDismissed() ? 'ask' : 'none'));
@@ -27,7 +28,7 @@ export function MobileAppPromo() {
     return (
       <div className="vc-modal-back" role="presentation">
         <div className="vc-dialog vc-app-promo" role="dialog" aria-modal="true" aria-labelledby="vc-app-promo-t">
-          <img className="vc-app-promo-logo" src="/assets/bonfire/logo-photo-96.jpg?v=2" alt="" width={72} height={72} draggable={false} />
+          <img className="vc-app-promo-logo" src={`${EMBER_ASSETS}/logo-photo-96.jpg?v=2`} alt="" width={72} height={72} draggable={false} />
           <h3 id="vc-app-promo-t">Ember has an app</h3>
           <p className="vc-dialog-sub">Get Ember for Android for notifications, swipe gestures and a smoother phone experience. There are desktop apps for macOS and Windows too.</p>
           <div className="vc-dialog-btns">

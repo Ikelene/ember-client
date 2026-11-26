@@ -1,17 +1,18 @@
-// Ember instances (bonfire-server): one connection per instance next to the Velora "home" socket. An instance is one
+// Ember instances (ember-server): one connection per instance next to the Nookara "home" socket. An instance is one
 // community, so each connection is one icon on the rail.
 // connections: origin -> { origin, info (/.well-known/bonfire), session, user, ws, conn, retry, acks, isAdmin, isOwner }
-// Velora mode: Velora signs a short instance token, the instance trades it for a session. Local mode: username + password.
-// Sessions live in localStorage['bonfire_instance_sessions']. The list of instances is always kept locally; signed in
-// with Velora it is merged with (and saved to) /bonfire/instances.
+// Nookara mode: Nookara signs a short instance token, the instance trades it for a session. Local mode: username + password.
+// Sessions live in localStorage['ember_instance_sessions']. The list of instances is always kept locally; signed in
+// with Nookara it is merged with (and saved to) /bonfire/instances.
 import { apiFetch, getToken } from '../api.js';
 import { K, acctKey, registry, hooks, normOrigin, instOf, loadSessions, loadSessionTags, tokenTag, saveSession, fromInstance, parseK } from './ids.js';
 import { onInstClientsFrame, rewatchInstClients } from './instClients.js';
 import { SHORT } from '../version.js';
 import { getState, patchState, toast, handleEvent, RESTRICTED_TEXT, instanceVoiceClosed, voiceSocketReady, loadEmojis, go, catchUp, resumeInstanceView, backoff, instanceRestricted, instanceRestored, forgetServerCache } from './store.js';
+import { EMBER_API, INST_AUTH_NOOKARA, WELL_KNOWN, isInstanceSoftware, isNookara, nookaraInfo } from '../compat.js';
 
 export const connections = new Map();
-const LIST_CACHE = () => acctKey('bonfire_instance_list'); // (per account: an alt must not inherit the main's servers)
+const LIST_CACHE = () => acctKey('ember_instance_list'); // (per account: an alt must not inherit the main's servers)
 
 const rawOrigin = u => { try { const x = new URL(String(u)); return /^https?:$/.test(x.protocol) ? x.origin : null; } catch { return null; } };
 export const hostOf = o => { try { return new URL(o).host; } catch { return String(o).replace(/^https?:\/\//, ''); } };
@@ -31,21 +32,21 @@ function rememberLabel(c) {
   const all = savedLabels(), old = all[c.origin];
   if (old?.name === name && (old.icon || null) === icon) return;
   writeLabels({ ...all, [c.origin]: { name, icon } });
-  if (getToken()) apiFetch('/bonfire/instances/prefs', { method: 'PATCH', body: JSON.stringify({ url: c.origin, name, icon: /^https?:\/\//i.test(icon || '') ? icon : null }) }).catch(() => {});
+  if (getToken()) apiFetch(`${EMBER_API}/instances/prefs`, { method: 'PATCH', body: JSON.stringify({ url: c.origin, name, icon: /^https?:\/\//i.test(icon || '') ? icon : null }) }).catch(() => {});
 }
 export const instView = c => ({
   sleep: c.sleep || (c.peeking ? 'idle' : null), // 'idle' (sleep mode) | 'manual' (disconnected by hand) | null
   origin: c.origin, host: hostOf(c.origin), name: c.info?.name || savedLabels()[c.origin]?.name || hostOf(c.origin), icon: c.info?.icon_url || savedLabels()[c.origin]?.icon || null, description: c.info?.description || '',
   community: c.info?.community || null, mode: c.info?.accounts_mode || null, status: c.peeking && c.status !== 'open' ? 'asleep' : c.status, claimed: c.info?.claimed !== false, features: c.info?.features || {},
   registration: c.info?.registration || 'closed', isAdmin: !!c.isAdmin, isOwner: !!c.isOwner, user: c.user || null, error: c.error || null, restricted: c.restricted || null,
-  needsVelora: c.info?.accounts_mode === 'velora' && !getToken(), pending: !!c.pending, failed: !!c.failed,
+  needsNookara: isNookara(c.info?.accounts_mode) && !getToken(), pending: !!c.pending, failed: !!c.failed,
   loaded: !!c.loaded, // this account's communities on it have been fetched (so "not in it" is known)
-  prefs: c.prefs || null, // Velora's push consent for it ({ muted, push }), signed in only
+  prefs: c.prefs || null, // Nookara's push consent for it ({ muted, push }), signed in only
   retryAt: c.retryAt || 0, // not connected: when the next try is (it never gives up)
-  voiceQuota: c.voiceQuota || null, // its admins: this month's voice minutes from Velora { cap_minutes, used_minutes } (cap null = no cap)
+  voiceQuota: c.voiceQuota || null, // its admins: this month's voice minutes from Nookara { cap_minutes, used_minutes } (cap null = no cap)
   serverInfo: c.isAdmin ? (c.serverInfo || null) : null, // its admins: /instance/info (build, runtime, stats, update)
-  managed: c.info?.managed || null, // hosted by Velora: { plan, limits, host }
-  readOnly: !!(c.info?.read_only || c.info?.community?.read_only), // hosted by Velora and its paid time ran out
+  managed: c.info?.managed || null, // hosted by Nookara: { plan, limits, host }
+  readOnly: !!(c.info?.read_only || c.info?.community?.read_only), // hosted by Nookara and its paid time ran out
   // addresses it had before (old signatures name them): exact origins, NOT normOrigin (that reads e_<x> as e-<x>, but a message signed
   // while the server was e_<x>.nookara.cc names e_<x>)
   previousUrls: Array.isArray(c.info?.previous_urls) ? c.info.previous_urls.map(rawOrigin).filter(Boolean) : [],
@@ -106,10 +107,15 @@ async function plain(origin, path, body, method = 'POST') {
 export async function discover(input) {
   const origin = normOrigin(input);
   if (!origin) throw new Error('bad_instance_url');
-  let res;
-  try { res = await fetch(`${origin}/.well-known/bonfire`, { cache: 'no-store', signal: AbortSignal.timeout(10000) }); } catch { throw new Error('instance_unreachable'); }
-  const info = await res.json().catch(() => null);
-  if (!res.ok || info?.software !== 'bonfire-server' || !info.accounts_mode) throw new Error('not_an_instance');
+  let res = null, info = null;
+  for (const path of WELL_KNOWN) { // /.well-known/ember, then the old name for servers that haven't moved yet
+    let r;
+    try { r = await fetch(`${origin}${path}`, { cache: 'no-store', signal: AbortSignal.timeout(10000) }); } catch { continue; }
+    res = r; info = await r.json().catch(() => null);
+    if (res.ok && info) break;
+  }
+  if (!res) throw new Error('instance_unreachable');
+  if (!res.ok || !isInstanceSoftware(info?.software) || !info.accounts_mode) throw new Error('not_an_instance');
   const landed = res.redirected ? normOrigin(res.url) : null;
   const moved = landed && landed !== origin && normOrigin(info.public_url) === landed ? landed : null;
   if (moved) return { origin: moved, movedFrom: origin, info: fromInstance(moved, info, '/instance') };
@@ -122,18 +128,18 @@ function adopt(c, { session, user, instance_admin, instance_owner }) {
   if (user) c.user = user;
   if (instance_admin !== undefined) { c.isAdmin = !!instance_admin; c.isOwner = !!instance_owner; }
   registry.set(c.origin, c);
-  saveSession(c.origin, session, c.info?.accounts_mode === 'velora' ? tokenTag(getToken()) : null);
+  saveSession(c.origin, session, isNookara(c.info?.accounts_mode) ? tokenTag(getToken()) : null);
 }
 // -> { session, user } (nothing is stored until the instance is added or adopts it)
-export async function veloraSession(origin) {
+export async function nookaraSession(origin) {
   let t;
-  try { t = await apiFetch('/bonfire/instance-token', { method: 'POST', body: JSON.stringify({ instance: origin }) }); }
+  try { t = await apiFetch(`${EMBER_API}/instance-token`, { method: 'POST', body: JSON.stringify({ instance: origin }) }); }
   catch (e) { throw restrictedErr(e) ? Object.assign(new Error('account_restricted'), { status: 403, restricted: true, text: e.error === 'account_restricted' ? e.message : '' }) : e; } // (Nookara won't sign new instance tokens while Ember is off for the account)
-  return plain(origin, '/api/v1/auth/velora', { token: t.token });
+  return plain(origin, INST_AUTH_NOOKARA, { token: t.token });
 }
 export const localSession = (origin, kind, username, password) => plain(origin, `/api/v1/auth/${kind === 'register' ? 'register' : 'login'}`, { username, password });
-async function authVelora(c) {
-  try { const r = await veloraSession(c.origin); adopt(c, r); return r; }
+async function authNookara(c) {
+  try { const r = await nookaraSession(c.origin); adopt(c, r); return r; }
   catch (e) { if (e.restricted) restrict(c, e.text); throw e; }
 }
 // forget this instance's session (and tell it)
@@ -141,8 +147,8 @@ function dropSession(c) {
   if (c.session) fetch(`${c.origin}/api/v1/auth/logout`, { method: 'POST', headers: { Authorization: `Bearer ${c.session}` }, keepalive: true }).catch(() => {});
   c.session = null; registry.delete(c.origin); saveSession(c.origin, null);
 }
-// Velora sign-out: Velora-login instances lose their session (local-account ones keep theirs)
-export function dropVeloraSessions() { for (const c of connections.values()) if (c.info?.accounts_mode === 'velora') dropSession(c); }
+// Nookara sign-out: Nookara-login instances lose their session (local-account ones keep theirs)
+export function dropNookaraSessions() { for (const c of connections.values()) if (isNookara(c.info?.accounts_mode)) dropSession(c); }
 // an existing (logged out) local-mode instance: log in again
 export async function loginInstance(origin, kind, username, password) {
   const c = connections.get(origin);
@@ -157,31 +163,31 @@ async function me(c) {
   return d;
 }
 const refreshing = new Map();
-// a 401 from the instance: a new session (automatic in Velora mode, a login in local mode)
+// a 401 from the instance: a new session (automatic in Nookara mode, a login in local mode)
 hooks.refresh = origin => {
   const c = connections.get(origin);
   if (!c) return Promise.resolve(false);
   if (!refreshing.has(origin)) {
     const p = (async () => {
       c.session = null; registry.delete(origin); saveSession(origin, null);
-      if (c.info?.accounts_mode !== 'velora' || !getToken()) { setStatus(c, 'login'); return false; }
-      // Velora rejecting the token signs out (api.js); anything else (Velora / the instance unreachable) is retried
-      try { await authVelora(c); return true; } catch (e) { c.failed = true; setStatus(c, getToken() ? 'closed' : 'login', e.message); if (getToken()) scheduleRetry(c, e.restricted ? RESTRICTED_RETRY : 0); return false; }
+      if (!isNookara(c.info?.accounts_mode) || !getToken()) { setStatus(c, 'login'); return false; }
+      // Nookara rejecting the token signs out (api.js); anything else (Nookara / the instance unreachable) is retried
+      try { await authNookara(c); return true; } catch (e) { c.failed = true; setStatus(c, getToken() ? 'closed' : 'login', e.message); if (getToken()) scheduleRetry(c, e.restricted ? RESTRICTED_RETRY : 0); return false; }
     })().finally(() => refreshing.delete(origin));
     refreshing.set(origin, p);
   }
   return refreshing.get(origin);
 };
 async function ensureSession(c) {
-  if (c.info.accounts_mode === 'velora' && !getToken()) { dropSession(c); setStatus(c, 'login'); return false; } // Velora-login instances need the Velora sign-in
-  if (c.session && c.info.accounts_mode === 'velora' && loadSessionTags()[c.origin] !== tokenTag(getToken())) dropSession(c); // from an older Ember sign-in
+  if (isNookara(c.info.accounts_mode) && !getToken()) { dropSession(c); setStatus(c, 'login'); return false; } // Nookara-login instances need the Nookara sign-in
+  if (c.session && isNookara(c.info.accounts_mode) && loadSessionTags()[c.origin] !== tokenTag(getToken())) dropSession(c); // from an older Ember sign-in
   if (c.session) {
     registry.set(c.origin, c);
 
     try { await me(c); return true; } catch (e) { if (e.status !== 401 && e.message !== 'instance_not_connected') throw e; }
     c.session = null; registry.delete(c.origin); saveSession(c.origin, null);
   }
-  if (c.info.accounts_mode === 'velora') { await authVelora(c); await me(c).catch(() => {}); return true; }
+  if (isNookara(c.info.accounts_mode)) { await authNookara(c); await me(c).catch(() => {}); return true; }
   setStatus(c, 'login');
   return false;
 }
@@ -419,7 +425,7 @@ function onFrame(c, m) {
       // its own accounts, and my profile there follows my Nookara one: bring over what changed while I was away (accountProfile.js)
       if (c.info?.accounts_mode === 'local' && c.info.features?.account_profiles && getToken()) import('./accountProfile.js').then(x => x.syncAccountProfile(c.origin)).catch(() => {});
       if (c.isAdmin) loadServerInfo(c);
-      if (c.isAdmin) apiFetch('/api/v1/instance/settings', { inst: c.origin }).then(d => { c.voiceQuota = d.velora?.voice || null; mirror(); }).catch(() => {});
+      if (c.isAdmin) apiFetch('/api/v1/instance/settings', { inst: c.origin }).then(d => { c.voiceQuota = nookaraInfo(d)?.voice || null; mirror(); }).catch(() => {});
       return;
     case 'instance_restarting':
       toast('Instance restarting…');
@@ -488,7 +494,7 @@ export async function connect(origin) {
     c.info = found.info;
     if (await Promise.race([ensureSession(c), hung])) openSocket(c); else mirror();
   } catch (e) {
-    if (e.message === 'instance_moved' && e.moved_to) { movedTo = normOrigin(e.moved_to); return; } // Velora: that address moved
+    if (e.message === 'instance_moved' && e.moved_to) { movedTo = normOrigin(e.moved_to); return; } // Nookara: that address moved
 
     if (c.sleep) { c.status = 'asleep'; mirror(); return; } // (disconnected while this try was running)
     if (c.peeking) { sleepInstance(c, 'idle'); return; }
@@ -498,7 +504,7 @@ export async function connect(origin) {
   } finally { c.busy = false; if (movedTo) moveInstance(origin, movedTo); }
 }
 // A server moved to a new address: the rail entry, its session (same server, same database) and the saved list follow, and the
-// old address is dropped. Velora rewrote the synced list already; this is for this device's copy (and an open tab).
+// old address is dropped. Nookara rewrote the synced list already; this is for this device's copy (and an open tab).
 const moved = new Set();
 export async function moveInstance(from, to) {
   const c = connections.get(from);
@@ -538,14 +544,14 @@ export async function moveInstance(from, to) {
 // the instance refused something for a missing permission (e.g. signing): trade a fresh instance token from the current
 // Ember sign-in (which may have been approved for more since) and reconnect. -> the new session's scopes, or null
 const renewing = new Map();
-export function renewVeloraSession(origin) {
+export function renewNookaraSession(origin) {
   const c = connections.get(origin);
-  if (!c || c.info?.accounts_mode !== 'velora' || !getToken()) return Promise.resolve(null);
+  if (!c || !isNookara(c.info?.accounts_mode) || !getToken()) return Promise.resolve(null);
   if (!renewing.has(origin)) {
     renewing.set(origin, (async () => {
       try {
         dropSession(c);
-        await authVelora(c);
+        await authNookara(c);
         const d = await me(c).catch(() => null);
         const ws = c.ws; c.ws = null; try { ws?.close(); } catch { /* gone */ }
         openSocket(c);
@@ -573,13 +579,13 @@ const ADDS = () => `${LIST_CACHE()}:adds`;
 const readAdds = () => { try { const v = JSON.parse(localStorage.getItem(ADDS()) || '[]'); return new Set(Array.isArray(v) ? v.map(normOrigin).filter(Boolean) : []); } catch { return new Set(); } };
 const writeAdds = set => { try { if (set.size) localStorage.setItem(ADDS(), JSON.stringify([...set])); else localStorage.removeItem(ADDS()); } catch { /* fine */ } };
 const readList = () => { try { const v = JSON.parse(localStorage.getItem(LIST_CACHE()) || '[]'); return Array.isArray(v) ? v.map(normOrigin).filter(Boolean) : []; } catch { return []; } };
-// always saved here; signed in with Velora it goes there too (the same list on every device)
+// always saved here; signed in with Nookara it goes there too (the same list on every device)
 const saveList = () => {
   const urls = [...connections.keys()];
   try { localStorage.setItem(LIST_CACHE(), JSON.stringify(urls)); } catch { /* fine */ }
-  return getToken() ? apiFetch('/bonfire/instances', { method: 'PUT', body: JSON.stringify({ instances: urls.map(url => ({ url })) }) }).then(d => { writeAdds(new Set()); applyPrefs(d); followMoves(d); }).catch(() => {}) : Promise.resolve();
+  return getToken() ? apiFetch(`${EMBER_API}/instances`, { method: 'PUT', body: JSON.stringify({ instances: urls.map(url => ({ url })) }) }).then(d => { writeAdds(new Set()); applyPrefs(d); followMoves(d); }).catch(() => {}) : Promise.resolve();
 };
-// Velora saw an old address of a server that moved (PUT /bonfire/instances answers { moved: { old: new } })
+// Nookara saw an old address of a server that moved (PUT /bonfire/instances answers { moved: { old: new } })
 function followMoves(d) {
   for (const [from, to] of Object.entries(d?.moved || {})) { const f = normOrigin(from), t = normOrigin(to); if (f && t && connections.has(f)) moveInstance(f, t); }
 }
@@ -593,9 +599,9 @@ function applyPrefs(d) {
   writeLabels(labels);
   mirror();
 }
-// signed in: Velora's list and this device's, together (Velora's order first); whatever only this device had goes back to Velora
-async function mergeWithVelora() {
-  const d = await apiFetch('/bonfire/instances').catch(() => null);
+// signed in: Nookara's list and this device's, together (Nookara's order first); whatever only this device had goes back to Nookara
+async function mergeWithNookara() {
+  const d = await apiFetch(`${EMBER_API}/instances`).catch(() => null);
   if (!d?.instances) return;
   const remote = [...new Set(d.instances.map(i => normOrigin(i.url)).filter(Boolean))];
   const adds = readAdds();
@@ -606,7 +612,7 @@ async function mergeWithVelora() {
   connections.clear();
   order.forEach(o => connections.set(o, old.get(o) || newConn(o)));
   applyPrefs(d);
-  // Velora's official server is added to every account once, flagged auto_join: join its community once connected
+  // Nookara's official server is added to every account once, flagged auto_join: join its community once connected
   for (const i of d.instances) if (i.auto_join) autoJoin.add(normOrigin(i.url));
   order.filter(o => !old.has(o)).forEach(o => connect(o));
   autoJoin.forEach(o => { const c = connections.get(o); if (c?.status === 'open') joinOnce(c); });
@@ -618,10 +624,10 @@ async function joinOnce(c) {
   if (!autoJoin.delete(c.origin)) return;
   try {
     if (c.info?.community && !getState().servers.some(s => s.inst === c.origin)) await joinCommunity(c.origin);
-  } catch { /* banned / full / request-only: Velora still marks it done, the gate shows the rest */ }
-  apiFetch('/bonfire/instances/default-joined', { method: 'POST', body: JSON.stringify({ url: c.origin }) }).catch(() => {});
+  } catch { /* banned / full / request-only: Nookara still marks it done, the gate shows the rest */ }
+  apiFetch(`${EMBER_API}/instances/default-joined`, { method: 'POST', body: JSON.stringify({ url: c.origin }) }).catch(() => {});
 }
-// on start: this device's list connects right away, then (signed in) Velora's list is merged in
+// on start: this device's list connects right away, then (signed in) Nookara's list is merged in
 export function startInstances() {
   readList().forEach(o => { if (!connections.has(o)) connections.set(o, newConn(o)); }); // (not on the rail yet: see below)
   const off = readManual();
@@ -633,7 +639,7 @@ export function startInstances() {
   let started = false;
   const once = () => { if (!started) { started = true; go_(); } };
   const t = setTimeout(once, 2500);
-  mergeWithVelora().catch(() => {}).finally(() => { clearTimeout(t); once(); });
+  mergeWithNookara().catch(() => {}).finally(() => { clearTimeout(t); once(); });
 }
 // the dialog finished (it holds a session): the instance goes on the rail and the list is saved
 export async function addInstance(origin, info, got) {
@@ -706,11 +712,11 @@ export function setInstanceUser(origin, user) {
   c.user = { ...c.user, ...user };
   mirror();
 }
-// Velora's per-server push consent (PROTOCOL §12.3): may this server push to me through Velora, and is it muted
+// Nookara's per-server push consent (PROTOCOL §12.3): may this server push to me through Nookara, and is it muted
 export async function setInstancePrefs(origin, patch) {
   const c = connections.get(origin);
   try {
-    const d = await apiFetch('/bonfire/instances/prefs', { method: 'PATCH', body: JSON.stringify({ url: origin, ...patch }) });
+    const d = await apiFetch(`${EMBER_API}/instances/prefs`, { method: 'PATCH', body: JSON.stringify({ url: origin, ...patch }) });
     if (c) { c.prefs = { muted: !!d?.muted, push: d?.push !== false }; mirror(); }
     toast(patch.muted !== undefined ? (patch.muted ? 'Muted - this server can\'t push to you.' : 'Unmuted.') : patch.push ? 'Push notifications from this server are on.' : 'Push notifications from this server are off.', true);
   } catch (e) { toast(e.message === 'instance_not_in_list' ? "This server isn't in your synced list yet - try again in a moment." : "Couldn't save that."); }
@@ -732,10 +738,10 @@ export async function quickJoin(input, code) {
   if (!getToken()) return null;
   const d = await discover(input);
   const info = d.info || {};
-  if (info.accounts_mode !== 'velora' || info.claimed === false || !info.community) return null;
+  if (!isNookara(info.accounts_mode) || info.claimed === false || !info.community) return null;
   if (!code && info.community.join_policy !== 'open') return null;
   let c = connections.get(d.origin);
-  if (!c?.session) c = await addInstance(d.origin, info, await veloraSession(d.origin));
+  if (!c?.session) c = await addInstance(d.origin, info, await nookaraSession(d.origin));
   else if (c.status !== 'open') await connect(d.origin);
   const already = getState().servers.find(x => x.inst === d.origin);
   if (already) return { sid: already.sid };

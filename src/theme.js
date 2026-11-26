@@ -1,3 +1,4 @@
+import { SITE_ACCENT, SITE_ACCENT_AT } from './compat.js';
 // Site-wide accent color. Defaults to the original purple; when the current
 // user has a saved Accent Color (profile.color), that becomes --accent
 // everywhere instead - nav, links, buttons, all of it, since the whole app
@@ -26,8 +27,8 @@ export function applyAccentColor(color) {
   root.setProperty('--purple-dim', `rgba(${r}, ${g}, ${b}, .12)`);
   // the plain-HTML pages (/assets/js/accent.js) read this, so they're in the same colour straight away
   try {
-    if (hex === DEFAULT_ACCENT) localStorage.removeItem('velora_accent');
-    else localStorage.setItem('velora_accent', hex);
-    localStorage.setItem('velora_accent_at', String(Date.now()));
+    if (hex === DEFAULT_ACCENT) localStorage.removeItem(SITE_ACCENT);
+    else localStorage.setItem(SITE_ACCENT, hex);
+    localStorage.setItem(SITE_ACCENT_AT, String(Date.now()));
   } catch { /* private mode */ }
 }

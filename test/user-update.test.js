@@ -22,8 +22,8 @@ const mk = () => ({
   presence: { ann: { status: 'online' } },
   typing: { 'c:5': { ann: 123 } },
   voiceStates: { c7: [{ username: 'ann', muted: false }] },
-  veloraFaces: { 2: { id: '2', username: 'ann', pfp: 'old', color: null, rank: 'free' } },
-  veloraNames: { 2: 'ann' },
+  nookaraFaces: { 2: { id: '2', username: 'ann', pfp: 'old', color: null, rank: 'free' } },
+  nookaraNames: { 2: 'ann' },
 });
 const ev = (user, extra = {}) => ({ user: { id: '2', username: 'ann', ...user }, changed: ['pfp'], v: 99, ...extra });
 
@@ -36,7 +36,7 @@ test('a new picture updates every cache that holds that account', () => {
   assert.equal(s.members[`${O}|c9`][0].pfp, NEW);
   assert.equal(s.msgs['c:5'].list[0].author.pfp, NEW); assert.equal(s.msgs['c:5'].list[0].reply.author.pfp, NEW);
   assert.equal(s.msgs['d:ann'].list[0].author.pfp, NEW);
-  assert.equal(s.veloraFaces[2].pfp, NEW);
+  assert.equal(s.nookaraFaces[2].pfp, NEW);
   // other people and the original state are untouched
   assert.equal(s.people.zed.pfp, 'z'); assert.equal(s.members.s1[1].pfp, 'z'); assert.equal(s.dms[1].pfp, 'z');
   assert.equal(s0.people.ann.pfp, OLD);
@@ -65,7 +65,7 @@ test('rename: name-keyed caches move to the new name', () => {
   assert.equal(s.msgs['d:ann'].list[0].author.username, 'annie');
   assert.equal(s.presence.annie.status, 'online'); assert.equal(s.presence.ann, undefined);
   assert.equal(s.typing['c:5'].annie, 123); assert.equal(s.voiceStates.c7[0].username, 'annie');
-  assert.equal(s.veloraNames[2], 'annie');
+  assert.equal(s.nookaraNames[2], 'annie');
 });
 
 test('same URL + pfp changed => cache-busted; colour-only change keeps the busted URL', () => {

@@ -1,5 +1,5 @@
 // "Update server": an instance's admins can pull a newer build of their server in one click (GET/POST /api/v1/instance/update, which asks
-// the host agent to rebuild + recreate the container). Unsupported servers (self-hosters, Velora-hosted ones) get a note instead of the button.
+// the host agent to rebuild + recreate the container). Unsupported servers (self-hosters, Nookara-hosted ones) get a note instead of the button.
 import { useEffect, useRef, useState } from 'react';
 import { CircleArrowUp, TriangleAlert } from 'lucide-react';
 

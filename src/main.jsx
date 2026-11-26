@@ -1,4 +1,5 @@
 import './tzfix.js'; // first: Alberta's UTC-6 before anything formats a time
+import './compat.js' // before anything reads storage: moves Ember's old storage keys to their new names (see compat.js)
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'

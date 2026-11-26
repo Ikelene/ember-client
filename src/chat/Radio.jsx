@@ -1,13 +1,13 @@
 // Internet Radio (easter egg - it has been in every ScratchCord version, so it's in Ember too).
 // Chat settings radio_enabled + radio_url. While /chat is open the stream plays and bars move along the bottom of the
-// page behind the messages, in the accent colour. The audio comes through Velora (/chat/radio, signed ticket) so
+// page behind the messages, in the accent colour. The audio comes through Nookara (/chat/radio, signed ticket) so
 // WebAudio may read it; if that fails it plays straight from the station without the bars.
 // One player for the whole app: the settings tab's controls talk to the same one.
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { apiFetch } from '../api.js';
 import { useChat } from './store.js';
 
-const VOL_KEY = 'bonfire_radio_volume';
+const VOL_KEY = 'ember_radio_volume';
 const readVol = () => { try { const v = Number(localStorage.getItem(VOL_KEY)); return Number.isFinite(v) && localStorage.getItem(VOL_KEY) !== null ? Math.min(Math.max(v, 0), 1) : 0.4; } catch { return 0.4; } };
 
 const R = { audio: null, ctx: null, analyser: null, gain: null, node: null, url: null, token: 0, gestureWait: null, retries: 0 };
@@ -158,7 +158,7 @@ export function RadioHost() {
   const enabled = useChat(s => !!s.settings.radio_enabled);
   const url = useChat(s => s.settings.radio_url || '');
   const animations = useChat(s => s.settings.animations !== false);
-  const { status, proxied: viaVelora, paused } = useRadio();
+  const { status, proxied: viaNookara, paused } = useRadio();
   const canvas = useRef(null);
 
   useEffect(() => {
@@ -167,7 +167,7 @@ export function RadioHost() {
   }, [enabled, url]);
   useEffect(() => () => stopRadio(), []); // leaving /chat stops it
 
-  const drawing = enabled && viaVelora && status === 'playing' && !paused && animations;
+  const drawing = enabled && viaNookara && status === 'playing' && !paused && animations;
   useEffect(() => {
     const root = document.documentElement;
     root.classList.toggle('vc-radio', drawing);

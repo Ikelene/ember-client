@@ -14,11 +14,11 @@ import { ServerIcon } from './ServerIcon.jsx';
 import { NotifIcon, NotifText, ago } from './Notifications.jsx';
 
 import { plainText } from './tokens.js';
-import { VELORA, instOf } from './ids.js';
+import { NOOKARA, instOf } from './ids.js';
 const lc = s => String(s || '').toLowerCase();
 // a message body as one plain line: custom emoji / mentions / links made readable, markdown marks dropped
 export function snippet(body, sid = null) {
-  let t = plainText(body, sid ? instOf(sid) : VELORA, sid);
+  let t = plainText(body, sid ? instOf(sid) : NOOKARA, sid);
   if (!t.trim()) return '';
   const st = stickerOfBody(t); // a personal sticker (stickerLink.js)
   if (st) return `Sticker: ${st.name}`;

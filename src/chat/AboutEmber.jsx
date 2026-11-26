@@ -1,20 +1,21 @@
 import { useEffect, useState } from 'react';
 import { SHORT, COMMIT, isRelease, commitUrl, repoUrl, repoInfo, copyrightLine } from '../version.js';
+import { EMBER_API, desktopBridge } from '../compat.js';
 
-export default function AboutBonfire() {
-  const desktop = !!window.bonfireDesktop?.isDesktop;
+export default function AboutEmber() {
+  const desktop = !!desktopBridge()?.isDesktop;
   const [installed, setInstalled] = useState(null);
   const [release, setRelease] = useState(null);
   const [repo, setRepo] = useState(undefined); // undefined: asking GitHub, null: couldn't tell
   useEffect(() => {
     let live = true;
     const controller = new AbortController();
-    if (desktop && typeof window.bonfireDesktop?.info === 'function') {
-      Promise.resolve().then(() => window.bonfireDesktop.info()).then(info => {
+    if (desktop && typeof desktopBridge()?.info === 'function') {
+      Promise.resolve().then(() => desktopBridge().info()).then(info => {
         if (live && typeof info?.version === 'string') setInstalled(info.version);
       }).catch(() => { if (live) setInstalled('Unavailable'); });
     }
-    fetch('/bonfire/latest.json', { signal: controller.signal, cache: 'no-cache' })
+    fetch(`${EMBER_API}/latest.json`, { signal: controller.signal, cache: 'no-cache' })
       .then(r => { if (!r.ok) throw new Error('Release unavailable'); return r.json(); })
       .then(info => { if (live && typeof info?.version === 'string') setRelease(info.version); })
       .catch(() => {});

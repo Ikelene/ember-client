@@ -1,10 +1,11 @@
-// Plan limits on Velora-hosted ("managed") Ember servers. The server answers 403 `plan_limit` { what, limit, used?, plan? } (a number
+// Plan limits on Nookara-hosted ("managed") Ember servers. The server answers 403 `plan_limit` { what, limit, used?, plan? } (a number
 // reached, or limit false / 0 for a feature the plan doesn't have) or `plan_feature` { what, limit: 0|null, plan, message } (a feature the
 // plan doesn't include at all). This file turns those into one clear card over the dimmed page: "Not included in your plan" with Upgrade / Self-host,
 // and an inline notice for "you've used N of M". Pages use usePlan(what, used): it knows the answer up front (from the plan the server
 // reports) and also catches the error from a request (catchPlan). Everything is read defensively: unknown fields are ignored.
 import { createContext, useContext, useState } from 'react';
 import { Lock, Rocket, Server, TriangleAlert } from 'lucide-react';
+import { legacyToNew } from '../compat.js';
 
 export const SELF_HOST_URL = 'https://github.com/Nookara-Project/ember-server#readme'; // (no Ember self-hosting guide on /guides yet: the server's own README)
 
@@ -17,9 +18,9 @@ const NAMES = {
 const ALIAS = {
   bot: 'bots', bridge: 'bridges', emoji: 'emojis', sound: 'sounds', soundboard: 'sounds', members: 'member_cap', member: 'member_cap', cap: 'member_cap',
   upload: 'max_upload_mb', uploads: 'max_upload_mb', upload_mb: 'max_upload_mb', upload_size: 'max_upload_mb', voice_keys: 'custom_voice_keys', voice: 'custom_voice_keys',
-  backup: 'backups', game_servers: 'game', game_server: 'game', bonfire_link: 'game', link: 'game', minecraft: 'game', webhook: 'webhooks',
+  backup: 'backups', game_servers: 'game', game_server: 'game', ember_link: 'game', link: 'game', minecraft: 'game', webhook: 'webhooks',
 };
-export const canon = what => { const k = String(what || '').toLowerCase().replace(/[\s-]+/g, '_'); return ALIAS[k] || k; };
+export const canon = what => { const k = legacyToNew(String(what || '').toLowerCase().replace(/[\s-]+/g, '_')); return ALIAS[k] || k; };
 export const featureName = what => NAMES[canon(what)]?.[0] || (String(what || '') ? `${String(what).replace(/_/g, ' ').replace(/^./, c => c.toUpperCase())}` : 'This');
 const nounOf = what => NAMES[canon(what)]?.[1] || String(what || 'items').replace(/_/g, ' ');
 const planLabel = p => { const n = typeof p === 'string' ? p : p?.name || p?.id; return n ? String(n).replace(/^./, c => c.toUpperCase()) : ''; };

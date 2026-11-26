@@ -1,4 +1,5 @@
 import { bare } from './ids.js';
+import { nookaraId, nookaraInfo, OLD_ORIGIN } from '../compat.js';
 
 // the same canonical JSON the instance uses: keys sorted recursively, no spaces, integers
 export function canonical(v) {
@@ -25,17 +26,17 @@ export function attachmentRefs(attachments = []) {
 }
 
 export function receivedPayload(m, iss) {
-  return payloadOf({ iss, instance: m.inst, community: bare(m.server), channel: bare(m.channel), author: m.author.velora_id,
+  return payloadOf({ iss, instance: m.inst, community: bare(m.server), channel: bare(m.channel), author: nookaraId(m.author),
     ts: m.signature.ts, nonce: m.signature.nonce, body: m.body, attachments: attachmentRefs(m.attachments || []),
     reply_to: m.reply_to ?? m.reply?.id ?? null, edit_of: m.edited_at ? m.id : null, sticker: m.sticker?.tid ?? null });
 }
 
-// the "iss" to sign with for an instance, from its discovery info (/.well-known/bonfire): the first of velora.signing_issuers
-// (https://nookara.cc on Nookara); an instance older than that list checks against its own velora_url (velora.issuer); with
-// neither, Velora's original https://velora.ikelene.net
+// the "iss" to sign with for an instance, from its discovery info (/.well-known/bonfire): the first of nookara.signing_issuers
+// (https://nookara.cc on Nookara); an instance older than that list checks against its own nookara_url (nookara.issuer); with
+// neither, Nookara's original https://velora.ikelene.net
 const originOf = u => { try { return new URL(u).origin; } catch { return null; } };
 export function issuerFor(info) {
-  const list = info?.velora?.signing_issuers;
+  const list = nookaraInfo(info)?.signing_issuers;
   if (Array.isArray(list) && list.length) return String(list[0]);
-  return originOf(info?.velora?.issuer) || 'https://velora.ikelene.net';
+  return originOf(nookaraInfo(info)?.issuer) || OLD_ORIGIN;
 }

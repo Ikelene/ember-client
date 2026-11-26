@@ -1,11 +1,12 @@
 // Hyperfocus game invite cards (see gameInvite.js for the message format). Name / banner / logo come from
-// GET /chat/hf-game/:id (Velora caches the launcher's game lists); an unknown game shows the name from the
+// GET /chat/hf-game/:id (Nookara caches the launcher's game lists); an unknown game shows the name from the
 // message and a gamepad icon. Join opens hyperfocus://join/... - in the Ember desktop app through the app
 // (only that exact URL shape is allowed out), in a browser through the OS protocol handler.
 import { useEffect, useRef, useState } from 'react';
 import { Gamepad2 } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { JOIN_URL, joinUrl } from './gameInvite.js';
+import { desktopBridge } from '../compat.js';
 
 const GET_HYPERFOCUS = 'https://ikelene.net/launcher/';
 const cache = new Map(); // game id -> { done, value, p }
@@ -42,7 +43,7 @@ function GameInvite({ inv, inert }) {
     const url = joinUrl(inv);
     if (busy || !JOIN_URL.test(url)) return;
     setBusy(true); setHint(false);
-    const desktop = window.bonfireDesktop;
+    const desktop = desktopBridge();
     if (desktop?.openExternal) {
       // the app can't tell whether Hyperfocus is installed (Windows shows its own "get an app" prompt if not)
       Promise.resolve(desktop.openExternal(url)).catch(() => {});

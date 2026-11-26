@@ -9,14 +9,15 @@ import { initials } from './Parts.jsx';
 import { useChat, toast, errorText, ask, go, refreshServer } from './store.js';
 import { imgHint, warnImage } from './imgHints.js';
 import { refreshInstance, loadInstanceData, hostOf } from './instances.js';
-import { VeloraImport } from './Bridge.jsx';
+import { NookaraImport } from './Bridge.jsx';
 import { PlatformIcon } from './platforms.jsx';
 import { OperatorTermsCheck } from './OperatorTerms.jsx';
 import { pictureAccept } from './accept.js';
+import { NOOKARA_WIRE, accountsMode } from '../compat.js';
 
 const STEPS = ['Claim', 'Your server', 'Accounts', 'Options', 'Done'];
 
-// (a server hosted by Velora always uses Velora accounts: the "how do people sign in" step is skipped)
+// (a server hosted by Nookara always uses Nookara accounts: the "how do people sign in" step is skipped)
 export function SetupWizard({ origin, onClose, name: givenName = '' }) {
   const inst = useChat(s => s.instances.find(i => i.origin === origin));
   const had = useChat(s => s.servers.find(x => x.inst === origin));
@@ -27,7 +28,7 @@ export function SetupWizard({ origin, onClose, name: givenName = '' }) {
   const [code, setCode] = useState('');
   const [terms, setTerms] = useState(false); // Ember Server Operator Terms: setting up a server means accepting them
   const [cfg, setCfg] = useState(null);
-  const [mode, setMode] = useState('velora');
+  const [mode, setMode] = useState(NOOKARA_WIRE);
   const [f, setF] = useState({ name: givenName, description: '' });
   const [icon, setIcon] = useState(null); // { file, url }
   const [sid, setSid] = useState(had?.sid || null); // the server (namespaced)
@@ -38,7 +39,7 @@ export function SetupWizard({ origin, onClose, name: givenName = '' }) {
   const pick = useRef(null);
   const call = (path, o = {}) => apiFetch(`/api/v1${path}`, { inst: origin, ...o });
   const claimed = !!inst?.claimed;
-  const loadCfg = () => call('/instance/settings').then(d => { setCfg(d); setMode(d.accounts_mode); }).catch(() => {});
+  const loadCfg = () => call('/instance/settings').then(d => { setCfg(d); setMode(accountsMode(d.accounts_mode)); }).catch(() => {});
   useEffect(() => { if (claimed && !cfg) loadCfg(); }, [claimed]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => { if (icon) URL.revokeObjectURL(icon.url); }, [icon]);
   useEffect(() => { if (sid && step >= 3) refreshServer(sid).then(d => { const v = d?.server; if (v) setOpts({ join_policy: v.join_policy, allow_uploads: v.allow_uploads !== false, upload_max_mb: String(v.upload_max_mb || 25) }); }); }, [sid, step === 3]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -72,7 +73,7 @@ export function SetupWizard({ origin, onClose, name: givenName = '' }) {
     setStep(accountsStep);
   }, false);
   const saveMode = () => run(async () => {
-    if (cfg && mode !== cfg.accounts_mode) { await call('/instance/settings', { method: 'PATCH', body: JSON.stringify({ accounts_mode: mode }) }); setRestartNote(true); await loadCfg(); }
+    if (cfg && mode !== accountsMode(cfg.accounts_mode)) { await call('/instance/settings', { method: 'PATCH', body: JSON.stringify({ accounts_mode: mode }) }); setRestartNote(true); await loadCfg(); }
   }, false);
   const saveOpts = () => run(async () => {
     const body = { join_policy: opts.join_policy, allow_uploads: opts.allow_uploads, upload_max_mb: Number(opts.upload_max_mb) };
@@ -109,7 +110,7 @@ export function SetupWizard({ origin, onClose, name: givenName = '' }) {
               <Foot onNext={claim} nextLabel="Claim this server" disabled={!code.trim() || !terms} canSkip={false} close={close} />
             </>
           )}
-          {step === 1 && importing && <VeloraImport origin={origin} onCancel={() => setImporting(false)} onDone={k => run(async () => { await made(k); setImporting(false); toast('Imported.', true); setStep(accountsStep); }, false)} />}
+          {step === 1 && importing && <NookaraImport origin={origin} onCancel={() => setImporting(false)} onDone={k => run(async () => { await made(k); setImporting(false); toast('Imported.', true); setStep(accountsStep); }, false)} />}
 
           {step === 1 && !importing && (
             <>
@@ -131,7 +132,7 @@ export function SetupWizard({ origin, onClose, name: givenName = '' }) {
             <>
               <p className="vc-dialog-sub">How do people sign in? You can't mix the two.</p>
               <div className="vc-seg-pick">
-                {[['velora', 'Nookara accounts', 'People log in with the Nookara account they already have. Messages can be signed.'], ['local', "This server's own accounts", 'People register here with a username and password.']].map(([id, label, hint]) => (
+                {[[NOOKARA_WIRE, 'Nookara accounts', 'People log in with the Nookara account they already have. Messages can be signed.'], ['local', "This server's own accounts", 'People register here with a username and password.']].map(([id, label, hint]) => (
                   <button key={id} type="button" className={`vc-check-card${mode === id ? ' on' : ''}`} onClick={() => setMode(id)}><KeyRound size={16} /><span><b>{label}</b><small>{hint}</small></span></button>
                 ))}
               </div>
@@ -141,7 +142,7 @@ export function SetupWizard({ origin, onClose, name: givenName = '' }) {
                 <button type="button" className="btn btn-surface" onClick={close}>Finish later</button><span className="grow" />
                 {(restartNote || cfg?.restart_required) && <button type="button" className="btn btn-surface" onClick={restart}><RefreshCw size={14} /> Restart server</button>}
                 <button type="button" className="btn btn-surface" disabled={busy} onClick={skip}>Skip</button>
-                <button type="button" className="btn btn-primary" disabled={busy} onClick={() => (cfg && mode !== cfg.accounts_mode ? saveMode() : skip())}>{cfg && mode !== cfg.accounts_mode ? 'Save' : 'Continue'}</button>
+                <button type="button" className="btn btn-primary" disabled={busy} onClick={() => (cfg && mode !== accountsMode(cfg.accounts_mode) ? saveMode() : skip())}>{cfg && mode !== accountsMode(cfg.accounts_mode) ? 'Save' : 'Continue'}</button>
               </div>
             </>
           )}

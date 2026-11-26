@@ -1,6 +1,7 @@
 import { onWebClientPath } from './chat/hosts.js';
 import { noteServerClock } from './chat/server-clock.js';
-import { VELORA, registry, hooks, routePath, unNsBody, instPath, fromInstance } from './chat/ids.js';
+import { NOOKARA, registry, hooks, routePath, unNsBody, instPath, fromInstance } from './chat/ids.js';
+import { desktopBridge, mobileBridge, ANDROID_UA, SITE_TOKEN, SITE_ME_CACHE_V2 } from './compat.js';
 
 function getFingerprint() {
   return [
@@ -12,20 +13,20 @@ function getFingerprint() {
   ].join('|');
 }
 
-// Ember in a browser (/chat) never touches the website's session: it keeps its own token (localStorage['bonfire_token'],
-// from Velora's "approve this app" screen - see chat/session.js). The desktop / Android shells keep their own token storage,
+// Ember in a browser (/chat) never touches the website's session: it keeps its own token (localStorage['ember_token'],
+// from Nookara's "approve this app" screen - see chat/session.js). The desktop / Android shells keep their own token storage,
 // and every other page (/me, /admin...) keeps velora_token.
 // Android installs its gesture API after the page finishes loading, but React
 // needs the native session during startup. The shell's UA is present on the
 // very first request, including in already-installed APKs. This only chooses
 // local storage; the server still validates every token and permission.
-const isAndroidBonfire = () => /\bBonfireAndroid\//.test(navigator.userAgent);
-export const isWebBonfire = () => onWebClientPath() && !window.bonfireDesktop && !window.bonfireMobile && !isAndroidBonfire();
-export const TOKEN_KEY = () => (isWebBonfire() ? 'bonfire_token' : 'velora_token');
+const isAndroidEmber = () => ANDROID_UA.test(navigator.userAgent);
+export const isWebEmber = () => onWebClientPath() && !desktopBridge() && !mobileBridge() && !isAndroidEmber();
+export const TOKEN_KEY = () => (isWebEmber() ? 'ember_token' : SITE_TOKEN);
 export function getToken() {
   try { return localStorage.getItem(TOKEN_KEY()); } catch { return null; }
 }
-// web Ember: Velora said the token is no good (or there never was one) - chat/store.js drops to signed-out mode
+// web Ember: Nookara said the token is no good (or there never was one) - chat/store.js drops to signed-out mode
 let authLostHook = null;
 export const onAuthLost = fn => { authLostHook = fn; };
 
@@ -35,7 +36,7 @@ let scopeHook = null;
 export const onScopeError = fn => { scopeHook = fn; };
 export function reportScopeError(data) { try { scopeHook?.(data || {}); } catch { /* fine */ } }
 
-// opts.inst: an instance origin (or 'velora', the default). Ids that came from an instance (origin|id) pick the instance by
+// opts.inst: an instance origin (or 'nookara', the default). Ids that came from an instance (origin|id) pick the instance by
 // themselves, so a request for a community can't go anywhere else. A /chat/... path on an instance is rewritten to
 // /api/v1/... with that instance's own session.
 async function instanceRequest(origin, rel, options, retry = true) {
@@ -70,9 +71,9 @@ async function instanceJson(origin, rel, options, fallback) {
 export async function apiFetch(path, options = {}) {
   const { inst: want, ...opts } = options;
   const r = routePath(path, want);
-  if (r.inst !== VELORA) return instanceJson(r.inst, r.path, { ...opts, body: unNsBody(r.inst, opts.body) }, 'request_failed');
+  if (r.inst !== NOOKARA) return instanceJson(r.inst, r.path, { ...opts, body: unNsBody(r.inst, opts.body) }, 'request_failed');
   const token = getToken();
-  if (!token && isWebBonfire()) throw Object.assign(new Error('signed_out'), { status: 401 }); // signed-out Ember never calls Velora
+  if (!token && isWebEmber()) throw Object.assign(new Error('signed_out'), { status: 401 }); // signed-out Ember never calls Nookara
   const headers = {
     'Content-Type': 'application/json',
     'X-Device-Fingerprint': getFingerprint(),
@@ -86,7 +87,7 @@ export async function apiFetch(path, options = {}) {
     const err = new Error(data.error || 'request_failed');
     err.status = res.status;
     Object.assign(err, data); keepPlanCode(err);
-    if (res.status === 401 && token && isWebBonfire() && ['unauthorized', 'invalid_token'].includes(data.error)) authLostHook?.(); // only Velora rejecting the token signs out (never a network error / 5xx)
+    if (res.status === 401 && token && isWebEmber() && ['unauthorized', 'invalid_token'].includes(data.error)) authLostHook?.(); // only Nookara rejecting the token signs out (never a network error / 5xx)
     if (res.status === 403 && data.error === 'insufficient_scope') reportScopeError(data);
     throw err;
   }
@@ -114,12 +115,12 @@ function xhrFetch(url, { method = 'POST', headers = {}, body, onProgress, signal
   });
 }
 
-// a file (FormData) to Velora or to an instance: same routing as apiFetch, resolves to the JSON answer.
+// a file (FormData) to Nookara or to an instance: same routing as apiFetch, resolves to the JSON answer.
 // options.onProgress(sent, total) follows the upload, options.signal cancels it
 export async function uploadFetch(path, form, options = {}) {
   const { inst: want, method = 'POST', headers: extra, onProgress, signal } = options;
   const r = routePath(path, want);
-  if (r.inst !== VELORA) return instanceJson(r.inst, r.path, { method, body: form, headers: extra, onProgress, signal }, 'upload_failed');
+  if (r.inst !== NOOKARA) return instanceJson(r.inst, r.path, { method, body: form, headers: extra, onProgress, signal }, 'upload_failed');
   const init = { method, headers: { Authorization: `Bearer ${getToken()}`, 'X-Device-Fingerprint': getFingerprint(), ...(extra || {}) }, body: form, signal };
   const res = onProgress ? await xhrFetch(r.path, { ...init, onProgress }).catch(e => { if (e.name === 'AbortError') throw e; throw Object.assign(new Error('upload_failed'), { status: 0 }); }) : await fetch(r.path, init);
   const data = await res.json().catch(() => ({}));
@@ -176,7 +177,7 @@ export async function uploadInPieces(dest, file, { expires, onProgress, signal }
 export async function downloadFetch(path, options = {}) {
   const r = routePath(path, options.inst);
   let res;
-  if (r.inst !== VELORA) res = await instanceRequest(r.inst, r.path, { method: 'GET' });
+  if (r.inst !== NOOKARA) res = await instanceRequest(r.inst, r.path, { method: 'GET' });
   else res = await fetch(r.path, { headers: { Authorization: `Bearer ${getToken()}`, 'X-Device-Fingerprint': getFingerprint() } });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -229,7 +230,7 @@ async function fetchAccountExport() {
   }
   const disposition = res.headers.get('Content-Disposition') || '';
   const match = /filename="([^"]+)"/.exec(disposition);
-  return { blob: await res.blob(), filename: match ? match[1] : 'velora-export.json' };
+  return { blob: await res.blob(), filename: match ? match[1] : 'nookara-export.json' };
 }
 
 export const api = {
@@ -285,8 +286,8 @@ export const api = {
 
 // The last /account/me for the session on this device: pages draw signed in (name, picture, accent
 // colour) straight away instead of flashing "signed out" while the real request is on its way.
-// Only used while the token (velora_token, or bonfire_token on web Ember) is still the session it was saved for.
-const ME_CACHE = () => (isWebBonfire() ? 'bonfire_me_cache_v2' : 'velora_me_cache_v2');
+// Only used while the token (velora_token, or ember_token on web Ember) is still the session it was saved for.
+const ME_CACHE = () => (isWebEmber() ? 'ember_me_cache_v2' : SITE_ME_CACHE_V2);
 function rememberMe(d) {
   try { if (d && d.account) localStorage.setItem(ME_CACHE(), JSON.stringify({ t: getToken(), d })); } catch { /* private mode / full */ }
 }

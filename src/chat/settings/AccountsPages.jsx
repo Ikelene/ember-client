@@ -6,7 +6,7 @@ import { CircleUserRound, Server, ExternalLink, LogOut, ArrowRight, RefreshCw, T
 import { SettingsPage, SCard } from './ui.jsx';
 import { useChat, ask, go, toast } from '../store.js';
 import { getToken, apiFetch } from '../../api.js';
-import { removeInstance, reconnect, dropVeloraSessions } from '../instances.js';
+import { removeInstance, reconnect, dropNookaraSessions } from '../instances.js';
 import { startSignIn } from '../session.js';
 import { signOut, savedAccounts, switchTo } from '../ProfilePopout.jsx';
 import { Avatar } from '../Profile.jsx';
@@ -15,13 +15,14 @@ import { loadHosted, billingState } from '../Hosting.jsx';
 import { siteHref } from '../hosts.js';
 import { normOrigin } from '../ids.js';
 import './accounts-pages.css';
+import { EMBER_API, isNookara, desktopBridge } from '../../compat.js';
 
 const NONE = []; // (a selector must return the same empty list every time)
 const dialog = detail => dispatchEvent(new CustomEvent('vc-dialog', { detail }));
 // links open in the browser (the desktop app hands them to the system's browser), like SettingsDialog's help links
 function openOutside(url) {
   const abs = new URL(url, location.origin).href;
-  const d = window.bonfireDesktop;
+  const d = desktopBridge();
   if (d?.openExternal) { Promise.resolve(d.openExternal(abs)).catch(() => {}); return; }
   window.open(abs, '_blank', 'noopener,noreferrer');
 }
@@ -34,7 +35,7 @@ export function AccountsPage({ onClose }) {
   const me = useChat(s => s.me);
   const signedIn = useChat(s => s.signedIn);
   const instances = useChat(s => s.instances || NONE);
-  const localInstances = instances.filter(i => i.mode !== 'velora' && !i.needsVelora); // (Nookara-linked ones are left out, see Server accounts)
+  const localInstances = instances.filter(i => !isNookara(i.mode) && !i.needsNookara); // (Nookara-linked ones are left out, see Server accounts)
   const [busy, setBusy] = useState('');
   const others = signedIn ? savedAccounts().filter(a => a.username.toLowerCase() !== String(me?.username || '').toLowerCase()) : [];
 
@@ -43,12 +44,12 @@ export function AccountsPage({ onClose }) {
     await signOut();
   }
   async function signOutAll() {
-    const own = instances.filter(i => i.mode !== 'velora');
+    const own = instances.filter(i => !isNookara(i.mode));
     const text = `You'll be signed out of Nookara${own.length ? `, and ${own.length === 1 ? 'the server with its own account is' : `the ${own.length} servers with their own accounts are`} removed from your server list${getToken() ? ' on every device' : ''}. You can add ${own.length === 1 ? 'it' : 'them'} back any time` : ''}.`;
     if (!(await ask({ title: 'Sign out of everything?', text, confirm: 'Sign out of everything', danger: true }))) return;
     setBusy('all');
     for (const i of own) await removeInstance(i.origin).catch(() => {}); // (before Nookara: the synced list is saved with this sign-in)
-    dropVeloraSessions();
+    dropNookaraSessions();
     if (signedIn) await signOut();
     else setBusy('');
   }
@@ -120,7 +121,7 @@ function InstanceRow({ inst, onClose }) {
   const name = s?.name || inst.community?.name || inst.name;
   const icon = s?.icon || inst.community?.icon_url || inst.icon;
   const u = inst.user;
-  const viaNookara = inst.mode === 'velora';
+  const viaNookara = isNookara(inst.mode);
   const st = STATUS[inst.status] || ['', inst.status || 'Not connected'];
   const open = () => { go(s && inst.status === 'open' ? { kind: 'server', sid: s.sid } : { kind: 'instance', inst: inst.origin }); onClose?.(); };
   const remove = async () => {
@@ -128,9 +129,9 @@ function InstanceRow({ inst, onClose }) {
     await removeInstance(inst.origin);
     toast(`Signed out of ${name}.`, true);
   };
-  const signIn = () => (inst.needsVelora ? startSignIn() : dialog({ kind: 'add-instance', url: inst.origin }));
+  const signIn = () => (inst.needsNookara ? startSignIn() : dialog({ kind: 'add-instance', url: inst.origin }));
   let who;
-  if (inst.needsVelora) who = <span className="ac-who">Uses Nookara sign-in - sign in to Nookara first</span>;
+  if (inst.needsNookara) who = <span className="ac-who">Uses Nookara sign-in - sign in to Nookara first</span>;
   else if (u) who = <span className="ac-who"><Avatar user={{ username: u.username, pfp: u.pfp || u.avatar_url || u.avatar }} size={18} /> @{u.username}{viaNookara ? ' - signed in with Nookara' : ''}</span>;
   else if (viaNookara) who = <span className="ac-who">Signed in with Nookara</span>;
   else who = <span className="ac-who">Not signed in</span>;
@@ -145,8 +146,8 @@ function InstanceRow({ inst, onClose }) {
       </div>
       <div className="sx-row-ctl ac-acts">
         <button type="button" className="btn btn-surface btn-sm" onClick={open}><ArrowRight size={13} /> Open</button>
-        {(inst.needsVelora || (!u && !viaNookara)) && <button type="button" className="btn btn-surface btn-sm" onClick={signIn}><LogIn size={13} /> Sign in</button>}
-        {inst.status !== 'open' && inst.status !== 'connecting' && !inst.needsVelora && <button type="button" className="btn btn-surface btn-sm" onClick={() => reconnect(inst.origin)}><RefreshCw size={13} /> Reconnect</button>}
+        {(inst.needsNookara || (!u && !viaNookara)) && <button type="button" className="btn btn-surface btn-sm" onClick={signIn}><LogIn size={13} /> Sign in</button>}
+        {inst.status !== 'open' && inst.status !== 'connecting' && !inst.needsNookara && <button type="button" className="btn btn-surface btn-sm" onClick={() => reconnect(inst.origin)}><RefreshCw size={13} /> Reconnect</button>}
         <button type="button" className="btn btn-surface btn-sm ac-danger" onClick={remove}><Trash2 size={13} /> Sign out and remove</button>
       </div>
     </div>
@@ -166,7 +167,7 @@ export function HostingPage({ onClose }) {
   useEffect(() => {
     if (!getToken()) { setLoaded(true); return; }
     loadHosted(true).then(() => setLoaded(true));
-    apiFetch('/bonfire/hosting/plans').then(d => setPlans(Object.fromEntries((d?.plans || []).map(p => [p.id, p.name])))).catch(() => {});
+    apiFetch(`${EMBER_API}/hosting/plans`).then(d => setPlans(Object.fromEntries((d?.plans || []).map(p => [p.id, p.name])))).catch(() => {});
   }, []);
   const create = () => { dialog({ kind: 'create-server' }); };
   const live = hosted.filter(h => h.billing !== 'archived');

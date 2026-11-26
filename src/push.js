@@ -1,4 +1,4 @@
-// Browser push for Velora (server side: webpush.js). One subscription per browser.
+// Browser push for Nookara (server side: webpush.js). One subscription per browser.
 import { apiFetch } from './api.js';
 
 export const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;

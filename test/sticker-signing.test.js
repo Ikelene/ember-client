@@ -23,7 +23,7 @@ test('the issuer a message is signed with follows what the instance accepts', as
   const { issuerFor } = await import('../src/chat/signing-payload.js');
   assert.equal(issuerFor({ velora: { issuer: 'https://nookara.cc', signing_issuers: ['https://nookara.cc', 'https://velora.ikelene.net'] } }), 'https://nookara.cc');
   assert.equal(issuerFor({ velora: { issuer: 'https://velora.ikelene.net', signing_issuers: ['https://nookara.cc', 'https://velora.ikelene.net'] } }), 'https://nookara.cc');
-  assert.equal(issuerFor({ velora: { issuer: 'https://nookara.cc/' } }), 'https://nookara.cc', 'older instance: its own velora_url');
+  assert.equal(issuerFor({ velora: { issuer: 'https://nookara.cc/' } }), 'https://nookara.cc', 'older instance: its own nookara_url');
   assert.equal(issuerFor({ velora: { issuer: 'https://velora.ikelene.net' } }), 'https://velora.ikelene.net');
   assert.equal(issuerFor(null), 'https://velora.ikelene.net');
 });

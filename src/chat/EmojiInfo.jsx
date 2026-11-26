@@ -13,6 +13,7 @@ import { cloneTargets, cloneEmoji } from './cloneEmoji.js';
 import { addPersonalFromEmoji, isPersonalEmoji } from './personal.js';
 import { Avatar } from './Profile.jsx';
 import { openMenu } from './Menu.jsx';
+import { isNookara } from '../compat.js';
 
 export function EmojiInfoHost() {
   const [info, setInfo] = useState(null); // { char } | { eid, name, animated, server? } + rect
@@ -29,7 +30,7 @@ export function EmojiInfoHost() {
       // an instance's emoji is asked about on that instance (the one whose emoji list has it), the rest (personal emojis) on Nookara
       const from = getState().emojis?.find(sv => sv.emojis?.some(x => x.eid === d.eid))?.sid;
       // (one in none of my lists - a bridge brought it in, say - is asked about where its message lives)
-      const where = instOpt(from) || (d.inst && d.inst !== 'velora' ? d.inst : undefined);
+      const where = instOpt(from) || (d.inst && !isNookara(d.inst) ? d.inst : undefined);
       if (d.eid) apiFetch(`/chat/emojis/${encodeURIComponent(d.eid)}/info`, { inst: where }).then(x => { if (x.personal) rememberLock(`e:${d.eid}`, !!x.personal.locked); setSrv(x.server || false); setOwner(x.personal?.owner || null); setExternal(x.external || null); setOrigin(x.personal?.origin || x.origin || null); }).catch(() => setSrv(false));
       else if (!emojiDataSync()) loadEmojiData().then(() => setInfo(x => (x ? { ...x } : x)));
     };

@@ -1,4 +1,4 @@
-// Shared by the Velora and Ember profile editors.
+// Shared by the Nookara and Ember profile editors.
 // All named zones, UTC/fixed offsets and compatibility aliases from IANA tzdb 2026e.
 // Source: https://data.iana.org/time-zones/tzdata-latest.tar.gz
 // Keep a bundled list so older browsers also show every choice.

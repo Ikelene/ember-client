@@ -4,7 +4,7 @@ import { SAVEABLE } from './uploadLinks.js';
 import { saveMedia } from './mediaDownload.js';
 import { canAttachInChannel } from './attachment-permissions.js';
 import { apiFetch } from '../api.js';
-import { instOpt, isInst, instOf, VELORA } from './ids.js';
+import { instOpt, isInst, instOf, NOOKARA } from './ids.js';
 import { isLegacyMessage } from './tokens.js';
 import { sigId } from './signing.js';
 import { VideoPlayer, AudioPlayer, VoicePlayer } from './MediaPlayer.jsx';
@@ -75,11 +75,12 @@ import { embedLabel } from './inviteLink.js';
 import { fmtSize, RISKY, KIND_OF } from './fileKinds.js';
 import { Avatar, BlockedMark } from './Profile.jsx';
 import { messageMenu, userMenu, openMenu } from './Menu.jsx';
-import { useScope, mentionsMe as isMention, useFace, wantVeloraFaces, useBlocked, blockedFace, isBlockedName, faceOf, BLOCKED_NAME, bridgedTyper } from './store.js';
+import { useScope, mentionsMe as isMention, useFace, wantNookaraFaces, useBlocked, blockedFace, isBlockedName, faceOf, BLOCKED_NAME, bridgedTyper } from './store.js';
 import { useNameStyle, colorFrom, NameDecor, P, has } from './roles.jsx';
 import { suggestQuery, useSuggestItems, MentionPicker, encodeRoleMentions } from './Mentions.jsx';
 import { serialize, fill, caretToEnd, caretText, replaceBeforeCaret, insertAt, resolveWord, markdownShortcut, styleMarkdown } from './richInput.js';
 import { pictureAccept } from './accept.js';
+import { CLIPBOARD_PATH, isNookara, nookaraId, mobileBridge, downloadsBridge, MEDIA_PASTE_EVENTS } from '../compat.js';
 
 const GROUP_MS = 7 * 60 * 1000;
 
@@ -94,7 +95,7 @@ const markdownMarker = e => {
 };
 
 const KLIPY = /^https:\/\/([a-z0-9-]+\.)*klipy\.com\//i;
-// a klipy.com/gifs/<name> page link: Velora asks Klipy's API for the GIF (their site blocks scrapers)
+// a klipy.com/gifs/<name> page link: Nookara asks Klipy's API for the GIF (their site blocks scrapers)
 export const KLIPY_PAGE = /^https:\/\/(?:www\.)?klipy\.com\/(gifs|stickers|clips)\/([\w-]{1,160})\/?(?:\?\S*)?$/i;
 const klipyPages = new Map(); // page url -> { url, width, height, title } | { url: null }
 function KlipyPageGif({ url }) {
@@ -117,7 +118,7 @@ function KlipyPageGif({ url }) {
   );
 }
 // a file (zip, pdf, exe...): what it is, its name + size, and a Download button. Programs / scripts ask first.
-// a file in Velora's temporary storage: { left: 'N days' } while it's there, 'gone' once it expired, null = don't know (yet)
+// a file in Nookara's temporary storage: { left: 'N days' } while it's there, 'gone' once it expired, null = don't know (yet)
 const leftText = s => (s < 3600 ? 'under an hour' : s < 86400 ? `${Math.round(s / 3600)} hours` : `${Math.round(s / 86400)} days`);
 // re-renders when the answers for these temporary-storage links arrive or change; `enabled` = start asking (a message scrolled into view)
 function useTempTick(urls, enabled) {
@@ -163,7 +164,7 @@ export function FileCard({ a, live = true }) {
     : TEMP_LINK.test(a.url) && !cdn ? `${a.url.split(/[?#]/)[0]}?dl=1` : a.url;
   const fetchDl = () => saveMedia(a.url, name).catch(() => { toast("Couldn't save it directly - opening it instead."); window.open(a.url, '_blank', 'noopener,noreferrer'); });
   const open = async e => {
-    const inApp = !!window.BonfireDownloads?.postMessage; // the Android app saves it with its real name instead of the link's
+    const inApp = !!downloadsBridge()?.postMessage; // the Android app saves it with its real name instead of the link's
     if (!risky && !cdn && !inApp) return; // the link just downloads
     e.preventDefault();
     if (risky && !(await ask({ title: 'Download this program?', text: `${name} can run code on your computer. Only open files from people you trust.`, confirm: 'Download' }))) return;
@@ -309,7 +310,7 @@ function ReplyText({ body, ctx }) {
 }
 
 // phones / tablets: no keyboard shortcuts, so editing gets Cancel and Save buttons and Enter makes a new line
-const touchEdit = () => !!window.bonfireMobile || !!window.matchMedia?.('(pointer: coarse)').matches;
+const touchEdit = () => !!mobileBridge() || !!window.matchMedia?.('(pointer: coarse)').matches;
 function EditMessageInput({ m, view, onSave, onCancel }) {
   const touch = touchEdit();
   const input = useRef(null);
@@ -363,7 +364,7 @@ function EditMessageInput({ m, view, onSave, onCancel }) {
   return (
     <div className="vc-edit">
       {mq && <MentionPicker items={items} sel={sel} setSel={setSel} onPick={pick} sid={sid} />}
-      <div ref={input} className="vc-input vc-edit-input" contentEditable={window.bonfireMobile ? 'plaintext-only' : true} suppressContentEditableWarning role="textbox" aria-label="Edit message" aria-multiline="true"
+      <div ref={input} className="vc-input vc-edit-input" contentEditable={mobileBridge() ? 'plaintext-only' : true} suppressContentEditableWarning role="textbox" aria-label="Edit message" aria-multiline="true"
         spellCheck autoCorrect="on" autoCapitalize="sentences" onInput={update}
         onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; update(); }}
         onBlur={() => setTimeout(() => setMq(null), 150)}
@@ -394,17 +395,17 @@ function authorKey(a) {
   return [a.bridge || (a.webhook ? 'hook' : 'user'), a.bridge_from || '', a.username || ''].join('');
 }
 
-// Velora people on an instance server can sign what they send. A message from one that carries no signature can't be tied to
+// Nookara people on an instance server can sign what they send. A message from one that carries no signature can't be tied to
 // their account: it gets the "Not signed" shield, but keeps their picture and colours (Ikelene 2026-11-13). Only a signature that
-// doesn't match takes those away. (Local accounts, bots, webhooks, system lines and Velora's own servers are exempt.)
-const isUnsigned = m => !!m.inst && m.author?.kind === 'velora' && !m.signature && !m.author.bot && !m.author.webhook && !m.system && (!m.pending || m.unsigned) && !m.ephemeral;
+// doesn't match takes those away. (Local accounts, bots, webhooks, system lines and Nookara's own servers are exempt.)
+const isUnsigned = m => !!m.inst && isNookara(m.author?.kind) && !m.signature && !m.author.bot && !m.author.webhook && !m.system && (!m.pending || m.unsigned) && !m.ephemeral;
 // 'unsigned' | 'bad' | null: should this message's author picture / colour be withheld?
 function useDistrust(m) {
   const v = useChat(s => (m.signature ? s.sigs[sigId(m)] : null));
   return v === 'bad' ? 'bad' : isUnsigned(m) ? 'unsigned' : null;
 }
-// a signed message is checked here against the author's Velora key (never taken from the instance's word). A good signature
-// shows nothing (that's the normal case); a bad one and an unsigned Velora message are marked.
+// a signed message is checked here against the author's Nookara key (never taken from the instance's word). A good signature
+// shows nothing (that's the normal case); a bad one and an unsigned Nookara message are marked.
 // (inside a stack only a bad signature is marked: a stack never mixes signed and unsigned messages, so its head has the shield)
 function SigBadge({ m, inStack }) {
   const v = useChat(s => (m.signature ? s.sigs[sigId(m)] : null));
@@ -415,7 +416,7 @@ function SigBadge({ m, inStack }) {
 // Message info (Manage messages only): the real author behind a message - most of all an alias, marked or not
 function messageInfo(m) {
   const a = aliasOf(m), au = m.author || {};
-  const kind = au.webhook ? (au.bridge ? `bridge (${au.bridge})` : 'webhook') : au.bot ? 'bot' : au.kind === 'local' ? 'local account' : au.kind === 'velora' ? 'Nookara account' : au.kind || 'account';
+  const kind = au.webhook ? (au.bridge ? `bridge (${au.bridge})` : 'webhook') : au.bot ? 'bot' : au.kind === 'local' ? 'local account' : isNookara(au.kind) ? 'Nookara account' : au.kind || 'account';
   const rows = [
     ['Sent by', `${au.username || 'Unknown'} (${kind})`],
     a && ['Shown as', `${a.name}${a.unmarked ? ' (unmarked alias: looks like a normal message)' : ' (alias, with the mask)'}`],
@@ -492,7 +493,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
   const [tr, setTr] = useState(null); // a translation shown under the text: { loading } | { text, from, same, local }
   const linkPreviews = useChat(s => s.settings.link_previews !== false);
   const hook = !!m.author?.webhook;
-  // on an instance: Velora people get their Velora profile, local accounts / bots a plain card (never a Velora lookup by name)
+  // on an instance: Nookara people get their Nookara profile, local accounts / bots a plain card (never a Nookara lookup by name)
   // an aliased bot message: the card is the real bot's, with a "Posting as alias" line. An unmarked alias (server setting) whose
   // name matched a member opens THAT member's card and takes their colour; one that matched nobody opens the bot's plain card.
   const alias = aliasOf(m);
@@ -501,12 +502,12 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
   const onUser = (name, el) => (aliasMember
     ? openUser(aliasMember.username, el, 'right', m.inst ? { ...alias.member, inst: m.inst } : undefined)
     : openUser(name, el, 'right', m.inst ? (alias && !unmarked ? { ...m.author, alias_name: alias.name } : m.author) : undefined));
-  const author = useFace(m.author); // a Velora person on an instance: their live Velora picture / colour / rank
+  const author = useFace(m.author); // a Nookara person on an instance: their live Nookara picture / colour / rank
   const shown = useName(m.author && m.inst ? { ...m.author, inst: m.inst } : m.author); // display name (displayNames.js), else the username
   const replyAlias = replyAliasOf(m.reply);
   const replyAuthor = useFace(useMemo(() => (m.reply?.author && m.inst ? { ...m.reply.author, inst: m.inst } : m.reply?.author), [m.reply?.author, m.inst]));
-  useEffect(() => { if (m.inst && m.author?.kind === 'velora') wantVeloraFaces([m.author]); }, [m.inst, m.author?.velora_id]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { const a = aliasMemberOf(alias); if (m.inst && a?.kind === 'velora') wantVeloraFaces([a]); }, [m.inst, alias?.member?.velora_id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (m.inst && isNookara(m.author?.kind)) wantNookaraFaces([m.author]); }, [m.inst, nookaraId(m.author)]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const a = aliasMemberOf(alias); if (m.inst && isNookara(a?.kind)) wantNookaraFaces([a]); }, [m.inst, nookaraId(alias?.member)]); // eslint-disable-line react-hooks/exhaustive-deps
   // somebody I blocked, in a server: "Blocked User" with the default picture, and the whole message under a cover until clicked
   // (only for me; everyone else sees them as usual). The real name stays behind the clicks, so their menu can still unblock.
   const blockedAuthor = useBlocked(view.kind === 'channel' && !hook && !m.system ? m.author : null, m.inst);
@@ -744,7 +745,7 @@ export function MessageList({ view, onUser, onReply, canPost, canMod, channels, 
   const blocks = useChat(s => s.blocks);
   const members = useChat(s => (view.sid ? s.members[view.sid] : null));
   const ctx = useMemo(() => ({
-    me, canPost, channels, linkImages, roles, sid: view.sid || null, inst: view.sid ? instOf(view.sid) : VELORA,
+    me, canPost, channels, linkImages, roles, sid: view.sid || null, inst: view.sid ? instOf(view.sid) : NOOKARA,
     onUser: (u, el) => onUser(u, el),
     onChannel: c => go({ kind: 'channel', sid: view.sid, cid: c.cid }),
     onLink: openLink,
@@ -912,12 +913,12 @@ export function Typing({ view }) {
   const t = useChat(s => (show ? s.typing[keyOf(view)] : null));
   const people = useChat(s => s.people);
   const members = useChat(s => (view.kind === 'channel' ? s.members[view.sid] : null));
-  const faces = useChat(s => s.veloraFaces);
+  const faces = useChat(s => s.nookaraFaces);
   const now = Date.now();
   // the picture comes from the server's member list first (bots are members there, not in `people`), then anyone I've seen
   const pfpOf = n => {
     const m = members?.find(x => x.username === n);
-    return (m ? faceOf(m, { veloraFaces: faces })?.pfp : null) || people[n]?.pfp || null;
+    return (m ? faceOf(m, { nookaraFaces: faces })?.pfp : null) || people[n]?.pfp || null;
   };
   const names = Object.entries(t || {}).filter(([, until]) => until > now).map(([n]) => n);
   // in a server, somebody I blocked types as "Blocked User" with the default picture
@@ -937,7 +938,7 @@ export function Typing({ view }) {
 }
 
 // unsent drafts, per conversation: kept across channel switches and page reloads (this browser, this account)
-const draftKey = () => `velora_chat_drafts_${getState().me?.username || ''}`;
+const draftKey = () => `nookara_chat_drafts_${getState().me?.username || ''}`;
 let draftMem = null;
 function draftsAll() {
   if (!draftMem) { try { draftMem = JSON.parse(localStorage.getItem(draftKey()) || '{}') || {}; } catch { draftMem = {}; } }
@@ -983,7 +984,7 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
   const [busy, setBusy] = useState(0);
   const ta = useRef(null); // the contenteditable box
   const composing = useRef(false);
-  const mobileTextInput = () => !!window.bonfireMobile || window.matchMedia('(pointer: coarse)').matches;
+  const mobileTextInput = () => !!mobileBridge() || window.matchMedia('(pointer: coarse)').matches;
   const saved = useRef(null); // the caret, kept while a picker has focus
   const file = useRef(null);
   const key = keyOf(view);
@@ -1168,15 +1169,15 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
     if (docked) { setEmoji(false); setPicker(false); }
     ta.current?.focus({ preventScroll: true });
   }
-  // DMs, group chats and Velora-hosted channels send files to Velora (account or temporary storage); instance communities keep their own
-  const onVelora = !(view.kind === 'channel' && isInst(view.sid));
-  // the biggest file this conversation takes (MB): an instance community says so itself; on Velora it depends on where it goes
+  // DMs, group chats and Nookara-hosted channels send files to Nookara (account or temporary storage); instance communities keep their own
+  const onNookara = !(view.kind === 'channel' && isInst(view.sid));
+  // the biggest file this conversation takes (MB): an instance community says so itself; on Nookara it depends on where it goes
   function uploadCap(dest) {
-    if (!onVelora) return getState().detail[view.sid]?.server.my_upload_max_mb || getState().detail[view.sid]?.server.upload_max_mb || 25; // (my_: with my roles)
+    if (!onNookara) return getState().detail[view.sid]?.server.my_upload_max_mb || getState().detail[view.sid]?.server.upload_max_mb || 25; // (my_: with my roles)
     return dest === 'account' ? getUploadLimits().saved_mb : getUploadLimits().server_mb;
   }
   // dropped / pasted / picked files wait in the tray (checked against the size limit now) and only upload when the message is
-  // sent - see sendMessage's uploads. On Velora each file goes where you picked: the remembered choice (chat setting
+  // sent - see sendMessage's uploads. On Nookara each file goes where you picked: the remembered choice (chat setting
   // dm_upload_dest), the "Where should this go?" picker the first time, or destOnce from the + menu (just these files).
   async function addFiles(fileList, destOnce) {
     const context = uploadContext.current;
@@ -1184,7 +1185,7 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
     const files = [...fileList]; // (copied now: a file input is emptied straight after this is called)
     if (!files.length) return;
     let dest = null;
-    if (onVelora) {
+    if (onNookara) {
       dest = destOnce || await chooseUploadDest(files);
       if (!dest || uploadContext.current !== context) return; // picker closed, or the conversation changed meanwhile
     }
@@ -1211,7 +1212,7 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
     setAtts(x => x.filter(y => y !== a));
     if (attPop?.id === a.id) setAttPop(null);
   }
-  // the storage badge on a waiting file (TempAttPopover): a Velora Pro member's picked expiry, or the other storage
+  // the storage badge on a waiting file (TempAttPopover): a Nookara Pro member's picked expiry, or the other storage
   const [attPop, setAttPop] = useState(null); // { id, rect } of the file whose popover is open
   const patchAtt = (id, p) => setAtts(x => x.map(y => (y.id === id ? { ...y, ...p } : y)));
   const popAtt = attPop && atts.find(a => a.id === attPop.id);
@@ -1225,7 +1226,7 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
       if (locked || (view.kind === 'channel' && !canAttach) || view.username === 'System') return;
       try {
         const url = new URL(e.detail.url);
-        if (url.origin !== location.origin || !url.pathname.startsWith('/__bonfire_clipboard/')) return;
+        if (url.origin !== location.origin || !url.pathname.startsWith(CLIPBOARD_PATH)) return;
         const response = await fetch(url, { cache: 'no-store', credentials: 'omit' });
         if (!response.ok) throw Error('Could not paste that media. Try copying it again.');
         const blob = await response.blob();
@@ -1233,10 +1234,10 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
         await addFiles([new File([blob], e.detail.name || 'clipboard-media', { type: blob.type })]);
       } catch (error) { if (uploadContext.current === context) toast(error.message); }
     };
-    el.addEventListener('bonfire-media-paste', receive);
-    return () => el.removeEventListener('bonfire-media-paste', receive);
+    MEDIA_PASTE_EVENTS.forEach(n => el.addEventListener(n, receive));
+    return () => MEDIA_PASTE_EVENTS.forEach(n => el.removeEventListener(n, receive));
   });
-  // "Upload to my Velora account": the file goes to Saved Media (your Velora storage) AND is attached to this message, the same
+  // "Upload to my Nookara account": the file goes to Saved Media (your Nookara storage) AND is attached to this message, the same
   // attachment a Saved Media pick gives
   async function addSavedFiles(files) {
     const context = uploadContext.current;
@@ -1292,7 +1293,7 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
       removeEventListener('drop', drop, opts); removeEventListener('dragend', stop, opts); removeEventListener('blur', stop);
     };
   }, []);
-  // the + button: a file for this conversation, or one kept on my Velora account (Saved Media)
+  // the + button: a file for this conversation, or one kept on my Nookara account (Saved Media)
   function uploadMenu(e) {
     const r = e.currentTarget.getBoundingClientRect();
     const lim = getUploadLimits();
@@ -1301,7 +1302,7 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
     const mine = rememberedUploadDest();
     openMenu({ clientX: r.left, clientY: Math.max(6, r.top - 150), preventDefault() {}, stopPropagation() {} }, [
       ...(isMobileDevice() ? [{ label: 'Take a photo', hint: 'Opens your camera and attaches the picture', icon: Camera, onClick: () => camera.current?.click() }] : []),
-      ...(onVelora ? [ // DMs / group chats: pick where these files go (just this once - the remembered choice stays)
+      ...(onNookara ? [ // DMs / group chats: pick where these files go (just this once - the remembered choice stays)
         { label: 'Upload to temporary storage', hint: `Free, deleted after a set time - up to ${lim.server_mb} MB${mine === 'temp' ? ' (your default)' : ''}`, icon: Clock, onClick: () => pickOnce('temp') },
         { label: 'Upload to account storage', hint: `Kept on your Nookara account - up to ${lim.saved_mb} MB${mine === 'account' ? ' (your default)' : ''}`, icon: CloudUpload, onClick: () => pickOnce('account') },
       ] : [
@@ -1314,11 +1315,11 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
   }
   // Voice messages. An empty box turns the send button into the record button. The input decides how it works, not the screen size:
   // a finger holds (let go sends, slide left deletes), a mouse or keyboard clicks once to start and again to send.
-  const canVoice = !sendOff && !cmd && !text.trim() && !atts.length && !busy && !locked && view.kind !== 'modmail' && view.username !== 'System' && (view.kind !== 'channel' || canAttach) && (!onVelora || canUploadMedia);
+  const canVoice = !sendOff && !cmd && !text.trim() && !atts.length && !busy && !locked && view.kind !== 'modmail' && view.username !== 'System' && (view.kind !== 'channel' || canAttach) && (!onNookara || canUploadMedia);
   async function sendVoice() {
     const v = view, reply = replyTo, recorded = await voice.finish();
     if (!recorded) return;
-    const dest = onVelora ? rememberedUploadDest() || 'temp' : undefined; // no picker for a voice message: the usual place, else temporary storage
+    const dest = onNookara ? rememberedUploadDest() || 'temp' : undefined; // no picker for a voice message: the usual place, else temporary storage
     const cap = uploadCap(dest);
     if (recorded.size > cap * 1024 * 1024) { toast(`That voice message is too big (${fmtSize(recorded.size)}) - files here go up to ${cap} MB.`); return; }
     if (!packActive()) playSound('voice_send', 0.5); // (a message sound pack plays its own send sound)

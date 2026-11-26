@@ -10,8 +10,8 @@ const { build } = await import(process.env.ESBUILD_MODULE || 'esbuild');
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const dashboard = fileURLToPath(new URL('../', import.meta.url));
 const chat = join(dashboard, 'src/chat').replaceAll('\\', '/');
-const entry = `import React from 'react';import{createRoot}from'react-dom/client';import{BootScreen}from'${chat}/Boot.jsx';import{BonfireLogo}from'${chat}/BonfireLogo.jsx';import{setDesign,getDesign}from'${chat}/design.js';window.setDesign=setDesign;window.getDesign=getDesign;
-createRoot(document.getElementById('root')).render(<div><BootScreen /><div className="vc"><div className="vc-composer" id="comp">x</div></div><div id="logo" style={{color:'rgb(1, 2, 3)'}}><BonfireLogo size={30} /></div></div>);`;
+const entry = `import React from 'react';import{createRoot}from'react-dom/client';import{BootScreen}from'${chat}/Boot.jsx';import{EmberLogo}from'${chat}/EmberLogo.jsx';import{setDesign,getDesign}from'${chat}/design.js';window.setDesign=setDesign;window.getDesign=getDesign;
+createRoot(document.getElementById('root')).render(<div><BootScreen /><div className="vc"><div className="vc-composer" id="comp">x</div></div><div id="logo" style={{color:'rgb(1, 2, 3)'}}><EmberLogo size={30} /></div></div>);`;
 const built = await build({ stdin: { contents: entry, loader: 'jsx', resolveDir: dashboard }, jsx: 'automatic', bundle: true, write: false, loader: { '.json': 'json' }, define: { 'process.env.NODE_ENV': '"production"' } });
 const css = readFileSync(join(chat, 'chat.css'), 'utf8') + readFileSync(join(chat, 'rounded.css'), 'utf8') + readFileSync(join(chat, 'boot.css'), 'utf8') + readFileSync(join(dashboard, 'src/styles.css'), 'utf8');
 const server = createServer((req, res) => {

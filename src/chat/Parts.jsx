@@ -1,7 +1,7 @@
 // The frame around the conversation: server rail, channel / DM sidebar, member list, your panel.
 import { BotTag } from './Bots.jsx';
 import { StatusLink } from './StatusLink.jsx';
-import { isDesktopApp } from './BonfireLogo.jsx';
+import { isDesktopApp } from './EmberLogo.jsx';
 import { VoiceChannelUsers, QuickVoiceBtns } from './VoiceParts.jsx';
 import { joinVoice } from './voice.js';
 import { openLinkChannel } from './ChannelTypes.jsx';
@@ -19,7 +19,7 @@ import { useChat, retryNow, go, keyOf, setStatus, setCustom, isMuted, effectiveN
 import { P, has, ChannelIcon, useNameStyle, colorFrom, NameDecor } from './roles.jsx';
 import { serverMenu, instanceMenu, channelMenu, userMenu, openMenu, copy } from './Menu.jsx';
 import { apiFetch, getToken } from '../api.js';
-import { VELORA, instOf, isInst } from './ids.js';
+import { NOOKARA, instOf, isInst } from './ids.js';
 import { loudUnread, needsChannelCount } from './unread.js';
 import { getLook, subscribeLook } from './look.js';
 import { removeInstance, reorderInstances, reconnect as reconnectInstance, disconnectInstance } from './instances.js';
@@ -36,6 +36,7 @@ const FOLD_KEY = 'ember:dmpins:folded';
 const readFolded = () => { try { const v = JSON.parse(localStorage.getItem(FOLD_KEY) || '[]'); return new Set(Array.isArray(v) ? v : []); } catch { return new Set(); } };
 const writeFolded = set => { try { localStorage.setItem(FOLD_KEY, JSON.stringify([...set])); } catch { /* private mode */ } };
 import Logo from '../components/Logo.jsx';
+import { mobileBridge } from '../compat.js';
 
 // who's typing in a conversation right now
 export function typersOf(typing, key) {
@@ -60,7 +61,7 @@ function TypingMark({ names, people, sid }) {
 }
 
 // ── the server rail ─────────────────────────────────────────────────────────
-// Every server is one plain icon: Velora-hosted ones (only while signed in with Velora) first, then the servers on instances in
+// Every server is one plain icon: Nookara-hosted ones (only while signed in with Nookara) first, then the servers on instances in
 // the order of the instance list. Each group is dragged within itself. An instance icon's tooltip names the server and its address.
 const localRailOrder = () => { try { const v = JSON.parse(localStorage.getItem('bf_rail_order') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
 export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }) {
@@ -98,13 +99,13 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
   // DMs with new messages sit in the rail under Home (with how many), like Discord / Fluxer
   const newDMs = dms.filter(c => c.unread > 0 && keyOf(view) !== `d:${c.username.toLowerCase()}`).slice(0, 6);
   const modmail = useChat(s => s.modmail);
-  // drag servers to put them in your own order (Velora's: saved to your account; instances: saved with the instance list). The state change
+  // drag servers to put them in your own order (Nookara's: saved to your account; instances: saved with the instance list). The state change
   // waits a tick: Chromium cancels a drag if the page changes during dragstart.
   const dragId = useRef(null);
   const [drag, setDrag] = useState(null); // { id, over, after }
-  const legacy = servers.filter(x => (x.inst || VELORA) === VELORA && !x.moved_to); // (a Velora-hosted server that moved to an Ember server is gone from the rail)
+  const legacy = servers.filter(x => (x.inst || NOOKARA) === NOOKARA && !x.moved_to); // (a Nookara-hosted server that moved to an Ember server is gone from the rail)
   const group = id => (id.startsWith('i:') ? 'i' : 'v');
-  // one order for the whole rail, Velora-hosted and Ember servers mixed (chat setting rail_order; local until it's saved)
+  // one order for the whole rail, Nookara-hosted and Ember servers mixed (chat setting rail_order; local until it's saved)
   const savedOrder = useChat(s => s.settings?.rail_order);
   const railOrder = savedOrder?.length ? savedOrder : localRailOrder();
   const idOf = x => (x.origin ? `i:${x.origin}` : `v:${x.sid}`);
@@ -130,9 +131,9 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
     const st = getState();
     const src = st.servers.find(x => x.sid === from.slice(2)), dst = st.servers.find(x => x.sid === id.slice(2));
     if (!src || !dst) return;
-    const vlist = st.servers.filter(x => (x.inst || VELORA) === VELORA && x.sid !== src.sid);
+    const vlist = st.servers.filter(x => (x.inst || NOOKARA) === NOOKARA && x.sid !== src.sid);
     vlist.splice(vlist.findIndex(x => x.sid === dst.sid) + (after ? 1 : 0), 0, src);
-    patchState({ servers: [...vlist, ...st.servers.filter(x => (x.inst || VELORA) !== VELORA)] });
+    patchState({ servers: [...vlist, ...st.servers.filter(x => (x.inst || NOOKARA) !== NOOKARA)] });
     saveSettings({ server_order: vlist.map(x => x.sid) }).catch(() => toast("Couldn't save the server order."));
   }
   const dropRef = useRef(dropOn);
@@ -247,7 +248,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
           onInvite: () => dialog('invite', s.sid), onSettings: () => dialog('settings', s.sid), onLeave: () => dialog('leave', s.sid), onRemove: ask_,
           onReconnect: () => reconnectInstance(inst.origin),
           onDisconnect: () => disconnectInstance(inst.origin),
-          onLogin: () => (inst.needsVelora ? startSignIn() : dialog('add-instance', null, { url: inst.origin })),
+          onLogin: () => (inst.needsNookara ? startSignIn() : dialog('add-instance', null, { url: inst.origin })),
         })}>
         <span className="vc-srv-ico"><ServerIcon src={icon} name={name} /></span>
       </RailItem>
@@ -275,7 +276,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
       <RailItem title="Create a server" onClick={onCreate}><span className="vc-srv-ico act"><Plus size={22} /></span></RailItem>
       <RailItem title="Discover" active={discoverOn} onClick={onDiscover}><span className="vc-srv-ico act"><Compass size={20} /></span></RailItem>
 
-      {!isDesktopApp() && !window.bonfireMobile && (
+      {!isDesktopApp() && !mobileBridge() && (
         <RailItem title="Get the Ember app" onClick={() => dialog('app-download')}><span className="vc-srv-ico act" data-app-download><Download size={20} /></span></RailItem>
       )}
     </nav>
@@ -497,9 +498,9 @@ export function useConnLost(ms = CONN_LOST_MS) {
   useEffect(() => { if (up) { setLost(false); return undefined; } const t = setTimeout(() => setLost(true), ms); return () => clearTimeout(t); }, [up, ms, shown]);
   return !up && lost;
 }
-// Velora hasn't connected yet since the page loaded (DMs, groups, friends live there): a small note where those lists are, with
+// Nookara hasn't connected yet since the page loaded (DMs, groups, friends live there): a small note where those lists are, with
 // Retry now. Waits a moment first, so a normal connect doesn't flash it. Later drops get the popup in Chat.jsx instead.
-export function VeloraConnNote({ className = '' }) {
+export function NookaraConnNote({ className = '' }) {
   const conn = useChat(s => s.conn);
   const at = useChat(s => s.connRetryAt);
   const connected = useChat(s => s.connected);
@@ -632,7 +633,7 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
       <div className="vc-side-list" ref={listRef}>
         <button type="button" className={`vc-ch vc-home-link${view.kind === 'home' ? ' on' : ''}`} onClick={() => go({ kind: 'home' })}><House size={18} /> <span>Home</span></button>
         <button type="button" className={`vc-ch vc-home-link${view.kind === 'notes' ? ' on' : ''}`} onClick={() => go({ kind: 'notes' })}><NotebookPen size={18} /> <span>Personal Notes</span></button>
-        <VeloraConnNote />
+        <NookaraConnNote />
         {modmail.messages.length > 0 && (
           <button type="button" className={`vc-dm vc-dm-mod${keyOf(view) === 'mm:' ? ' on' : ''}${keyOf(view) !== 'mm:' && modmail.unread ? ' unread' : ''}`} onClick={() => go({ kind: 'modmail' })}>
             <span className="vc-av vc-sys-av" style={{ width: 32, height: 32 }}><ShieldCheck size={18} /></span>
@@ -711,9 +712,9 @@ export function MemberList({ sid, cid, onUser, embedded = false }) {
     return () => { live = false; };
   }, [cid, sid, permKey, allMembers?.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const members = useMemo(() => (viewers && allMembers ? allMembers.filter(m => viewers.has(String(m.id))) : allMembers), [allMembers, viewers]);
-  const more = useChat(s => s.membersMore[sid]); // a big Velora-hosted server: more pages to load (as you scroll)
+  const more = useChat(s => s.membersMore[sid]); // a big Nookara-hosted server: more pages to load (as you scroll)
   const presence = useChat(s => s.presence);
-  const names = useChat(s => s.veloraNames);
+  const names = useChat(s => s.nookaraNames);
   const signedIn = useChat(s => s.signedIn);
   const dnv = useDisplayNamesVersion(); // a display name came in / changed: sort again
   useEffect(() => { wantDisplayNames((allMembers || []).filter(m => !serverOwnName(m)).map(m => m.username)); }, [allMembers]);
@@ -725,7 +726,7 @@ export function MemberList({ sid, cid, onUser, embedded = false }) {
   const groups = useMemo(() => {
     if (!members) return [];
     const st = m => statusOf(sid, m) || 'offline';
-    const none = m => statusOf(sid, m) === null; // an instance's own accounts and bots (or signed out of Velora): no presence, so no online / offline
+    const none = m => statusOf(sid, m) === null; // an instance's own accounts and bots (or signed out of Nookara): no presence, so no online / offline
     const on = members.filter(m => !none(m) && st(m) !== 'offline');
     const nm = m => personName(m, displayNameOf(m.username)); // (display names sort the list, displayNames.js)
     const by = (a, b) => nm(a).localeCompare(nm(b), undefined, { sensitivity: 'base' });
@@ -757,7 +758,7 @@ export function MemberList({ sid, cid, onUser, embedded = false }) {
             n++;
             if (title === 'Offline' && n > shown) return null;
             const p = presenceFor(sid, m);
-            const blocked = !!blocks?.length && isBlockedPerson(m, isInst(sid) ? instOf(sid) : VELORA); // somebody I blocked: no name, picture or status line
+            const blocked = !!blocks?.length && isBlockedPerson(m, isInst(sid) ? instOf(sid) : NOOKARA); // somebody I blocked: no name, picture or status line
             const sub = blocked ? null : subtitle(p);
             return (
               <button type="button" key={m.username} className={`vc-member vl-rise${p?.status === 'offline' ? ' off' : ''}`} onClick={e => onUser(m.username, e.currentTarget, 'left', isInst(sid) ? m : undefined)}
@@ -848,7 +849,7 @@ export function UserPanel({ onSettings, onEditProfile }) {
   const connected = useChat(s => s.connected);
   const lost = useConnLost();
   const showConn = conn !== 'open' && (lost || !connected); // a short drop keeps your status showing
-  // the account of the server I'm looking at, when it's one of that server's own (not a Velora one): that's who I am there
+  // the account of the server I'm looking at, when it's one of that server's own (not a Nookara one): that's who I am there
   const view = useChat(s => s.view);
   const here = useChat(s => { const o = view.inst || (view.sid && isInst(view.sid) ? instOf(view.sid) : null); return o ? s.instances.find(i => i.origin === o) : null; });
   const [pop, setPop] = useState(null); // the panel's rect while the pop-out is open
@@ -859,7 +860,7 @@ export function UserPanel({ onSettings, onEditProfile }) {
     addEventListener('vc-custom-status', open);
     return () => removeEventListener('vc-custom-status', open);
   }, []);
-  if (!signedIn || (here?.user && here.user.kind === 'local')) { // signed out of Velora, or on a server with its own accounts: no Velora pop-out
+  if (!signedIn || (here?.user && here.user.kind === 'local')) { // signed out of Nookara, or on a server with its own accounts: no Nookara pop-out
     const u = here?.user;
     const editable = hasAccountProfile(here); // its own accounts keep a profile: the name opens it (Settings > Profile, on this server)
     const who = u && <><Avatar user={u} size={36} /><span className="vc-me-txt"><b>{u.display_name || u.username}</b><small>{here.host}</small></span></>;

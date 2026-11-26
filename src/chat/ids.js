@@ -1,10 +1,11 @@
 // Ids across instances. Every server / channel id that came from an instance is kept as `origin|id` everywhere in Ember's
-// state (a hostile instance can pick any sid / cid, so two instances' ids must never meet). Velora's own (legacy) ids stay
+// state (a hostile instance can pick any sid / cid, so two instances' ids must never meet). Nookara's own (legacy) ids stay
 // bare: they never contain '|', so they can't collide with a namespaced one. Only the code that talks to an instance
 // turns a key back into the bare id, and the origin comes out of the key itself - a request for community X can only
 // ever go to the instance X was loaded from.
 import { onWebClientPath, hostedAlias } from './hosts.js';
-export const VELORA = 'velora';
+import { NOOKARA_INST, desktopBridge, mobileBridge, ANDROID_UA, SITE_ME_CACHE_V2 } from '../compat.js';
+export const NOOKARA = NOOKARA_INST; // Nookara's own servers' key (see compat.js)
 
 export function normOrigin(input) {
   let s = String(input || '').trim();
@@ -18,15 +19,15 @@ export function normOrigin(input) {
     return u.origin;
   } catch { return null; }
 }
-export const K = (inst, id) => (id == null ? id : !inst || inst === VELORA ? String(id) : `${inst}|${id}`);
+export const K = (inst, id) => (id == null ? id : !inst || inst === NOOKARA ? String(id) : `${inst}|${id}`);
 export function parseK(k) {
   k = String(k ?? '');
   const i = k.indexOf('|');
-  return i > 0 ? { inst: k.slice(0, i), id: k.slice(i + 1) } : { inst: VELORA, id: k };
+  return i > 0 ? { inst: k.slice(0, i), id: k.slice(i + 1) } : { inst: NOOKARA, id: k };
 }
 export const instOf = k => parseK(k).inst;
 export const bare = k => parseK(k).id;
-export const isInst = k => instOf(k) !== VELORA;
+export const isInst = k => instOf(k) !== NOOKARA;
 export const instOpt = k => (k && isInst(k) ? instOf(k) : undefined); // apiFetch's opts.inst for something that came from an instance (a message's channel...)
 
 // ── the instances this page is connected to (set by instances.js; api.js reads it) ──
@@ -34,17 +35,17 @@ export const registry = new Map(); // origin -> { origin, session }
 export const hooks = { refresh: null, restricted: null }; // refresh(origin) -> Promise<boolean>: a new session after a 401; restricted(origin, message): the instance said account_restricted (Ember switched off for this account)
 
 // Everything Ember keeps per account on this device (its server list, the sessions it opened on instances) is stored under the
-// signed-in Velora account's name, so switching accounts shows that account's servers and not the previous one's.
-// web Ember remembers the name at sign-in (localStorage['bonfire_user']); the apps read it from the cached /account/me
+// signed-in Nookara account's name, so switching accounts shows that account's servers and not the previous one's.
+// web Ember remembers the name at sign-in (localStorage['ember_user']); the apps read it from the cached /account/me
 export function acct() {
   try {
-    const web = onWebClientPath() && !window.bonfireDesktop && !window.bonfireMobile && !/\bBonfireAndroid\//.test(navigator.userAgent);
-    const u = web ? localStorage.getItem('bonfire_user') : JSON.parse(localStorage.getItem('velora_me_cache_v2') || 'null')?.d?.account?.username;
+    const web = onWebClientPath() && !desktopBridge() && !mobileBridge() && !ANDROID_UA.test(navigator.userAgent);
+    const u = web ? localStorage.getItem('ember_user') : JSON.parse(localStorage.getItem(SITE_ME_CACHE_V2) || 'null')?.d?.account?.username;
     return u ? String(u).toLowerCase() : '';
   } catch { return ''; }
 }
 export const acctKey = base => { const a = acct(); return a ? `${base}:${a}` : base; };
-const SESSIONS = 'bonfire_instance_sessions';
+const SESSIONS = 'ember_instance_sessions';
 // (keys go through normOrigin: a session saved under e_<slug>.nookara.cc is the e-<slug> server's)
 const byOrigin = v => (v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, s]) => [normOrigin(k) || k, s])) : {});
 export function loadSessions() { try { return byOrigin(JSON.parse(localStorage.getItem(acctKey(SESSIONS)) || '{}')); } catch { return {}; } }
@@ -52,9 +53,9 @@ export function saveSession(origin, session, tag) {
   try { const all = loadSessions(); if (session) all[origin] = session; else delete all[origin]; localStorage.setItem(acctKey(SESSIONS), JSON.stringify(all)); } catch { /* private mode */ }
   try { const t = loadSessionTags(); if (session && tag) t[origin] = tag; else delete t[origin]; localStorage.setItem(acctKey(SESSION_TAGS), JSON.stringify(t)); } catch { /* private mode */ }
 }
-// which Ember sign-in a Velora-login session came from: signing in again (e.g. now with "Sign messages" approved) must
+// which Ember sign-in a Nookara-login session came from: signing in again (e.g. now with "Sign messages" approved) must
 // trade a fresh instance token, or the instance keeps the old session's permissions
-const SESSION_TAGS = 'bonfire_instance_session_tags';
+const SESSION_TAGS = 'ember_instance_session_tags';
 export function loadSessionTags() { try { return byOrigin(JSON.parse(localStorage.getItem(acctKey(SESSION_TAGS)) || '{}')); } catch { return {}; } }
 export function tokenTag(token) { let h = 0; for (let i = 0; i < (token || '').length; i++) h = (h * 31 + token.charCodeAt(i)) | 0; return token ? (h >>> 0).toString(36) : ''; }
 
@@ -103,13 +104,13 @@ export function routePath(path, optInst) {
   const found = new Set();
   const clean = String(path).replace(COMPOSITE, (_, inst, id) => { found.add(inst); return encodeURIComponent(id); });
   if (found.size > 1) throw Object.assign(new Error('mixed_instances'), { status: 400 });
-  const inst = [...found][0] || optInst || VELORA;
+  const inst = [...found][0] || optInst || NOOKARA;
   if (optInst && found.size && inst !== optInst) throw Object.assign(new Error('mixed_instances'), { status: 400 });
   return { inst, path: clean };
 }
 const BODY_KEYS = new Set(['sid', 'cid', 'channel', 'server']);
 export function unNsBody(inst, body) {
-  if (typeof body !== 'string' || inst === VELORA) return body;
+  if (typeof body !== 'string' || inst === NOOKARA) return body;
   let v; try { v = JSON.parse(body); } catch { return body; }
   const pre = `${inst}|`;
   const walk = (x, k) => (Array.isArray(x) ? x.map(y => walk(y, k)) : x && typeof x === 'object' ? Object.fromEntries(Object.entries(x).map(([a, b]) => [a, walk(b, a)])) : typeof x === 'string' && BODY_KEYS.has(k) && x.startsWith(pre) ? x.slice(pre.length) : x);

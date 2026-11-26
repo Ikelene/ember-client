@@ -24,8 +24,8 @@ test('saved media import avoids browser fetch and signs destination hashes in at
   const instance = 'https://chat.test', calls = [];
   const upload = { url: instance + '/uploads/local.png', sha256: 'a'.repeat(64) };
   const gif = { url: 'https://static.klipy.com/giphy/cat.gif', type: 'gif' };
-  const remote = { url: 'https://velora.test/uploads/saved.png', sha256: 'b'.repeat(64), name: 'saved.png' };
-  const prepared = await prepareInstanceAttachments([upload, remote, gif], instance, 'https://velora.test', async a => {
+  const remote = { url: 'https://nookara.test/uploads/saved.png', sha256: 'b'.repeat(64), name: 'saved.png' };
+  const prepared = await prepareInstanceAttachments([upload, remote, gif], instance, 'https://nookara.test', async a => {
     calls.push(a);
     return { url: instance + '/uploads/imported.png', sha256: 'c'.repeat(64) };
   });

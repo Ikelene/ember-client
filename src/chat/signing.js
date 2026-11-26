@@ -1,6 +1,6 @@
-// Message signing (bonfire-server/PROTOCOL.md §8). The Velora account's signing key (Ed25519, fetched with the SIGN_MESSAGES
-// permission, imported non-extractable, kept in memory) signs what you send in velora-mode communities that allow it; every signed
-// message you receive is checked here against the author's Velora key, whatever the instance says. No Ed25519 in this browser = nothing is signed.
+// Message signing (ember-server/PROTOCOL.md §8). The Nookara account's signing key (Ed25519, fetched with the SIGN_MESSAGES
+// permission, imported non-extractable, kept in memory) signs what you send in nookara-mode communities that allow it; every signed
+// message you receive is checked here against the author's Nookara key, whatever the instance says. No Ed25519 in this browser = nothing is signed.
 import { apiFetch } from '../api.js';
 import { patchState, getState } from './store.js';
 import { serverNow } from './server-clock.js';
@@ -12,10 +12,11 @@ const unb64u = s => Uint8Array.from(atob(String(s).replace(/-/g, '+').replace(/_
 
 export { canonical } from './signing-payload.js';
 import { canonical, payloadOf, receivedPayload, issuerFor } from './signing-payload.js';
-const bytesOf = payload => enc.encode(`bonfire-msg-v1\n${canonical(payload)}`);
+import { EMBER_API, nookaraId, SIGN_PREFIX, OLD_ORIGIN } from '../compat.js';
+const bytesOf = payload => enc.encode(`${SIGN_PREFIX}\n${canonical(payload)}`);
 
 // ── the account key ──
-// One Ed25519 key per Velora account (PROTOCOL.md §2.3). Velora hands it to a token that holds SIGN_MESSAGES; it is imported here as a
+// One Ed25519 key per Nookara account (PROTOCOL.md §2.3). Nookara hands it to a token that holds SIGN_MESSAGES; it is imported here as a
 // NON-extractable CryptoKey and kept in memory only. It is fetched again when it is older than KEY_AGE (so a rotation on the website
 // is picked up) or when a sign attempt fails.
 const KEY_AGE = 30 * 1000;
@@ -28,7 +29,7 @@ async function supported() {
   try { await crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify']); return true; } catch { return false; }
 }
 async function fetchKey() {
-  const d = await apiFetch('/bonfire/signing-key');
+  const d = await apiFetch(`${EMBER_API}/signing-key`);
   if (!d?.kid || !d.private_key) throw new Error('invalid_key');
   const priv = await crypto.subtle.importKey('pkcs8', unb64u(d.private_key), { name: 'Ed25519' }, false, ['sign']); // false = non-extractable
   device = { kid: d.kid, priv, at: Date.now() };
@@ -46,7 +47,7 @@ if (typeof document !== 'undefined') document.addEventListener('visibilitychange
 export async function setupSigning() {
   device = null;
   try {
-    const s = await apiFetch('/bonfire/session');
+    const s = await apiFetch(`${EMBER_API}/session`);
     if (((Number(s?.effective) || 0) & SIGN_BIT) !== SIGN_BIT) { patchState({ signing: { state: 'no_scope' } }); return; }
     if (!(await supported())) { patchState({ signing: { state: 'unsupported' } }); return; }
     await refresh();
@@ -54,11 +55,11 @@ export async function setupSigning() {
 }
 
 // The signed "iss" is the account issuer the instance checks against, not the page's address. An instance lists the ones it
-// accepts in discovery (velora.signing_issuers, preferred first: https://nookara.cc on Nookara). One older than that list
-// checks against its own velora_url (velora.issuer); with neither, Velora's original https://velora.ikelene.net, which every
+// accepts in discovery (nookara.signing_issuers, preferred first: https://nookara.cc on Nookara). One older than that list
+// checks against its own nookara_url (nookara.issuer); with neither, Nookara's original https://velora.ikelene.net, which every
 // client signed with before. Checks of received messages try all of them (and the page's own host, for messages signed on
 // ember.nookara.cc before the issuer was pinned).
-const SIG_ISS = 'https://velora.ikelene.net';
+const SIG_ISS = OLD_ORIGIN;
 const SIG_ISS_ALL = [...new Set(['https://nookara.cc', SIG_ISS, location.origin, 'https://ember.nookara.cc'])];
 // -> { kid, sig, ts, nonce } for a message about to be sent / edited (info: the instance's discovery info, for the issuer)
 export async function signMessage(fields, info) {
@@ -82,7 +83,7 @@ const keyCache = new Map(); // kid -> { at, key | null }
 async function keyFor(kid) {
   const hit = keyCache.get(kid);
   if (hit && Date.now() - hit.at < 10 * 60 * 1000) return hit.key;
-  const r = await fetch(`/bonfire/keys/kid/${encodeURIComponent(kid)}`);
+  const r = await fetch(`${EMBER_API}/keys/kid/${encodeURIComponent(kid)}`);
   if (r.status === 404) { keyCache.set(kid, { at: Date.now(), key: null }); return null; }
   if (!r.ok) throw new Error('key_lookup');
   const key = await r.json();
@@ -99,7 +100,7 @@ export async function checkMessage(m) {
   try {
     const key = await keyFor(sig.kid);
     if (!key) return 'bad';
-    const vid = m.author.velora_id;
+    const vid = nookaraId(m.author);
     if (!vid || String(key.user_id) !== String(vid)) return 'bad';
     if (key.revoked_at != null && Number(key.revoked_at) < Number(sig.ts)) return 'bad';
     const pub = await importKey(key.public_key);

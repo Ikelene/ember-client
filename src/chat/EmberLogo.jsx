@@ -1,16 +1,17 @@
+import { desktopBridge } from '../compat.js';
 // Ember's logo: a chat bubble drawn as one soft outline (the tail's corner is rounded off). It is plain inline SVG in
 // currentColor, so it takes the surrounding text colour and costs nothing to load. `tile` adds the dark rounded square behind it.
-export const BONFIRE_MARK = 'M50 14A36 36 0 0 1 86 50A36 36 0 0 1 50 86H25Q14 86 14 75V50A36 36 0 0 1 50 14Z';
-export function BonfireLogo({ size = 16, tile = false, className = '' }) {
+export const EMBER_MARK = 'M50 14A36 36 0 0 1 86 50A36 36 0 0 1 50 86H25Q14 86 14 75V50A36 36 0 0 1 50 14Z';
+export function EmberLogo({ size = 16, tile = false, className = '' }) {
   return (
     <svg className={`bf-logo ${tile ? 'tile' : ''} ${className}`} width={size} height={size} viewBox="0 0 100 100" aria-hidden="true" focusable="false">
       {tile && <rect width="100" height="100" rx="22" fill="#141417" />}
-      <path d={BONFIRE_MARK} fill="none" stroke="currentColor" strokeWidth={tile ? 7.5 : 8.5} strokeLinejoin="round" strokeLinecap="round" transform={tile ? 'translate(50 50) scale(.84) translate(-50 -50)' : undefined} />
+      <path d={EMBER_MARK} fill="none" stroke="currentColor" strokeWidth={tile ? 7.5 : 8.5} strokeLinejoin="round" strokeLinecap="round" transform={tile ? 'translate(50 50) scale(.84) translate(-50 -50)' : undefined} />
     </svg>
   );
 }
 // the old flame logo, drawn (kept for reference)
-export function BonfireLogoDrawn({ size = 16, tile = false, className = '' }) {
+export function EmberLogoDrawn({ size = 16, tile = false, className = '' }) {
   return (
     <svg className={`bf-logo ${className}`} width={size} height={size} viewBox="0 0 512 512" aria-hidden="true" focusable="false">
       <defs>
@@ -25,4 +26,4 @@ export function BonfireLogoDrawn({ size = 16, tile = false, className = '' }) {
     </svg>
   );
 }
-export const isDesktopApp = () => typeof window !== 'undefined' && !!window.bonfireDesktop?.isDesktop;
+export const isDesktopApp = () => typeof window !== 'undefined' && !!desktopBridge()?.isDesktop;

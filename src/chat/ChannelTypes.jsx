@@ -13,6 +13,7 @@ import { Dialog } from './Dialogs.jsx';
 import { instOpt, isInst } from './ids.js';
 import { imgHint, warnImage } from './imgHints.js';
 import { pictureAccept } from './accept.js';
+import { EMBER_API, NOOKARA_CAP_JS, isNookara, needsNookaraPayments, nookaraCap, nookaraCaptchaPass } from '../compat.js';
 
 export const TYPES = [
   { id: 'text', label: 'Text', hint: 'Messages, pictures and GIFs.', Icon: Hash },
@@ -342,8 +343,8 @@ function WebhookManager({ cid, logs }) {
 }
 
 // ── the roles shop (shown instead of messages) ──
-// An instance's paid roles are paid in Velora credits: buying one makes a Velora pay request, which you approve here (signed in
-// with Velora) or on Velora's payment page; the instance hands out the role once Velora says it's paid (chat_shop_update).
+// An instance's paid roles are paid in Nookara credits: buying one makes a Nookara pay request, which you approve here (signed in
+// with Nookara) or on Nookara's payment page; the instance hands out the role once Nookara says it's paid (chat_shop_update).
 // the shop's items in sections: roles with no category first (cards, no heading), then each category in order; empty ones are left out
 export function shopGroups(d) {
   const cats = Array.isArray(d?.categories) ? d.categories : [];
@@ -359,7 +360,7 @@ export function RoleShop({ channel }) {
   const [d, setD] = useState(null);
   const [busy, setBusy] = useState(null);
   const [pay, setPay] = useState(null); // { it, req }: an instance's pay request waiting for approval
-  const [credits, setCredits] = useState(null); // my Velora balance (an instance doesn't know it)
+  const [credits, setCredits] = useState(null); // my Nookara balance (an instance doesn't know it)
   const load = () => apiFetch(`/chat/channels/${channel.cid}/shop`).then(setD).catch(e => toast(errorText(e.message)));
   useEffect(() => { load(); }, [channel.cid, channel.config]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (onInst && signedIn) apiFetch('/account/me').then(x => setCredits(x.account?.credits ?? null)).catch(() => {}); }, [onInst, signedIn, pay]);
@@ -371,7 +372,7 @@ export function RoleShop({ channel }) {
     if (it.pending) { setPay({ it, req: it.pending }); return; }
     if (!onInst && !it.has && payLack) { await scopeBlocked('CURRENCY_PAY'); return; }
     if (!it.has && !it.owned && it.price > 0) {
-      if (onInst && d?.payments === 'velora_required') { toast(errorText('velora_required')); return; }
+      if (onInst && needsNookaraPayments(d?.payments)) { toast(errorText('nookara_required')); return; }
       if (!(await ask({ title: `Buy ${it.role.name}?`, text: `${it.price} credits goes to the server owner${onInst ? ' through Nookara - you approve the payment next' : ''}. You keep it after that - take it off and put it back on whenever you like.${onInst ? (credits != null ? ` You have ${credits} credits.` : '') : readLack || d?.balance == null ? '' : ` You have ${d.balance} credits.`}`, confirm: onInst ? 'Continue' : `Buy for ${it.price} credits` }))) return;
     }
     setBusy(it.role.rid);
@@ -386,7 +387,7 @@ export function RoleShop({ channel }) {
     : d && (readLack || d.balance == null
       ? <span className="vc-balance vc-scope-locked" role="button" tabIndex={0} aria-disabled="true" data-tip={scopeTip(readLack, 'Your credit balance') || 'Your balance is hidden from this login.'} onClick={() => scopeBlocked('CURRENCY_READ')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') scopeBlocked('CURRENCY_READ'); }}><Coins size={15} /> Balance hidden</span>
       : <span className="vc-balance"><Coins size={15} /> {d.balance.toLocaleString()}</span>);
-  const paidOff = onInst && d && d.payments !== 'velora';
+  const paidOff = onInst && d && !isNookara(d.payments);
   return (
     <div className="vc-shop">
       <div className="vc-shop-head">
@@ -395,7 +396,7 @@ export function RoleShop({ channel }) {
         <span className="grow" />
         {balance}
       </div>
-      {paidOff && d.items.some(it => it.price > 0 && !it.owned) && <p className="vc-warn-note">{d.payments === 'velora_required' ? 'Paid roles need a Nookara account - yours only exists on this server. Free roles work as usual.' : "This server can't take credit payments right now, so only free roles work."}</p>}
+      {paidOff && d.items.some(it => it.price > 0 && !it.owned) && <p className="vc-warn-note">{needsNookaraPayments(d.payments) ? 'Paid roles need a Nookara account - yours only exists on this server. Free roles work as usual.' : "This server can't take credit payments right now, so only free roles work."}</p>}
       {!d && <div className="vc-loading"><i /><i /><i /></div>}
       {d && !d.items.length && <div className="vc-empty-note">Nothing in this shop yet.</div>}
       {d && shopGroups(d).map(g => (
@@ -447,7 +448,7 @@ export function RoleShop({ channel }) {
   );
 }
 
-// the Cap captcha Velora's payment routes want (skipped while the 2-day captcha pass is active)
+// the Cap captcha Nookara's payment routes want (skipped while the 2-day captcha pass is active)
 function loadScript(src, ready) {
   if (ready()) return Promise.resolve();
   let el = document.querySelector(`script[data-src="${src}"]`);
@@ -456,8 +457,8 @@ function loadScript(src, ready) {
 }
 const PAY_ERR = { captcha_required: 'Do the captcha first.', captcha_failed: "The captcha didn't go through - try it again.", captcha_unavailable: "The captcha can't be loaded right now - use the payment page instead.", insufficient_balance: "You don't have enough credits for that.", request_paid: 'That payment already went through.', request_expired: 'That payment request ran out - buy the role again.', request_cancelled: 'That payment was cancelled.', wrong_account: 'That payment is for a different Nookara account.', not_found: 'That payment request is gone.' };
 const PAY_DONE = { declined: 'The payment was declined - you were not charged.', expired: 'The payment request ran out - buy the role again whenever you like.', failed: "The payment didn't go through - you weren't given the role." };
-// "Approve payment of N credits": in-app with the Ember login (needs Spend Credits + a captcha), or on Velora's payment page.
-// The id is the only thing taken from the instance: the page is always Velora's own, never a link the instance sent.
+// "Approve payment of N credits": in-app with the Ember login (needs Spend Credits + a captcha), or on Nookara's payment page.
+// The id is the only thing taken from the instance: the page is always Nookara's own, never a link the instance sent.
 function PayRequest({ channel, it, req, onDone }) {
   const signedIn = useChat(s => s.signedIn);
   const payLack = useScopeStatus('CURRENCY_PAY');
@@ -481,10 +482,10 @@ function PayRequest({ channel, it, req, onDone }) {
     if (payLack) { await scopeBlocked('CURRENCY_PAY'); return; }
     setBusy(true);
     try {
-      await loadScript('/assets/js/captcha-pass.js?v=1', () => !!window.VeloraCaptchaPass);
-      await loadScript('/assets/js/velora-cap.js?v=1', () => !!window.VeloraCap);
-      const captcha_token = await window.VeloraCap.paymentToken(btn.current);
-      await apiFetch(`/bonfire/pay-requests/${encodeURIComponent(req.id)}/approve`, { method: 'POST', body: JSON.stringify({ captcha_token }) });
+      await loadScript('/assets/js/captcha-pass.js?v=1', () => !!nookaraCaptchaPass());
+      await loadScript(`${NOOKARA_CAP_JS}?v=1`, () => !!nookaraCap());
+      const captcha_token = await nookaraCap().paymentToken(btn.current);
+      await apiFetch(`${EMBER_API}/pay-requests/${encodeURIComponent(req.id)}/approve`, { method: 'POST', body: JSON.stringify({ captcha_token }) });
       setState({ status: 'confirming' });
       const r = await apiFetch(`/chat/channels/${channel.cid}/shop/${it.role.rid}/status`).catch(() => null);
       if (r && r.status !== 'pending') finish(r.status, r);
@@ -492,7 +493,7 @@ function PayRequest({ channel, it, req, onDone }) {
     setBusy(false);
   }
   async function decline() {
-    if (signedIn) await apiFetch(`/bonfire/pay-requests/${encodeURIComponent(req.id)}/decline`, { method: 'POST' }).catch(() => {});
+    if (signedIn) await apiFetch(`${EMBER_API}/pay-requests/${encodeURIComponent(req.id)}/decline`, { method: 'POST' }).catch(() => {});
     onDone(null);
   }
   const over = PAY_DONE[state.status];

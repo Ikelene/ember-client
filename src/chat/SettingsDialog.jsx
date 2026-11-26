@@ -14,11 +14,12 @@ import ChatSettingsTab, { GROUPS, matches, useDesktopMac, desktopAppTitle, Desig
 import ProfileEditor from './ProfileEditor.jsx';
 import { useChat, ask, getState } from './store.js';
 import { NameText } from './displayNames.js';
-import { isWebBonfire } from '../api.js';
-import { signOutVelora, startSignIn } from './session.js';
+import { isWebEmber } from '../api.js';
+import { signOutNookara, startSignIn } from './session.js';
 import { Avatar } from './Profile.jsx';
 import { hasAccountProfile } from './accountProfileCore.js';
 import './SettingsDialog.css';
+import { desktopBridge, SITE_TOKEN, SITE_ME_CACHE } from '../compat.js';
 
 const rowText = title => (GROUPS.find(([t]) => t === title)?.[1] || []).flatMap(([, label, hint, choices]) => [label, hint, ...(choices || []).map(c => c[1])]);
 // what each page answers to in the search box (its title, its rows, and a few words for the pages that aren't simple rows)
@@ -64,7 +65,7 @@ const HELP = [
   ['Get support', LifeBuoy, 'https://nookara.cc/support', ['Support', 'Help', 'Contact', 'Question']],
 ];
 function openOutside(url) {
-  const d = window.bonfireDesktop;
+  const d = desktopBridge();
   if (d?.openExternal) { Promise.resolve(d.openExternal(url)).catch(() => {}); return; }
   window.open(url, '_blank', 'noopener,noreferrer');
 }
@@ -92,7 +93,7 @@ export default function SettingsDialog({ page: startPage, target, onClose }) {
   const me = useChat(s => s.me);
   const signedIn = useChat(s => s.signedIn);
   const serverAccount = useChat(s => s.instances.some(hasAccountProfile)); // an account of a server's own has a profile to edit, Nookara or not
-  const desktop = !!window.bonfireDesktop?.isDesktop || typeof window.bonfireDesktop?.getAppSettings === 'function';
+  const desktop = !!desktopBridge()?.isDesktop || typeof desktopBridge()?.getAppSettings === 'function';
   const mac = useDesktopMac();
   const [page, setPage] = useState(startPage || (signedIn ? 'profile' : 'Account'));
   const [q, setQ] = useState('');
@@ -102,7 +103,7 @@ export default function SettingsDialog({ page: startPage, target, onClose }) {
   const search = useRef(null);
 
   // pages that exist here, and the ones that match the search
-  // signed out of Velora (web Ember): only the pages that don't need an account
+  // signed out of Nookara (web Ember): only the pages that don't need an account
   const [design, setDesignState] = useState(() => effectiveDesign());
   useEffect(() => subscribeDesign(() => setDesignState(effectiveDesign())), []);
   const groups = useMemo(() => PAGES.map(([g, items]) => [g, items.filter(it => (it[4] !== 'desktop' || desktop) && (it[4] !== 'modern' || design === 'rounded') && (signedIn || ['Account', 'About', 'theme', 'text', 'voice', 'accounts'].includes(it[0]) || (it[0] === 'profile' && serverAccount)))
@@ -170,9 +171,9 @@ export default function SettingsDialog({ page: startPage, target, onClose }) {
   }); // re-bound each render so it sees the current page / search
 
   const logout = async () => {
-    if (isWebBonfire()) { await signOutVelora(); return; } // Ember's own sign-in only; the website's session stays
-    try { localStorage.removeItem('velora_token'); localStorage.removeItem('velora_me_cache'); } catch { /* fine */ }
-    if (window.bonfireDesktop?.logout) await window.bonfireDesktop.logout();
+    if (isWebEmber()) { await signOutNookara(); return; } // Ember's own sign-in only; the website's session stays
+    try { localStorage.removeItem(SITE_TOKEN); localStorage.removeItem(SITE_ME_CACHE); } catch { /* fine */ }
+    if (desktopBridge()?.logout) await desktopBridge().logout();
     else location.assign('/login');
   };
   const current = groups.flatMap(([, items]) => items).find(it => it[0] === page);
@@ -237,7 +238,7 @@ export default function SettingsDialog({ page: startPage, target, onClose }) {
                       : page === 'text' ? <TextLayoutPage />
                         : page === 'blocking' ? <BlockingPage />
                           : <>
-                            <ChatSettingsTab embedded bare page={page} query={matches(q, current?.[1] || '') ? '' : q} web={isWebBonfire()} onLogout={signedIn ? logout : undefined} onLogin={signedIn ? undefined : () => startSignIn()} />
+                            <ChatSettingsTab embedded bare page={page} query={matches(q, current?.[1] || '') ? '' : q} web={isWebEmber()} onLogout={signedIn ? logout : undefined} onLogin={signedIn ? undefined : () => startSignIn()} />
                             {page === 'Notifications' && signedIn && <div className="bf-sd-extra"><NotifLevels /></div>}
                           </>}
           </div>

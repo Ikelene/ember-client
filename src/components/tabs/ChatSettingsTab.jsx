@@ -1,6 +1,6 @@
 import { E2eeSettings } from '../../chat/E2ee.jsx';
 import { siteHref } from '../../chat/hosts.js';
-import AboutBonfire from '../../chat/AboutBonfire.jsx';
+import AboutEmber from '../../chat/AboutEmber.jsx';
 import { useEffect, useState, useRef } from 'react';
 import { Bell, Gamepad2, LogOut, ShieldCheck, MessagesSquare, Volume2, Pause, Play, Radio, Power, PanelBottomClose, Minimize2 } from 'lucide-react';
 import { SOUND_PACKS, getMessageSounds, setMessageSounds, subscribeMessageSounds, playPackSound } from '../../chat/messageSounds.js';
@@ -14,7 +14,8 @@ import { apiFetch } from '../../api.js';
 import { useChat } from '../../chat/store.js';
 import { BotsManager } from '../../chat/Bots.jsx';
 import NotificationsTab, { PushPrompt } from './NotificationsTab.jsx';
-import './BonfireSettings.css';
+import './EmberSettings.css';
+import { NOOKARA_WIRE, desktopBridge, notifBridge } from '../../compat.js';
 
 // My Account > Chat: Ember settings (saved to the account, so every device gets them)
 export const GROUPS = [
@@ -34,7 +35,7 @@ export const GROUPS = [
     ['strip_tracking', 'Remove tracking from links', 'Cleans tracking junk (like ?utm_source=, ?si= or fbclid) off links you paste or send. Only the junk goes; the link still works the same.'],
     ['link_previews', 'Show link previews', "A card with the page's title and picture under messages with links, DMs included. Nookara fetches the page, so it sees that link, even in an encrypted DM. Off = a button to show one when you want it."],
     ['link_images', 'Show pictures from links', 'Links to pictures show as the picture instead of a link.'],
-    ['yt_mode', 'Play YouTube videos', "Through Nookara: Nookara streams the video for you - no ads, no trackers. YouTube's player: starts instantly, but YouTube can track you and show ads.", [['ask', 'Ask each time'], ['velora', 'Through Nookara'], ['youtube', "YouTube's player"]]],
+    ['yt_mode', 'Play YouTube videos', "Through Nookara: Nookara streams the video for you - no ads, no trackers. YouTube's player: starts instantly, but YouTube can track you and show ads.", [['ask', 'Ask each time'], [NOOKARA_WIRE, 'Through Nookara'], ['youtube', "YouTube's player"]]],
     ['dm_upload_dest', 'Where files in DMs go', "Nookara account storage: kept until you delete them, counts toward your storage. Temporary storage: free, deleted a set time after you send them (pictures about 30 days, videos and sounds 14, other files 7). The + button can always pick once.", [['ask', 'Ask every time'], ['account', 'Account storage'], ['temp', 'Temporary storage']]],
     ['animations', 'Animations', 'Messages, menus and pop-ups slide and fade in. Off = everything changes instantly.'],
   ]],
@@ -49,10 +50,10 @@ export const GROUPS = [
   ]],
 ];
 
-// The Android app: notification controls that open Android's own settings pages (native bridge: BonfireNotifications)
-const inAndroidApp = () => typeof window !== 'undefined' && !!window.BonfireNotifications?.postMessage;
+// The Android app: notification controls that open Android's own settings pages (native bridge: EmberNotifications)
+const inAndroidApp = () => typeof window !== 'undefined' && !!notifBridge()?.postMessage;
 function AndroidNotifications() {
-  const send = type => { try { window.BonfireNotifications.postMessage(JSON.stringify({ type })); } catch { /* the app is older than this setting */ } };
+  const send = type => { try { notifBridge().postMessage(JSON.stringify({ type })); } catch { /* the app is older than this setting */ } };
   return <div className="card" id="bf-android-notifications">
     <div className="card-header"><span className="card-title">Android notifications</span></div>
     <div className="card-body">
@@ -67,13 +68,13 @@ function AndroidNotifications() {
 }
 
 // The desktop app's system: true on macOS. Guessed from the browser straight away, then taken from the app itself
-// (bonfireDesktop.info() gives { platform, rpcAvailable, overlayAvailable }); cached for the page's life.
+// (emberDesktop.info() gives { platform, rpcAvailable, overlayAvailable }); cached for the page's life.
 let desktopInfo = null;
 const guessMac = () => { try { return /mac/i.test(navigator.userAgentData?.platform || navigator.platform || ''); } catch { return false; } };
 export function useDesktopMac() {
   const [mac, setMac] = useState(() => (desktopInfo ? desktopInfo.platform === 'darwin' : guessMac()));
   useEffect(() => {
-    const info = window.bonfireDesktop?.info;
+    const info = desktopBridge()?.info;
     if (desktopInfo || typeof info !== 'function') return undefined;
     let live = true;
     Promise.resolve(info()).then(v => { if (v?.platform) { desktopInfo = v; if (live) setMac(v.platform === 'darwin'); } }).catch(() => {});
@@ -91,7 +92,7 @@ function DesktopNotifications() {
   const [notifications, setNotifications] = useState(null);
   const [err, setErr] = useState('');
   useEffect(() => {
-    window.bonfireDesktop.notificationStatus?.().then(setNotifications).catch(() => setErr(`Could not load ${osName} notification settings.`));
+    desktopBridge().notificationStatus?.().then(setNotifications).catch(() => setErr(`Could not load ${osName} notification settings.`));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return <div className="card">
     <div className="card-header"><span className="card-title">Desktop notifications</span></div>
@@ -99,7 +100,7 @@ function DesktopNotifications() {
       {err && <div className="inline-msg error" role="alert">{err}</div>}
       <div className="cs-row">
         <div className="cs-text"><b><Bell size={15} /> {osName} notifications</b><span>Show native Ember notifications for DMs and incoming calls while the app is inactive.</span></div>
-        <button type="button" className="btn btn-surface btn-sm" disabled={!notifications?.supported || notifications?.enabled} onClick={async () => { try { await window.bonfireDesktop.enableNotifications(); setNotifications(await window.bonfireDesktop.notificationStatus()); } catch { setErr(`${osName} notifications couldn't be enabled.`); } }}>{notifications?.enabled ? 'Enabled' : 'Enable'}</button>
+        <button type="button" className="btn btn-surface btn-sm" disabled={!notifications?.supported || notifications?.enabled} onClick={async () => { try { await desktopBridge().enableNotifications(); setNotifications(await desktopBridge().notificationStatus()); } catch { setErr(`${osName} notifications couldn't be enabled.`); } }}>{notifications?.enabled ? 'Enabled' : 'Enable'}</button>
       </div>
     </div>
   </div>;
@@ -107,45 +108,45 @@ function DesktopNotifications() {
 
 function DesktopSettings() {
   const mac = useDesktopMac(); // the Mac app: its own words, and no Discord RPC capture (Windows named pipes only)
-  const desktop = typeof window !== 'undefined' && window.bonfireDesktop?.isDesktop;
-  const canDetectGames = typeof window !== 'undefined' && typeof window.bonfireDesktop?.detectState === 'function';
+  const desktop = typeof window !== 'undefined' && desktopBridge()?.isDesktop;
+  const canDetectGames = typeof window !== 'undefined' && typeof desktopBridge()?.detectState === 'function';
   const [rpc, setRpc] = useState(null);
   const [detect, setDetect] = useState(null);
   const [err, setErr] = useState('');
   // app start-up / tray settings (desktop 1.7.0+; older apps don't have getAppSettings, so these rows stay hidden)
-  const hasApp = typeof window !== 'undefined' && typeof window.bonfireDesktop?.getAppSettings === 'function';
+  const hasApp = typeof window !== 'undefined' && typeof desktopBridge()?.getAppSettings === 'function';
   const [app, setApp] = useState(null);
   useEffect(() => {
     if (!hasApp) return () => {};
     let live = true;
-    window.bonfireDesktop.getAppSettings().then(v => { if (live && v) setApp(v); }).catch(() => {});
-    const off = window.bonfireDesktop.onAppSettings?.(v => { if (live && v) setApp(v); }); // the tray menu can change them too
+    desktopBridge().getAppSettings().then(v => { if (live && v) setApp(v); }).catch(() => {});
+    const off = desktopBridge().onAppSettings?.(v => { if (live && v) setApp(v); }); // the tray menu can change them too
     return () => { live = false; if (typeof off === 'function') off(); };
   }, [hasApp]);
   async function setAppSetting(key, value) {
     const prev = app;
     setApp(s => ({ ...s, [key]: value })); setErr('');
     try {
-      const v = await window.bonfireDesktop.setAppSettings({ [key]: value });
+      const v = await desktopBridge().setAppSettings({ [key]: value });
       if (v) setApp(v); else { setApp(prev); setErr("That didn't save - try again."); }
     } catch { setApp(prev); setErr("That didn't save - try again."); }
   }
 
   useEffect(() => {
     if (!desktop) return;
-    window.bonfireDesktop.rpcState?.().then(setRpc).catch(() => setErr('Could not load game status settings.'));
-    window.bonfireDesktop.detectState?.().then(setDetect).catch(() => setErr('Could not load game detection settings.'));
+    desktopBridge().rpcState?.().then(setRpc).catch(() => setErr('Could not load game status settings.'));
+    desktopBridge().detectState?.().then(setDetect).catch(() => setErr('Could not load game detection settings.'));
   }, [desktop]);
   if (!desktop && !hasApp) return null;
 
   async function setRpcEnabled(enabled) {
     setRpc(s => ({ ...s, enabled })); setErr('');
-    try { setRpc(await window.bonfireDesktop.setRpcEnabled(enabled)); }
+    try { setRpc(await desktopBridge().setRpcEnabled(enabled)); }
     catch { setRpc(s => ({ ...s, enabled: !enabled })); setErr("That didn't save - try again."); }
   }
   async function setDetectEnabled(enabled) {
     setDetect(s => ({ ...s, enabled })); setErr('');
-    try { setDetect(await window.bonfireDesktop.setDetectEnabled(enabled)); }
+    try { setDetect(await desktopBridge().setDetectEnabled(enabled)); }
     catch { setDetect(s => ({ ...s, enabled: !enabled })); setErr("That didn't save - try again."); }
   }
 
@@ -268,7 +269,7 @@ export const matches = (q, ...texts) => { const t = String(q || '').trim().toLow
 
 // page / query / bare: used by Ember's settings dialog (chat/SettingsDialog.jsx), which draws its own
 // sidebar + title; page picks the category, query hides the rows that don't match the search.
-// read-only: the key your messages are signed with is the Velora account's (made and rotated on the account page)
+// read-only: the key your messages are signed with is the Nookara account's (made and rotated on the account page)
 function SigningKeyRow() {
   const sg = useChat(s => s.signing);
   const text = sg?.state === 'ready' ? <>Signing key <code>{sg.kid}</code> - managed on your Nookara account</>
@@ -282,14 +283,14 @@ function SigningKeyRow() {
     </div>
   );
 }
-// onLogin (instead of onLogout) = signed out of Velora: only the Account page has anything to show; web = Ember in a browser (its own sign-in)
+// onLogin (instead of onLogout) = signed out of Nookara: only the Account page has anything to show; web = Ember in a browser (its own sign-in)
 export default function ChatSettingsTab({ embedded = false, onLogout, onLogin, web = false, page, query = '', bare = false }) {
   const [s, setS] = useState(null);
   const [ownCategory, setCategory] = useState('Privacy');
   const category = page || ownCategory;
   const [saving, setSaving] = useState(false);
   const contentRef = useRef(null);
-  const desktop = !!window.bonfireDesktop?.isDesktop || typeof window.bonfireDesktop?.getAppSettings === 'function';
+  const desktop = !!desktopBridge()?.isDesktop || typeof desktopBridge()?.getAppSettings === 'function';
   const mac = useDesktopMac();
   const categories = [...GROUPS.map(([title]) => title), 'About', 'Bots', ...(desktop ? ['Windows app'] : []), ...(onLogout || onLogin ? ['Account'] : [])];
   useEffect(() => { if (contentRef.current) contentRef.current.scrollTop = 0; }, [category]);
@@ -355,7 +356,7 @@ export default function ChatSettingsTab({ embedded = false, onLogout, onLogin, w
       {s && category === 'Extras' && <RadioSettings s={s} change={change} saving={saving} />}
       {s && category === 'Bots' && <BotsManager />}
       {category === 'Windows app' && <DesktopSettings />}
-      {category === 'About' && <AboutBonfire />}
+      {category === 'About' && <AboutEmber />}
       {onLogin && category === 'Account' && <div className="card">
         <div className="card-header"><span className="card-title">{bare ? 'Your account' : 'Sign in'}</span></div>
         <div className="card-body cs-rows">

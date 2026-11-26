@@ -5,6 +5,7 @@ import { useChat } from './store.js';
 import { BotTag, AddBotButton, TrustedIn } from './Bots.jsx';
 import { GALLERY_PERMS } from './BotGalleryDev.jsx';
 import { getToken } from '../api.js';
+import { EMBER_API } from '../compat.js';
 
 const httpsOnly = u => (/^https:\/\//i.test(u || '') ? u : null); // listing text is the developer's: only https links
 const permName = k => (GALLERY_PERMS.find(p => p[0] === k) || [k, k.replace(/_/g, ' ')])[1];
@@ -23,8 +24,8 @@ export function BotGallery() {
   const [err, setErr] = useState(false);
   const [open, setOpen] = useState(null); // a bot's id
   useEffect(() => { const t = setTimeout(() => setDeb(q.trim()), 300); return () => clearTimeout(t); }, [q]);
-  useEffect(() => { fetch('/bonfire/bots/gallery/tags').then(r => (r.ok ? r.json() : Promise.reject())).then(x => setTags(x.tags || [])).catch(() => {}); }, []);
-  const load = (page = 1) => fetch(`/bonfire/bots/gallery?q=${encodeURIComponent(deb)}&tag=${encodeURIComponent(tag)}&page=${page}`).then(r => (r.ok ? r.json() : Promise.reject()))
+  useEffect(() => { fetch(`${EMBER_API}/bots/gallery/tags`).then(r => (r.ok ? r.json() : Promise.reject())).then(x => setTags(x.tags || [])).catch(() => {}); }, []);
+  const load = (page = 1) => fetch(`${EMBER_API}/bots/gallery?q=${encodeURIComponent(deb)}&tag=${encodeURIComponent(tag)}&page=${page}`).then(r => (r.ok ? r.json() : Promise.reject()))
     .then(x => { setErr(false); setD(cur => ({ ...x, results: page > 1 && cur ? [...cur.results, ...x.results] : x.results })); }).catch(() => setErr(true));
   useEffect(() => { setD(null); load(1); }, [deb, tag]); // eslint-disable-line react-hooks/exhaustive-deps
   if (open) return <BotDetail id={open} signedIn={signedIn} onBack={() => setOpen(null)} />;
@@ -71,7 +72,7 @@ function BotDetail({ id, signedIn, onBack }) {
   useEffect(() => {
     // with a login, the owner and staff can open their unlisted bots too
     const t = getToken();
-    fetch(`/bonfire/bots/gallery/${encodeURIComponent(id)}`, t ? { headers: { Authorization: `Bearer ${t}` } } : undefined)
+    fetch(`${EMBER_API}/bots/gallery/${encodeURIComponent(id)}`, t ? { headers: { Authorization: `Bearer ${t}` } } : undefined)
       .then(r => (r.ok ? r.json() : Promise.reject(r.status))).then(x => setB(x.bot || x)).catch(() => setErr("Couldn't load that bot."));
   }, [id]);
   return (
@@ -108,7 +109,7 @@ function BotDetail({ id, signedIn, onBack }) {
               </div></div>
           )}
           <p className="vc-hint">After adding it, connect the bot to that server's address with its token. Its developer's page or the support link explains how.</p>
-          {/* spam, scams or rule-breaking: Velora staff see it in Admin > Apps */}
+          {/* spam, scams or rule-breaking: Nookara staff see it in Admin > Apps */}
           <p className="vc-hint"><a href={`https://nookara.cc/report?bot=${encodeURIComponent(b.id)}`} target="_blank" rel="noopener noreferrer"><Flag size={12} style={{ verticalAlign: '-2px' }} /> Report this bot to Nookara</a></p>
         </>
       )}

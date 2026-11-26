@@ -13,6 +13,7 @@ import { isInst, instOf } from './ids.js';
 import { imgHint, warnImage } from './imgHints.js';
 import { userScrolled } from './userscroll.js';
 import { pictureAccept } from './accept.js';
+import { isNookara, nookaraId } from '../compat.js';
 
 export const P = {
   SEND: 1, MANAGE_CHANNELS: 2, MANAGE_SERVER: 4, MANAGE_ROLES: 8, KICK: 16, BAN: 32,
@@ -21,7 +22,7 @@ export const P = {
   CHANGE_NICKNAME: 8192, MANAGE_NICKNAMES: 16384, // instances only: your own server nickname / anyone's below you
   CUSTOMIZE_PROFILE: 32768, // instances only: your own picture, banner, colour, bio and pronouns on that server
 };
-const INST_ONLY_PERMS = new Set(['UNMARKED_ALIASES', 'CHANGE_NICKNAME', 'MANAGE_NICKNAMES', 'CUSTOMIZE_PROFILE']); // Velora's own servers don't have these
+const INST_ONLY_PERMS = new Set(['UNMARKED_ALIASES', 'CHANGE_NICKNAME', 'MANAGE_NICKNAMES', 'CUSTOMIZE_PROFILE']); // Nookara's own servers don't have these
 export const PERM_LIST = [
   ['ADMIN', 'Administrator', 'Every permission, and can do anything in the server. Be careful who gets this.'],
   ['MANAGE_SERVER', 'Manage server', 'Change the name, description, icon, banner and server settings.'],
@@ -68,9 +69,9 @@ export function rolesOf(sid, username, st = getState()) {
 export function nameColor(sid, user, st = getState()) {
   if (!user) return null;
   const allow = sid ? st.detail[sid]?.server.allow_accent !== false : true;
-  // a Velora person on an instance: their accent comes from their live Velora profile, which may not have loaded yet - hold the
+  // a Nookara person on an instance: their accent comes from their live Nookara profile, which may not have loaded yet - hold the
   // name neutral until it has (rather than showing the role colour first and flipping to the accent)
-  if (allow && user.inst && user.kind === 'velora' && user.velora_id && !st.veloraFaces[String(user.velora_id)]) return null;
+  if (allow && user.inst && isNookara(user.kind) && nookaraId(user) && !st.nookaraFaces[String(nookaraId(user))]) return null;
   if (allow && user.color && !/^#?(fff|ffffff)$/i.test(user.color)) return user.color;
   if (!sid) return null;
   return rolesOf(sid, user.username, st).find(r => r.color)?.color || null;

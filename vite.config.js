@@ -21,15 +21,15 @@ const versionFile = () => ({
   },
 })
 
-// `npm run dev` proxies everything that is not the client itself to a running Velora (VELORA_ORIGIN, default http://localhost:3100)
-const target = process.env.VELORA_ORIGIN || 'http://localhost:3100'
+// `npm run dev` proxies everything that is not the client itself to a running Nookara (NOOKARA_ORIGIN, default http://localhost:3100)
+const target = process.env.NOOKARA_ORIGIN || process.env.VELORA_ORIGIN || 'http://localhost:3100'
 const proxied = ['/chat/', '/api', '/bonfire', '/assets', '/u', '/me', '/im', '/groups', '/friends', '/account', '/push', '/media', '/admin', '/login', '/build.json']
 const proxy = Object.fromEntries(proxied.map(p => [p, { target, changeOrigin: true }]))
 proxy['/ws'] = { target, ws: true, changeOrigin: true }
 
 export default defineConfig(({ command }) => ({
   plugins: [react(), versionFile()],
-  // Velora serves the built bundle under /ember/ (and index.html at /chat); `npm run dev` runs at the root
+  // Nookara serves the built bundle under /ember/ (and index.html at /chat); `npm run dev` runs at the root
   base: command === 'build' ? (process.env.EMBER_BASE || '/ember/') : '/',
   define: {
     __EMBER_COMMIT__: JSON.stringify(commit),

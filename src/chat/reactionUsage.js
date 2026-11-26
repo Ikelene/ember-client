@@ -3,7 +3,7 @@
 export const DEFAULT_REACTIONS = ['👍', '❤️', '😂', '🔥', '🎉', '👀'];
 // ⭐ is the starboard's vote, not a reaction choice, so it never ranks.
 const isStar = emoji => emoji.replace(/\uFE0F/g, '') === '⭐';
-const key = account => `bonfire.reaction-usage.v1:${String(account || 'anonymous')}`;
+const key = account => `ember.reaction-usage.v1:${String(account || 'anonymous')}`;
 function entries(account) {
   try {
     const data = JSON.parse(localStorage.getItem(key(account)) || '[]');

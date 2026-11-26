@@ -7,14 +7,15 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Copy, Pencil, ChevronRight, Check, Circle, Moon, MinusCircle, EyeOff, Smile, X, Users, IdCard, UserPlus, Crown, Globe, LogOut, Plus, Coins, ExternalLink } from 'lucide-react';
 import { NOOKARA_ORIGIN } from './hosts.js';
-import { isWebBonfire, getToken, apiFetch } from '../api.js';
-import { signOutVelora, startSignIn, savedBonfireAccounts, rememberAccount, switchBonfireAccount } from './session.js';
+import { isWebEmber, getToken, apiFetch } from '../api.js';
+import { signOutNookara, startSignIn, savedEmberAccounts, rememberAccount, switchEmberAccount } from './session.js';
 import { useChat, lookup, wantPresence, setStatus, setCustom, toast, getState, onUserUpdate } from './store.js';
 import { copy } from './Menu.jsx';
 import { renderBody } from './text.jsx';
 import { Avatar, STATUS_LABEL, ActivityCard, HandleLine } from './Profile.jsx';
 import { ManageFacts } from './ClientVia.jsx';
 import './ProfilePopout.css';
+import { desktopBridge, SITE_TOKEN, SITE_SAVED, SITE_ME_CACHE, SITE_ACCENT, SITE_ACCENT_AT } from '../compat.js';
 
 const isHex = c => /^#[0-9a-f]{6}$/i.test(c || '');
 const hostOf = u => { try { return new URL(/^https?:\/\//i.test(u) ? u : `https://${u}`).hostname.replace(/^www\./, ''); } catch { return u; } };
@@ -109,25 +110,25 @@ const STATUS_ITEMS = [
 ];
 
 // the accounts saved on this device (same list as the login page's "Choose an account" and the site's account menu)
-const web = () => isWebBonfire();
+const web = () => isWebEmber();
 export function savedAccounts() {
-  if (web()) return savedBonfireAccounts();
-  try { const a = JSON.parse(localStorage.getItem('velora_saved') || '[]'); return Array.isArray(a) ? a.filter(x => x && x.username && x.token) : []; } catch { return []; }
+  if (web()) return savedEmberAccounts();
+  try { const a = JSON.parse(localStorage.getItem(SITE_SAVED) || '[]'); return Array.isArray(a) ? a.filter(x => x && x.username && x.token) : []; } catch { return []; }
 }
 function rememberCurrent(username, pfp) {
   if (web()) { rememberAccount(username, getToken(), pfp); return; }
   try {
-    const token = localStorage.getItem('velora_token');
+    const token = localStorage.getItem(SITE_TOKEN);
     if (!token || !username) return;
     const list = savedAccounts().filter(a => a.username.toLowerCase() !== username.toLowerCase());
     list.unshift({ username, token, pfp: pfp || null });
-    localStorage.setItem('velora_saved', JSON.stringify(list.slice(0, 10)));
+    localStorage.setItem(SITE_SAVED, JSON.stringify(list.slice(0, 10)));
   } catch { /* private mode */ }
 }
 export async function switchTo(a, setBusy) {
   setBusy(a.username);
   if (web()) {
-    try { await switchBonfireAccount(a); } catch (e) {
+    try { await switchEmberAccount(a); } catch (e) {
       setBusy('');
       toast(e.message === 'ended' ? `${a.username} was signed out - sign in again with "Add another account".` : "Couldn't reach Nookara - try again.");
     }
@@ -137,11 +138,11 @@ export async function switchTo(a, setBusy) {
     const r = await fetch('/auth/validate', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${a.token}` }, body: JSON.stringify({ token: a.token }) });
     const d = await r.json().catch(() => ({}));
     if (!d?.valid) throw new Error('ended');
-    localStorage.setItem('velora_token', a.token);
-    ['velora_accent', 'velora_accent_at', 'velora_me_cache'].forEach(k => localStorage.removeItem(k));
+    localStorage.setItem(SITE_TOKEN, a.token);
+    [SITE_ACCENT, SITE_ACCENT_AT, SITE_ME_CACHE].forEach(k => localStorage.removeItem(k));
     location.reload();
   } catch {
-    try { localStorage.setItem('velora_saved', JSON.stringify(savedAccounts().filter(x => x.username.toLowerCase() !== a.username.toLowerCase()))); } catch { /* fine */ }
+    try { localStorage.setItem(SITE_SAVED, JSON.stringify(savedAccounts().filter(x => x.username.toLowerCase() !== a.username.toLowerCase()))); } catch { /* fine */ }
     setBusy('');
     toast(`${a.username} was signed out on this device - sign in again with "Add another account".`);
   }
@@ -149,9 +150,9 @@ export async function switchTo(a, setBusy) {
 
 // the switcher's Sign out (the other one is Settings > Account): the same as Settings' Log out (the lockout screen uses it too)
 export async function signOut() {
-  if (isWebBonfire()) { await signOutVelora(); return; } // Ember's own sign-in only; the website's session stays
-  try { localStorage.removeItem('velora_token'); localStorage.removeItem('velora_me_cache'); } catch { /* fine */ }
-  if (window.bonfireDesktop?.logout) await window.bonfireDesktop.logout();
+  if (isWebEmber()) { await signOutNookara(); return; } // Ember's own sign-in only; the website's session stays
+  try { localStorage.removeItem(SITE_TOKEN); localStorage.removeItem(SITE_ME_CACHE); } catch { /* fine */ }
+  if (desktopBridge()?.logout) await desktopBridge().logout();
   else location.assign('/login');
 }
 
@@ -242,7 +243,7 @@ export function MePopout({ anchor, onClose, onEditProfile, onCustomStatus }) {
     wantPresence(username);
     return () => { gone = true; };
   }, [username]);
-  // the person changed their profile while the card is open (Velora's user_update): re-read it in place
+  // the person changed their profile while the card is open (Nookara's user_update): re-read it in place
   useEffect(() => onUserUpdate(m => {
     if (!p || String(p.id) !== String(m.user.id)) return;
     lookup(m.user.username).then(d => { if (d && String(d.id) === String(m.user.id)) setP(d); }).catch(() => {});
@@ -388,7 +389,7 @@ export function MePopout({ anchor, onClose, onEditProfile, onCustomStatus }) {
                 ))}
                 {!others.length && <div className="bf-pp-fl-none">No other accounts on this device yet.</div>}
                 <div className="bf-pp-fl-sep" />
-                <a href={isWebBonfire() ? '#' : `/login?next=${encodeURIComponent('/chat' + location.hash)}`} onClick={e => { rememberCurrent(username, me.pfp); if (isWebBonfire()) { e.preventDefault(); startSignIn(); } }}><UserPlus size={15} /><span className="bf-pp-fl-txt"><span>Add another account</span></span></a>
+                <a href={isWebEmber() ? '#' : `/login?next=${encodeURIComponent('/chat' + location.hash)}`} onClick={e => { rememberCurrent(username, me.pfp); if (isWebEmber()) { e.preventDefault(); startSignIn(); } }}><UserPlus size={15} /><span className="bf-pp-fl-txt"><span>Add another account</span></span></a>
                 <button type="button" onClick={() => signOut()}><LogOut size={15} /><span className="bf-pp-fl-txt"><span>Sign out</span></span></button>
               </Flyout>
             )}

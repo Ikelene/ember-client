@@ -1,5 +1,5 @@
 // What shows where there's nothing to show yet: a server whose instance isn't connected / signed in (instead of its channels),
-// and Velora-only places (friends, DMs, groups) while you're signed out of Velora.
+// and Nookara-only places (friends, DMs, groups) while you're signed out of Nookara.
 import { useEffect, useState } from 'react';
 import { ShieldCheck, LogIn, RefreshCw, Users, Server, TriangleAlert, Trash2, KeyRound, Globe, Ban, LifeBuoy, LogOut, UserRound, Cake, ExternalLink, Moon, Unplug } from 'lucide-react';
 import { useChat, go, toast, errorText, ask, RESTRICTED_TEXT } from './store.js';
@@ -124,9 +124,9 @@ export function InstanceGate({ origin }) {
   if (status === 'login') {
     return (
       <Box icon={<KeyRound size={34} />} title={`Signed out of ${host}`}>
-        <p>{inst.needsVelora ? 'This server signs you in with your Nookara account.' : 'Log in to open this server.'}</p>
+        <p>{inst.needsNookara ? 'This server signs you in with your Nookara account.' : 'Log in to open this server.'}</p>
         <div className="vc-gate-btns">
-          {inst.needsVelora ? <button type="button" className="btn btn-primary" onClick={() => startSignIn()}><ShieldCheck size={15} /> Sign in with Nookara</button>
+          {inst.needsNookara ? <button type="button" className="btn btn-primary" onClick={() => startSignIn()}><ShieldCheck size={15} /> Sign in with Nookara</button>
             : <button type="button" className="btn btn-primary" onClick={() => dialog('add-instance', { url: origin })}><LogIn size={15} /> Log in</button>}
           {retry}
         </div>

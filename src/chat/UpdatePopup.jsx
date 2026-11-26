@@ -5,8 +5,9 @@
 //  - the desktop app: a new version is downloading (progress) -> once it's in, Restart to update
 import { useEffect, useState } from 'react';
 import { RotateCw, X, Download } from 'lucide-react';
-import { BonfireLogo, isDesktopApp } from './BonfireLogo.jsx';
+import { EmberLogo, isDesktopApp } from './EmberLogo.jsx';
 import { COMMIT, isRelease, sameCommit, latestCommit, servedCommit } from '../version.js';
+import { desktopBridge } from '../compat.js';
 
 const mb = n => (n ? `${(n / 1048576).toFixed(n > 104857600 ? 0 : 1)} MB` : '');
 
@@ -34,14 +35,14 @@ export function UpdatePopup() {
     const schedule = () => { clearTimeout(timer); if (live) timer = setTimeout(check, latest && !sameCommit(latest, COMMIT) ? WAITING_EVERY : IDLE_EVERY); };
     const onFocus = () => { if (Date.now() - lastGithub > 30 * 1000) check(); };
     addEventListener('focus', onFocus);
-    const onPush = () => { lastGithub = 0; check(); }; // Velora says its files changed: ask GitHub and the site again
+    const onPush = () => { lastGithub = 0; check(); }; // Nookara says its files changed: ask GitHub and the site again
     addEventListener('vc-web-build', onPush);
     timer = setTimeout(check, 20000);
     return () => { live = false; clearTimeout(timer); removeEventListener('focus', onFocus); removeEventListener('vc-web-build', onPush); };
   }, []);
   useEffect(() => {
-    if (!isDesktopApp() || !window.bonfireDesktop.onUpdate) return undefined;
-    return window.bonfireDesktop.onUpdate(u => { if (u?.state === 'downloading' || u?.state === 'ready') setApp(u); else if (u?.state === 'error') setApp(a => (a?.state === 'downloading' ? null : a)); });
+    if (!isDesktopApp() || !desktopBridge().onUpdate) return undefined;
+    return desktopBridge().onUpdate(u => { if (u?.state === 'downloading' || u?.state === 'ready') setApp(u); else if (u?.state === 'error') setApp(a => (a?.state === 'downloading' ? null : a)); });
   }, []);
   const close = k => setHide(h => ({ ...h, [k]: true }));
 
@@ -49,10 +50,10 @@ export function UpdatePopup() {
   if (app?.state === 'ready' && !hide[`ready:${app.version}`]) {
     return (
       <div className="vc-upd" role="status">
-        <span className="vc-upd-ico"><BonfireLogo size={34} /></span>
+        <span className="vc-upd-ico"><EmberLogo size={34} /></span>
         <div className="vc-upd-txt"><b>Ember {app.version} is ready</b><span>Restart Ember to update. If you don't, it updates by itself next time you quit.</span></div>
         <div className="vc-upd-btns">
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => window.bonfireDesktop.installUpdate()}><RotateCw size={14} /> Restart to update</button>
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => desktopBridge().installUpdate()}><RotateCw size={14} /> Restart to update</button>
           <button type="button" className="vc-ico-btn" title="Later" onClick={() => close(`ready:${app.version}`)}><X size={15} /></button>
         </div>
       </div>
@@ -62,7 +63,7 @@ export function UpdatePopup() {
     const pct = Math.max(0, Math.min(100, app.progress || 0));
     return (
       <div className="vc-upd" role="status">
-        <span className="vc-upd-ico"><BonfireLogo size={34} /></span>
+        <span className="vc-upd-ico"><EmberLogo size={34} /></span>
         <div className="vc-upd-txt">
           <b>Downloading Ember {app.version}</b>
           <span>{pct}%{app.total ? ` - ${mb(app.got)} of ${mb(app.total)}` : ''}. Keep chatting, it's in the background.</span>
@@ -78,7 +79,7 @@ export function UpdatePopup() {
   if (web && !hide.web) {
     return (
       <div className="vc-upd" role="status">
-        <span className="vc-upd-ico"><BonfireLogo size={34} /></span>
+        <span className="vc-upd-ico"><EmberLogo size={34} /></span>
         <div className="vc-upd-txt"><b>Ember has been updated</b><span>Reload to get the newest version - anything you're typing is kept.</span></div>
         <div className="vc-upd-btns">
           <button type="button" className="btn btn-primary btn-sm" onClick={() => location.reload()}><RotateCw size={14} /> Reload</button>
