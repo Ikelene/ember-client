@@ -9,6 +9,8 @@ import { K, acctKey, registry, hooks, normOrigin, instOf, loadSessions, loadSess
 import { onInstClientsFrame, rewatchInstClients } from './instClients.js';
 import { SHORT } from '../version.js';
 import { getState, patchState, toast, handleEvent, RESTRICTED_TEXT, instanceVoiceClosed, voiceSocketReady, loadEmojis, go, catchUp, resumeInstanceView, backoff, instanceRestricted, instanceRestored, forgetServerCache } from './store.js';
+import { isV2, communityOf, parseAddress, createErrorText } from './addresses.js';
+import { locate } from './homeserver.js';
 import { EMBER_API, INST_AUTH_NOOKARA, WELL_KNOWN, isInstanceSoftware, isNookara, nookaraInfo } from '../compat.js';
 
 export const connections = new Map();
@@ -37,6 +39,8 @@ function rememberLabel(c) {
 export const instView = c => ({
   sleep: c.sleep || (c.peeking ? 'idle' : null), // 'idle' (sleep mode) | 'manual' (disconnected by hand) | null
   origin: c.origin, host: hostOf(c.origin), name: c.info?.name || savedLabels()[c.origin]?.name || hostOf(c.origin), icon: c.info?.icon_url || savedLabels()[c.origin]?.icon || null, description: c.info?.description || '',
+  // a homeserver with many servers (protocol_version 2): the ones it lists, and what it calls itself
+  v2: isV2(c.info), communities: Array.isArray(c.info?.communities) ? c.info.communities : [], homeserver: c.info?.homeserver && typeof c.info.homeserver === 'object' ? c.info.homeserver : null,
   community: c.info?.community || null, mode: c.info?.accounts_mode || null, status: c.peeking && c.status !== 'open' ? 'asleep' : c.status, claimed: c.info?.claimed !== false, features: c.info?.features || {},
   registration: c.info?.registration || 'closed', isAdmin: !!c.isAdmin, isOwner: !!c.isOwner, user: c.user || null, error: c.error || null, restricted: c.restricted || null,
   needsNookara: isNookara(c.info?.accounts_mode) && !getToken(), pending: !!c.pending, failed: !!c.failed,
@@ -694,9 +698,10 @@ export async function reorderInstances(from, to, after) {
 }
 // join the instance's community (or ask to, per its join policy) - or use an invite code -> { sid } | { pending: true }
 // password: for a server that asks for one (join_policy 'password'); an invite code always gets in
-export async function joinCommunity(origin, code, password) {
+// which: the server's id there, on a homeserver with several (none = the one its discovery names)
+export async function joinCommunity(origin, code, password, which) {
   const c = connections.get(origin);
-  const sid = c?.info?.community?.sid;
+  const sid = which ?? c?.info?.community?.sid;
   const d = code
     ? await apiFetch(`/chat/join/${encodeURIComponent(String(code).trim().split(/[/#?]/).filter(Boolean).pop())}`, { method: 'POST', inst: origin })
     : await apiFetch(`/chat/servers/${K(origin, sid)}/join`, { method: 'POST', body: JSON.stringify(password ? { password } : {}) });
@@ -734,27 +739,61 @@ export async function refreshInstance(origin) {
 // An Ember server that signs you in with your Nookara account: connect with this account, join (with the invite code when
 // there is one) and open it. -> { sid } | { pending: true, name } | null when it needs the full dialog: signed out, a server
 // with its own accounts, one nobody has set up, or one that wants a join password / approval and no invite code was given.
-export async function quickJoin(input, code) {
+// sid: which server, on a homeserver with several (an address, a Discover card)
+export async function quickJoin(input, code, sid) {
   if (!getToken()) return null;
   const d = await discover(input);
   const info = d.info || {};
-  if (!isNookara(info.accounts_mode) || info.claimed === false || !info.community) return null;
-  if (!code && info.community.join_policy !== 'open') return null;
+  const com = communityOf(info, sid);
+  if (!isNookara(info.accounts_mode) || info.claimed === false || !(sid != null ? isV2(info) || com : info.community)) return null;
+  if (!code && com && com.join_policy !== 'open') return null; // (a server it doesn't list: only asking tells)
   let c = connections.get(d.origin);
   if (!c?.session) c = await addInstance(d.origin, info, await nookaraSession(d.origin));
   else if (c.status !== 'open') await connect(d.origin);
-  const already = getState().servers.find(x => x.inst === d.origin);
+  // in it already (with several servers there, an invite or an address is for one of them: being in another doesn't count)
+  const already = getState().servers.find(x => x.inst === d.origin && (sid != null ? x.sid === K(d.origin, sid) : !(isV2(info) && code)));
   if (already) return { sid: already.sid };
-  const r = await joinCommunity(d.origin, code);
-  return r.pending ? { pending: true, name: info.community.name } : r;
+  const r = await joinCommunity(d.origin, code, undefined, sid);
+  return r.pending ? { pending: true, name: com?.name } : r;
 }
 // Join buttons (invite embeds, the invite pop-up, Discover): straight in when it can, the Add a server dialog when it can't
-export async function joinAndOpen(origin, code) {
-  const dialog = () => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'add-instance', url: origin, ...(code ? { invite: code } : {}) } }));
+export async function joinAndOpen(origin, code, sid) {
+  const dialog = () => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'add-instance', url: origin, ...(code ? { invite: code } : {}), ...(sid != null ? { server: String(sid) } : {}) } }));
   let r = null;
-  try { r = await quickJoin(origin, code); } catch { r = null; } // (anything odd: the dialog shows what went wrong)
+  try { r = await quickJoin(origin, code, sid); } catch { r = null; } // (anything odd: the dialog shows what went wrong)
   if (!r) { dialog(); return false; }
   if (r.pending) { toast(`Asked to join ${r.name || 'the server'}.`, true); return true; }
   go({ kind: 'server', sid: r.sid });
   return true;
+}
+
+// ── servers by address (slug@domain, on a homeserver with many servers) ──
+// the domain's homeserver (its /.well-known/ember may point somewhere else), then that homeserver's id for the slug
+// -> { origin, sid, slug, address }; throws an Error whose message createErrorText (addresses.js) puts in plain words
+export async function resolveAddress({ slug, domain }) {
+  let hs;
+  try { hs = await locate(domain); }
+  catch (e) { throw new Error(e?.code === 'unreachable' ? 'instance_unreachable' : 'not_an_instance'); }
+  const origin = normOrigin(hs.origin);
+  if (!origin) throw new Error('not_an_instance');
+  const path = `/api/v1/servers/resolve?address=${encodeURIComponent(`${slug}@${domain}`)}`;
+  let r;
+  try { r = connections.get(origin)?.session ? await apiFetch(path, { inst: origin }) : await plain(origin, path, null, 'GET'); }
+  catch (e) {
+    if (e.status === 404 && !['server_not_found', 'wrong_homeserver'].includes(e.message)) throw new Error(hs.protocol_version >= 2 ? 'server_not_found' : 'not_found'); // (an older server has no addresses)
+    throw e;
+  }
+  if (r?.sid == null) throw new Error('server_not_found');
+  return { origin, sid: String(r.sid), slug: r.slug || slug, address: r.address || `${slug}@${domain}` };
+}
+// typed, pasted or opened (#/i/slug@domain/code): find the server, then the usual join (straight in when it can, the Add a
+// server dialog when it has to ask). -> true when it went somewhere, false when it isn't an address or didn't work (a toast says why)
+export async function joinByAddress(input) {
+  const a = typeof input === 'string' ? parseAddress(input) : input;
+  if (!a?.slug || !a.domain) return false;
+  let at;
+  try { at = await resolveAddress(a); } catch (e) { toast(createErrorText(e)); return false; }
+  const mine = connections.get(at.origin) && getState().servers.find(x => x.sid === K(at.origin, at.sid));
+  if (mine) { go({ kind: 'server', sid: mine.sid }); return true; }
+  return joinAndOpen(at.origin, a.code || undefined, at.sid);
 }

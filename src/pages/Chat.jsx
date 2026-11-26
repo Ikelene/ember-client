@@ -706,7 +706,7 @@ function ChatPage() {
       {dialog?.kind === 'app-download' && <AppDownload onClose={() => setDialog(null)} />}
       {dialog?.kind === 'test-bot' && <TestBotDialog key={dialog.id} id={dialog.id} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'import' && <ImportServer onClose={() => setDialog(null)} />}
-      {dialog?.kind === 'add-instance' && <AddInstance url={dialog.url} invite={dialog.invite} onClose={() => setDialog(null)} onSetup={origin => setDialog({ kind: 'setup', origin })} onCreate={dialog.fromCreate ? () => setDialog({ kind: 'create-server' }) : undefined} />}
+      {dialog?.kind === 'add-instance' && <AddInstance url={dialog.url} invite={dialog.invite} server={dialog.server} onClose={() => setDialog(null)} onSetup={origin => setDialog({ kind: 'setup', origin })} onCreate={dialog.fromCreate ? () => setDialog({ kind: 'create-server' }) : undefined} />}
 
       {dialog?.kind === 'setup' && <SetupWizard origin={dialog.origin} name={dialog.name} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'create-server' && <CreateServer onClose={() => setDialog(null)} onSetup={(origin, name) => setDialog({ kind: 'setup', origin, name })} onAddByAddress={() => setDialog({ kind: 'add-instance', fromCreate: true })} />}

@@ -22,6 +22,7 @@ import { apiFetch, getToken } from '../api.js';
 import { NOOKARA, instOf, isInst } from './ids.js';
 import { loudUnread, needsChannelCount } from './unread.js';
 import { getLook, subscribeLook } from './look.js';
+import { railEntries, railPos, railOrigin } from './addresses.js';
 import { removeInstance, reorderInstances, reconnect as reconnectInstance, disconnectInstance } from './instances.js';
 import { startSignIn } from './session.js';
 import { useHomeSession } from './HomeserverLogin.jsx';
@@ -109,11 +110,13 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
   // one order for the whole rail, Nookara-hosted and Ember servers mixed (chat setting rail_order; local until it's saved)
   const savedOrder = useChat(s => s.settings?.rail_order);
   const railOrder = savedOrder?.length ? savedOrder : localRailOrder();
-  const idOf = x => (x.origin ? `i:${x.origin}` : `v:${x.sid}`);
+  // an instance is one entry, or (a homeserver I'm in several servers on) one per server: addresses.js railEntries
+  const entries = railEntries(instances, servers).map(e => ({ rail: e.id, inst: e.inst, server: e.server }));
+  const idOf = x => x.rail || `v:${x.sid}`;
   const ordered = (() => {
-    const all = [...legacy, ...instances];
-    const pos = new Map((railOrder || []).map((id, n) => [id, n]));
-    return all.map((x, n) => [x, pos.has(idOf(x)) ? pos.get(idOf(x)) : 1000 + n]).sort((a, b) => a[1] - b[1]).map(([x]) => x);
+    const all = [...legacy, ...entries];
+    // (sort is stable: a homeserver's servers that share one saved place stay in their own order)
+    return all.map((x, n) => { const at = railPos(railOrder, idOf(x)); return [x, at >= 0 ? at : 1000 + n]; }).sort((a, b) => a[1] - b[1]).map(([x]) => x);
   })();
   function dropOn(id, after) {
     const from = dragId.current;
@@ -127,7 +130,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
     else patchState({ settings: { ...getState().settings, rail_order: list } });
     try { localStorage.setItem('bf_rail_order', JSON.stringify(list)); } catch { /* fine */ }
     // (each list's own order follows too, for older apps)
-    if (group(from) === 'i' && group(id) === 'i') reorderInstances(from.slice(2), id.slice(2), after).catch(() => {});
+    if (group(from) === 'i' && group(id) === 'i') reorderInstances(railOrigin(from), railOrigin(id), after).catch(() => {}); // (two servers of one homeserver: nothing to do there)
     if (group(from) !== 'v' || group(id) !== 'v') return;
     const st = getState();
     const src = st.servers.find(x => x.sid === from.slice(2)), dst = st.servers.find(x => x.sid === id.slice(2));
@@ -234,17 +237,17 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
       <span className="vc-srv-ico"><ServerIcon src={s.icon} name={s.name} /></span>
     </RailItem>
   );
-  const instItem = (inst, i) => {
-    const s = servers.find(x => x.inst === inst.origin); // the community, once I'm in it
+  const instItem = ({ rail, inst, server: s }, i) => { // s = the community, once I'm in it
+    const split = rail !== `i:${inst.origin}`; // one of several servers on this homeserver
     const name = s?.name || inst.community?.name || inst.name;
     const icon = s?.icon || inst.community?.icon_url || inst.icon;
-    const active = view.inst === inst.origin || (!!view.sid && instOf(view.sid) === inst.origin);
+    const active = split ? view.sid === s.sid : view.inst === inst.origin || (!!view.sid && instOf(view.sid) === inst.origin);
     const muted = s && isMuted(s.sid);
-    const ask_ = async () => { if (await ask({ title: `Remove ${name}?`, text: `${inst.host} leaves your server list${getToken() ? ' on every device' : ''}. Your account there stays as it is - you can add it again any time.`, confirm: 'Remove from list', danger: true })) removeInstance(inst.origin); };
+    const ask_ = async () => { if (await ask({ title: `Remove ${split ? inst.host : name}?`, text: `${inst.host} leaves your server list${split ? ', with every server you are in on it,' : ''}${getToken() ? ' on every device' : ''}. Your account there stays as it is - you can add it again any time.`, confirm: 'Remove from list', danger: true })) removeInstance(inst.origin); };
     return (
-      <RailItem key={inst.origin} dnd={dnd(`i:${inst.origin}`)} active={active} unread={!active && !!s && loudUnreadOf(s)} title={`${name} · ${inst.host}`} server={s?.sid} style={{ '--i': legacy.length + i }}
+      <RailItem key={rail} dnd={dnd(rail)} active={active} unread={!active && !!s && loudUnreadOf(s)} title={`${name} · ${inst.host}`} server={s?.sid} style={{ '--i': legacy.length + i }}
         status={inst.status !== 'open' ? inst.status : null} sleep={inst.sleep} badge={s && !muted ? (s.mentions || 0) + (srvMentions[s.sid] || 0) : 0}
-        onClick={() => go(s && inst.status === 'open' ? { kind: 'server', sid: s.sid } : { kind: 'instance', inst: inst.origin })}
+        onClick={() => go(s && inst.status === 'open' ? { kind: 'server', sid: s.sid } : { kind: 'instance', inst: inst.origin, ...(split ? { then: { kind: 'server', sid: s.sid } } : {}) })}
         onContextMenu={e => instanceMenu(e, inst, s, {
           onInvite: () => dialog('invite', s.sid), onSettings: () => dialog('settings', s.sid), onLeave: () => dialog('leave', s.sid), onRemove: ask_,
           onReconnect: () => reconnectInstance(inst.origin),
@@ -271,7 +274,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
         </RailItem>
       )}
       <div className="vc-rail-sep" />
-      {preview(ordered, idOf).map((x, n) => (x.origin ? instItem(x, n) : item(x, n)))}
+      {preview(ordered, idOf).map((x, n) => (x.rail ? instItem(x, n) : item(x, n)))}
 
       {(legacy.length > 0 || instances.length > 0) && <div className="vc-rail-sep" />}
       <RailItem title="Create a server" onClick={onCreate}><span className="vc-srv-ico act"><Plus size={22} /></span></RailItem>

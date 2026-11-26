@@ -11,7 +11,9 @@ import { Avatar } from './Profile.jsx';
 import { useChat, go, toast, errorText, ask } from './store.js';
 import { Toggle } from './roles.jsx';
 import { PlatformIcon } from './platforms.jsx';
-import { discover, nookaraSession, localSession, addInstance, loginInstance, instanceConn, refreshInstance, joinCommunity, hostOf } from './instances.js';
+import { discover, nookaraSession, localSession, addInstance, loginInstance, instanceConn, refreshInstance, joinCommunity, joinByAddress, hostOf } from './instances.js';
+import { communityOf, parseAddress } from './addresses.js';
+import { K } from './ids.js';
 import { startSignIn, hasNookara } from './session.js';
 import { useUnsaved, UnsavedBar } from './unsaved.jsx';
 import { PlanGate, planOf } from './PlanGate.jsx';
@@ -23,13 +25,14 @@ function InstanceCard({ origin, info }) {
   return (
     <div className="vc-invite-srv vc-inst-card">
       <span className="vc-srv-ico lg">{(c?.icon_url || info.icon_url) ? <img src={c?.icon_url || info.icon_url} alt="" /> : initials(c?.name || info.name)}</span>
-      <div><b>{c?.name || info.name}</b><small>{hostOf(origin)}{c ? <> - <Users size={13} /> {c.member_count} member{c.member_count === 1 ? '' : 's'}</> : ''}</small>
+      <div><b>{c?.name || info.name}</b><small>{hostOf(origin)}{c && c.member_count != null ? <> - <Users size={13} /> {c.member_count} member{c.member_count === 1 ? '' : 's'}</> : ''}</small>
         <small>{isNookara(info.accounts_mode) ? <><ShieldCheck size={13} /> Signs you in with your Nookara account</> : <><KeyRound size={13} /> Has its own accounts</>}</small></div>
     </div>
   );
 }
 
-export function AddInstance({ url, invite, onClose, onSetup, onCreate }) {
+// server: which server there, on a homeserver with several (it came from an address or a Discover card)
+export function AddInstance({ url, invite, server, onClose, onSetup, onCreate }) {
   const [text, setText] = useState(url || '');
   const [found, setFound] = useState(null); // { origin, info }
   const [step, setStep] = useState(url ? 'look' : 'url'); // url | auth | join
@@ -44,16 +47,20 @@ export function AddInstance({ url, invite, onClose, onSetup, onCreate }) {
   const conns = useChat(s => s.instances);
   const mine = useChat(s => s.servers);
   const live = found && conns.find(i => i.origin === found.origin);
-  const info = found ? { ...found.info, ...(live ? { community: live.community, claimed: live.claimed } : {}) } : null;
-  const member = found && mine.find(m => m.inst === found.origin);
+  const base = found ? { ...found.info, ...(live ? { community: live.community, claimed: live.claimed } : {}) } : null;
+  // (a server the homeserver doesn't list: nothing is known about it until it's asked)
+  const info = base && server != null ? { ...base, community: communityOf(base, server) || { sid: server, name: 'This server', join_policy: 'open', unlisted: true } } : base;
+  const member = found && mine.find(m => m.inst === found.origin && (server == null || m.sid === K(found.origin, server)));
 
   async function look(value = text) {
+    const at = parseAddress(value); // name@example.com (with or without an invite code): found by its address instead
+    if (at) { onClose(); joinByAddress(at); return; }
     setBusy(true); setErr('');
     try {
       const d = await discover(value);
       setFound(d); setText(d.origin);
       // a server that uses Nookara accounts, while signed in: no Connect step, it connects with this account right away
-      if (!instanceConn(d.origin)?.session && isNookara(d.info.accounts_mode) && hasNookara() && d.info.claimed !== false && d.info.community) {
+      if (!instanceConn(d.origin)?.session && isNookara(d.info.accounts_mode) && hasNookara() && d.info.claimed !== false && (d.info.community || server != null)) {
         try { await authed(await nookaraSession(d.origin), d); } catch { setStep('auth'); }
       } else setStep(instanceConn(d.origin)?.session ? 'join' : 'auth');
     } catch (e) { setErr(errorText(e.message)); setStep('url'); }
@@ -68,7 +75,7 @@ export function AddInstance({ url, invite, onClose, onSetup, onCreate }) {
     const { origin } = f;
     const c = await addInstance(origin, f.info, got);
     // (a server waiting for its owner to claim it back after switching accounts mode still has its community: people join it as usual)
-    if ((f.info.claimed === false && !f.info.community) || (!f.info.community && c.isAdmin)) { onSetup?.(origin); return; }
+    if ((f.info.claimed === false && !f.info.community) || (!f.info.community && c.isAdmin && server == null)) { onSetup?.(origin); return; }
     setStep('join');
   }
   async function viaNookara() {
@@ -88,9 +95,11 @@ export function AddInstance({ url, invite, onClose, onSetup, onCreate }) {
     setBusy(false);
   }
   async function join(withCode) {
+    const at = withCode && parseAddress(withCode); // an invite to a server by its address, maybe on another homeserver
+    if (at) { onClose(); joinByAddress(at); return; }
     setBusy(true);
     try {
-      const r = await joinCommunity(found.origin, withCode, withCode ? undefined : joinPass);
+      const r = await joinCommunity(found.origin, withCode, withCode ? undefined : joinPass, server ?? undefined);
       if (r.pending) { setAsked(true); toast(`Asked to join ${info.community?.name || 'the server'}.`, true); }
       else { onClose(); setTimeout(() => go({ kind: 'server', sid: r.sid }), 200); }
     } catch (e) { toast(errorText(e.message)); }
@@ -107,7 +116,7 @@ export function AddInstance({ url, invite, onClose, onSetup, onCreate }) {
           {(step === 'url' || step === 'look') && (
             <form onSubmit={e => { e.preventDefault(); look(); }}>
               <label className="vc-field"><span>Server address</span>
-                <div className="vc-row"><input className="form-input" autoFocus placeholder="chat.example.com" value={text} onChange={e => setText(e.target.value)} />
+                <div className="vc-row"><input className="form-input" autoFocus placeholder="chat.example.com or name@example.com" value={text} onChange={e => setText(e.target.value)} />
                   <button className="btn btn-primary" type="submit" disabled={!text.trim() || busy}>{busy ? 'Looking...' : 'Continue'}</button></div></label>
               {err && <p className="vc-err"><TriangleAlert size={14} /> {err}</p>}
               <div className="vc-dialog-btns"><span className="grow" /><button type="button" className="btn btn-surface" onClick={close}>Cancel</button></div>

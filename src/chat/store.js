@@ -17,9 +17,10 @@ import { applyIdentity, applyNick } from './identity.js';
 import { applyUserUpdate, instancesWithAccount } from './userUpdate.js';
 import { findPending, dropSettled, wireText, settle } from './pending.js';
 import { NOOKARA, K, parseK, instOf, bare, isInst, normOrigin, acctKey } from './ids.js';
+import { parseAddress, addressHash } from './addresses.js';
 import { myIdOn } from './tokens.js';
 import { readChannel as readMsgCache, writeChannel as writeMsgCache, dropChannels as dropMsgCache } from './msgCache.js';
-import { connections, sendTo, startInstances, loadInstanceData, retryInstances, resumeInstances, renewNookaraSession, holdInstances, forgetIfEmpty, wakeInstance, instanceWoke, recheckSleepers } from './instances.js';
+import { connections, sendTo, startInstances, loadInstanceData, retryInstances, resumeInstances, renewNookaraSession, holdInstances, forgetIfEmpty, wakeInstance, instanceWoke, recheckSleepers, joinByAddress } from './instances.js';
 import { attachmentRefs } from './signing-payload.js';
 import { spoilerName } from './spoiler.js';
 import { prepareInstanceAttachments } from './attachment-preparation.js';
@@ -244,7 +245,8 @@ export function cleanServerProfile(p) {
 }
 // someone's look on their Ember server only (server profiles: the member's `profile`), by their id there. One index per member list
 const serverProfiles = new WeakMap();
-const instMembers = (inst, s) => { const sid = (s.servers || []).find(x => x.inst === inst)?.sid; return sid ? s.members?.[sid] || null : null; }; // (some callers pass a partial state)
+// (a homeserver with several servers: the one on screen when it is one of them, else the first I'm in)
+const instMembers = (inst, s) => { const v = s.view?.sid; const sid = v && instOf(v) === inst && s.members?.[v] ? v : (s.servers || []).find(x => x.inst === inst)?.sid; return sid ? s.members?.[sid] || null : null; }; // (some callers pass a partial state)
 export function serverProfileOf(u, s = state) {
   if (!u?.inst || u.inst === NOOKARA || u.id == null) return null;
   const list = instMembers(u.inst, s);
@@ -2123,6 +2125,7 @@ export function hashFor(v) {
   if (v.kind === 'channel') return at(v.sid) ? `${at(v.sid)}/s/${bare(v.sid)}/${bare(v.cid)}${mid}` : `#/s/${v.sid}/${v.cid}${mid}`;
   if (v.kind === 'server') return at(v.sid) ? `${at(v.sid)}/s/${bare(v.sid)}` : `#/s/${v.sid}`;
   if (v.kind === 'instance') return `#/i/${encodeURIComponent(v.inst)}`;
+  if (v.kind === 'address') return addressHash(v);
   if (v.kind === 'invite') return v.inst && v.inst !== NOOKARA ? `#/i/${encodeURIComponent(v.inst)}/invite/${v.code}` : `#/invite/${v.code}`;
   if (v.kind === 'dm') return `#/dm/${encodeURIComponent(v.username)}`;
   if (v.kind === 'group') return `#/g/${v.room}`;
@@ -2142,6 +2145,8 @@ export function readHash() {
   if (parts[1] === 'i' && parts[2]) {
     let inst = null;
     try { inst = decodeURIComponent(parts[2]); } catch { /* bad */ }
+    // #/i/<slug>@<domain>/<code>: a server by its address (addresses.js), not an instance origin
+    if (inst && inst.includes('@') && !/^https?:/i.test(inst)) { const a = parts.length <= 5 ? parseAddress(location.hash) : null; return a ? { kind: 'address', slug: a.slug, domain: a.domain, code: a.code } : { kind: 'home' }; }
     const [, , , a, b, c, d] = parts;
     inst = normOrigin(inst); // only a proper, normalised origin is an instance
     if (!inst || inst.includes('|')) return { kind: 'home' };
@@ -2220,6 +2225,14 @@ export async function open(v) {
       resumeInstanceView(io);
       return;
     }
+  }
+  if (v.kind === 'address') {
+    // stay where you were while the address is looked up; then the usual join (instances.js joinByAddress)
+    const back = ['channel', 'dm', 'group'].includes(state.view.kind) ? hashFor(state.view) : '#/home';
+    history.replaceState(null, '', clientUrl(back));
+    if (!state.view.kind || state.view.kind === 'home') set(s => ({ view: s.view }));
+    joinByAddress(v);
+    return;
   }
   if (v.kind === 'invite') {
     // stay where you were; the invite shows as a pop-up

@@ -42,7 +42,7 @@ export async function setReaction(id, emoji, on, inst) {
   // id: a channel message id, dm:<id> for a DM, g:<room>:<id> for a group message; inst: the instance a message lives on (none = Nookara)
   const base = reactionBase(id);
   const nookaraOnly = /^(dm|g):/.test(String(id)); // these keep a custom emoji's whole token, like a DM message does
-  const out = on && inst && timedOutIn(getState().servers.find(x => x.inst === inst)?.sid); // (one instance = one server)
+  const out = on && inst && timedOutIn((v => (v && instOf(v) === inst ? v : getState().servers.find(x => x.inst === inst)?.sid))(getState().view.sid)); // (the server on screen, when the homeserver has several)
   if (out) { toast(`You're timed out until ${untilText(out)} - no reactions until then.`); return; }
   try {
     await apiFetch(`${base}/reactions/${encodeURIComponent(inst ? stableKey(emoji) : c && !nookaraOnly ? c[3] : emoji)}`, { method: on ? 'PUT' : 'DELETE', inst });
