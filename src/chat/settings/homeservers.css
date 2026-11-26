@@ -1,0 +1,55 @@
+/* Settings > My account (HomeAccountPage.jsx) and Settings > Homeservers (HomeserversPage.jsx, LoginMethods.jsx).
+   Square by default; Modern softens under html.vc-rounded. */
+.hsx-ok { display: inline-flex; align-items: center; gap: 4px; color: #6fcf8f; }
+.hsx-login.off .sx-row-txt b { color: var(--dim); }
+.hsx-foot { display: block; margin-top: 10px; }
+.hsx-tag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; font-size: 10.5px; font-style: normal; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); background: var(--surface-3, #1c1c20); }
+.hsx-tag.warn { color: #e8a84a; }
+.hsx-issue { display: flex; align-items: center; gap: 5px; color: #e8a84a; font-size: 12px; }
+.hsx-warn { color: #e8a84a; }
+
+.hsx-head { display: flex; align-items: center; gap: 12px; }
+.hsx-head .sx-row-txt { flex: 1; min-width: 0; }
+.hsx-head .sx-row-txt b { font-size: 16px; color: #fff; }
+.hsx-tabs { display: flex; align-self: flex-start; max-width: 100%; overflow-x: auto; }
+.hsx-tabs button { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.hsx-block { margin-top: 14px; }
+.hsx-block > .form-textarea { width: 100%; font-family: var(--font-mono, ui-monospace, monospace); font-size: 13px; }
+.hsx-num { width: 120px; }
+.hsx-count { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 13px; }
+.hsx-admins .vc-settings { padding: 0; }
+
+.hsx-methods { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.hsx-method.off .sx-row-txt b { color: var(--dim); }
+.hsx-method.open > .sx-list-row { border-bottom-color: transparent; }
+.hsx-ctl { display: flex; align-items: center; gap: 6px; }
+.hsx-fields { display: flex; flex-direction: column; gap: 12px; padding: 14px 12px; background: #0e0e10; border: 1px solid var(--border); border-top: 0; }
+.hsx-fields .vc-field, .hsx-fields .vc-note { margin: 0; }
+.hsx-field .form-input, .hsx-field .form-select { width: 100%; }
+.hsx-field.bad .form-input { border-color: #e8a84a; }
+.hsx-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.hsx-copy { display: flex; align-items: center; gap: 8px; }
+.hsx-copy code { flex: 1; min-width: 0; padding: 8px 10px; background: #0a0a0c; border: 1px solid var(--border); font-size: 12.5px; overflow-wrap: anywhere; user-select: all; }
+.hsx-copy .form-input { flex: 1; min-width: 0; }
+.hsx-copy .btn { flex: none; display: inline-flex; align-items: center; gap: 6px; }
+.hsx-more summary { cursor: pointer; color: var(--dim); font-size: 13px; font-weight: 600; }
+.hsx-more[open] summary { margin-bottom: 12px; }
+.hsx-check { display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; }
+.hsx-check input { margin-top: 3px; accent-color: var(--accent); }
+.hsx-check span { display: flex; flex-direction: column; gap: 2px; }
+.hsx-check small { color: var(--muted); font-size: 12px; }
+.hsx-add { display: flex; flex-direction: column; gap: 10px; padding: 12px; background: #0e0e10; border: 1px solid var(--border); }
+.hsx-addbtn { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; }
+
+@media (max-width: 700px) {
+  .hsx-two { grid-template-columns: 1fr; }
+  .hsx-head { flex-wrap: wrap; }
+  .hsx-copy { flex-wrap: wrap; }
+  .hsx-add .sx-opts { --cols: 1 !important; }
+}
+
+html.vc-rounded .hsx-tag { border-radius: 99px; background: var(--m-on); }
+html.vc-rounded .hsx-fields { border: 0; border-radius: 0 0 calc(10px * var(--rk, 1)) calc(10px * var(--rk, 1)); background: var(--m-app); }
+html.vc-rounded .hsx-method.open > .sx-list-row { border-radius: calc(10px * var(--rk, 1)) calc(10px * var(--rk, 1)) 0 0; }
+html.vc-rounded .hsx-copy code { border: 0; border-radius: calc(8px * var(--rk, 1)); background: var(--m-main); }
+html.vc-rounded .hsx-add { border: 0; border-radius: calc(10px * var(--rk, 1)); background: var(--m-app); }

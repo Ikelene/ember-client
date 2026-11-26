@@ -4,10 +4,14 @@
 // the profile editor.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronLeft, ChevronRight, Search, UserRound, CircleUser, Shield, Bell, MessageSquare, Monitor, Sparkles, SlidersHorizontal, Bot, Info, Bug, LifeBuoy, ExternalLink, Users, Cloud, ShieldOff, Palette, Type, Mic, LayoutTemplate, SmilePlus } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Search, UserRound, CircleUser, Shield, Bell, MessageSquare, Monitor, Sparkles, SlidersHorizontal, Bot, Info, Bug, LifeBuoy, ExternalLink, Users, Cloud, ShieldOff, Palette, Type, Mic, LayoutTemplate, SmilePlus, AtSign, Building2 } from 'lucide-react';
 import { PersonalExpressionsPage } from './PersonalPages.jsx';
 import { AccountsPage, HostingPage } from './settings/AccountsPages.jsx';
 import VoicePage from './settings/VoicePage.jsx';
+import HomeAccountPage from './settings/HomeAccountPage.jsx';
+import HomeserversPage from './settings/HomeserversPage.jsx';
+import { useHomeSession } from './HomeserverLogin.jsx';
+import { useAdminHomeservers } from './homeApi.js';
 import { ThemePage, TextLayoutPage, BlockingPage, NotifLevels } from './settings/LookPages.jsx';
 import { effectiveDesign, subscribeDesign } from './design.js';
 import ChatSettingsTab, { GROUPS, matches, useDesktopMac, desktopAppTitle, DesignSettings } from '../components/tabs/ChatSettingsTab.jsx';
@@ -23,14 +27,19 @@ import { desktopBridge, SITE_TOKEN, SITE_ME_CACHE } from '../compat.js';
 
 const rowText = title => (GROUPS.find(([t]) => t === title)?.[1] || []).flatMap(([, label, hint, choices]) => [label, hint, ...(choices || []).map(c => c[1])]);
 // what each page answers to in the search box (its title, its rows, and a few words for the pages that aren't simple rows)
-// (a 5th field: 'desktop' = only in the desktop app, 'modern' = only in the Modern look; 'signed' pages need a Nookara sign-in)
+// (a 5th field: 'desktop' = only in the desktop app, 'modern' = only in the Modern look, 'home' = only with a homeserver (v2)
+// sign-in, 'hsadmin' = only for an admin of a homeserver; 'signed' pages need a Nookara sign-in)
 const PAGES = [
   ['Account', [
+    ['homeaccount', 'My account', AtSign, ['Homeserver account', 'Handle', 'Sign-in methods', 'Login methods', 'Link a login', 'Unlink', 'Password', 'Single sign-on', 'SSO', 'Google', 'GitHub', 'Manage this account'], 'home'],
     ['accounts', 'Signed-in accounts', Users, ['Accounts', 'Sign out', 'Log out', 'Switch accounts', 'Server accounts', 'Instances', 'Signed in']],
     ['Account', 'Nookara account', CircleUser, ['Log out', 'Sign out', 'Account management', 'Email', 'Password', 'Security', 'Signing key', 'Message signing', 'Signed messages', 'Sign messages as you', 'Ed25519']],
     ['profile', 'My profile', UserRound, ['Edit profile', 'Profile customization', 'Username', 'Change username', 'Avatar', 'Profile picture', 'Banner', 'Accent colour', 'Accent color', 'About me', 'Bio', 'Website', 'Country', 'Local time', 'Time zone', 'Profile visibility', 'Friends only', 'Badges']],
     ['expressions', 'Personal Expressions', SmilePlus, ['Emojis', 'Personal emoji', 'Personal emojis', 'My emojis', 'Custom emoji', 'Add emoji', 'Stickers', 'Personal sticker', 'Personal stickers', 'My stickers', 'Add sticker', 'Save sticker', 'Lock my emojis and stickers', 'Clone lock']],
     ['hosting', 'Server hosting', Cloud, ['Hosting', 'Hosted servers', 'Plan', 'Billing', 'Backups', 'Ember server']],
+  ]],
+  ['Homeservers', [
+    ['homeservers', 'Homeservers', Building2, ['Homeserver', 'Admin', 'Accounts & sign-in', 'Registration', 'Sign-in methods', 'Login methods', 'OpenID Connect', 'OIDC', 'OAuth', 'Single sign-on', 'SSO', 'Callback address', 'Client secret', 'Who can create servers', 'Admins', 'Federation'], 'hsadmin'],
   ]],
   ['Privacy & safety', [
     ['Privacy', 'Privacy', Shield, rowText('Privacy')],
@@ -95,7 +104,9 @@ export default function SettingsDialog({ page: startPage, target, onClose }) {
   const serverAccount = useChat(s => s.instances.some(hasAccountProfile)); // an account of a server's own has a profile to edit, Nookara or not
   const desktop = !!desktopBridge()?.isDesktop || typeof desktopBridge()?.getAppSettings === 'function';
   const mac = useDesktopMac();
-  const [page, setPage] = useState(startPage || (signedIn ? 'profile' : 'Account'));
+  const home = !!useHomeSession(); // signed in on a homeserver the v2 way: its account has a page
+  const hsAdmin = useAdminHomeservers().length > 0;
+  const [page, setPage] = useState(startPage || (signedIn ? 'profile' : home ? 'homeaccount' : 'Account'));
   const [q, setQ] = useState('');
   const [closing, setClosing] = useState(false);
   const dirty = useRef({ on: false, nudge: null });
@@ -106,8 +117,8 @@ export default function SettingsDialog({ page: startPage, target, onClose }) {
   // signed out of Nookara (web Ember): only the pages that don't need an account
   const [design, setDesignState] = useState(() => effectiveDesign());
   useEffect(() => subscribeDesign(() => setDesignState(effectiveDesign())), []);
-  const groups = useMemo(() => PAGES.map(([g, items]) => [g, items.filter(it => (it[4] !== 'desktop' || desktop) && (it[4] !== 'modern' || design === 'rounded') && (signedIn || ['Account', 'About', 'theme', 'text', 'voice', 'accounts'].includes(it[0]) || (it[0] === 'profile' && serverAccount)))
-    .map(it => (it[4] === 'desktop' && mac ? [it[0], desktopAppTitle(true), it[2], MAC_APP_WORDS, it[4]] : it))]).filter(([, items]) => items.length), [desktop, signedIn, mac, design, serverAccount]);
+  const groups = useMemo(() => PAGES.map(([g, items]) => [g, items.filter(it => (it[4] !== 'desktop' || desktop) && (it[4] !== 'modern' || design === 'rounded') && (it[4] !== 'home' || home) && (it[4] !== 'hsadmin' || hsAdmin) && (signedIn || ['Account', 'About', 'theme', 'text', 'voice', 'accounts', 'homeaccount', 'homeservers'].includes(it[0]) || (it[0] === 'profile' && serverAccount)))
+    .map(it => (it[4] === 'desktop' && mac ? [it[0], desktopAppTitle(true), it[2], MAC_APP_WORDS, it[4]] : it))]).filter(([, items]) => items.length), [desktop, signedIn, mac, design, serverAccount, home, hsAdmin]);
   const shown = useMemo(() => groups.map(([g, items]) => [g, items.filter(([, label, , words]) => matches(q, label, ...words))]).filter(([, items]) => items.length), [groups, q]);
   const help = useMemo(() => HELP.filter(([label, , , words]) => matches(q, label, ...words)), [q]);
   const all = shown.flatMap(([, items]) => items);
@@ -119,7 +130,7 @@ export default function SettingsDialog({ page: startPage, target, onClose }) {
   async function leaveOk() {
     if (!dirty.current.on) return true;
     dirty.current.nudge?.();
-    return ask({ title: 'Discard your changes?', text: "Your profile changes aren't saved yet.", confirm: 'Discard', danger: true });
+    return ask({ title: 'Discard your changes?', text: page === 'homeservers' ? "Your changes aren't saved yet." : "Your profile changes aren't saved yet.", confirm: 'Discard', danger: true });
   }
   async function go(id) {
     if (narrow) {
@@ -222,13 +233,15 @@ export default function SettingsDialog({ page: startPage, target, onClose }) {
         <div className="bf-sd-main">
           <header className="bf-sd-head">
             <button type="button" className="bf-sd-backbtn" aria-label="Back to settings" onClick={backToList}><ChevronLeft size={22} /></button>
-            {['accounts', 'hosting', 'voice', 'theme', 'text', 'blocking', 'design', 'expressions'].includes(page)
+            {['accounts', 'hosting', 'voice', 'theme', 'text', 'blocking', 'design', 'expressions', 'homeaccount', 'homeservers'].includes(page)
               ? <h2 className="bf-sd-crumbs"><span>Settings</span><ChevronRight size={14} /><span>{groups.find(([, items]) => items.some(it => it[0] === page))?.[0]}</span><ChevronRight size={14} /><b>{current?.[1]}</b></h2>
               : <h2>{Icon && <Icon size={19} />} {current?.[1] || 'Settings'}</h2>}
             <button type="button" className="bf-sd-x" aria-label="Close settings" data-tip="Close (Esc)" onClick={() => close()}><X size={18} /></button>
           </header>
           <div className="bf-sd-content" ref={content} key={page}>
             {page === 'profile' ? <ProfileEditor target={target} onDirty={(on, nudge) => { dirty.current = { on, nudge }; }} />
+              : page === 'homeaccount' ? <HomeAccountPage />
+              : page === 'homeservers' ? <HomeserversPage onDirty={(on, nudge) => { dirty.current = { on, nudge }; }} />
               : page === 'accounts' ? <AccountsPage onClose={() => close()} />
                 : page === 'hosting' ? <HostingPage onClose={() => close()} />
                   : page === 'expressions' ? <PersonalExpressionsPage />
