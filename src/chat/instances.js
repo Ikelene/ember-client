@@ -467,6 +467,7 @@ function onFrame(c, m) {
       rewatchInstClients(c.origin); // (open profile cards: the new socket doesn't know what the old one watched)
       c.activeAt = Date.now();
       if (c.source === 'home') homeConnected(c.origin);
+      if (c.source) dispatchEvent(new CustomEvent('ember-hs-ready', { detail: { origin: c.origin } })); // (push.js: this homeserver gets a pusher)
       loadInstanceData(c.origin).then(() => { catchUp(c.origin); if (autoJoin.has(c.origin)) joinOnce(c); if (c.peeking) { clearTimeout(c.peekT); c.peekT = setTimeout(() => endPeek(c), PEEK_FOR); } });
 
       // its own accounts, and my profile there follows my Nookara one: bring over what changed while I was away (accountProfile.js)

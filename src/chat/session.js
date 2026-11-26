@@ -83,7 +83,8 @@ export const sessionKind = () => (getToken() ? 'nookara' : currentSession() ? 'h
 // the signed-in Nookara account's name as a handle (nookara.cc is its homeserver)
 export const nookaraHandle = username => `${username}@${DEFAULT_HOMESERVER}`;
 // sign out of a homeserver (its tokens are forgotten), or of all of them
-export const signOutHome = origin => forgetHome(origin);
+// (the homeservers forget this device's pusher first, while the session can still ask them to: push.js)
+export const signOutHome = origin => { const go = () => forgetHome(origin); return import('../push.js').then(p => p.dropPushers()).catch(() => {}).then(go, go); };
 export const signOutHomes = () => forgetHomes();
 function startNookaraSignIn(back = {}) {
   if (onEmberHost()) { popupSignIn(back); return; }
