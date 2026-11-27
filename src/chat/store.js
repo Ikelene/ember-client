@@ -18,7 +18,7 @@ import { applyIdentity, applyNick } from './identity.js';
 import { applyUserUpdate, instancesWithAccount } from './userUpdate.js';
 import { findPending, dropSettled, wireText, settle } from './pending.js';
 import { NOOKARA, K, parseK, instOf, bare, isInst, normOrigin, acctKey } from './ids.js';
-import { parseAddress, addressHash, inviteUrl, inviteBase, parseProtocolLink, openRouteLink } from './addresses.js';
+import { parseAddress, addressHash, inviteUrl, inviteBase, parseProtocolLink, openRouteLink, serverOfInst } from './addresses.js';
 import { setInviteHomes } from './inviteLink.js';
 import { myIdOn } from './tokens.js';
 import { readChannel as readMsgCache, writeChannel as writeMsgCache, dropChannels as dropMsgCache } from './msgCache.js';
@@ -2411,7 +2411,7 @@ export function takeJump(key) { const j = jumpPoints.get(key); jumpPoints.delete
 export function resumeInstanceView(origin) {
   const v = state.view;
   if (v.kind !== 'instance' || v.inst !== origin) return;
-  const srv = state.servers.find(x => x.inst === origin);
+  const srv = serverOfInst(state.servers, origin, { communitySid: connections.get(origin)?.info?.community?.sid }); // (its default server, on a homeserver with several)
   if (srv && connections.get(origin)?.status === 'open') open(v.then && instOf(v.then.sid || '') === origin ? v.then : { kind: 'server', sid: srv.sid });
 }
 // the Home button in the rail goes back to what was last open under Home (a DM, a group, Personal Notes or Home itself), until a reload

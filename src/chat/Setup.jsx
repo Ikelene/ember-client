@@ -7,6 +7,7 @@ import { Dialog } from './Dialogs.jsx';
 import { Toggle } from './roles.jsx';
 import { initials } from './Parts.jsx';
 import { useChat, toast, errorText, ask, go, refreshServer } from './store.js';
+import { serverOfInst } from './addresses.js';
 import { imgHint, warnImage } from './imgHints.js';
 import { refreshInstance, loadInstanceData, hostOf } from './instances.js';
 import { NookaraImport } from './Bridge.jsx';
@@ -20,7 +21,7 @@ const STEPS = ['Claim', 'Your server', 'Accounts', 'Options', 'Done'];
 // (a server hosted by Nookara always uses Nookara accounts: the "how do people sign in" step is skipped)
 export function SetupWizard({ origin, onClose, name: givenName = '' }) {
   const inst = useChat(s => s.instances.find(i => i.origin === origin));
-  const had = useChat(s => s.servers.find(x => x.inst === origin));
+  const had = useChat(s => serverOfInst(s.servers, origin, { communitySid: s.instances.find(i => i.origin === origin)?.community?.sid })); // (its own server, on a homeserver with several)
   const accountsStep = inst?.managed ? 3 : 2;
   const [step, setStep] = useState(() => (inst && inst.claimed ? (inst.community || had ? accountsStep : 1) : 0));
   const [busy, setBusy] = useState(false);

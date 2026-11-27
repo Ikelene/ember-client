@@ -13,6 +13,8 @@ import { siteHref } from './hosts.js';
 import { StatusLink } from './StatusLink.jsx';
 import { statusIdForHost } from './status.js';
 import { homeDomainOf } from './homeservers.js';
+import { serverOfInst } from './addresses.js';
+import { K } from './ids.js';
 
 export const SUPPORT_URL = 'https://nookara.cc/support';
 // where the birthday is set (Nookara account settings; a website session, the Ember token can't set it)
@@ -114,7 +116,8 @@ export function SignedOutSidebar() {
 // view.kind === 'instance': the server's sidebar and channels stay out until its socket is up and signed in
 export function InstanceGate({ origin }) {
   const inst = useChat(s => s.instances.find(i => i.origin === origin));
-  const srv = useChat(s => s.servers.find(x => x.inst === origin));
+  const then = useChat(s => (s.view.kind === 'instance' && s.view.inst === origin ? s.view.then?.sid || null : null)); // (the server it is opening, on a homeserver with several)
+  const srv = useChat(s => serverOfInst(s.servers, origin, { viewSid: then, communitySid: s.instances.find(i => i.origin === origin)?.community?.sid }));
   const lockReason = useChat(s => s.lockReason);
   const [busy, setBusy] = useState(false);
   const [code, setCode] = useState('');
@@ -176,13 +179,40 @@ export function InstanceGate({ origin }) {
       </Box>
     );
   }
-  async function join(c) {
-    setBusy(true);
+  async function join(c, which) {
+    setBusy(which || true);
     try {
-      const r = await joinCommunity(origin, c, c ? undefined : pass);
+      const r = await joinCommunity(origin, c, c ? undefined : pass, which);
       if (r.pending) toast(`Asked to join ${name}.`, true); else go({ kind: 'server', sid: r.sid });
     } catch (e) { toast(errorText(e.message)); }
     setBusy(false);
+  }
+  // a homeserver with several servers: the ones it lists, each with its own Join (an invite or an address finds the others)
+  const listed = inst.v2 ? (inst.communities || []).filter(c => c && c.sid != null) : [];
+  if (listed.length > 1) {
+    return (
+      <Box icon={<Server size={34} />} title={`Servers on ${host}`}>
+        <p>Pick one to join with your account. Servers it doesn't list can be joined with an invite or their address.</p>
+        <div className="vc-rows vc-gate-list">
+          {listed.map(c => {
+            const mine = srv && srv.sid === K(origin, c.sid);
+            return (
+              <div key={c.sid} className="vc-list-row vc-ch-row">
+                <span className="vc-ch-ico">{c.icon_url ? <img src={c.icon_url} alt="" /> : initials(c.name)}</span>
+                <span className="vc-list-txt"><b>{c.name}</b><small>{c.address || host} - <Users size={11} /> {c.member_count}</small></span>
+                {mine ? <button type="button" className="btn btn-surface btn-sm" onClick={() => go({ kind: 'server', sid: srv.sid })}>Open</button>
+                  : c.join_policy !== 'invite' && c.join_policy !== 'password' && <button type="button" className="btn btn-primary btn-sm" disabled={!!busy} onClick={() => join(undefined, String(c.sid))}>{busy === String(c.sid) ? 'Joining...' : joinLabel(c.join_policy, 'Join')}</button>}
+              </div>
+            );
+          })}
+        </div>
+        <form className="vc-row vc-gate-code" onSubmit={e => { e.preventDefault(); if (code.trim()) join(code); }}>
+          <input className="form-input" placeholder="Invite code or link" value={code} onChange={e => setCode(e.target.value)} />
+          <button type="submit" className="btn btn-surface" disabled={!code.trim() || !!busy}>Join with invite</button>
+        </form>
+        <div className="vc-gate-btns">{remove}</div>
+      </Box>
+    );
   }
   return (
     <Box icon={<span className="vc-srv-ico lg">{community.icon_url ? <img src={community.icon_url} alt="" /> : initials(name)}</span>} title={name}>

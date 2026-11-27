@@ -193,8 +193,10 @@ export function useProfileTargets() {
   const instances = useChat(s => s.instances);
   const home = useChat(s => s.home); // (signed in on a homeserver: that account's profile is the one people see everywhere)
   const accounts = instances.filter(hasAccountProfile).map(i => {
-    const srv = servers.find(x => x.inst === i.origin);
     if (home && i.origin === home.origin) return { sid: accountTarget(i.origin), name: home.account?.handle || i.name, icon: i.homeserver?.icon_url || i.icon || null, account: i.origin, home: true };
+    // an account on a homeserver with several servers belongs to the homeserver, not to the first server I'm in there
+    if (i.v2) return { sid: accountTarget(i.origin), name: i.user?.username && i.homeserver?.domain ? (i.user.username.includes('@') ? i.user.username : `${i.user.username}@${i.homeserver.domain}`) : i.homeserver?.domain || i.name, icon: i.homeserver?.icon_url || i.icon || null, account: i.origin };
+    const srv = servers.find(x => x.inst === i.origin);
     return { sid: accountTarget(i.origin), name: srv?.name || i.name, icon: srv?.icon || i.icon || null, account: i.origin };
   }).sort((a, b) => !!b.home - !!a.home);
   const own = new Set(accounts.map(a => a.account));

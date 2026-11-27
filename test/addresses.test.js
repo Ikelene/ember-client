@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseAddress, addressHash, slugIssue, validSlug, slugFrom, createErrorText, railEntries, railOrigin, railPos, isV2, communityOf, inviteBase, inviteUrl, parseInviteUrl, parseProtocolLink, openRouteLink } from '../src/chat/addresses.js';
+import { parseAddress, addressHash, slugIssue, validSlug, slugFrom, createErrorText, railEntries, railOrigin, railPos, isV2, communityOf, inviteBase, inviteUrl, parseInviteUrl, parseProtocolLink, openRouteLink, serverOfInst } from '../src/chat/addresses.js';
 import { addressInviteRef, setInviteHomes, isHiddenInviteLine, embedLabel } from '../src/chat/inviteLink.js';
 
 test('addresses: slug@domain, with and without a code', () => {
@@ -147,4 +147,12 @@ test('invite links: cards in messages, hidden only for homeservers this device u
   assert.equal(isHiddenInviteLine('http://localhost:4102/i/cabin/Ab12'), true);
   assert.equal(embedLabel('https://b.test/i/cabin/Ab12'), 'Server Invite');
   setInviteHomes([]);
+});
+
+test('the server a lookup on a homeserver with several means: on screen, else its default, else the first', () => {
+  const H = 'http://hs', servers = [{ sid: 'http://other|x', inst: 'http://other' }, { sid: `${H}|a`, inst: H }, { sid: `${H}|b`, inst: H }];
+  assert.equal(serverOfInst(servers, H, { viewSid: `${H}|b`, communitySid: 'a' }).sid, `${H}|b`);
+  assert.equal(serverOfInst(servers, H, { viewSid: 'http://other|x', communitySid: 'b' }).sid, `${H}|b`);
+  assert.equal(serverOfInst(servers, H).sid, `${H}|a`);
+  assert.equal(serverOfInst(servers, 'http://none'), null);
 });

@@ -175,3 +175,9 @@ export function railPos(order, id) {
   if (!origin) return -1;
   return list.findIndex(x => railOrigin(x) === origin);
 }
+// the server of an instance a lookup means, on a homeserver with several: the one on screen when it is there, else the
+// homeserver's default one, else the first I'm in (servers: [{ sid: 'origin|id', inst }]) -> a server | null
+export function serverOfInst(servers, origin, { viewSid = null, communitySid = null } = {}) {
+  const mine = (servers || []).filter(s => s.inst === origin);
+  return (viewSid && mine.find(s => s.sid === viewSid)) || (communitySid != null && mine.find(s => s.sid === `${origin}|${communitySid}`)) || mine[0] || null;
+}

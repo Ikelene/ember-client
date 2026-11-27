@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom';
 import { Copy, RefreshCw, Lock } from 'lucide-react';
 import ImageCropper from '../components/ImageCropper.jsx';
 import { useChat, lookup, ask, toast, errorText, loadMembers } from './store.js';
+import { serverOfInst } from './addresses.js';
 import { PopoutCard } from './ProfilePopout.jsx';
 import { pictureAccept } from './accept.js';
 import { cropToBlob } from './ServerProfileEditor.jsx';
@@ -25,9 +26,9 @@ const skippedText = list => (list?.length ? ` Your ${list.map(k => (k === 'pfp' 
 
 export default function AccountProfileEditor({ origin, onDirty }) {
   const inst = useChat(s => s.instances.find(i => i.origin === origin));
-  const srv = useChat(s => s.servers.find(x => x.inst === origin));
+  const srv = useChat(s => serverOfInst(s.servers, origin, { viewSid: s.view.sid, communitySid: s.instances.find(i => i.origin === origin)?.community?.sid }));
   const homeAcct = useChat(s => (s.home?.origin === origin ? s.home : null)); // my homeserver account: the profile people see everywhere
-  const srvName = homeAcct ? homeAcct.domain : srv?.name || inst?.name || 'this server';
+  const srvName = homeAcct ? homeAcct.domain : inst?.v2 ? inst.homeserver?.domain || inst.host || 'this homeserver' : srv?.name || inst?.name || 'this server'; // (an account on a homeserver is the homeserver's, not one server's)
   const me = useChat(s => s.me);
   const signedIn = useChat(s => s.signedIn);
   const [nk, setNk] = useState(null); // my Nookara profile (signed in): whose profile a sync follows, and what a copy would bring
