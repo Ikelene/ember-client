@@ -1,6 +1,6 @@
 // Message text: a little markdown (**bold**, *italic*, __underline__, ~~strike~~, `code`,
 // ```blocks```, ||spoilers||), links, @mentions, #channels, and picture links shown as pictures.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Hash, MessageSquare, ChevronRight } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { NOOKARA, instOf } from './ids.js';
@@ -10,8 +10,9 @@ import { stickerOfBody } from './stickerLink.js';
 import { onEmberHost } from './hosts.js';
 import { ask, customEmoji, loadEmojis, useChat, hashFor, fullHandle } from './store.js';
 import { NameText } from './displayNames.js';
-import { UNI_EMOJI, Twemoji, nameOfChar } from './emoji.jsx';
-import { emojiDataSync } from './EmojiPicker.jsx';
+import { Twemoji } from './emoji.jsx';
+import { UNI_EMOJI, nameOfChar } from './emojiNames.js';
+import { emojiDataSync } from './emojiData.js';
 import { extractInvites } from './gameInvite.js';
 import { isHiddenInviteLine } from './inviteLink.js';
 import { highlight } from './codeColors.js';
@@ -345,15 +346,6 @@ export function renderBody(body, ctx) {
     }
   });
   return { nodes, images, media, invites: invites.slice(0, 3), links: links.slice(0, 3), jumbo: JUMBO.test(String(body || '')) && (String(body).match(EMOJI_ONE) || []).length <= 27 };
-}
-
-// a profile bio: the same markdown as chat (bold, italic, underline, strike, code, spoilers, links, lists, quotes,
-// small headers, -# subtext), but a link on its own line stays a link (no pictures / players) and headers stay small.
-// inert = a preview (the /me profile tab): links don't do anything, there is no Ember pop-up host there.
-const BIO_CTX = { linkImages: false, bio: true, legacy: true };
-export function BioText({ text, className = 'pe-bio', inert = false }) {
-  const nodes = useMemo(() => renderBody(text || '', BIO_CTX).nodes, [text]);
-  return <div className={`${className} vc-bio`} onClickCapture={inert ? e => { if (e.target.closest?.('a')) { e.preventDefault(); e.stopPropagation(); } } : undefined}>{nodes}</div>;
 }
 
 const pad = n => String(n).padStart(2, '0');

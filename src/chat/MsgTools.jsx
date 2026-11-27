@@ -9,12 +9,14 @@ import { openMessage } from './e2ee/session.js';
 import { forwardText, forwardLimit, forwardHasFiles, FORWARD_FILES_NOTE } from './forward.js';
 import { Dialog } from './Dialogs.jsx';
 import { Avatar } from './Profile.jsx';
-import { ChannelIcon, P, has } from './roles.jsx';
-import { decodeRoleMentions } from './Mentions.jsx';
+import { ChannelIcon } from './roles.jsx';
+import { P, has } from './perms.js';
+import { decodeRoleMentions } from './mentions.js';
 import { plainText } from './tokens.js';
 import { renderBody, stampOf } from './text.jsx';
 import { GameInvites } from './GameInvite.jsx';
-import { AliasMark, aliasOf, aliasFace, shownName } from './Alias.jsx';
+import { AliasMark } from './Alias.jsx';
+import { aliasOf, aliasFace, shownName } from './aliases.js';
 
 // ── forwarding ──
 // the forwarded copy says where it came from; @everyone / @here inside it never ping again

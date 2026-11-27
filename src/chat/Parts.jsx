@@ -1,27 +1,29 @@
 // The frame around the conversation: server rail, channel / DM sidebar, member list, your panel.
 import { BotTag } from './Bots.jsx';
 import { StatusLink } from './StatusLink.jsx';
-import { isDesktopApp } from './EmberLogo.jsx';
+import { isDesktopApp } from './emberLogo.js';
 import { VoiceChannelUsers, QuickVoiceBtns } from './VoiceParts.jsx';
 import { joinVoice } from './voice.js';
-import { openLinkChannel } from './ChannelTypes.jsx';
+import { openLinkChannel } from './channelTypes.js';
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Share2, Hash, Lock, Plus, Compass, ChevronDown, Settings, UserPlus, LogOut, House, MessageCircle, Home,
   Pencil, Trash2, Check, X, Circle, Moon, MinusCircle, EyeOff, Smile, UsersRound, Megaphone, FolderPlus, ShieldCheck, Download, Server, UserRound, Volume2, CircleArrowUp, NotebookPen, Unplug, Repeat } from 'lucide-react';
 
-import { RetryIn } from './Gate.jsx';
+import { RetryIn } from './RetryIn.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
 import { inviteLinkFor, fullHandle, nookaraDomain } from './store.js';
-import { HomeChip, useServerHome } from './homeLabels.jsx';
+import { HomeChip } from './homeLabels.jsx';
+import { useServerHome } from './serverHome.js';
 import { deviceAccounts, switchToAccount } from './accountSwitch.js';
 import { nookaraDmRows } from './social.js';
 import { SocialDmRow } from './SocialHome.jsx';
 import { useName, NameText, personName, displayNameOf, useDisplayNamesVersion, wantDisplayNames, serverOwnName } from './displayNames.js';
 import { useChat, retryNow, go, keyOf, setStatus, setCustom, isMuted, effectiveNotify, ask, refreshServer, toast, errorText, setDetailLayout, patchState, saveSettings, getState, statusOf, presenceFor, useFace, isBlockedPerson, isBlockedName, blockedFace, BLOCKED_NAME, loadMoreMembers, lastHomeView, bridgedTyper } from './store.js';
-import { P, has, ChannelIcon, useNameStyle, colorFrom, NameDecor } from './roles.jsx';
-import { serverMenu, instanceMenu, channelMenu, userMenu, openMenu, copy } from './Menu.jsx';
+import { ChannelIcon, NameDecor } from './roles.jsx';
+import { P, has, useNameStyle, colorFrom } from './perms.js';
+import { serverMenu, instanceMenu, channelMenu, userMenu, openMenu, copy } from './menus.js';
 import { apiFetch, getToken } from '../api.js';
 import { NOOKARA, instOf, isInst, normOrigin } from './ids.js';
 import { loudUnread, needsChannelCount } from './unread.js';
@@ -30,12 +32,14 @@ import { railEntries, railPos, railOrigin } from './addresses.js';
 import { homeDomainOf, openHomeserverSettings } from './homeservers.js';
 import { removeInstance, reorderInstances, reconnect as reconnectInstance, disconnectInstance } from './instances.js';
 import { startSignIn } from './session.js';
-import { useHomeSession } from './HomeserverLogin.jsx';
-import { Avatar, subtitle, RoleChip, STATUS_LABEL, BlockedMark, openProfileEditor } from './Profile.jsx';
+import { useHomeSession } from './homeSessions.js';
+import { Avatar, RoleChip, BlockedMark } from './Profile.jsx';
+import { subtitle, STATUS_LABEL, openProfileEditor } from './profiles.jsx';
 import { hasAccountProfile, accountTarget } from './accountProfileCore.js';
 import { MePopout } from './ProfilePopout.jsx';
-import { PinCategoryHost, pinMenuItems, catMenuItems, pinItem, unpinItem, moveCategory } from './DmPins.jsx';
+import { PinCategoryHost } from './DmPins.jsx';
 import { cleanPins, pinnedSet, dmKey, groupKey, viewKeyOf } from './dmPinsCore.js';
+import { pinMenuItems, catMenuItems, pinItem, unpinItem, moveCategory } from './dmPinActions.js';
 import { PinItemRow } from './PinItems.jsx';
 import { UnreadPills } from './UnreadPills.jsx';
 // which pinned DM categories are folded (this device only)
@@ -45,11 +49,6 @@ const writeFolded = set => { try { localStorage.setItem(FOLD_KEY, JSON.stringify
 import Logo from '../components/Logo.jsx';
 import { mobileBridge } from '../compat.js';
 
-// who's typing in a conversation right now
-export function typersOf(typing, key) {
-  const now = Date.now();
-  return Object.entries(typing[key] || {}).filter(([, until]) => until > now).map(([n]) => n);
-}
 // little pictures of whoever's typing + the bouncing squares (channel / DM rows)
 // (sid: a server channel - somebody I blocked there is "Blocked User" with the default picture)
 function TypingMark({ names, people, sid }) {
@@ -295,8 +294,6 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
     </nav>
   );
 }
-// open one of the page's dialogs from anywhere (Chat.jsx listens)
-export const dialog = (kind, sid, extra) => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind, sid, ...extra } }));
 // the homeserver badge on a rail icon: its icon, else the first letters of its domain on a color of its own
 const hsHue = d => [...String(d)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
 function RailHome({ domain, icon }) {
@@ -318,7 +315,9 @@ function RailItem({ active, unread, title, onClick, children, style, badge, onCo
   );
 }
 import { initials } from './initials.js';
-export { initials };
+import { dialog } from './dialogs.js';
+import { typersOf } from './typers.js';
+import { useConnLost } from './connLost.js';
 
 // ── the server's sidebar: header (banner), categories, channels ─────────────
 export function ServerSidebar({ sid, onInvite, onSettings, onChannel, onLeave, onUser }) {
@@ -508,19 +507,6 @@ function applyLocal(sid, cats, order) {
 }
 
 // ── home: friends, DMs, group chats ─────────────────────────────────────────
-// true once the home socket has been down for `ms` in a row. Short drops (a server restart, a network blip) reconnect by
-// themselves, so nothing should say so until then.
-export const CONN_LOST_MS = 15000;
-export function useConnLost(ms = CONN_LOST_MS) {
-  const up = useChat(s => s.conn === 'open');
-  const [lost, setLost] = useState(false);
-  // (counted while the app is on screen: coming back from another app restarts it, so a phone that was away doesn't get the
-  // popup the moment it's back while the socket is reconnecting anyway - Ikelene 2026-11-22)
-  const [shown, setShown] = useState(0);
-  useEffect(() => { const v = () => { if (document.visibilityState === 'visible') { setLost(false); setShown(n => n + 1); } }; document.addEventListener('visibilitychange', v); return () => document.removeEventListener('visibilitychange', v); }, []);
-  useEffect(() => { if (up) { setLost(false); return undefined; } const t = setTimeout(() => setLost(true), ms); return () => clearTimeout(t); }, [up, ms, shown]);
-  return !up && lost;
-}
 // Nookara hasn't connected yet since the page loaded (DMs, groups, friends live there): a small note where those lists are, with
 // Retry now. Waits a moment first, so a normal connect doesn't flash it. Later drops get the popup in Chat.jsx instead.
 export function NookaraConnNote({ className = '' }) {

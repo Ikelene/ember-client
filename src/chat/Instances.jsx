@@ -5,20 +5,23 @@ import { Server, ShieldCheck, KeyRound, Users, Check, Trash2, RefreshCw, Plus, T
 
 import { apiFetch } from '../api.js';
 import { Dialog } from './Dialogs.jsx';
-import { initials } from './Parts.jsx';
+import { initials } from './initials.js';
 import { Avatar } from './Profile.jsx';
-import { useChat, go, toast, errorText, ask } from './store.js';
+import { useChat, go, toast, errorText } from './store.js';
 import { Toggle } from './roles.jsx';
 import { PlatformIcon } from './platforms.jsx';
 import { discover, nookaraSession, localSession, addInstance, loginInstance, instanceConn, refreshInstance, joinCommunity, joinByAddress, hostOf, canHomeConnect, homeConnect, nookaraSignsIn } from './instances.js';
 import { communityOf, parseAddress, parseInviteUrl } from './addresses.js';
 import { K } from './ids.js';
 import { startSignIn, hasNookara } from './session.js';
-import { useUnsaved, UnsavedBar } from './unsaved.jsx';
+import { UnsavedBar } from './unsaved.jsx';
+import { useUnsaved } from './useUnsaved.js';
 import { hsCall } from './homeApi.js';
-import { PlanGate, planOf } from './PlanGate.jsx';
-import { joinLabel, joinHint } from './Community.jsx';
-import { EMBER_API, INST_REGISTER_NOOKARA, NOOKARA_WIRE, isNookara, accountsMode, nookaraInfo, nookaraUrl, nookaraRegistration, NOOKARA_URL_FIELD, SERVER_ENV } from '../compat.js';
+import { PlanGate } from './PlanGate.jsx';
+import { planOf } from './plans.js';
+import { joinLabel, joinHint } from './community.js';
+import { EMBER_API, INST_REGISTER_NOOKARA, NOOKARA_WIRE, isNookara, accountsMode, nookaraInfo, nookaraUrl, nookaraRegistration, NOOKARA_URL_FIELD, SERVER_ENV } from '../compat.js';
+import { restartInstance } from './restartInstance.js';
 
 // why another homeserver wouldn't take my account (PROTOCOL 4b)
 // registering / logging in on a homeserver that hands out accounts by invite or by approval (PROTOCOL §4a Registration)
@@ -203,10 +206,6 @@ export function AddInstance({ url, invite, server, onClose, onSetup }) {
 }
 
 // ── an instance's own settings (instance admins only): the Instance pages of Server settings ──
-export async function restartInstance(origin, name) {
-  if (!(await ask({ title: `Restart ${name}?`, text: 'Everyone on it is disconnected for a moment while it starts again. It only comes back by itself if it runs under something that restarts it (Docker, systemd).', confirm: 'Restart', danger: true }))) return;
-  try { await apiFetch('/api/v1/instance/restart', { inst: origin, method: 'POST' }); toast('Restarting...', true); } catch (e) { toast(errorText(e.message)); }
-}
 export function InstanceTab({ origin, tab, onDirty }) {
   const inst = useChat(s => s.instances.find(i => i.origin === origin));
   const [cfg, setCfg] = useState(null);

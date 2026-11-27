@@ -1,8 +1,4 @@
-// The loading screen: the Ember logo picture (a small 17 KB jpg) breathing gently, switched off for prefers-reduced-motion.
-// index.html paints the same markup before the scripts have loaded; both start the animation at the same point of one clock
-// (--boot-t) so the hand-over doesn't restart it. BootMark (the bubble with a light running round it) is the small spinner
-// the "connecting to a server" card uses.
-import { EMBER_MARK } from './EmberLogo.jsx';
+import { EMBER_MARK } from './emberLogo.js';
 import { EMBER_ASSETS } from '../compat.js';
 
 export function BootMark({ size = 88, className = '' }) {

@@ -1,0 +1,85 @@
+// Glint (clips.nookara.cc): links, the API and your own clips
+import { getToken } from '../api.js';
+import { useState, useEffect } from 'react';
+import { uploadKey } from './uploadLinks.js';
+import { desktopBridge } from '../compat.js';
+
+export const GLINT_API = 'https://clips.nookara.cc/api';
+
+export const GLINT_DOWNLOAD = 'https://clips.nookara.cc/download';
+
+export const GLINT_BROWSE = 'https://clips.nookara.cc/';
+
+export const glintLink = id => `https://clips.nookara.cc/c/${id}`;
+
+export async function glintFetch(path, { method = 'GET', auth = true } = {}) {
+  const token = auth ? getToken() : null;
+  if (auth === 'required' && !token) throw Object.assign(new Error('unauthorized'), { status: 401 });
+  const res = await fetch(GLINT_API + path, { method, headers: token ? { Authorization: `Bearer ${token}` } : {}, credentials: 'omit' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || `http_${res.status}`), { status: res.status });
+  return data;
+}
+
+// ── my clips: fetched once per session (refreshed in the background when older than 5 minutes) ──
+// state: undefined = not asked yet / loading, null = Glint failed (don't filter, no tab), [] / [clips]
+let mine; let mineAt = 0; let mineJob = null;
+
+const subs = new Set();
+
+const tell = () => subs.forEach(f => f(mine));
+
+export function loadMyClips({ force = false } = {}) {
+  if (!getToken()) { mine = null; tell(); return Promise.resolve(null); }
+  if (mineJob) return mineJob;
+  if (!force && mine !== undefined && mine !== null && Date.now() - mineAt < 5 * 60 * 1000) return Promise.resolve(mine);
+  mineJob = glintFetch('/me/clips', { auth: 'required' })
+    .then(d => (Array.isArray(d?.clips) ? d.clips : Array.isArray(d) ? d : null))
+    .catch(() => (Array.isArray(mine) ? mine : null)) // a failed refresh keeps what we had
+    .then(list => { mine = list; mineAt = Date.now(); mineJob = null; tell(); return list; });
+  return mineJob;
+}
+
+export function useMyClips() {
+  const [v, setV] = useState(mine);
+  useEffect(() => { subs.add(setV); setV(mine); loadMyClips(); return () => { subs.delete(setV); }; }, []);
+  return v;
+}
+
+export const myClipsNow = () => mine;
+
+// clips that still exist (the API leaves deleted ones out; a clip whose render failed doesn't count)
+export const liveClips = list => (Array.isArray(list) ? list.filter(c => c && c.id && c.status !== 'failed' && c.visibility !== 'deleted') : []);
+
+// Saved Media items that are really Glint clip videos (drafts too): matched by url or by the Nookara upload id
+export function glintMediaMatcher(list) {
+  if (!Array.isArray(list) || !list.length) return () => false;
+  const urls = new Set(), ids = new Set();
+  for (const c of list) {
+    if (c.videoUrl) urls.add(uploadKey(c.videoUrl)); // by /uploads/ path: the same clip file on nookara.cc and cdn.nookara.cc matches
+    if (c.mediaId != null) ids.add(`u${c.mediaId}`);
+  }
+  return m => ids.has(String(m.id)) || urls.has(uploadKey(m.url));
+}
+
+// ── one clip's like state (GET /clips/:id, with the token so it says whether I liked it), cached per session ──
+const info = new Map(); // id -> promise of { liked, likes } | null
+
+export function clipLikes(id) {
+  if (!info.has(id)) info.set(id, glintFetch(`/clips/${encodeURIComponent(id)}`).then(d => { const c = d?.clip || d; return { liked: !!c?.liked, likes: Number(c?.likes) || 0 }; }).catch(() => null));
+  return info.get(id);
+}
+
+export async function setClipLike(id, on) {
+  const d = await glintFetch(`/clips/${encodeURIComponent(id)}/like`, { method: on ? 'PUT' : 'DELETE', auth: 'required' });
+  const v = { liked: !!d.liked, likes: Number(d.likes) || 0 };
+  info.set(id, Promise.resolve(v));
+  return v;
+}
+
+// open a page in the browser (the desktop app sends https links out through openExternal)
+export function openOutside(url) {
+  const d = desktopBridge();
+  if (d?.openExternal) { Promise.resolve(d.openExternal(url)).catch(() => {}); return; }
+  window.open(url, '_blank', 'noopener,noreferrer');
+}

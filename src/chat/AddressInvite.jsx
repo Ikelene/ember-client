@@ -5,22 +5,14 @@ import { useEffect, useState } from 'react';
 import { Users, LogIn } from 'lucide-react';
 import { HomeChip } from './homeLabels.jsx';
 import { Dialog } from './Dialogs.jsx';
-import { initials } from './Parts.jsx';
+import { initials } from './initials.js';
 import { useChat, go } from './store.js';
 import { resolveAddress, joinByAddress } from './instances.js';
 import { addressHash, parseAddress, createErrorText } from './addresses.js';
 import { fromInstance, K } from './ids.js';
-import { HomeserverLogin, useHomeSession } from './HomeserverLogin.jsx';
-
-const KEPT = 'ember_pending_invite';
-export function keepInvite(hash) { try { sessionStorage.setItem(KEPT, hash); } catch { /* private mode: it is just not finished after */ } }
-export function dropInvite() { try { sessionStorage.removeItem(KEPT); } catch { /* fine */ } }
-// the kept invite (an address with its code), taken off the list -> { slug, domain, address, code } | null
-export function takeInvite() {
-  let h = null;
-  try { h = sessionStorage.getItem(KEPT); sessionStorage.removeItem(KEPT); } catch { /* none */ }
-  return h ? parseAddress(h) : null;
-}
+import { HomeserverLogin } from './HomeserverLogin.jsx';
+import { useHomeSession } from './homeSessions.js';
+import { keepInvite, dropInvite } from './addressInvites.js';
 
 // address: { slug, domain, code } or, from a link whose host isn't the domain, { slug, origin, code }
 export function AddressInvite({ address, onClose }) {

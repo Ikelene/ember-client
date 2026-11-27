@@ -7,7 +7,8 @@ import { apiFetch } from '../api.js';
 import { useChat, refreshServer, toast, errorText } from './store.js';
 import { Toggle } from './roles.jsx';
 import { Card } from './SettingsShell.jsx';
-import { useUnsaved, UnsavedBar } from './unsaved.jsx';
+import { UnsavedBar } from './unsaved.jsx';
+import { useUnsaved } from './useUnsaved.js';
 
 const BITS = [[1024, 'See it'], [1, 'Send messages'], [256, 'Attach files']];
 

@@ -1,7 +1,8 @@
 // "Attach a Glint clip" when you have no clips yet: what Glint is + where to get it
 import { Download, History, Scissors, Link2, Keyboard } from 'lucide-react';
 import { Dialog } from './Dialogs.jsx';
-import { GlintMark, GLINT_DOWNLOAD, GLINT_BROWSE, openOutside } from './glint.jsx';
+import { GlintMark } from './glint.jsx';
+import { GLINT_DOWNLOAD, GLINT_BROWSE, openOutside } from './glintApi.js';
 
 const POINTS = [
   [History, 'Always-on replay', 'Glint keeps the last few minutes of your game in the background.'],

@@ -6,32 +6,20 @@ import { viaProxy } from './mediaProxy.js';
 import { Star, CornerDownRight, Shuffle, Trophy, History, Check } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { useChat, toast, errorText, go, openLink, jumpToMessage } from './store.js';
-import { setReaction } from './Reactions.jsx';
+import { setReaction } from './reactions.js';
 import { renderBody, stampOf } from './text.jsx';
 import { GameInvites } from './GameInvite.jsx';
-import { viewMedia } from './MediaViewer.jsx';
+import { viewMedia } from './mediaViewer.js';
 import { Avatar } from './Profile.jsx';
 import { VideoPlayer, AudioPlayer } from './MediaPlayer.jsx';
-import { FileCard } from './Messages.jsx';
-import { K, bare, instOf, instOpt, isInst } from './ids.js';
+import { FileCard } from './FileCard.jsx';
+import { K, instOf, instOpt, isInst } from './ids.js';
 import { isSpoiler } from './spoiler.js';
 import { aliasOf, aliasFace, shownName } from './aliases.js';
+import { wid, STAR } from './starboard.js';
 
 // the star, drawn (never the emoji)
 const StarIco = () => <Star size={13} className="vc-stb-inline" fill="currentColor" />;
-
-export const STAR = '⭐';
-
-// the star button in a message's quick actions: only where a starboard is watching that channel
-export function useStarboardFor(sid, cid) {
-  const chans = useChat(s => s.detail[sid]?.channels);
-  return useMemo(() => (chans || []).some(b => b.type === 'starboard' && b.cid !== cid && (b.config?.watch?.length ? b.config.watch.includes(wid(cid)) : true)), [chans, cid]);
-}
-// a starboard's `watch` holds the channel ids its server uses (bare ones on an instance)
-const wid = cid => (isInst(cid) ? bare(cid) : cid);
-export function starredByMe(m, me) {
-  return !!(m.reactions || []).find(r => r.emoji === STAR)?.users?.includes(me);
-}
 
 // settings in the channel editor: which channels it watches + how many stars it takes
 export function StarboardSettings({ config, setConfig, sid, channel }) {

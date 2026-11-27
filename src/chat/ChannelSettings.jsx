@@ -7,12 +7,15 @@ import { apiFetch, uploadFetch } from '../api.js';
 import { useChat, getState, go, ask, toast, errorText, refreshServer } from './store.js';
 import { imgHint, warnImage } from './imgHints.js';
 import { isInst, instOpt } from './ids.js';
-import { P, has, CHANNEL_ICONS, ChannelIcon, Toggle } from './roles.jsx';
-import { TYPES, TypePicker, TypeSettings } from './ChannelTypes.jsx';
+import { ChannelIcon, Toggle } from './roles.jsx';
+import { P, has, CHANNEL_ICONS } from './perms.js';
+import { TypePicker, TypeSettings } from './ChannelTypes.jsx';
+import { TYPES } from './channelTypes.js';
 import { ChannelBridge } from './Bridge.jsx';
 import { ChannelPerms } from './ChannelPerms.jsx';
 import { SettingsShell, Card } from './SettingsShell.jsx';
-import { useUnsaved, UnsavedBar } from './unsaved.jsx';
+import { UnsavedBar } from './unsaved.jsx';
+import { useUnsaved } from './useUnsaved.js';
 import { pictureAccept } from './accept.js';
 
 const LINK_OK = /^https?:\/\/\S+\.\S+/;

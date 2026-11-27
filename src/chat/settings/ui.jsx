@@ -6,18 +6,13 @@
 //   <PreviewArea> + usePv('name')      a live preview; elements marked with usePv(name) get outlined while a card with
 //                                       that target is hovered, so you can see what the setting changes
 // Square by default; Modern (html.vc-rounded) softens them (settings-ui.css).
-import { createContext, useContext, useState } from 'react';
+import { useContext, useState } from 'react';
 import './settings-ui.css';
+import { HoverCtx } from './usePv.js';
 
-const HoverCtx = createContext({ target: null, set: () => {} });
 export function PreviewHost({ children }) {
   const [target, set] = useState(null);
   return <HoverCtx.Provider value={{ target, set }}>{children}</HoverCtx.Provider>;
-}
-// className for something in the preview: outlined while its setting is hovered
-export function usePv(name) {
-  const { target } = useContext(HoverCtx);
-  return target && (Array.isArray(name) ? name.includes(target) : target === name) ? ' pv-hl' : '';
 }
 // at the top of the page; it scrolls away with the page (Ikelene 2026-11-15: no smaller copy stuck in the corner while you scroll)
 export function PreviewArea({ children, label = 'Preview' }) {

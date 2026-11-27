@@ -1,13 +1,14 @@
 // The media picker (the GIF button by Send, and "Attach a Glint clip" in the + menu): search Klipy GIFs, star them into Saved
 // Media, Saved Media = starred GIFs + every picture / video / audio file on your Nookara account (minus Glint clip videos), and
 // Game Clips = your Glint clips (only when you have some) - picking one sends its link, which shows as the Glint clip card.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { viaProxy } from './mediaProxy.js';
 import { Search, Star, X, Upload, Music, Play, Loader2, Eye, Lock, ExternalLink } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { useChat, getState, toast, errorText, ask, loadMedia, saveGif, unsaveGif, deleteMedia, saveFilesToMedia, getUploadLimits } from './store.js';
-import { useMyClips, liveClips, glintMediaMatcher, glintLink, loadMyClips, GlintMark, NewTag, openOutside, GLINT_BROWSE } from './glint.jsx';
-import { fmtTime } from './MediaPlayer.jsx';
+import { GlintMark, NewTag } from './glint.jsx';
+import { useMyClips, liveClips, glintMediaMatcher, glintLink, loadMyClips, openOutside, GLINT_BROWSE } from './glintApi.js';
+import { fmtTime } from './fmtTime.js';
 import { StatusLink } from './StatusLink.jsx';
 import { pictureAccept } from './accept.js';
 import { desktopBridge } from '../compat.js';
@@ -211,14 +212,4 @@ function Clips({ clips, onSendLink }) {
       </div>
     </>
   );
-}
-
-// keep the picker inside the window
-export function usePickerPlacement(ref) {
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    if (r.left < 8) el.style.transform = `translateX(${8 - r.left}px)`;
-  });
 }

@@ -8,30 +8,22 @@ import { createPortal } from 'react-dom';
 import { Copy, Pencil, ChevronRight, Check, Circle, Moon, MinusCircle, EyeOff, Smile, X, Users, IdCard, UserPlus, Crown, Globe, LogOut, Plus, Coins, ExternalLink } from 'lucide-react';
 import { NOOKARA_ORIGIN } from './hosts.js';
 import { isWebEmber, getToken, apiFetch } from '../api.js';
-import { signOutNookara, startSignIn, savedEmberAccounts, rememberAccount, switchEmberAccount } from './session.js';
+import { startSignIn, rememberAccount } from './session.js';
 import { useChat, lookup, wantPresence, setStatus, setCustom, toast, getState, onUserUpdate, fullHandle, nookaraDomain } from './store.js';
-import { copy } from './Menu.jsx';
+import { copy } from './menus.js';
 import { renderBody } from './text.jsx';
-import { Avatar, STATUS_LABEL, ActivityCard, HandleLine } from './Profile.jsx';
+import { Avatar, ActivityCard, HandleLine } from './Profile.jsx';
+import { STATUS_LABEL } from './profiles.jsx';
 import { ManageFacts } from './ClientVia.jsx';
 import { deviceAccounts, switchToAccount } from './accountSwitch.js';
 import { HomeserverIcon } from './HomeserverLogin.jsx';
 import './ProfilePopout.css';
-import { desktopBridge, SITE_TOKEN, SITE_SAVED, SITE_ME_CACHE, SITE_ACCENT, SITE_ACCENT_AT } from '../compat.js';
+import { SITE_TOKEN, SITE_SAVED } from '../compat.js';
+import { web, savedAccounts, localTimeFrom, switchTo, signOut } from './profileActions.js';
 
 const isHex = c => /^#[0-9a-f]{6}$/i.test(c || '');
 const hostOf = u => { try { return new URL(/^https?:\/\//i.test(u) ? u : `https://${u}`).hostname.replace(/^www\./, ''); } catch { return u; } };
 const BODY_CTX = { linkImages: false, bio: true };
-
-// local time from a UTC offset in minutes (what other people get), or from a time zone name (the editor's draft)
-export function localTimeFrom({ tzOffsetMin, timeZone }) {
-  try {
-    // (Alberta stays on UTC-6 since 2026-11-01, newer than browsers' time zone data)
-    if (timeZone) return new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: timeZone === 'America/Edmonton' ? 'Etc/GMT+6' : timeZone });
-    if (Number.isFinite(tzOffsetMin)) return new Date(Date.now() + (tzOffsetMin + new Date().getTimezoneOffset()) * 60000).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  } catch { /* bad zone */ }
-  return '';
-}
 
 function Bio({ text }) {
   const nodes = useMemo(() => (text ? renderBody(text, BODY_CTX).nodes : null), [text]);
@@ -111,12 +103,6 @@ const STATUS_ITEMS = [
   ['invisible', EyeOff, 'Invisible', "You'll look offline, but can still use Nookara."],
 ];
 
-// the accounts saved on this device (same list as the login page's "Choose an account" and the site's account menu)
-const web = () => isWebEmber();
-export function savedAccounts() {
-  if (web()) return savedEmberAccounts();
-  try { const a = JSON.parse(localStorage.getItem(SITE_SAVED) || '[]'); return Array.isArray(a) ? a.filter(x => x && x.username && x.token) : []; } catch { return []; }
-}
 function rememberCurrent(username, pfp) {
   if (web()) { rememberAccount(username, getToken(), pfp); return; }
   try {
@@ -126,36 +112,6 @@ function rememberCurrent(username, pfp) {
     list.unshift({ username, token, pfp: pfp || null });
     localStorage.setItem(SITE_SAVED, JSON.stringify(list.slice(0, 10)));
   } catch { /* private mode */ }
-}
-export async function switchTo(a, setBusy) {
-  setBusy(a.username);
-  if (web()) {
-    try { await switchEmberAccount(a); } catch (e) {
-      setBusy('');
-      toast(e.message === 'ended' ? `${a.username} was signed out - sign in again with "Add another account".` : "Couldn't reach Nookara - try again.");
-    }
-    return;
-  }
-  try {
-    const r = await fetch('/auth/validate', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${a.token}` }, body: JSON.stringify({ token: a.token }) });
-    const d = await r.json().catch(() => ({}));
-    if (!d?.valid) throw new Error('ended');
-    localStorage.setItem(SITE_TOKEN, a.token);
-    [SITE_ACCENT, SITE_ACCENT_AT, SITE_ME_CACHE].forEach(k => localStorage.removeItem(k));
-    location.reload();
-  } catch {
-    try { localStorage.setItem(SITE_SAVED, JSON.stringify(savedAccounts().filter(x => x.username.toLowerCase() !== a.username.toLowerCase()))); } catch { /* fine */ }
-    setBusy('');
-    toast(`${a.username} was signed out on this device - sign in again with "Add another account".`);
-  }
-}
-
-// the switcher's Sign out (the other one is Settings > Account): the same as Settings' Log out (the lockout screen uses it too)
-export async function signOut() {
-  if (isWebEmber()) { await signOutNookara(); return; } // Ember's own sign-in only; the website's session stays
-  try { localStorage.removeItem(SITE_TOKEN); localStorage.removeItem(SITE_ME_CACHE); } catch { /* fine */ }
-  if (desktopBridge()?.logout) await desktopBridge().logout();
-  else location.assign('/login');
 }
 
 // your custom status beside the avatar: click to change it, x to clear it; none yet = "What's on your mind?"

@@ -7,23 +7,24 @@ import { createPortal } from 'react-dom';
 import { MessageCircle, Maximize2, X, UserPlus, Check, Clock, ExternalLink, Globe, Gamepad2, Music, Tv, Trophy, Radio, MoreHorizontal, Pencil, CalendarDays, LogIn, ShieldCheck, Crown, UserMinus, Ban, Link as LinkIcon, Plus } from 'lucide-react';
 import { apiFetch, getToken } from '../api.js';
 import { BotTag, AddBotButton, TrustedIn } from './Bots.jsx';
-import { useChat, lookup, go, wantPresence, toast, errorText, getState, setCustom, ask, loadFriends, toggleBlock, memberRef, faceOf, botPresenceOf, loadMembers, onUserUpdate, markBotPeer, cleanServerProfile, socialProfileOf, fullHandle } from './store.js';
+import { useChat, lookup, go, wantPresence, toast, errorText, setCustom, ask, loadFriends, toggleBlock, memberRef, faceOf, botPresenceOf, loadMembers, onUserUpdate, markBotPeer, cleanServerProfile, socialProfileOf, fullHandle } from './store.js';
 import { isInst, NOOKARA } from './ids.js';
 import { hasAccountProfile, accountTarget } from './accountProfileCore.js';
 import { ServerIcon } from './ServerIcon.jsx';
-// your own profile's "Edit profile": Ember's settings, Profile page (Chat.jsx listens for vc-dialog)
-// target: which profile to open on (accountProfileCore.js accountTarget: your account on a server with its own accounts)
-export const openProfileEditor = target => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'chat-settings', page: 'profile', ...(typeof target === 'string' ? { target } : {}) } }));
-import { elapsed, BioText } from './text.jsx';
-import { userMenu } from './Menu.jsx';
-import { RoleChips, modRights, moderate } from './roles.jsx';
-import { PlatformIcon, PLATFORM_NAMES } from './platforms.jsx';
+import { elapsed } from './text.jsx';
+import { BioText } from './BioText.jsx';
+import { userMenu } from './menus.js';
+import { RoleChips } from './roles.jsx';
+import { modRights, moderate } from './perms.js';
+import { PlatformIcon } from './platforms.jsx';
+import { PLATFORM_NAMES } from './platformNames.js';
 import StatusReply from './StatusReply.jsx';
-import { ManageFacts, useInstClients } from './ClientVia.jsx';
+import { ManageFacts } from './ClientVia.jsx';
+import { useInstClients } from './clientVia.js';
 import { MaskIcon } from './Alias.jsx';
 import { EMBER_API, isNookara, nookaraId, nookaraProfileBadges } from '../compat.js';
+import { STATUS_LABEL, onPlatform, VERB, plainOn, subtitle, openProfileEditor } from './profiles.jsx';
 
-export const STATUS_LABEL = { online: 'Online', idle: 'Idle', dnd: 'Do not disturb', invisible: 'Invisible', offline: 'Offline' };
 const CONN_HOVER = { discord: '#5865F2', fluxer: '#7c78ee', github: '#ffffff', spotify: '#1DB954' };
 // one linked account: brand icon (tinted like the text) + account name, platform name as the tooltip, links to the account when there is a URL
 function Connection({ c }) {
@@ -36,7 +37,6 @@ function Connection({ c }) {
     : <span className="vc-chip vc-conn" style={style} data-tip={label}>{body}</span>;
 }
 
-const VERB = { playing: 'Playing', listening: 'Listening to', watching: 'Watching', competing: 'Competing in', streaming: 'Streaming', custom: '' };
 const ACT_ICON = { playing: Gamepad2, listening: Music, watching: Tv, competing: Trophy, streaming: Radio, custom: Gamepad2 };
 
 // the shared status mark: a square dot, or (online / idle / dnd on a phone) a small phone in the same colour
@@ -71,7 +71,6 @@ export function Icon3DS({ className = 'vc-3ds' }) {
     </svg>
   );
 }
-const onPlatform = a => (a?.platform === '3ds' ? '3DS' : null);
 export function StatusSq({ status, username }) {
   const consoleOn = useChat(s => !!s.presence[username]?.console) && PHONE_OK.has(status);
   const mobile = useChat(s => !!s.presence[username]?.mobile) && PHONE_OK.has(status) && !consoleOn;
@@ -96,21 +95,6 @@ export function Avatar({ user, size = 32, status, className = '', ghost: ghostPr
 // next to "Blocked User" in a server: you blocked this person (only you see it)
 export function BlockedMark({ size = 13 }) {
   return <span className="vc-blocked-mark" title="You blocked this person" aria-label="Blocked by you"><Ban size={size} /></span>;
-}
-// who someone's listening to, for "Listening to <artist>" instead of the app's name: Spotify puts the artist in details; music
-// apps like Chime send a song (it has a duration) with "by <artist>" as its state. Radio and the rest keep the app's name.
-function listenArtist(a) {
-  if (a?.type !== 'listening') return '';
-  if (a.app === 'Spotify') return a.details || '';
-  return Number(a.duration) > 0 && a.state ? String(a.state).replace(/^by\s+/i, '') : '';
-}
-// "Playing Hyperfocus", or their custom status
-export function subtitle(p) {
-  const a = p?.activities?.[0];
-  if (a && onPlatform(a)) return <><Icon3DS /> Playing on <strong className="vc-sub-activity">{onPlatform(a)}</strong></>;
-  if (listenArtist(a)) return <>Listening to <strong className="vc-sub-activity">{listenArtist(a)}</strong></>; // the artist; the song title stays on the activity card
-  if (a) return a.type === 'custom' ? a.name : <>{VERB[a.type] || 'Playing'} <strong className="vc-sub-activity">{a.name}</strong></>;
-  return p?.custom || '';
 }
 export function RoleChip({ role }) {
   if (role === 'owner') return <span className="vc-role owner ico" title="Server owner" aria-label="Server owner"><Crown size={14} /></span>;
@@ -149,10 +133,6 @@ export function ActivityCard({ a, compact = false }) {
   );
 }
 
-// who = the author / member object when the person was clicked on an instance server: a Nookara person (v:) is looked up on
-// Nookara by their Nookara id (the name Nookara knows them by now, checked against the id); a local account or bot there has no
-// Nookara profile at all (a Nookara account with the same name is somebody else): a plain card from the instance's own data.
-export const plainOn = who => !!who?.inst && !isNookara(who.kind);
 // A bot on an instance server: the instance gives its description / trusted_in / gallery_id; a gallery-linked one is completed from
 // Nookara's public gallery detail (avatar, description, owner, approval state). Cached for a minute.
 const galleryCache = new Map();
@@ -610,25 +590,6 @@ export function ProfileModal({ username: shown, from, sid, who, dm = false, onCl
 function regionName(cc) {
   try { return new Intl.DisplayNames(undefined, { type: 'region' }).of(cc.toUpperCase()); } catch { return cc; }
 }
-
-// for anything that can open a profile: click -> mini profile; "expand" -> large
-export function useProfiles() {
-  const [mini, setMini] = useState(null);
-  const [big, setBig] = useState(null);
-  const view = useChat(s => s.view);
-  const sid = view.kind === 'channel' ? view.sid : null;
-  const dm = view.kind === 'dm' || view.kind === 'group' || view.kind === 'sdm' || (view.kind === 'channel' && !!view.dm); // (full handles there)
-  // who: the author / member object when it's someone on an instance server (decides Nookara profile vs plain card)
-  const openMini = (username, el, side = 'right', who) => setMini({ username, anchor: el?.getBoundingClientRect?.() || el, side, sid, who, dm, k: Date.now() + Math.random() });
-  const ui = (
-    <>
-      {mini && <MiniProfile key={mini.k} {...mini} onClose={() => setMini(m => (m?.k === mini.k ? null : m))} onExpand={(u, rect) => setBig({ username: u, from: rect, sid: mini.sid, who: mini.who, dm: mini.dm })} />}
-      {big && <ProfileModal {...big} onClose={() => setBig(null)} />}
-    </>
-  );
-  return { openMini, openBig: (username, from, inDm = dm) => setBig({ username, from, sid, dm: inDm }), ui };
-}
-export const meName = () => getState().me?.username;
 
 // Modern look: the dates as one quiet line of icons (month + year; the full date on hover) instead of labelled rows.
 // Classic keeps the labelled rows (.vc-fact-classic); CSS shows one or the other.

@@ -2,8 +2,9 @@ import { siteHref } from './hosts.js';
 // Link previews under messages. The server makes them (GET /chat/unfurl: Nookara, or the instance a message is on) - the
 // browser never visits the linked site; pictures come from that server too. YouTube gets Ember's own player (YouTube's
 // embed, or streamed through the instance / Nookara), Ember invites + Nookara profiles get their own cards.
-import { VideoPlayer, fmtTime } from './MediaPlayer.jsx';
-import { viewPicture } from './MediaViewer.jsx';
+import { VideoPlayer } from './MediaPlayer.jsx';
+import { fmtTime } from './fmtTime.js';
+import { viewPicture } from './mediaViewer.js';
 import { useEffect, useRef, useState } from 'react';
 import { HomeChip } from './homeLabels.jsx';
 import { Play, Download, ShieldCheck, Eye, Loader2, Users, ExternalLink, BookmarkPlus, BookmarkCheck, Coins, Heart, Clock, HardDrive, Folder, File as FileIcon, FileArchive, FileCode, FileText, Image as ImageIcon, Film, Music, MessagesSquare, MessageSquare, ArrowBigUp, Pin, Lock, Ban, Globe, KeyRound, FileX } from 'lucide-react';
@@ -13,7 +14,8 @@ import { useChat, getState, toast, errorText, openLink, saveSettings, loadMedia,
 import { K } from './ids.js';
 import { openFile as openSealedFile } from './e2ee/session.js';
 import { inviteRef, addressInviteRef, paymentRef, glintRef, driveRef, forumRef, siteRef, loadSiteHosts, onSiteHosts } from './inviteLink.js';
-import { GlintMark, GLINT_DOWNLOAD, clipLikes, setClipLike, openOutside } from './glint.jsx';
+import { GlintMark } from './glint.jsx';
+import { GLINT_DOWNLOAD, clipLikes, setClipLike, openOutside } from './glintApi.js';
 import { fmtSize, RISKY, KIND_OF } from './fileKinds.js';
 import { NOOKARA_WIRE, isNookara, NOOKARA_INST, desktopBridge } from '../compat.js';
 

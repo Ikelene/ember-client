@@ -7,7 +7,8 @@ import { toast, errorText, customEmoji, useChat } from './store.js';
 import { instOpt, isInst, registry } from './ids.js';
 import { playBoardSound, previewBoardSound, stopBoardSounds } from './voice.js';
 import { Twemoji } from './emoji.jsx';
-import { usePlan, PlanGate, PlanNotice, PlanUsage } from './PlanGate.jsx';
+import { PlanGate, PlanNotice, PlanUsage } from './PlanGate.jsx';
+import { usePlan } from './plans.js';
 
 const SoundIcon = ({ s }) => {
   if (!s.emoji) return <AudioLines size={16} />;

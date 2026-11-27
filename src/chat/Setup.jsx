@@ -5,7 +5,7 @@ import { Check, Upload, RefreshCw, KeyRound, TriangleAlert } from 'lucide-react'
 import { apiFetch, uploadFetch } from '../api.js';
 import { Dialog } from './Dialogs.jsx';
 import { Toggle } from './roles.jsx';
-import { initials } from './Parts.jsx';
+import { initials } from './initials.js';
 import { useChat, toast, errorText, ask, go, refreshServer } from './store.js';
 import { serverOfInst } from './addresses.js';
 import { imgHint, warnImage } from './imgHints.js';

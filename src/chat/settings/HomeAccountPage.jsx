@@ -4,24 +4,21 @@ import { useEffect, useState } from 'react';
 import { CircleUserRound, Pencil, ExternalLink, KeyRound, Link2, Unlink, LogOut, Check, RefreshCw, TriangleAlert, Fingerprint } from 'lucide-react';
 import { SettingsPage, SCard } from './ui.jsx';
 import { ask, toast, useChat } from '../store.js';
-import { Avatar, openProfileEditor } from '../Profile.jsx';
+import { Avatar } from '../Profile.jsx';
+import { openProfileEditor } from '../profiles.jsx';
 import { hasAccountProfile, accountTarget } from '../accountProfileCore.js';
 import { normOrigin } from '../ids.js';
-import { HomeserverIcon, useHomeSession, useHomeSessions } from '../HomeserverLogin.jsx';
+import { HomeserverIcon } from '../HomeserverLogin.jsx';
+import { useHomeSession, useHomeSessions } from '../homeSessions.js';
 import { setCurrent, homeInfo, resolve as resolveHomeserver } from '../homeserver.js';
 import { signOutHome, signInOn } from '../session.js';
 import { loadLogins, unlinkLogin, linkLogin, homeJson } from '../homeApi.js';
 import { Dialog } from '../Dialogs.jsx';
 import { loginErrorText, KIND_LABEL } from '../homeAdmin.js';
-import { desktopBridge } from '../../compat.js';
 import './accounts-pages.css';
 import './homeservers.css';
+import { openOutside } from './openOutside.js';
 
-export function openOutside(url) {
-  const d = desktopBridge();
-  if (d?.openExternal) { Promise.resolve(d.openExternal(url)).catch(() => {}); return; }
-  window.open(url, '_blank', 'noopener,noreferrer');
-}
 const when = t => { const d = new Date(typeof t === 'number' && t < 1e12 ? t * 1000 : t); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); };
 
 export default function HomeAccountPage() {

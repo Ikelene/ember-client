@@ -9,25 +9,18 @@ import { MemberList } from './Parts.jsx';
 import { serverUnreadCount } from './unread.js';
 import { PinsPanel } from './MsgTools.jsx';
 import { ProfileCard, Avatar } from './Profile.jsx';
-import { NotifIcon, NotifText, ago } from './Notifications.jsx';
+import { NotifIcon, NotifText } from './Notifications.jsx';
+import { ago } from './ago.js';
 import { ServerIcon } from './ServerIcon.jsx';
-import { snippet } from './Dashboard.jsx';
+import { snippet } from './dashboard.js';
 import { loadMentions, loadSaved, unsaveMessage } from './inbox.js';
 import { siteHref } from './hosts.js';
 import { stampOf } from './text.jsx';
 import { shownName } from './aliases.js';
+import { useInboxCount } from './inboxCount.js';
 
 const TAB_KEY = 'bf_panel_tab';
 const savedTab = () => { try { return localStorage.getItem(TAB_KEY) || 'people'; } catch { return 'people'; } };
-
-export function useInboxCount() {
-  const notif = useChat(s => s.notifUnread);
-  const servers = useChat(s => s.servers);
-  const srvMentions = useChat(s => s.srvMentions);
-  useChat(s => s.notify);
-  const pings = servers.reduce((n, s) => n + (isMuted(s.sid) ? 0 : (s.mentions || 0) + (srvMentions[s.sid] || 0)), 0);
-  return notif + pings;
-}
 
 export function SidePanel({ view, channel, detail, group, onUser, onLeaveGroup, onClose }) {
   const [tab, setTabRaw] = useState(savedTab);

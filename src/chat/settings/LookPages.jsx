@@ -1,15 +1,16 @@
 // Settings pages for how Ember looks (Modern only: Theme, Text & layout) and two that work in both looks (Blocking, and the
 // per-server notification levels shown on the Notifications page). Appearance lives in look.js (per device).
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Palette, Type, ShieldOff, Bell, Trash2, Upload, MessageCircle, Server, Check, RotateCcw, UserX } from 'lucide-react';
-import { SettingsPage, SCard, SRow, OptionCards, Switch, ResetButton, PreviewArea, usePv } from './ui.jsx';
-import { getLook, setLook, subscribeLook, resetLook, THEMES, FONTS, setCustomFont, hasCustomFont, DEFAULT_LOOK } from '../look.js';
+import { SettingsPage, SCard, SRow, OptionCards, Switch, ResetButton, PreviewArea } from './ui.jsx';
+import { usePv } from './usePv.js';
+import { setLook, resetLook, THEMES, FONTS, setCustomFont, hasCustomFont, DEFAULT_LOOK } from '../look.js';
 import { useChat, setNotify, notifyOf, toggleBlock, toast, ask, saveSettings } from '../store.js';
 import { ServerIcon } from '../ServerIcon.jsx';
 import { Avatar } from '../Profile.jsx';
 import './look-pages.css';
+import { useLook } from './lookValue.js';
 
-const useLook = () => useSyncExternalStore(subscribeLook, getLook);
 const ACCENTS = ['#e88fb4', '#5865f2', '#3b82f6', '#06b6d4', '#14b8a6', '#22c55e', '#84cc16', '#eab308', '#f97316', '#ef4444', '#ec4899', '#a78bfa'];
 
 // a tiny Ember: sidebar, a few messages (one mentions you), the composer. Parts get outlined while their setting is hovered.
@@ -229,5 +230,4 @@ export function NotifLevels() {
     </SCard>
   );
 }
-export const useLookValue = useLook;
-export { DEFAULT_LOOK, RotateCcw, Bell, MessageCircle, Server };
+export { RotateCcw, Bell, MessageCircle, Server };

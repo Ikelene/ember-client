@@ -10,19 +10,21 @@ import { apiFetch } from '../api.js';
 import { useChat, toast, errorText, refreshServer, jumpToMessage, loadMembers } from './store.js';
 import { instOf, K } from './ids.js';
 import { openHomeserverSettings } from './homeservers.js';
-import { Toggle, P, has, modRights, moderate, RoleAddMenu } from './roles.jsx';
+import { Toggle, RoleAddMenu } from './roles.jsx';
+import { P, has, modRights, moderate } from './perms.js';
 import { Avatar } from './Profile.jsx';
 import { stampOf } from './text.jsx';
 import { Card } from './SettingsShell.jsx';
-import { useUnsaved, UnsavedBar } from './unsaved.jsx';
+import { UnsavedBar } from './unsaved.jsx';
+import { useUnsaved } from './useUnsaved.js';
 import { JoinInvites, UploadsTab } from './Community.jsx';
 import { SERVER_REMOTE_MODES, DAYS_MAX, clampDays, effectiveDays, domainRules, domainRuleIssue } from './federation.js';
+import { fmtBytes } from './fmtBytes.js';
 
 const clone = v => JSON.parse(JSON.stringify(v));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const fail = e => toast(errorText(e.message));
 const url = sid => `/chat/servers/${sid}/settings`;
-export const fmtBytes = n => { if (!n) return '0 B'; const u = ['B', 'KB', 'MB', 'GB', 'TB']; const i = Math.min(u.length - 1, Math.floor(Math.log(n) / Math.log(1024))); return `${(n / 1024 ** i).toFixed(i ? 1 : 0)} ${u[i]}`; };
 
 // one page's draft of some settings sections. keys: section names, or 'join_policy'. extra: { changed, body(), reset() } for
 // fields that aren't settings (a new join password)

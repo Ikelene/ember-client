@@ -1,44 +1,23 @@
 // What shows where there's nothing to show yet: a server whose instance isn't connected / signed in (instead of its channels),
 // and Nookara-only places (friends, DMs, groups) while you're signed out of Nookara.
-import { useEffect, useState } from 'react';
-import { ShieldCheck, LogIn, RefreshCw, Users, Server, TriangleAlert, Trash2, KeyRound, Globe, Ban, LifeBuoy, LogOut, UserRound, Cake, ExternalLink, Moon, Unplug } from 'lucide-react';
+import { useState } from 'react';
+import { ShieldCheck, LogIn, RefreshCw, Users, Server, TriangleAlert, Trash2, KeyRound, Globe, Ban, LifeBuoy, LogOut, UserRound, Moon, Unplug } from 'lucide-react';
 import { useChat, go, toast, errorText, ask, RESTRICTED_TEXT } from './store.js';
-import { initials } from './Parts.jsx';
+import { initials } from './initials.js';
 import { reconnect, joinCommunity, removeInstance } from './instances.js';
-import { joinLabel, joinHint } from './Community.jsx';
+import { joinLabel, joinHint } from './community.js';
 import { startSignIn, signOutHome } from './session.js';
-import { HomeserverLogin, useHomeSession } from './HomeserverLogin.jsx';
-import { signOut, savedAccounts, switchTo } from './ProfilePopout.jsx';
-import { siteHref } from './hosts.js';
+import { HomeserverLogin } from './HomeserverLogin.jsx';
+import { useHomeSession } from './homeSessions.js';
+import { signOut, savedAccounts, switchTo } from './profileActions.js';
 import { StatusLink } from './StatusLink.jsx';
 import { statusIdForHost } from './status.js';
 import { homeDomainOf } from './homeservers.js';
 import { serverOfInst } from './addresses.js';
 import { K } from './ids.js';
+import { lockText, SUPPORT_URL } from './gateText.jsx';
+import { RetryIn } from './RetryIn.jsx';
 
-export const SUPPORT_URL = 'https://nookara.cc/support';
-// where the birthday is set (Nookara account settings; a website session, the Ember token can't set it)
-export const BIRTHDAY_URL = siteHref('/me#settings/birthday');
-
-// The lockout notice by reason (store.js lockReason). Staff restrictions keep the old wording; Nookara's birthday gate
-// (no birthday yet / under the minimum age for their region) says what to do instead.
-export function lockText(reason) {
-  if (reason === 'birthday_required') return {
-    icon: <Cake size={34} />, title: 'Set your birthday to use Ember',
-    text: 'Ember and direct messages are off until you add your date of birth in your Nookara account settings. Only you can see it. Ember unlocks as soon as it is saved.',
-    action: <a className="btn btn-primary" href={BIRTHDAY_URL} target="_blank" rel="noopener noreferrer"><Cake size={15} /> Set your birthday <ExternalLink size={13} /></a>,
-  };
-  if (reason === 'under_minimum_age') return {
-    icon: <Ban size={34} />, title: "Ember isn't available for your account",
-    text: "You're under the minimum age for chat in your region, so Ember and direct messages are off. The rest of your Nookara account works as usual. Contact Nookara support if your birthday is wrong.",
-    action: <a className="btn btn-primary" href={SUPPORT_URL} target="_blank" rel="noopener noreferrer"><LifeBuoy size={15} /> Nookara support</a>,
-  };
-  return {
-    icon: <Ban size={34} />, title: 'Ember is switched off',
-    text: `${RESTRICTED_TEXT} Contact Nookara support if you think this is a mistake.`,
-    action: <a className="btn btn-primary" href={SUPPORT_URL} target="_blank" rel="noopener noreferrer"><LifeBuoy size={15} /> Nookara support</a>,
-  };
-}
 const dialog = (kind, extra) => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind, ...extra } }));
 
 function Box({ icon, spin, title, children }) {
@@ -72,14 +51,6 @@ export function LockedScreen() {
       </div>
     </Box>
   );
-}
-
-// "retrying in 12 s" (it never gives up; the network / tab coming back tries at once too)
-export function RetryIn({ at, busy }) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
-  const s = Math.max(0, Math.ceil(((at || 0) - now) / 1000));
-  return <small>{busy || !at || !s ? 'Trying again...' : `Retrying in ${s} s`}</small>;
 }
 
 // The login screen: nookara.cc (the default homeserver) or another one. Signed in on a homeserver already (and not with

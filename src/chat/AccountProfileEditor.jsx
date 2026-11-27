@@ -10,7 +10,7 @@ import { useChat, lookup, ask, toast, errorText, loadMembers } from './store.js'
 import { serverOfInst } from './addresses.js';
 import { PopoutCard } from './ProfilePopout.jsx';
 import { pictureAccept } from './accept.js';
-import { cropToBlob } from './ServerProfileEditor.jsx';
+import { cropToBlob } from './serverProfile.js';
 import { getAccountProfile, saveAccountProfile, setAccountPicture, copyFromNookara, syncAccountProfile } from './accountProfile.js';
 import { follows } from './accountProfileCore.js';
 

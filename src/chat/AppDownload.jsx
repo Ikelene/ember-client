@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 import { Download, Monitor, Laptop, Smartphone, Terminal, Package, Box, Archive } from 'lucide-react';
 import { openSite, siteHref } from './hosts.js';
 import { Dialog } from './Dialogs.jsx';
-import { isDesktopApp } from './EmberLogo.jsx';
+import { isDesktopApp } from './emberLogo.js';
 import { isMobileDevice } from './store.js';
 import { APP_TARGETS, detectAppTarget, linuxDownloads } from './appDownloadInfo.js';
 import { mobileBridge } from '../compat.js';

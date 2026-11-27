@@ -69,7 +69,7 @@ export async function renamePersonalEmoji(eid, name) {
   return loadPersonalEmojis();
 }
 export async function deletePersonalEmoji(eid) {
-  try { await apiFetch(`/chat/personal-emojis/${encodeURIComponent(eid)}`, { method: 'DELETE' }); (await import('./EmojiPicker.jsx')).forgetRecent(eid); }
+  try { await apiFetch(`/chat/personal-emojis/${encodeURIComponent(eid)}`, { method: 'DELETE' }); (await import('./emojiData.js')).forgetRecent(eid); }
   catch (e) { toast(msg(e)); }
   return loadPersonalEmojis();
 }

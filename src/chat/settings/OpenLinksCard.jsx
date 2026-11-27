@@ -5,14 +5,10 @@ import { useState } from 'react';
 import { Link2 } from 'lucide-react';
 import { toast } from '../store.js';
 import { clientUrl } from '../hosts.js';
-import { desktopBridge } from '../../compat.js';
+import { canOpenLinks } from './openLinks.js';
 
 const SCHEME = 'web+ember';
 const DONE_KEY = 'ember_link_handler';
-export function canOpenLinks() {
-  if (typeof navigator === 'undefined' || typeof navigator.registerProtocolHandler !== 'function' || desktopBridge()?.isDesktop) return false;
-  return location.protocol === 'https:' || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
-}
 export function OpenLinksCard() {
   const [done, setDone] = useState(() => { try { return localStorage.getItem(DONE_KEY) === location.origin; } catch { return false; } });
   if (!canOpenLinks()) return null;

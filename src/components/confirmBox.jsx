@@ -2,17 +2,12 @@
 // <ConfirmHost /> is mounted once in App.jsx.
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-
-let show = null; // set by the mounted host
-export function confirmBox(text, opts = {}) {
-  if (!show) return Promise.resolve(window.confirm(text)); // no host on this page (shouldn't happen)
-  return new Promise(resolve => show({ text, ...opts, resolve }));
-}
+import { setConfirmHost } from './confirm.js';
 
 export function ConfirmHost() {
   const [q, setQ] = useState(null);
   const [closing, setClosing] = useState(false);
-  useEffect(() => { show = o => { setClosing(false); setQ(o); }; return () => { show = null; }; }, []);
+  useEffect(() => { setConfirmHost(o => { setClosing(false); setQ(o); }); return () => setConfirmHost(null); }, []);
   useEffect(() => {
     if (!q) return undefined;
     const k = e => { if (e.key === 'Escape') answer(false); };

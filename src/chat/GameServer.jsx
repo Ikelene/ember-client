@@ -12,20 +12,16 @@ import {
 import { apiFetch } from '../api.js';
 import { useChat, toast, errorText, ask, refreshServer, getState } from './store.js';
 import { Dialog } from './Dialogs.jsx';
-import { has, P } from './roles.jsx';
+import { has, P } from './perms.js';
 import { Avatar } from './Profile.jsx';
 import { stampOf } from './text.jsx';
 import { instOf, instOpt, isInst } from './ids.js';
-import { usePlan, PlanGate } from './PlanGate.jsx';
+import { PlanGate } from './PlanGate.jsx';
+import { usePlan } from './plans.js';
 import { isEmberSource, GAME_CLI, legacyToNew } from '../compat.js';
+import { GAME_ERRORS } from './gameErrors.js';
 
 // ── small helpers ────────────────────────────────────────────────────────────
-export const GAME_ERRORS = {
-  instance_not_linked: "That Minecraft server isn't linked to this Ember server.", already_linked: 'That Minecraft server is already linked.',
-  too_many_instances: 'An Ember server can link up to 10 Minecraft servers.', console_needs_ember: 'Commands can only be run from Ember itself.',
-  not_a_console: "This isn't a console channel.", claim_not_found: 'That code is gone - get a new one.', empty_command: 'Type a command first.',
-  bad_purpose: 'Pick what the channel is for.', not_linked: "That server isn't linked any more.", not_a_game_channel: "That isn't a game server channel.",
-};
 const errText = code => GAME_ERRORS[legacyToNew(code)] || errorText(code);
 const PLATFORM_LABEL = { paper: 'Paper', spigot: 'Spigot', fabric: 'Fabric', velocity: 'Velocity', forge: 'Forge' };
 const PURPOSE_LABEL = { info: 'Join info', console: 'Console', chat: 'Synced chat' };

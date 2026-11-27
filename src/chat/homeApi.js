@@ -6,7 +6,7 @@ import { apiFetch } from '../api.js';
 import { registry } from './ids.js';
 import { useChat } from './store.js';
 import { homeFetch, getSession, sessions, popupRedirectUri, HomeserverError } from './homeserver.js';
-import { useHomeSession } from './HomeserverLogin.jsx';
+import { useHomeSession } from './homeSessions.js';
 import { checkLinkMessage } from './homeAdmin.js';
 
 const NONE = [];

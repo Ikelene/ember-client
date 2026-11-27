@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Search, Bot, ArrowLeft, ExternalLink, Link2, ShieldCheck, Tag, Flag } from 'lucide-react';
 import { useChat } from './store.js';
 import { BotTag, AddBotButton, TrustedIn } from './Bots.jsx';
-import { GALLERY_PERMS } from './BotGalleryDev.jsx';
+import { GALLERY_PERMS } from './botGallery.js';
 import { getToken } from '../api.js';
 import { EMBER_API } from '../compat.js';
 

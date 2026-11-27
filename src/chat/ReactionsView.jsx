@@ -1,31 +1,18 @@
 // Who reacted: the little stacked faces on a reaction chip, and the "View Reactions" dialog (right-click a message or a chip).
 // Nookara DMs / groups carry every reactor's name; server messages only the first 25, so an Ember server is asked for the
 // whole list (GET /messages/:id/reactions, with each person's face). Old Nookara-hosted servers keep the 25 (no new features there).
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { apiFetch } from '../api.js';
-import { useChat, lookupMany, useFace } from './store.js';
+import { useChat, useFace } from './store.js';
 import { instOpt } from './ids.js';
 import { reactionId, reactionBase } from './msg-actions.js';
-import { Avatar, useProfiles } from './Profile.jsx';
-import { ReactionEmoji, reactionName } from './Reactions.jsx';
-
-// names -> faces: the server's member list when it has them, else Nookara's public profiles (looked up in batches)
-export function useNameFaces(names, sid) {
-  const people = useChat(s => s.people);
-  const members = useChat(s => (sid ? s.members[sid] : null));
-  const key = names.join('\n');
-  useEffect(() => {
-    const miss = names.filter(n => !people[n] && !members?.some(m => m.username === n));
-    if (miss.length) lookupMany(miss).catch(() => {});
-  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
-  return useMemo(() => names.map(n => {
-    const mem = members?.find(m => m.username === n);
-    const p = people[n];
-    return { username: n, ...(mem || {}), pfp: mem?.pfp || p?.pfp || null, display_name: mem?.display_name || p?.display_name || null };
-  }), [key, people, members]); // eslint-disable-line react-hooks/exhaustive-deps
-}
+import { Avatar } from './Profile.jsx';
+import { useProfiles } from './profiles.jsx';
+import { ReactionEmoji } from './Reactions.jsx';
+import { reactionName } from './reactions.js';
+import { useNameFaces } from './reactionsView.js';
 
 function Face({ u, size }) {
   const f = useFace(u);
@@ -44,10 +31,6 @@ export function ReactorFaces({ r, sid }) {
       {r.count > 3 && <span className="vc-react-more">+{r.count - 2}</span>}
     </span>
   );
-}
-
-export function openReactionsView(m, emoji) {
-  dispatchEvent(new CustomEvent('vc-reactions-view', { detail: { m, emoji: emoji || null } }));
 }
 
 export function ReactionsViewHost() {
@@ -124,4 +107,3 @@ function Person({ u, r, sid, onPick }) {
     </button>
   );
 }
-

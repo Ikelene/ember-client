@@ -6,9 +6,7 @@ import { ScrollText, TriangleAlert } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { useChat, toast, errorText } from './store.js';
 import { instOf, isInst } from './ids.js';
-
-export const OPERATOR_TERMS_URL = 'https://nookara.cc/operator-terms';
-export const OPERATOR_TERMS_VERSION = '1.0';
+import { OPERATOR_TERMS_URL } from './operatorTerms.js';
 
 export const TermsLink = ({ children = 'Ember Server Operator Terms' }) => <a href={OPERATOR_TERMS_URL} target="_blank" rel="noreferrer">{children}</a>;
 

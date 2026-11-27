@@ -8,9 +8,10 @@ import { Dialog } from './Dialogs.jsx';
 import { apiFetch, getToken } from '../api.js';
 import { useChat, go, loadMembers } from './store.js';
 import { bare, normOrigin, NOOKARA } from './ids.js';
-import { moderate } from './roles.jsx';
-import { useAddTargets, errText } from './Bots.jsx';
+import { moderate } from './perms.js';
+import { useAddTargets, errText } from './bots.js';
 import { EMBER_API, ADMIN_EMBER_API } from '../compat.js';
+import { addCalls } from './botTest.js';
 
 const STATE = { pending: 'Pending', private: 'Private (not submitted)', rejected: 'Rejected', delisted: 'Delisted', approved: 'Approved', banned: 'Banned' };
 const EXTRA = {
@@ -21,13 +22,6 @@ const EXTRA = {
 const why = e => EXTRA[e?.message] || errText(e);
 const when = ms => (ms ? new Date(ms).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-');
 const mono = { fontFamily: 'monospace', fontSize: 12 };
-
-// the two API examples for the "Advanced (API)" box: bash and PowerShell
-export function addCalls(origin, ticket) {
-  const bash = `curl -X POST ${origin}/api/v1/bots/gallery/add \\\n  -H "Authorization: Bearer <your session on that instance>" -H "Content-Type: application/json" \\\n  -d '{"ticket":"${ticket}","sid":"<server id on that instance>"}'`;
-  const ps = `$h = @{ Authorization = "Bearer <your session on that instance>" }\n$body = @{ ticket = "${ticket}"; sid = "<server id on that instance>" } | ConvertTo-Json\nInvoke-RestMethod -Method Post -Uri "${origin}/api/v1/bots/gallery/add" -Headers $h -ContentType "application/json" -Body $body`;
-  return { bash, ps };
-}
 
 function Advanced({ id }) {
   const [inst, setInst] = useState('');

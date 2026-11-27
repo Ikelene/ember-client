@@ -7,30 +7,18 @@ import { ChevronRight, Globe, Plus, Server, TriangleAlert, LogIn, AtSign, Users 
 import { apiFetch } from '../api.js';
 import { EMBER_API } from '../compat.js';
 import { loadDirectory } from './directory.js';
-import { pickListed, isListedAdded } from './DiscoverPage.jsx';
+import { pickListed, isListedAdded } from './discover.js';
 import { joinTarget } from './joinInput.js';
 import { HomeChip } from './homeLabels.jsx';
 import { Dialog } from './Dialogs.jsx';
-import { initials } from './Parts.jsx';
+import { initials } from './initials.js';
 import { useChat, go, toast } from './store.js';
-import { K, normOrigin } from './ids.js';
+import { K } from './ids.js';
 import { discover, addInstance, nookaraSession, instanceConn, loadInstanceData, hostOf, canHomeConnect, homeConnect, nookaraSignsIn, joinByAddress } from './instances.js';
 import { hasNookara } from './session.js';
-import { currentSession, currentOrigin } from './homeserver.js';
 import { discoveryDoc } from './homeApi.js';
 import { isV2, slugIssue, slugFrom, createErrorText } from './addresses.js';
-
-// the homeservers a server can be made on: [{ origin, domain, name, icon, count, listed }]
-export function createHosts(instances) {
-  const out = (instances || []).filter(i => i.v2).map(i => ({
-    origin: i.origin, domain: i.homeserver?.domain || i.host, name: i.homeserver?.name || i.name, icon: i.homeserver?.icon_url || i.icon || null, listed: true,
-  }));
-  let home = null;
-  try { const o = normOrigin(currentOrigin()), s = currentSession(); if (o && s) home = { origin: o, domain: s.account?.domain || hostOf(o), name: s.account?.domain || hostOf(o), icon: null, listed: false, home: true }; } catch { /* no homeserver sign-in */ }
-  if (home) { const at = out.find(h => h.origin === home.origin); if (at) at.home = true; else out.unshift(home); }
-  return out;
-}
-export const useCreateHosts = () => createHosts(useChat(s => s.instances));
+import { useCreateHosts } from './createHosts.js';
 
 const POLICIES = [['open', 'Anyone can join'], ['request', 'People ask to join'], ['invite', 'Only with an invite']];
 

@@ -6,7 +6,7 @@
 import { apiFetch } from '../api.js';
 import { getState } from './store.js';
 import { isInst } from './ids.js';
-import { P, has } from './roles.jsx';
+import { P, has } from './perms.js';
 import { isPersonalEmoji, isMyPersonalSticker, LOCK_TOAST } from './personal.js';
 
 export { LOCK_TOAST };

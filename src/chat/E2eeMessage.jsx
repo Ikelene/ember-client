@@ -4,7 +4,8 @@ import { Lock, LockOpen, AlertTriangle, Clock, File as FileIcon, Download, Link2
 import { useChat, openE2eeGate, dismissKeyChange, dropFailed, useBotPeer, waitingNames, rewrapDm } from './store.js';
 import { nameList, memberName } from './e2ee/homedm.js';
 import { LinkEmbeds } from './LinkEmbeds.jsx';
-import { openSafety, openSafetyId, E2eeLockedPanel } from './E2ee.jsx';
+import { E2eeLockedPanel } from './E2ee.jsx';
+import { openSafety, openSafetyId } from './e2eeSafety.js';
 import * as E2EE from './e2ee/session.js';
 import { opensByItself, autoMax } from './e2ee/files.js';
 import { shownName } from './spoiler.js';

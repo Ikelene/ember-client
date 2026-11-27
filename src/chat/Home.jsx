@@ -7,9 +7,11 @@ import { MessageCircle, UserPlus, Check, X, House, Users, Inbox, ShieldOff, User
 import { apiFetch } from '../api.js';
 import { useChat, go, fullHandle, loadFriends, toast, errorText, ask, toggleBlock, setHomeRequests, addSocialFriend, socialFriendAction, startSocialDm } from './store.js';
 import { accountName, shownHandle, dmTitle, dmUnread, cleanHandle, nookaraDmRows } from './social.js';
-import { PersonCard, DmFace, face } from './SocialHome.jsx';
+import { PersonCard, DmFace } from './SocialHome.jsx';
+import { face } from './socialHome.js';
 import { NameText, displayNameOf } from './displayNames.js';
-import { Avatar, subtitle } from './Profile.jsx';
+import { Avatar } from './Profile.jsx';
+import { subtitle } from './profiles.jsx';
 import { NookaraConnNote } from './Parts.jsx';
 import Dashboard from './Dashboard.jsx';
 import { SavedList } from './SidePanel.jsx';

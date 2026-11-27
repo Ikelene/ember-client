@@ -8,7 +8,8 @@ import { apiFetch, uploadFetch, downloadFetch } from '../api.js';
 import { useChat, toast, errorText, ask, go } from './store.js';
 import { hasNookara } from './session.js';
 import { normOrigin } from './ids.js';
-import { usePlan, PlanGate, PlanNotice, PlanUsage } from './PlanGate.jsx';
+import { PlanGate, PlanNotice, PlanUsage } from './PlanGate.jsx';
+import { usePlan } from './plans.js';
 import { EMBER_API } from '../compat.js';
 
 const when = t => new Date(t).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });

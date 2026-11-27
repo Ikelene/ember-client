@@ -5,7 +5,8 @@
 //  - the desktop app: a new version is downloading (progress) -> once it's in, Restart to update
 import { useEffect, useState } from 'react';
 import { RotateCw, X, Download } from 'lucide-react';
-import { EmberLogo, isDesktopApp } from './EmberLogo.jsx';
+import { EmberLogo } from './EmberLogo.jsx';
+import { isDesktopApp } from './emberLogo.js';
 import { COMMIT, isRelease, sameCommit, latestCommit, servedCommit } from '../version.js';
 import { desktopBridge } from '../compat.js';
 

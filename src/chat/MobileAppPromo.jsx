@@ -3,9 +3,9 @@
 // away by itself. Never shown in the Android app, the desktop app, or on a computer.
 import { useEffect, useState } from 'react';
 import { Smartphone, Download, X } from 'lucide-react';
-import { isDesktopApp } from './EmberLogo.jsx';
+import { isDesktopApp } from './emberLogo.js';
 import { isMobileDevice } from './store.js';
-import { dialog } from './Parts.jsx';
+import { dialog } from './dialogs.js';
 import { EMBER_ASSETS, mobileBridge, ANDROID_UA } from '../compat.js';
 
 const KEY = 'bf_app_promo';

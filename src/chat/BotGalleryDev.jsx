@@ -1,29 +1,15 @@
 // A bot's gallery listing, in the developer's bot list: status, the listing form, submit / resubmit / withdraw, review message.
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronUp, Send, Save, Undo2, Plus, X, BadgeCheck, Clock, Lock, Ban, CircleAlert, EyeOff } from 'lucide-react';
+import { ChevronDown, ChevronUp, Send, Save, Undo2, Plus, X } from 'lucide-react';
 import { apiFetch } from '../api.js';
-import { confirmBox } from '../components/confirmBox.jsx';
+import { confirmBox } from '../components/confirm.js';
+import { STATE_INFO, SHORT_MIN, SHORT_MAX, LONG_MIN, GALLERY_PERMS } from './botGallery.js';
 
-export const GALLERY_PERMS = [
-  ['send_messages', 'Send messages'], ['attach_files', 'Attach files'], ['manage_channels', 'Manage channels'], ['manage_server', 'Manage server'],
-  ['manage_roles', 'Manage roles'], ['kick_members', 'Kick members'], ['ban_members', 'Ban members'], ['manage_messages', 'Manage messages'],
-  ['mention_everyone', 'Mention everyone'], ['administrator', 'Administrator'],
-];
-
-export const STATE_INFO = {
-  private: { label: 'Private', Icon: Lock, hint: 'Only you can add it.' },
-  pending: { label: 'Pending review', Icon: Clock, hint: 'Waiting for Nookara staff to look at it.' },
-  approved: { label: 'Approved', Icon: BadgeCheck, hint: 'Listed in the gallery with a Verified checkmark.' },
-  rejected: { label: 'Rejected', Icon: CircleAlert, hint: 'Staff sent it back. Fix what they said and submit it again.' },
-  delisted: { label: 'Delisted', Icon: EyeOff, hint: 'Staff took it out of the gallery. You can submit it again.' },
-  banned: { label: 'Banned', Icon: Ban, hint: 'This bot can not be listed.' },
-};
 export function StateChip({ state }) {
   const i = STATE_INFO[state] || STATE_INFO.private;
   return <span className={`bg-state ${state || 'private'}`} title={i.hint}><i.Icon size={12} /> {i.label}</span>;
 }
 
-export const SHORT_MIN = 10, SHORT_MAX = 200, LONG_MIN = 20;
 // first sentence (or ~160 chars) of the long description, offered as the short one
 const suggestShort = long => {
   const t = (long || '').replace(/\s+/g, ' ').trim();

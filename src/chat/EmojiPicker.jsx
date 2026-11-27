@@ -3,34 +3,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Clock, Smile, Users, Cat, Apple, Plane, Trophy, Lightbulb, Heart, Flag, Upload, Trash2, UserRound, Sticker } from 'lucide-react';
 import { apiFetch, uploadFetch } from '../api.js';
-import { useChat, getState, loadEmojis, toast, errorText, customEmoji } from './store.js';
+import { useChat, getState, loadEmojis, toast, errorText } from './store.js';
 import { imgHint, warnImage } from './imgHints.js';
 import { isInst } from './ids.js';
-import { Twemoji, shortName, allNames } from './emoji.jsx';
-import { usePlan, PlanGate, PlanNotice, PlanUsage } from './PlanGate.jsx';
+import { Twemoji } from './emoji.jsx';
+import { shortName, allNames } from './emojiNames.js';
+import { PlanGate, PlanNotice, PlanUsage } from './PlanGate.jsx';
+import { usePlan } from './plans.js';
 import { emojiMenuItems } from './cloneEmoji.js';
 import { loadPersonalEmojis, loadStickers, loadPersonalStickers } from './personal.js';
-import { openMenu } from './Menu.jsx';
+import { openMenu } from './menus.js';
 import { CloneSetting } from './PersonalPages.jsx';
 import { pictureAccept } from './accept.js';
+import { recents, dataSync, loadData, emojiToken } from './emojiData.js';
 
 const GROUPS = [
   [0, 'Smileys', Smile], [1, 'People', Users], [3, 'Animals and nature', Cat], [4, 'Food and drink', Apple],
   [5, 'Travel and places', Plane], [6, 'Activities', Trophy], [7, 'Objects', Lightbulb], [8, 'Symbols', Heart], [9, 'Flags', Flag],
 ];
-let dataP = null;
-let dataSync = null;
-const loadData = () => (dataP ||= fetch('/assets/emoji/emoji.json').then(r => r.json()).then(d => { dataSync = d; return d; }).catch(() => { dataP = null; return []; }));
-export const loadEmojiData = loadData;
-export const emojiDataSync = () => dataSync;
-export const emojiToken = e => `<${e.animated ? 'a' : ''}:${e.name}:${e.eid}>`;
-export const emojiUrl = customEmoji;
 
-function recents() { try { return JSON.parse(localStorage.getItem('nookara_chat_emoji_recent') || '[]'); } catch { return []; } }
-// a custom emoji you deleted from your personal emojis leaves Recent for good (personal.js deletePersonalEmoji)
-export function forgetRecent(eid) {
-  try { localStorage.setItem('nookara_chat_emoji_recent', JSON.stringify(recents().filter(r => !r.c || r.c.eid !== eid))); } catch { /* fine */ }
-}
 function addRecent(item) {
   try { localStorage.setItem('nookara_chat_emoji_recent', JSON.stringify([item, ...recents().filter(x => x.k !== item.k)].slice(0, 24))); } catch { /* fine */ }
 }

@@ -4,17 +4,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Minimize, PictureInPicture2, Loader2, RotateCcw, Music } from 'lucide-react';
 import { peaksOf, seededPeaks, voiceSeconds } from './voice-note.js';
+import { fmtTime } from './fmtTime.js';
 
 const VOL_KEY = 'ember_media_volume';
 const savedVol = () => { try { const v = JSON.parse(localStorage.getItem(VOL_KEY) || 'null'); return v && typeof v.volume === 'number' ? v : { volume: 0.8, muted: false }; } catch { return { volume: 0.8, muted: false }; } };
 const saveVol = (volume, muted) => { try { localStorage.setItem(VOL_KEY, JSON.stringify({ volume, muted })); } catch { /* fine */ } };
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
-export const fmtTime = s => {
-  if (!Number.isFinite(s)) return '0:00';
-  s = Math.max(0, Math.floor(s));
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-  return h ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${m}:${String(sec).padStart(2, '0')}`;
-};
 
 function useMedia(ref) {
   const [st, setSt] = useState({ playing: false, time: 0, duration: 0, buffered: 0, waiting: false, ended: false, rate: 1, ...savedVol() });

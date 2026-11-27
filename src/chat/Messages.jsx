@@ -1,16 +1,16 @@
 import { siteHref } from './hosts.js';
 // The conversation: messages (grouped by person, with day dividers), the composer and who's typing.
 import { SAVEABLE } from './uploadLinks.js';
-import { saveMedia } from './mediaDownload.js';
 import { canAttachInChannel } from './attachment-permissions.js';
 import { apiFetch } from '../api.js';
 import { instOpt, isInst, instOf, NOOKARA } from './ids.js';
 import { isLegacyMessage } from './tokens.js';
 import { sigId } from './signing.js';
 import { VideoPlayer, AudioPlayer, VoicePlayer } from './MediaPlayer.jsx';
-import { useVoiceRecorder, VoiceBar } from './VoiceNote.jsx';
+import { VoiceBar } from './VoiceNote.jsx';
+import { useVoiceRecorder } from './voiceRecorder.js';
 import { holdOutcome, isVoiceAtt, isVoiceLink } from './voice-note.js';
-import { viewMedia } from './MediaViewer.jsx';
+import { viewMedia } from './mediaViewer.js';
 import { Fragment, createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { AudioLines, Eye, EyeOff, Reply, Pencil, Trash2, Copy, Plus, X, SmilePlus, Lock, SendHorizontal, AlertCircle, ImageIcon, CornerUpRight, Music, Film, ArrowRight, ArrowLeft, Webhook, Phone, Pin, ChevronUp, Star, Upload, CloudUpload, RotateCw, Camera } from 'lucide-react';
@@ -20,31 +20,35 @@ import { SealedPreview } from './LinkEmbeds.jsx';
 import { E2eeMessageNote, OpenedAttachments, PreviewOnAsk, E2eeComposerNotes, E2eeLockedPanel } from './E2eeMessage.jsx';
 import { GameInvites } from './GameInvite.jsx';
 import { inviteSummary } from './gameInvite.js';
-import { PlatformIcon, PLATFORM_NAMES } from './platforms.jsx';
+import { PlatformIcon } from './platforms.jsx';
+import { PLATFORM_NAMES } from './platformNames.js';
 import { GameEventLine } from './GameServer.jsx';
 import { BotTag } from './Bots.jsx';
-import { AliasMark, aliasOf, replyAliasOf, aliasKey, aliasFace, isUnmarked, aliasMemberOf } from './Alias.jsx';
+import { AliasMark } from './Alias.jsx';
+import { aliasOf, replyAliasOf, aliasKey, aliasFace, isUnmarked, aliasMemberOf } from './aliases.js';
 import { CommandPicker, CommandBar, MessageComponents, InteractionLine, Thinking, EphemeralNote } from './Commands.jsx';
 import { slashEntries, matchEntries } from './commands.js';
 import { ViaBadge } from './ClientVia.jsx';
 import { usePronouns } from './pronouns.js';
 import { useName, NameText } from './displayNames.js';
-import { Reactions, QuickReactions, openReactionPicker } from './Reactions.jsx';
+import { Reactions, QuickReactions } from './Reactions.jsx';
+import { openReactionPicker, setReaction } from './reactions.js';
 import MediaPicker, { GifBadge, StarButton } from './MediaPicker.jsx';
 import GlintIntro from './GlintIntro.jsx';
-import { GlintMark, NewTag, loadMyClips, liveClips } from './glint.jsx';
-import EmojiPicker, { loadEmojiData } from './EmojiPicker.jsx';
+import { GlintMark, NewTag } from './glint.jsx';
+import { loadMyClips, liveClips } from './glintApi.js';
+import EmojiPicker from './EmojiPicker.jsx';
+import { loadEmojiData } from './emojiData.js';
 import { useDocked, watchKeyboard, dockHeight, closeKeyboard, withoutKeyboard, useBackCloses } from './pickerDock.js';
 import { TriangleAlert, Shield, Clock, HardDrive } from 'lucide-react';
 import { expiryAt, expiryLabel } from './temp-expiry.js';
-import { tempId, isCdnTemp } from './upload-dest.js';
 import { TempAttPopover } from './TempAttPopover.jsx';
 import { shortDays, daysText } from './temp-pick.js';
 import { viaProxy } from './mediaProxy.js';
 import { Ellipsis, Languages } from 'lucide-react';
 import { saveRef, savedIdOf, saveMessage, unsaveMessage, translate, langName } from './inbox.js';
 import { getLook, subscribeLook } from './look.js';
-import { BookmarkPlus, Smile, File as FileIcon, FileArchive, FileCode, FileText, Download, Coins, MessageSquareQuote, Forward } from 'lucide-react';
+import { BookmarkPlus, Smile, File as FileIcon, Coins, MessageSquareQuote, Forward } from 'lucide-react';
 import { messageCaps, reactionId, pinPath } from './msg-actions.js';
 
 // a "GIF" picture-frame icon (drawn, not text) for the GIF picker button
@@ -61,27 +65,32 @@ function GifIcon() {
 import { packActive } from './messageSounds.js';
 import { playSound, loadEmojis, loadMembers, loadCommands, clearStatusReply, useTimedOut, untilText, dismissEphemeral, useBotPeer } from './store.js';
 import { sendSticker } from './personal.js';
-import { openStickerInfo, stickerMenuItems } from './StickerInfo.jsx';
+import { openStickerInfo, stickerMenuItems } from './stickerInfo.js';
 import { stickerOfBody } from './stickerLink.js';
 import { isMobileDevice, fullHandle } from './store.js';
-import { takeJump, fileKind, uploadMedia, saveToMedia, isMineMsg, loadUploadLimits, getUploadLimits, chooseUploadDest, rememberedUploadDest, tempFileInfo, tempFileInfoNow, onTempInfo, TEMP_LINK } from './store.js';
-import { useStarboardFor, starredByMe, STAR } from './Starboard.jsx';
+import { takeJump, fileKind, uploadMedia, saveToMedia, isMineMsg, loadUploadLimits, getUploadLimits, chooseUploadDest, rememberedUploadDest, tempFileInfo, tempFileInfoNow, TEMP_LINK } from './store.js';
+import { useStarboardFor, starredByMe, STAR } from './starboard.js';
 import { CALL_LINE, callLineText } from './callText.js';
-import { setReaction } from './Reactions.jsx';
 import { getState, useChat, keyOf, loadMessages, sendMessage, setTyping, editMessage, deleteMessage, dropFailed, retryQueued, toast, errorText, dmErrorText, go, openLink, ask, askStripTracking } from './store.js';
 import { cleanText, hasTracking } from './cleanLinks.js';
 import { isSpoiler, spoilerName, shownName, nameInLink } from './spoiler.js';
 import { renderBody, timeOf, stampOf, dayOf } from './text.jsx';
 import { embedLabel } from './inviteLink.js';
-import { fmtSize, RISKY, KIND_OF } from './fileKinds.js';
+import { fmtSize, KIND_OF } from './fileKinds.js';
 import { Avatar, BlockedMark } from './Profile.jsx';
-import { messageMenu, userMenu, openMenu } from './Menu.jsx';
+import { messageMenu, userMenu, openMenu } from './menus.js';
 import { useScope, mentionsMe as isMention, useFace, wantNookaraFaces, useBlocked, blockedFace, isBlockedName, faceOf, BLOCKED_NAME, bridgedTyper } from './store.js';
-import { useNameStyle, colorFrom, NameDecor, P, has } from './roles.jsx';
-import { suggestQuery, useSuggestItems, MentionPicker, encodeRoleMentions } from './Mentions.jsx';
+import { NameDecor } from './roles.jsx';
+import { useNameStyle, colorFrom, P, has } from './perms.js';
+import { MentionPicker } from './Mentions.jsx';
+import { suggestQuery, useSuggestItems, encodeRoleMentions } from './mentions.js';
 import { serialize, fill, caretToEnd, caretText, replaceBeforeCaret, insertAt, resolveWord, markdownShortcut, styleMarkdown } from './richInput.js';
 import { pictureAccept } from './accept.js';
-import { CLIPBOARD_PATH, isNookara, nookaraId, mobileBridge, downloadsBridge, MEDIA_PASTE_EVENTS } from '../compat.js';
+import { CLIPBOARD_PATH, isNookara, nookaraId, mobileBridge, MEDIA_PASTE_EVENTS } from '../compat.js';
+import { KLIPY_PAGE } from './linkPatterns.js';
+import { useTempTick, useTempFile } from './tempFile.js';
+import { hoverSubs, hovId, setHovered } from './hovered.js';
+import { FileCard, ExpiredFile } from './FileCard.jsx';
 
 const GROUP_MS = 7 * 60 * 1000;
 
@@ -96,8 +105,6 @@ const markdownMarker = e => {
 };
 
 const KLIPY = /^https:\/\/([a-z0-9-]+\.)*klipy\.com\//i;
-// a klipy.com/gifs/<name> page link: Nookara asks Klipy's API for the GIF (their site blocks scrapers)
-export const KLIPY_PAGE = /^https:\/\/(?:www\.)?klipy\.com\/(gifs|stickers|clips)\/([\w-]{1,160})\/?(?:\?\S*)?$/i;
 const klipyPages = new Map(); // page url -> { url, width, height, title } | { url: null }
 function KlipyPageGif({ url }) {
   const [g, setG] = useState(() => klipyPages.get(url));
@@ -118,29 +125,6 @@ function KlipyPageGif({ url }) {
     </a>
   );
 }
-// a file (zip, pdf, exe...): what it is, its name + size, and a Download button. Programs / scripts ask first.
-// a file in Nookara's temporary storage: { left: 'N days' } while it's there, 'gone' once it expired, null = don't know (yet)
-const leftText = s => (s < 3600 ? 'under an hour' : s < 86400 ? `${Math.round(s / 3600)} hours` : `${Math.round(s / 86400)} days`);
-// re-renders when the answers for these temporary-storage links arrive or change; `enabled` = start asking (a message scrolled into view)
-function useTempTick(urls, enabled) {
-  const [, bump] = useState(0);
-  const key = urls.join('\n');
-  useEffect(() => {
-    const ids = new Set(urls.map(tempId).filter(Boolean));
-    if (!ids.size || !enabled) return undefined;
-    const off = onTempInfo(id => { if (ids.has(id)) bump(n => n + 1); });
-    urls.forEach(u => tempFileInfo(u));
-    return off;
-  }, [key, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
-}
-export function useTempFile(url, enabled = true) {
-  const temp = TEMP_LINK.test(String(url || ''));
-  useTempTick(temp ? [url] : [], enabled);
-  const info = temp ? tempFileInfoNow(url) : null;
-  if (!temp || !info) return null;
-  if (info === 'gone') return 'gone';
-  return { left: leftText(Math.max(0, info.expires_in - (Date.now() - info.at) / 1000)), ttl: info.ttl_days };
-}
 // "Expires Nov 29, 2026" for the temporary files of one message (null until all answers are in, and when none is left)
 function useExpiryLabel(urls, enabled) {
   useTempTick(urls, enabled);
@@ -148,41 +132,6 @@ function useExpiryLabel(urls, enabled) {
   const infos = urls.map(tempFileInfoNow);
   if (infos.some(i => i === undefined)) return null;
   return expiryLabel(infos.map(i => expiryAt(i)), { now: Date.now(), locale: navigator.language });
-}
-export function ExpiredFile({ name }) {
-  return <div className="vc-filecard vc-att-expired"><FileIcon size={18} /><span><b>{shownName(name) || 'File'}</b><small>This file expired. Temporary files are deleted after a set time.</small></span></div>;
-}
-export function FileCard({ a, live = true }) {
-  const name = shownName((() => { try { return decodeURIComponent(a.name || a.url.split('/').pop()); } catch { return a.name || 'file'; } })());
-  const ext = (/\.([a-z0-9]{1,10})$/i.exec(name)?.[1] || /\.([a-z0-9]{1,10})$/i.exec(a.url)?.[1] || '').toLowerCase();
-  const risky = RISKY.test(ext);
-  const temp = useTempFile(a.url, live);
-  // A temporary file in the CDN bucket ignores ?dl=1 (nothing runs in front of the bucket), and a plain-text one would open in the tab instead of
-  // downloading: those are fetched and saved with their real name (mediaDownload.js, the same path the picture viewer uses; the Android app
-  // hands the https link to Download Manager). A /t/ link keeps ?dl=1. If the fetch is refused, the link opens in a new tab instead.
-  const cdn = isCdnTemp(a.url);
-  const dl = /^https:\/\/files\.catbox\.moe\/[\w-]+\.[a-z0-9]{1,8}$/i.test(a.url) ? `/chat/dl?u=${encodeURIComponent(a.url)}&n=${encodeURIComponent(name)}`
-    : TEMP_LINK.test(a.url) && !cdn ? `${a.url.split(/[?#]/)[0]}?dl=1` : a.url;
-  const fetchDl = () => saveMedia(a.url, name).catch(() => { toast("Couldn't save it directly - opening it instead."); window.open(a.url, '_blank', 'noopener,noreferrer'); });
-  const open = async e => {
-    const inApp = !!downloadsBridge()?.postMessage; // the Android app saves it with its real name instead of the link's
-    if (!risky && !cdn && !inApp) return; // the link just downloads
-    e.preventDefault();
-    if (risky && !(await ask({ title: 'Download this program?', text: `${name} can run code on your computer. Only open files from people you trust.`, confirm: 'Download' }))) return;
-    if (cdn || inApp) fetchDl(); else location.href = dl;
-  };
-  if (temp === 'gone') return <ExpiredFile name={name} />;
-  const Ico = /^(zip|rar|7z|tar|gz|xz|bz2)$/.test(ext) ? FileArchive : /^(js|ts|jsx|tsx|py|json|html|css|c|cpp|cs|java|lua|sb3|pmp|sh|ps1)$/.test(ext) ? FileCode : /^(txt|md|pdf|doc|docx|rtf|odt|log)$/.test(ext) ? FileText : FileIcon;
-  return (
-    <div className="vc-filecard">
-      <span className="vc-filecard-ico"><Ico size={26} />{ext && <b>{ext.slice(0, 4)}</b>}</span>
-      <div className="vc-filecard-txt">
-        <a className="vc-filecard-name" href={dl} download={name} onClick={open} title={name}>{name}</a>
-        <small>{[KIND_OF(ext), fmtSize(a.size)].filter(Boolean).join(' - ')}{temp?.left && <span className="vc-filecard-exp" title={`Temporary file: deleted ${temp.left} from now`}> - expires in {temp.left}</span>}</small>
-      </div>
-      <a className="vc-filecard-dl" href={dl} download={name} onClick={open} title={`Download ${name}`}><Download size={16} /><span>Download</span></a>
-    </div>
-  );
 }
 // temps: more temporary-storage links that count for the expiry footer (encrypted DM files: they show from a local copy, opened or not)
 function Attachments({ list: all, extra = [], m, temps = [] }) {
@@ -436,11 +385,6 @@ function messageInfo(m) {
   ask({ title: 'Message info', text, confirm: au.id ? 'Copy author ID' : 'OK', cancel: 'Close' })
     .then(ok => { if (ok && au.id) navigator.clipboard?.writeText(String(au.id)).then(() => toast('Author ID copied', true)).catch(() => {}); });
 }
-// one hover toolbar per message list: it glides to the message under the mouse instead of each message drawing its own
-// (MessageList moves it; the hovered Message portals its buttons into it)
-const hoverSubs = new Set();
-let hovId = null;
-export const setHovered = id => { if (id === hovId) return; hovId = id; hoverSubs.forEach(f => f()); };
 const subHover = f => { hoverSubs.add(f); return () => hoverSubs.delete(f); };
 const useHovered = id => useSyncExternalStore(subHover, () => hovId === id);
 // holding Shift turns the hover toolbar into quick Edit + Delete buttons (Delete then skips the "are you sure")

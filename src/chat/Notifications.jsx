@@ -6,6 +6,7 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Bell, Settings, Megaphone, ShieldAlert, Coins, UserPlus, ShoppingBag, Gem, Award, Server, LifeBuoy, UserCheck, MessageCircle, Gift, Info, Star, Heart, CheckCheck } from 'lucide-react';
 import { useChat, getState, loadNotifs, closeNotifs, readNotifs, seeNotifs, followNotifLink } from './store.js';
+import { ago } from './ago.js';
 
 // the category icon names Nookara sends (lucide names) -> the components; anything else is a bell
 const ICONS = {
@@ -19,17 +20,6 @@ export function NotifText({ text }) {
   const parts = String(text || '').split('**');
   const open = parts.length % 2 === 0; // even count = the last ** has no partner
   return parts.map((p, i) => <Fragment key={i}>{i % 2 === 0 ? p : open && i === parts.length - 1 ? `**${p}` : <b>{p}</b>}</Fragment>);
-}
-
-export function ago(t) {
-  const at = new Date(t).getTime();
-  if (!at) return '';
-  const s = Math.max(0, Math.round((Date.now() - at) / 1000));
-  if (s < 60) return 'now';
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  if (s < 7 * 86400) return `${Math.floor(s / 86400)}d`;
-  return new Date(at).toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 export function NotifIcon({ n }) {

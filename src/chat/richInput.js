@@ -3,7 +3,7 @@
 // People and channels are <@id> / <#cid> tokens (tokens.js): only a picked suggestion (or a name typed in full and
 // followed by a space) becomes one, so pasted text like "@yell at me" stays plain text and pings nobody.
 import { getState, customEmoji } from './store.js';
-import { emojiDataSync } from './EmojiPicker.jsx';
+import { emojiDataSync } from './emojiData.js';
 import { userById, channelById, userToken, channelToken, nameOf } from './tokens.js';
 import { NOOKARA, instOf } from './ids.js';
 

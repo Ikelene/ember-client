@@ -3,26 +3,17 @@
 // or a tile (Home > Shortcuts), with the right-click / long-press menu for it. Home shortcuts are the chat setting
 // home_shortcuts on Nookara, so every device has the same ones (live, via chat_settings_changed).
 import { useEffect, useMemo, useState } from 'react';
-import { House, UsersRound, ChevronDown, ChevronLeft, ChevronRight, MessageCircle, Hash } from 'lucide-react';
-import { useChat, getState, go, keyOf, refreshServer, saveSettings, loadSettings, toast, errorText } from './store.js';
-import { openMenu, userMenu } from './Menu.jsx';
-import { Avatar, subtitle } from './Profile.jsx';
+import { UsersRound, ChevronDown, Hash } from 'lucide-react';
+import { useChat, go, keyOf, refreshServer, toast } from './store.js';
+import { openMenu } from './menus.js';
+import { Avatar } from './Profile.jsx';
+import { subtitle } from './profiles.jsx';
 import { NameText } from './displayNames.js';
 import { ServerIcon } from './ServerIcon.jsx';
 import { ChannelIcon } from './roles.jsx';
-import { pinMenuItems, catMenuItems } from './DmPins.jsx';
-import { parseItem, viewKeyOf, cleanPins, cleanShortcuts, toggleShortcut, moveShortcut, MAX_SHORTCUTS } from './dmPinsCore.js';
-
-// ── Home shortcuts ──
-export const getShortcuts = () => cleanShortcuts(getState().settings?.home_shortcuts);
-function setShortcuts(next) {
-  saveSettings({ home_shortcuts: next }).catch(e => { toast(errorText(e?.message)); loadSettings(); });
-}
-export function homeMenuItem(k) {
-  const list = getShortcuts();
-  const on = list.includes(k);
-  return { label: on ? 'Remove from Home' : 'Add to Home', icon: House, disabled: !on && list.length >= MAX_SHORTCUTS, hint: !on && list.length >= MAX_SHORTCUTS ? `Home has ${MAX_SHORTCUTS} already` : '', onClick: () => setShortcuts(toggleShortcut(getShortcuts(), k)) };
-}
+import { parseItem, viewKeyOf, cleanPins, cleanShortcuts } from './dmPinsCore.js';
+import { catMenuItems } from './dmPinActions.js';
+import { itemMenu } from './pinItems.js';
 
 // which categories are folded (this device only; the DM list in Parts.jsx uses the same key)
 const FOLD_KEY = 'ember:dmpins:folded';
@@ -71,22 +62,6 @@ function useItem(k) {
     name: c ? c.name : ch.loading ? 'Loading...' : ch.server ? 'Channel' : 'Unavailable', sub: ch.server?.name || "You're not in this server",
     open: () => (ch.server ? go({ kind: 'channel', sid: x.sid, cid: x.cid }) : toast("You're not in that server any more.")),
   };
-}
-
-// the right-click / long-press menu of an item (tile = Home shortcut: also move left / right)
-export function itemMenu(e, k, it, { tile = false } = {}) {
-  const list = tile ? getShortcuts() : [];
-  const i = list.indexOf(k);
-  const more = [
-    ...pinMenuItems(k),
-    ...(tile ? [i > 0 && { label: 'Move left', icon: ChevronLeft, onClick: () => setShortcuts(moveShortcut(getShortcuts(), k, -1)) },
-      i >= 0 && i < list.length - 1 && { label: 'Move right', icon: ChevronRight, onClick: () => setShortcuts(moveShortcut(getShortcuts(), k, 1)) }] : []),
-  ].filter(Boolean);
-  if (it.kind === 'dm' && !it.gone && it.username !== 'System') {
-    userMenu(e, it.username, { onProfile: () => dispatchEvent(new CustomEvent('vc-open-big', { detail: { username: it.username, dm: true } })), extra: ['sep', ...more] });
-    return;
-  }
-  openMenu(e, [{ label: 'Open', icon: MessageCircle, onClick: it.open }, 'sep', ...more]);
 }
 
 // one row in a list (the DM list's categories, Home's pinned list). Extra props (drag and drop) go on the button.

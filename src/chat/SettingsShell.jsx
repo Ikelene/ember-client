@@ -5,8 +5,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, Search } from 'lucide-react';
-import { matches } from '../components/tabs/ChatSettingsTab.jsx';
-import { useNarrow } from './SettingsDialog.jsx';
+import { matches } from '../components/tabs/chatSettings.js';
+import { useNarrow } from './useNarrow.js';
 import { getState, ask } from './store.js';
 import './SettingsDialog.css';
 

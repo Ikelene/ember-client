@@ -9,15 +9,14 @@ import { SdmHeadLock } from './E2eeMessage.jsx';
 import { useChat, go, toast, ask, getState, addSocialFriend, socialFriendAction, startSocialDm, socialDmAction, socialProfileById, socialAccount } from './store.js';
 import { Avatar } from './Profile.jsx';
 import { Dialog } from './Dialogs.jsx';
-import { openMenu } from './Menu.jsx';
+import { openMenu } from './menus.js';
 import { accountName, shownHandle, dmHandle, dmTitle, dmUnread, sameAccount, cleanHandle } from './social.js';
 import './dashboard.css';
 import './home.css';
+import { useDomain, face } from './socialHome.js';
 
 const STATUS = { online: 'Online', idle: 'Idle', dnd: 'Do not disturb', offline: 'Offline' };
 const hourWord = h => (h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening');
-export const face = a => ({ username: a.display_name || a.handle || a.id, pfp: a.avatar_url || null }); // (the name gives the letter and colour when there's no picture)
-export const useDomain = () => useChat(s => socialAccount(s)?.domain || '');
 
 // someone's card: what their homeserver says about them (GET /social/profile/:id), and what I can do
 export function PersonCard({ person, dm = false, onClose }) {

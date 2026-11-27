@@ -1,8 +1,7 @@
 // Aliases: a bot can post a message under another name and picture (message.alias = { name, avatar_url } | null).
 // The author is still the real bot (mentions, blocks, menus, reports and the profile card use it); the alias only changes the
 // name and picture people see, next to a mask whose tooltip (Tooltip.jsx, data-tip-alias) names the real sender.
-// The plain helpers (which alias, which name / picture) live in aliases.js so store.js can use them too.
-export { aliasOf, replyAliasOf, aliasKey, aliasFace, shownName, shownPfp, isUnmarked, aliasMemberOf } from './aliases.js';
+// The plain helpers (which alias, which name / picture) live in aliases.js.
 
 // lucide has no mask: a drama mask drawn the lucide way (24 grid, stroke 2, round caps / joins, currentColor)
 export function MaskIcon({ size = 14, className = '' }) {

@@ -8,13 +8,11 @@ import { instOf, bare } from './ids.js';
 import { Toggle } from './roles.jsx';
 import { Avatar } from './Profile.jsx';
 import { stampOf } from './text.jsx';
-import { usePlan, PlanNotice, PlanUsage } from './PlanGate.jsx';
+import { PlanNotice, PlanUsage } from './PlanGate.jsx';
+import { usePlan } from './plans.js';
 
 const patch = (sid, body) => apiFetch(`/chat/servers/${sid}`, { method: 'PATCH', body: JSON.stringify(body) }).then(() => refreshServer(sid));
 const fail = e => toast(errorText(e.message));
-// the join button and a line under it for a server's join policy (Gate, Instances)
-export const joinLabel = (policy, fallback) => ({ request: 'Request to join', password: 'Join with password' })[policy] || fallback;
-export const joinHint = policy => ({ request: 'Someone on the server lets you in.', password: 'This server asks for a password.', allowlist: 'Only people on its list can join.', invite: 'You need an invite link to join.' })[policy] || '';
 const EXPIRES = [['Never', ''], ['30 minutes', 1800], ['1 hour', 3600], ['1 day', 86400], ['7 days', 604800], ['30 days', 2592000]];
 
 // requestsOnly: inside Server settings > Joining (which has the join policy and member limit itself)

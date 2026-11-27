@@ -11,14 +11,16 @@ import { AccountsPage } from './settings/AccountsPages.jsx';
 import VoicePage from './settings/VoicePage.jsx';
 import HomeAccountPage from './settings/HomeAccountPage.jsx';
 import HomeserversPage from './settings/HomeserversPage.jsx';
-import { useHomeSession } from './HomeserverLogin.jsx';
+import { useHomeSession } from './homeSessions.js';
 import { useAdminHomeservers } from './homeApi.js';
 import { showHomeservers } from './homeservers.js';
 import { ThemePage, TextLayoutPage, BlockingPage, NotifLevels } from './settings/LookPages.jsx';
 import { effectiveDesign, subscribeDesign } from './design.js';
-import ChatSettingsTab, { GROUPS, matches, useDesktopMac, desktopAppTitle, DesignSettings } from '../components/tabs/ChatSettingsTab.jsx';
+import ChatSettingsTab, { DesignSettings } from '../components/tabs/ChatSettingsTab.jsx';
+import { GROUPS, matches, useDesktopMac, desktopAppTitle } from '../components/tabs/chatSettings.js';
 import ProfileEditor from './ProfileEditor.jsx';
-import { OpenLinksCard, canOpenLinks } from './settings/OpenLinksCard.jsx';
+import { OpenLinksCard } from './settings/OpenLinksCard.jsx';
+import { canOpenLinks } from './settings/openLinks.js';
 import { useChat, ask, getState } from './store.js';
 import { NameText } from './displayNames.js';
 import { isWebEmber } from '../api.js';
@@ -27,6 +29,7 @@ import { Avatar } from './Profile.jsx';
 import { hasAccountProfile } from './accountProfileCore.js';
 import './SettingsDialog.css';
 import { desktopBridge, SITE_TOKEN, SITE_ME_CACHE } from '../compat.js';
+import { useNarrow } from './useNarrow.js';
 
 const rowText = title => (GROUPS.find(([t]) => t === title)?.[1] || []).flatMap(([, label, hint, choices]) => [label, hint, ...(choices || []).map(c => c[1])]);
 // what each page answers to in the search box (its title, its rows, and a few words for the pages that aren't simple rows)
@@ -80,20 +83,6 @@ function openOutside(url) {
   const d = desktopBridge();
   if (d?.openExternal) { Promise.resolve(d.openExternal(url)).catch(() => {}); return; }
   window.open(url, '_blank', 'noopener,noreferrer');
-}
-
-// phones: the pages come as a full-width list first, then slide in one at a time (see SettingsDialog.css .bf-sd.m)
-const NARROW = '(max-width: 700px)';
-export function useNarrow() {
-  const [n, setN] = useState(() => !!window.matchMedia?.(NARROW).matches);
-  useEffect(() => {
-    const m = window.matchMedia?.(NARROW);
-    if (!m) return undefined;
-    const on = () => setN(m.matches);
-    m.addEventListener('change', on);
-    return () => m.removeEventListener('change', on);
-  }, []);
-  return n;
 }
 
 export default function SettingsDialog({ page: startPage, target, hs, onClose }) {

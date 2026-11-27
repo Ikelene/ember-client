@@ -3,16 +3,17 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Users, Lock, Copy, SmilePlus, History } from 'lucide-react';
 import { emojiLock, rememberLock, originLabel } from './cloneLock.js';
-import { serverMenuIcon } from './ServerIcon.jsx';
+import { serverMenuIcon } from './serverMenuIcon.jsx';
 import { apiFetch } from '../api.js';
 import { go, loadServersOf, toast, errorText, customEmoji, getState } from './store.js';
 import { instOpt } from './ids.js';
-import { Twemoji, nameOfChar } from './emoji.jsx';
-import { emojiDataSync, loadEmojiData } from './EmojiPicker.jsx';
+import { Twemoji } from './emoji.jsx';
+import { nameOfChar } from './emojiNames.js';
+import { emojiDataSync, loadEmojiData } from './emojiData.js';
 import { cloneTargets, cloneEmoji } from './cloneEmoji.js';
 import { addPersonalFromEmoji, isPersonalEmoji } from './personal.js';
 import { Avatar } from './Profile.jsx';
-import { openMenu } from './Menu.jsx';
+import { openMenu } from './menus.js';
 import { isNookara } from '../compat.js';
 
 export function EmojiInfoHost() {

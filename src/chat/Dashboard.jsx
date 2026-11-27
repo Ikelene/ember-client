@@ -3,30 +3,19 @@
 // plus three small reads: friend requests, message requests and the unread notifications (the bell's own endpoint).
 // Works in both looks; dashboard.css draws it square by default and soft under html.vc-rounded.
 import { useEffect, useMemo, useState } from 'react';
-import { stickerOfBody } from './stickerLink.js';
 import { AtSign, Bell, Check, CheckCheck, ChevronRight, Headphones, Inbox, MessageCircle, MessageSquareText, Server, ShieldCheck, Sparkles, UserPlus, Users, UsersRound, Volume2, X } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { useChat, go, isMuted, readNotifs, followNotifLink, loadFriends, toast, errorText } from './store.js';
 import { NameText } from './displayNames.js';
 import { serverUnreadCount } from './unread.js';
-import { Avatar, subtitle } from './Profile.jsx';
+import { Avatar } from './Profile.jsx';
+import { subtitle } from './profiles.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
-import { NotifIcon, NotifText, ago } from './Notifications.jsx';
+import { NotifIcon, NotifText } from './Notifications.jsx';
+import { ago } from './ago.js';
 
-import { plainText } from './tokens.js';
-import { NOOKARA, instOf } from './ids.js';
+import { snippet } from './dashboard.js';
 const lc = s => String(s || '').toLowerCase();
-// a message body as one plain line: custom emoji / mentions / links made readable, markdown marks dropped
-export function snippet(body, sid = null) {
-  let t = plainText(body, sid ? instOf(sid) : NOOKARA, sid);
-  if (!t.trim()) return '';
-  const st = stickerOfBody(t); // a personal sticker (stickerLink.js)
-  if (st) return `Sticker: ${st.name}`;
-  t = t.replace(/<a?:(\w+):\w+>/g, ':$1:').replace(/<@&\w+>/g, '@role').replace(/<#\w+>/g, '#channel').replace(/<t:(\d+)(:\w)?>/g, (m, s) => new Date(Number(s) * 1000).toLocaleString());
-  t = t.replace(/https?:\/\/(files\.|litter\.)?catbox\.moe\/\S+/g, '[file]').replace(/https?:\/\/\S+/g, u => { try { return new URL(u).host; } catch { return u; } });
-  t = t.replace(/^(#{1,3}|-#|>>>|>)\s+/gm, '').replace(/(\*\*|__|~~|\|\||`)/g, '').replace(/\s+/g, ' ').trim();
-  return t;
-}
 const hourWord = h => (h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening');
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 

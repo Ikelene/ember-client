@@ -14,7 +14,8 @@ import { instOpt, bare } from './ids.js';
 import { openHomeserverSettings } from './homeservers.js';
 // bridge links name channels by the server's own id; Ember keeps an Ember server's ids as origin|id (ids.js)
 const sameCh = (a, b) => String(bare(a)) === String(bare(b));
-import { usePlan, PlanGate, PlanNotice, planOf } from './PlanGate.jsx';
+import { PlanGate, PlanNotice } from './PlanGate.jsx';
+import { usePlan, planOf } from './plans.js';
 import { EMBER_API, INST_IMPORT_NOOKARA, legacyToNew } from '../compat.js';
 
 const ERR = {

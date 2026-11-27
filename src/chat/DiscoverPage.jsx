@@ -4,18 +4,14 @@
 import { useEffect, useState } from 'react';
 import { HomeChip } from './homeLabels.jsx';
 import { ArrowLeft, AtSign, Bot, Compass, Globe, Search, ShieldCheck, Users, X } from 'lucide-react';
-import { joinAndOpen, joinByAddress } from './instances.js';
 import { loadDirectory, mergeGroups, filterGroups } from './directory.js';
-import { joinLabel } from './Community.jsx';
-import { useChat, go } from './store.js';
-import { normOrigin, K } from './ids.js';
-import { initials } from './Parts.jsx';
+import { joinLabel } from './community.js';
+import { useChat } from './store.js';
+import { initials } from './initials.js';
 import { BotGallery } from './BotGallery.jsx';
 import { EMBER_API } from '../compat.js';
+import { DISCOVER_TABS, isListedAdded, pickListed } from './discover.js';
 
-// While Discovery is open the sidebar lists its sections (Servers, Bots) instead of the last server's channels (Ikelene
-// 2026-11-16); Chat.jsx keeps which one is open, so the sidebar and the tabs under the header stay in step.
-export const DISCOVER_TABS = [['servers', 'Servers', Globe], ['bots', 'Bots', Bot]];
 export function DiscoverSidebar({ tab, onTab }) {
   return (
     <div className="vc-side vc-disc-side">
@@ -59,23 +55,6 @@ export default function DiscoverPage({ onClose, tab: tabIn = 'servers', onTab })
   );
 }
 
-// a server on a homeserver with many: I'm in it when its own key is in my list; an older one is its whole address
-const listedSid = r => { const url = normOrigin(r.url); return url && r.sid ? K(url, r.sid) : null; };
-// (a quiet connection is only there for my account or a DM on that homeserver: in a server there only when one is in my list)
-const inList = (mine, url, servers = []) => mine.some(i => i.origin === url && (!i.quiet || servers.some(s => s.inst === url)));
-export const isListedAdded = (r, servers, mine) => (listedSid(r) ? servers.some(s => s.sid === listedSid(r)) : inList(mine, normOrigin(r.url), servers));
-// a directory listing was picked: open it when I'm in it, otherwise join (the Add a server dialog only when it has to ask).
-// -> Promise<true when it opened or joined>
-export async function pickListed(r, servers, mine) {
-  const url = normOrigin(r.url);
-  if (!url) return r.address ? joinByAddress(r.address) : false;
-  if (listedSid(r)) {
-    if (isListedAdded(r, servers, mine)) { go({ kind: 'server', sid: listedSid(r) }); return true; }
-    return joinAndOpen(url, undefined, r.sid);
-  }
-  if (inList(mine, url, servers)) { go({ kind: 'instance', inst: url }); return true; }
-  return joinAndOpen(url);
-}
 // directory pictures are untrusted links: only https ones show (the banner across the top of the card, its tint where there's none)
 const safeImg = u => /^https:\/\//i.test(u || '');
 function ServerResults({ q, onClose }) {
