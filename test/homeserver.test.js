@@ -231,6 +231,34 @@ test('the callback: only Ember\'s own origin, only the state that was sent', () 
   assert.throws(() => hs.checkCallback(msg({ type: 'ember-auth', state: 'abc' }), pending, ember), { code: 'failed' });
 });
 
+// several accounts of one homeserver on one device (carol and dave on b.test): one is in use per homeserver
+test('several accounts on one homeserver: kept apart, switched, signed out one at a time; old storage migrates', () => {
+  fresh();
+  const mk = (id, username) => ({ origin: 'https://b.test', domain: 'b.test', name: 'B', icon_url: null, token_url: 'https://b.test/token', access_token: `at-${username}`, refresh_token: `rt-${username}`, expires_at: null, account: { id, username, domain: 'b.test', handle: `${username}@b.test`, display_name: username, avatar_url: null } });
+  // the old single-session storage: { origin: session }, with per-account stores under their bare names
+  local.setItem(hs.SESSIONS_KEY, JSON.stringify({ 'https://b.test': mk('1', 'carol') }));
+  local.setItem(hs.CURRENT_KEY, 'https://b.test');
+  local.setItem('ember_instance_list', '["x"]');
+  assert.equal(hs.currentAccount().handle, 'carol@b.test');
+  assert.deepEqual(Object.keys(JSON.parse(local.getItem(hs.SESSIONS_KEY))), ['https://b.test|1@b.test']);
+  assert.equal(local.getItem('ember_instance_list:hs:1@b.test'), '["x"]'); // (went with carol)
+  // dave signs in on the same homeserver: both kept, carol still in use until switched
+  const all = JSON.parse(local.getItem(hs.SESSIONS_KEY)); all['https://b.test|2@b.test'] = mk('2', 'dave');
+  local.setItem(hs.SESSIONS_KEY, JSON.stringify(all));
+  assert.deepEqual(hs.allSessions().map(x => [x.account.handle, x.active]), [['carol@b.test', true], ['dave@b.test', false]]);
+  assert.equal(hs.getSession('https://b.test').account.handle, 'carol@b.test');
+  assert.equal(hs.setCurrent('https://b.test', 'https://b.test|2@b.test'), true);
+  assert.equal(hs.currentAccount().handle, 'dave@b.test');
+  assert.equal(hs.getSession('https://b.test').access_token, 'at-dave');
+  assert.equal(hs.setCurrent('https://b.test', 'https://other.test|2@b.test'), false); // (a key of another homeserver)
+  // signing out the one in use: the other account of that homeserver takes over; signing out the last: nothing left
+  assert.equal(hs.signOut('https://b.test'), true);
+  assert.equal(hs.currentAccount().handle, 'carol@b.test');
+  assert.equal(hs.signOutAccount('https://b.test|1@b.test'), true);
+  assert.equal(hs.currentSession(), null);
+  assert.equal(local.getItem(hs.CURRENT_KEY), null);
+});
+
 test('token exchange against a mock homeserver: the session is stored per homeserver', async () => {
   fresh();
   const m = await mockHomeserver();
@@ -249,7 +277,7 @@ test('token exchange against a mock homeserver: the session is stored per homese
     assert.ok(s.expires_at > Date.now());
     assert.equal(hs.currentOrigin(), m.origin);
     assert.equal(hs.currentAccount().handle, `bob@${m.host}`);
-    assert.deepEqual(Object.keys(JSON.parse(local.getItem(hs.SESSIONS_KEY))), [m.origin]);
+    assert.deepEqual(Object.keys(JSON.parse(local.getItem(hs.SESSIONS_KEY))), [`${m.origin}|7@${m.host}`]); // (stored per account)
     assert.equal(local.getItem(hs.CURRENT_KEY), m.origin);
     assert.deepEqual(hs.recentHomeservers(), [{ domain: m.host, name: 'Mock Home', icon_url: `${m.origin}/icon.png` }]);
     // a code only works once, and only with its verifier

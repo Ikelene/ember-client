@@ -7,8 +7,9 @@
 export const CLIENT_ID = 'ember';
 export const DEFAULT_HOMESERVER = 'nookara.cc';
 // storage (all new names; nothing here is shared with the Nookara sign-in in session.js)
-export const SESSIONS_KEY = 'ember_hs_sessions'; // localStorage: { [homeserver origin]: session }
+export const SESSIONS_KEY = 'ember_hs_sessions'; // localStorage: { ['<origin>|<account>']: session } (several accounts on one homeserver)
 export const CURRENT_KEY = 'ember_hs_current'; // localStorage: the homeserver origin in use
+export const ACTIVE_KEY = 'ember_hs_active'; // localStorage: { [origin]: '<origin>|<account>' }: which of its accounts the app uses there
 export const RECENT_KEY = 'ember_hs_recent'; // localStorage: [{ domain, name, icon_url }], newest first
 export const PENDING_KEY = 'ember_hs_pending'; // sessionStorage: a full-page sign-in on its way back (verifier, state, where to return)
 const RECENT_MAX = 6;
@@ -186,6 +187,8 @@ export function authorizeUrl(hs, { redirect_uri, state, challenge, hint }) {
   const q = { response_type: 'code', client_id: CLIENT_ID, redirect_uri, state, code_challenge: challenge, code_challenge_method: 'S256' };
   for (const [k, v] of Object.entries(q)) u.searchParams.set(k, v);
   if (hint) u.searchParams.set('login_hint', hint);
+  // another account of a homeserver already signed in here: ask for its sign-in form, never a session it remembers
+  if (allSessions().some(s => s.origin === hs.origin)) u.searchParams.set('prompt', 'login');
   return u.href;
 }
 
@@ -198,10 +201,52 @@ export function onSignedOut(fn) { endHooks.add(fn); return () => endHooks.delete
 const readJson = (store, key, fallback) => { try { const v = JSON.parse(store().getItem(key) || 'null'); return v ?? fallback; } catch { return fallback; } };
 const writeJson = (store, key, v) => { try { if (v == null) store().removeItem(key); else store().setItem(key, JSON.stringify(v)); } catch { /* private mode / full */ } };
 const okSession = s => s && typeof s === 'object' && typeof s.access_token === 'string' && s.access_token && s.account && typeof s.account.username === 'string';
-export function sessions() {
-  const all = readJson(env.storage, SESSIONS_KEY, {});
+// One device can hold several accounts of one homeserver (carol@b.test and dave@b.test). Each session is stored under
+// '<origin>|<account id>@<domain>'; the app runs as one account per homeserver at a time (ACTIVE_KEY), so everything that asks
+// by origin (sessions(), getSession, homeFetch, refresh) gets that one. Switching account reloads the app.
+export const accountIdOf = s => `${s?.account?.id ?? s?.account?.username}@${s?.domain}`.toLowerCase();
+export const sessionKeyOf = s => `${s.origin}|${accountIdOf(s)}`;
+export const originOfKey = k => String(k).split('|')[0];
+// stores keyed by the account (ids.js acct()): written under the bare name before several accounts per homeserver, they go
+// with the account that was signed in then, once
+const ACCOUNT_STORES = ['ember_cmd_cache', 'ember_disconnected', 'ember_emoji_cache', 'ember_instance_list', 'ember_last_channel', 'ember_locked', 'ember_outbox', 'ember_server_cache', 'ember_instance_sessions', 'ember_instance_session_tags', 'ember_e2ee_unlocked', 'ember_e2ee_dm_members', 'ember_hidden_servers'];
+function readAll() {
+  const raw = readJson(env.storage, SESSIONS_KEY, {});
+  if (!raw || typeof raw !== 'object') return {};
   const out = {};
-  if (all && typeof all === 'object') for (const [o, s] of Object.entries(all)) if (okSession(s) && s.origin === o && safeUrl(o)?.origin === o) out[o] = s;
+  let old = false;
+  for (const [k, s] of Object.entries(raw)) {
+    if (!okSession(s) || safeUrl(s.origin)?.origin !== s.origin) continue;
+    if (k === s.origin) old = true; // (stored by origin, before)
+    else if (originOfKey(k) !== s.origin) continue;
+    out[sessionKeyOf(s)] = s;
+  }
+  if (old) migrate(out);
+  return out;
+}
+function migrate(all) {
+  const active = activeMap();
+  for (const [k, s] of Object.entries(all)) if (!active[s.origin]) active[s.origin] = k;
+  writeJson(env.storage, SESSIONS_KEY, all);
+  writeJson(env.storage, ACTIVE_KEY, active);
+  let cur = null;
+  try { cur = env.storage().getItem(CURRENT_KEY); if (env.storage().getItem('ember_user')) cur = null; } catch { /* blocked */ }
+  const key = cur && active[cur];
+  if (!key) return;
+  const suffix = `:hs:${String(key).split('|').slice(1).join('|')}`;
+  try { for (const b of ACCOUNT_STORES) { const v = env.storage().getItem(b); if (v != null && env.storage().getItem(b + suffix) == null) env.storage().setItem(b + suffix, v); } } catch { /* fine */ }
+}
+function activeMap() { const v = readJson(env.storage, ACTIVE_KEY, {}); return v && typeof v === 'object' ? v : {}; }
+function setActive(origin, key) { const a = activeMap(); if (key) a[origin] = key; else delete a[origin]; writeJson(env.storage, ACTIVE_KEY, Object.keys(a).length ? a : null); }
+// every account on this device ([{ ...session, key, active }]), each homeserver's account in use first
+export function allSessions() {
+  const all = readAll(), act = activeMap();
+  return Object.entries(all).map(([k, s]) => ({ ...s, key: k, active: act[s.origin] === k })).sort((x, y) => Number(y.active) - Number(x.active));
+}
+// { [origin]: the session of the account in use there }
+export function sessions() {
+  const out = {};
+  for (const s of allSessions()) if (!out[s.origin] || s.active) out[s.origin] = s;
   return out;
 }
 export const getSession = origin => sessions()[origin] || null;
@@ -213,7 +258,9 @@ export function currentOrigin() {
 }
 export const currentSession = () => getSession(currentOrigin());
 export const currentAccount = () => currentSession()?.account || null;
-export function setCurrent(origin) {
+// origin: the homeserver to run as; key: which of its accounts (left out: the one in use there)
+export function setCurrent(origin, key = null) {
+  if (key) { if (!readAll()[key] || originOfKey(key) !== origin) return false; setActive(origin, key); }
   if (!getSession(origin)) return false;
   try { env.storage().setItem(CURRENT_KEY, origin); } catch { /* fine */ }
   changed();
@@ -235,25 +282,38 @@ function saveSession(hs, d, old) {
     expires_at: Number(d.expires_in) > 0 ? Date.now() + Number(d.expires_in) * 1000 : null,
     account: account(d.account, hs.domain, old?.account),
   };
-  const all = sessions();
-  all[hs.origin] = s;
+  const all = readAll();
+  const key = sessionKeyOf(s);
+  if (old && sessionKeyOf(old) !== key) delete all[sessionKeyOf(old)];
+  all[key] = s;
   writeJson(env.storage, SESSIONS_KEY, all);
-  if (!old) try { env.storage().setItem(CURRENT_KEY, hs.origin); } catch { /* fine */ }
+  if (!old) { setActive(hs.origin, key); try { env.storage().setItem(CURRENT_KEY, hs.origin); } catch { /* fine */ } }
   changed();
-  return s;
+  return { ...s, key };
 }
 // sign out of a homeserver: its tokens are forgotten (the recent-homeservers list keeps the domain)
-export function signOut(origin = currentOrigin(), reason = 'signout') {
-  const all = sessions();
-  if (!origin || !all[origin]) return false;
-  delete all[origin];
+// key: which account (left out: the one in use there). Another account of the same homeserver, if any, is the one in use after.
+export function signOut(origin = currentOrigin(), reason = 'signout', key = null) {
+  const all = readAll();
+  key = key || activeMap()[origin] || Object.keys(all).find(k => originOfKey(k) === origin);
+  if (!origin || !key || !all[key]) return false;
+  const wasActive = (activeMap()[origin] || key) === key;
+  delete all[key];
   writeJson(env.storage, SESSIONS_KEY, Object.keys(all).length ? all : null);
-  try { if (env.storage().getItem(CURRENT_KEY) === origin) { const next = Object.keys(all)[0]; if (next) env.storage().setItem(CURRENT_KEY, next); else env.storage().removeItem(CURRENT_KEY); } } catch { /* fine */ }
+  const sameHs = Object.keys(all).filter(k => originOfKey(k) === origin);
+  if (wasActive) setActive(origin, sameHs[0] || null);
+  try {
+    if (!sameHs.length && env.storage().getItem(CURRENT_KEY) === origin) {
+      const next = Object.values(all)[0]?.origin;
+      if (next) env.storage().setItem(CURRENT_KEY, next); else env.storage().removeItem(CURRENT_KEY);
+    }
+  } catch { /* fine */ }
   changed();
-  for (const fn of [...endHooks]) try { fn(origin, reason); } catch { /* theirs */ }
+  for (const fn of [...endHooks]) try { fn(origin, reason, { key, wasActive, others: sameHs.length }); } catch { /* theirs */ }
   return true;
 }
-export function signOutAll() { for (const o of Object.keys(sessions())) signOut(o); }
+export const signOutAccount = key => signOut(originOfKey(key), 'signout', key);
+export function signOutAll() { for (const s of allSessions()) signOut(s.origin, 'signout', s.key); }
 
 export function recentHomeservers() {
   const v = readJson(env.storage, RECENT_KEY, []);

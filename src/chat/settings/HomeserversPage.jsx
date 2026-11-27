@@ -15,9 +15,9 @@ import { LoginMethods } from './LoginMethods.jsx';
 import { ask, toast, useChat } from '../store.js';
 import { Avatar } from '../Profile.jsx';
 import { HomeserverIcon, HomeserverLogin } from '../HomeserverLogin.jsx';
-import { useHomeSessions, useHomeSession } from '../homeSessions.js';
+import { useHomeSessions, useHomeSession, useAllHomeSessions } from '../homeSessions.js';
 import { refreshInstance, reconnect, removeInstance } from '../instances.js';
-import { signOutHome, nookaraHandle } from '../session.js';
+import { signOutHome, nookaraHandle, signOutHomeAccount } from '../session.js';
 import { forgetHomeserver } from '../homeserver.js';
 import { normOrigin } from '../ids.js';
 import { homeserverRows, forgetText } from '../homeservers.js';
@@ -171,7 +171,7 @@ function InfoTab({ hs, inst, autoUpdate, onDirty }) {
 // ── the list: every homeserver on this device ──
 const NONE = [];
 function MyHomeservers({ admins, onManage }) {
-  const sessions = useHomeSessions();
+  const sessions = useAllHomeSessions(); // (every account: several can share a homeserver)
   const home = useHomeSession();
   const instances = useChat(s => s.instances || NONE);
   const servers = useChat(s => s.servers || NONE);
@@ -182,15 +182,18 @@ function MyHomeservers({ admins, onManage }) {
   const homeHandle = (signedIn && me ? nookaraHandle(me.username) : null) || home?.account?.handle || null;
   const rows = homeserverRows(sessions, instances, servers, { homeHandle, norm: normOrigin });
   const hidden = useHiddenServers(); // (servers taken off the rail with "Hide from list")
-  async function signOut(r) {
-    if (!(await ask({ title: `Sign out of ${r.domain}?`, text: `Ember forgets its sign-in for ${r.handle || r.domain} on this device.${r.servers.length ? ' Your servers there stay in your list, signed out, until you sign in again or forget it.' : ''}`, confirm: 'Sign out', danger: true }))) return;
-    await signOutHome(r.origin);
-    toast(`Signed out of ${r.domain}.`, true);
+  // one account (a homeserver can have several here): acc = one of r.accounts, the one in use when left out
+  async function signOut(r, acc = r.accounts.find(a => a.active) || r.accounts[0]) {
+    const who = acc?.handle || r.handle || r.domain;
+    if (!(await ask({ title: `Sign out of ${who}?`, text: `Ember forgets the sign-in for ${who} on this device.${r.accounts.length > 1 ? ` Your other ${r.domain} ${r.accounts.length === 2 ? 'account stays' : 'accounts stay'} signed in.` : r.servers.length ? ' Your servers there stay in your list, signed out, until you sign in again or forget it.' : ''}`, confirm: 'Sign out', danger: true }))) return;
+    if (acc?.session) await signOutHomeAccount(acc.session); else await signOutHome(r.origin);
+    toast(`Signed out of ${who}.`, true);
   }
   async function forget(r) {
-    if (!(await ask({ title: `Forget ${r.domain}?`, text: forgetText(r), confirm: 'Forget', danger: true }))) return;
+    const many = r.accounts.length > 1;
+    if (!(await ask({ title: `Forget ${r.domain}?`, text: `${forgetText(r)}${many ? ` Every account of it on this device is signed out: ${r.accounts.map(a => a.handle).join(', ')}. To sign out of just one, use its own Sign out.` : ''}`, confirm: many ? 'Forget and sign out all' : 'Forget', danger: true }))) return;
     if (r.inst) await removeInstance(r.inst.origin).catch(() => {});
-    if (r.session) await signOutHome(r.origin);
+    for (const a of r.accounts) if (a.session) await signOutHomeAccount(a.session); // eslint-disable-line no-await-in-loop
     forgetHomeserver(r.domain);
     toast(`Forgot ${r.domain}.`, true);
   }
@@ -206,7 +209,9 @@ function MyHomeservers({ admins, onManage }) {
               <div className="sx-row-txt">
                 <b>{r.name}{admin && <i className="hsx-tag">{admin.isOwner ? <><Crown size={11} /> Owner</> : 'Admin'}</i>}</b>
                 <span className="ac-host"><Globe size={12} /> {r.domain}{r.legacy ? ' - one server on its own' : ''}</span>
-                {r.handle && <span className="ac-who"><AtSign size={12} /> {r.handle}</span>}
+                {r.accounts.length > 1 ? r.accounts.map(a => (
+                  <span className="ac-who" key={a.key}><AtSign size={12} /> {a.handle}{a.active ? ' (in use)' : ''} <button type="button" className="btn btn-surface btn-sm" onClick={() => signOut(r, a)}><LogOut size={12} /> Sign out</button></span>
+                )) : r.handle && <span className="ac-who"><AtSign size={12} /> {r.handle}</span>}
                 <span className={`ac-state ${r.status[0]}`}>{r.status[1]}{r.servers.length ? ` - ${r.servers.length} ${r.servers.length === 1 ? 'server' : 'servers'}` : ''}</span>
                 {(() => {
                   const hid = (servers || []).filter(x => x.inst === r.origin && hidden.has(x.sid));
@@ -216,7 +221,7 @@ function MyHomeservers({ admins, onManage }) {
               <div className="sx-row-ctl ac-acts">
                 {admin && <button type="button" className="btn btn-primary btn-sm" onClick={() => onManage(admin)}><Settings2 size={13} /> Manage</button>}
                 {down && <button type="button" className="btn btn-surface btn-sm" onClick={() => reconnect(r.inst.origin)}><RefreshCw size={13} /> Reconnect</button>}
-                {r.session && <button type="button" className="btn btn-surface btn-sm" onClick={() => signOut(r)}><LogOut size={13} /> Sign out</button>}
+                {r.session && r.accounts.length < 2 && <button type="button" className="btn btn-surface btn-sm" onClick={() => signOut(r)}><LogOut size={13} /> Sign out</button>}
                 <button type="button" className="btn btn-surface btn-sm ac-danger" onClick={() => forget(r)}><Trash2 size={13} /> Forget</button>
               </div>
             </div>

@@ -3,7 +3,7 @@
 // there, else the homeserver session marked current (Chat.jsx boot). Switching keeps the others signed in.
 import { getToken } from '../api.js';
 import { savedEmberAccounts, rememberAccount, switchEmberAccount } from './session.js';
-import { sessions, currentOrigin, setCurrent, DEFAULT_HOMESERVER } from './homeserver.js';
+import { allSessions, currentOrigin, setCurrent, DEFAULT_HOMESERVER } from './homeserver.js';
 import { clientUrl } from './hosts.js';
 
 // -> [{ key, kind: 'nookara' | 'home', handle, name, domain, pfp, current, origin?, saved? }]
@@ -18,9 +18,9 @@ export function deviceAccounts(nookaraUser = null, { nookaraDomain = DEFAULT_HOM
     seen.add(k);
     out.push({ key: `nk:${k}`, kind: 'nookara', handle: `${a.username}@${nookaraDomain}`, name: a.username, domain: nookaraDomain, pfp: a.pfp || null, current: false, saved: a });
   }
-  for (const s of Object.values(sessions())) {
+  for (const s of allSessions()) { // (each account, several per homeserver too)
     if (!s?.account) continue;
-    out.push({ key: `hs:${s.origin}`, kind: 'home', handle: s.account.handle, name: s.account.display_name || s.account.username, domain: s.domain, pfp: s.account.avatar_url || null, icon: s.icon_url || null, hsName: s.name || s.domain, current: s.origin === cur, origin: s.origin });
+    out.push({ key: `hs:${s.key}`, kind: 'home', handle: s.account.handle, name: s.account.display_name || s.account.username, domain: s.domain, pfp: s.account.avatar_url || null, icon: s.icon_url || null, hsName: s.name || s.domain, current: s.origin === cur && s.active, origin: s.origin, hsKey: s.key });
   }
   return out;
 }
@@ -32,7 +32,7 @@ export async function switchToAccount(a, current = null) {
   if (getToken() && current?.kind === 'nookara') {
     try { rememberAccount(localStorage.getItem('ember_user') || current.handle.split('@')[0], getToken(), current.pfp); } catch { /* fine */ }
   }
-  setCurrent(a.origin);
+  setCurrent(a.origin, a.hsKey || null);
   try { localStorage.removeItem('ember_token'); localStorage.removeItem('ember_user'); localStorage.removeItem('ember_me_cache_v2'); } catch { /* private mode */ }
   history.replaceState(null, '', clientUrl('#/home'));
   location.reload();

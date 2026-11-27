@@ -41,7 +41,14 @@ export function acct() {
   try {
     const web = onWebClientPath() && !desktopBridge() && !mobileBridge() && !ANDROID_UA.test(navigator.userAgent);
     const u = web ? localStorage.getItem('ember_user') : JSON.parse(localStorage.getItem(SITE_ME_CACHE_V2) || 'null')?.d?.account?.username;
-    return u ? String(u).toLowerCase() : '';
+    if (u) return String(u).toLowerCase();
+    // no Nookara sign-in: the homeserver account the app runs as (homeserver.js: one per homeserver in use, several per device)
+    if (web) {
+      const cur = localStorage.getItem('ember_hs_current');
+      const key = cur && JSON.parse(localStorage.getItem('ember_hs_active') || '{}')?.[cur];
+      if (key) return `hs:${String(key).split('|').slice(1).join('|')}`.toLowerCase();
+    }
+    return '';
   } catch { return ''; }
 }
 export const acctKey = base => { const a = acct(); return a ? `${base}:${a}` : base; };

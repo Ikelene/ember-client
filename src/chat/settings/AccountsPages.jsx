@@ -8,7 +8,7 @@ import { getToken } from '../../api.js';
 import { removeInstance, dropNookaraSessions } from '../instances.js';
 import { nookaraHandle, signOutHomes } from '../session.js';
 import { HomeserverLogin, HomeserverIcon } from '../HomeserverLogin.jsx';
-import { useHomeSessions } from '../homeSessions.js';
+import { useAllHomeSessions } from '../homeSessions.js';
 import { signOut, savedAccounts, switchTo } from '../profileActions.js';
 import { Avatar } from '../Profile.jsx';
 import { siteHref } from '../hosts.js';
@@ -32,7 +32,7 @@ export function AccountsPage({ onHomeservers }) {
   const signedIn = useChat(s => s.signedIn);
   const instances = useChat(s => s.instances || NONE);
   const [busy, setBusy] = useState('');
-  const homes = useHomeSessions(); // homeserver (v2) sign-ins
+  const homes = useAllHomeSessions(); // homeserver (v2) sign-ins: every account, several on one homeserver too
   const others = signedIn ? savedAccounts().filter(a => a.username.toLowerCase() !== String(me?.username || '').toLowerCase()) : [];
 
   async function signOutNookara() {
@@ -85,11 +85,11 @@ export function AccountsPage({ onHomeservers }) {
       {homes.length > 0 && (
         <SCard title="Homeserver accounts" sub="Accounts you signed in to on their own homeserver.">
           {homes.map(s => (
-            <div className="sx-list-row" key={s.origin}>
+            <div className="sx-list-row" key={s.key}>
               {s.account.avatar_url ? <Avatar user={{ username: s.account.username, pfp: s.account.avatar_url }} size={36} /> : <HomeserverIcon hs={s} className="ac-ico" />}
-              <div className="sx-row-txt"><b>{s.account.handle}</b><span>{s.account.display_name !== s.account.username ? `${s.account.display_name} - ` : ''}{s.name}{!signedIn && s.origin === currentOrigin() ? ' - in use' : ''}</span></div>
-              {(signedIn || s.origin !== currentOrigin()) && <div className="sx-row-ctl">
-                <button type="button" className="btn btn-surface btn-sm" disabled={!!busy} onClick={() => { setBusy(s.origin); switchToAccount({ kind: 'home', origin: s.origin }, signedIn && me ? { kind: 'nookara', handle: nookaraHandle(me.username), pfp: me.pfp } : null); }}><Repeat size={13} /> {busy === s.origin ? 'Switching...' : 'Switch'}</button>
+              <div className="sx-row-txt"><b>{s.account.handle}</b><span>{s.account.display_name !== s.account.username ? `${s.account.display_name} - ` : ''}{s.name}{!signedIn && s.origin === currentOrigin() && s.active ? ' - in use' : ''}</span></div>
+              {(signedIn || s.origin !== currentOrigin() || !s.active) && <div className="sx-row-ctl">
+                <button type="button" className="btn btn-surface btn-sm" disabled={!!busy} onClick={() => { setBusy(s.key); switchToAccount({ kind: 'home', origin: s.origin, hsKey: s.key }, signedIn && me ? { kind: 'nookara', handle: nookaraHandle(me.username), pfp: me.pfp } : null); }}><Repeat size={13} /> {busy === s.key ? 'Switching...' : 'Switch'}</button>
               </div>}
             </div>
           ))}

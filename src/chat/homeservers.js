@@ -43,10 +43,13 @@ export function statusOf(inst, session) {
 // -> [{ origin, domain, name, icon_url, handle, session, inst, status: [tone, words], servers: [names], legacy }]
 export function homeserverRows(sessions, instances, servers, { homeHandle = null, norm = o => o } = {}) {
   const rows = new Map();
-  for (const s of sessions || []) {
+  for (const s of sessions || []) { // (each account: a homeserver can have several here, `active` = the one in use)
     const origin = norm(s.origin);
     if (!origin) continue;
-    rows.set(origin, { origin, domain: s.domain, name: s.name || s.domain, icon_url: s.icon_url || null, handle: s.account?.handle || null, session: true, inst: null });
+    const had = rows.get(origin);
+    const acc = { key: s.key || origin, handle: s.account?.handle || null, active: s.active !== false, session: s };
+    if (had) { had.accounts.push(acc); if (acc.active) had.handle = acc.handle; continue; }
+    rows.set(origin, { origin, domain: s.domain, name: s.name || s.domain, icon_url: s.icon_url || null, handle: s.account?.handle || null, session: true, inst: null, accounts: [acc] });
   }
   for (const i of instances || []) {
     if (i.quiet && i.source !== 'home') continue; // (only there for a DM)
@@ -58,7 +61,7 @@ export function homeserverRows(sessions, instances, servers, { homeHandle = null
       name: had?.name || i.homeserver?.name || (i.v2 ? domain : i.community?.name || i.name) || domain,
       icon_url: had?.icon_url || i.homeserver?.icon_url || i.icon || null,
       handle: had?.handle || own || (i.user || i.viaNookara || i.source ? homeHandle : null),
-      session: !!had, inst: i,
+      session: !!had, inst: i, accounts: had?.accounts || [],
     });
   }
   return [...rows.values()].map(r => ({

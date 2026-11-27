@@ -9,8 +9,9 @@ import { openProfileEditor } from '../profiles.jsx';
 import { hasAccountProfile, accountTarget } from '../accountProfileCore.js';
 import { normOrigin } from '../ids.js';
 import { HomeserverIcon } from '../HomeserverLogin.jsx';
-import { useHomeSession, useHomeSessions } from '../homeSessions.js';
-import { setCurrent, homeInfo, resolve as resolveHomeserver } from '../homeserver.js';
+import { useHomeSession, useAllHomeSessions } from '../homeSessions.js';
+import { switchToAccount } from '../accountSwitch.js';
+import { homeInfo, resolve as resolveHomeserver } from '../homeserver.js';
 import { signOutHome, signInOn } from '../session.js';
 import { loadLogins, unlinkLogin, linkLogin, homeJson } from '../homeApi.js';
 import { Dialog } from '../Dialogs.jsx';
@@ -24,7 +25,7 @@ const when = t => { const d = new Date(typeof t === 'number' && t < 1e12 ? t * 1
 
 export default function HomeAccountPage() {
   const s = useHomeSession();
-  const all = useHomeSessions();
+  const everyone = useAllHomeSessions(); // (every account on this device, several per homeserver too)
   const origin = s?.origin || null;
   const profiled = useChat(st => hasAccountProfile(st.instances.find(i => i.origin === normOrigin(origin)))); // (its profile is kept there: 4.1)
   const me = useChat(st => (st.home ? st.me : null));
@@ -89,13 +90,13 @@ export default function HomeAccountPage() {
         </div>
       </SCard>
 
-      {all.length > 1 && (
-        <SCard title="Your other homeserver accounts" sub="Pick the one these settings are about.">
-          {all.filter(x => x.origin !== origin).map(x => (
-            <div className="sx-list-row" key={x.origin}>
+      {everyone.length > 1 && (
+        <SCard title="Your other homeserver accounts" sub="Switch to one: the app starts over as that account. The others stay signed in.">
+          {everyone.filter(x => x.key !== s.key).map(x => (
+            <div className="sx-list-row" key={x.key}>
               <HomeserverIcon hs={x} className="ac-ico" />
               <div className="sx-row-txt"><b>{x.account.handle}</b><span>{x.name}</span></div>
-              <div className="sx-row-ctl"><button type="button" className="btn btn-surface btn-sm" onClick={() => setCurrent(x.origin)}>Show this one</button></div>
+              <div className="sx-row-ctl"><button type="button" className="btn btn-surface btn-sm" onClick={() => switchToAccount({ kind: 'home', origin: x.origin, hsKey: x.key })}>Switch to it</button></div>
             </div>
           ))}
         </SCard>

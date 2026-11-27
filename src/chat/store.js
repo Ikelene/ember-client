@@ -2939,7 +2939,10 @@ function startHome() {
   refreshHomeMe(); loadSocial(); startHomeKeys();
   onSignedOut(() => { // the homeserver ended the session (or Sign out): back to signed out
     if (!state.home) return;
-    if (currentSession() && normOrigin(currentSession().origin) === state.home.origin) return;
+    const now = currentSession();
+    if (now && normOrigin(now.origin) === state.home.origin && String(now.account?.id ?? now.account?.username) === String(state.home.account?.id ?? state.home.account?.username)) return; // (another account's session)
+    // the account the app runs as is gone, and another account of a homeserver is in use now: start over as that one
+    if (now) { history.replaceState(null, '', clientUrl('#/home')); location.reload(); return; }
     set({ me: null, home: null, social: emptySocial(), homeRequests: 0 });
     E2EE.setHome(null);
     if (isHomeView(state.view) && state.view.kind !== 'home') go({ kind: 'home' }, { replace: true });

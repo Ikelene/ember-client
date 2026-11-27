@@ -8,7 +8,7 @@ import { toast, stopKeepingMessages, getState } from './store.js';
 import { forgetAccount as forgetKeptMessages } from './msgCache.js';
 import { acctKey } from './ids.js';
 import { EMBER_API, notifBridge } from '../compat.js';
-import { DEFAULT_HOMESERVER, probeDefault, defaultProbe, startLogin, handleCallback, isCallbackHash, currentSession, signInWith, signOut as forgetHome, signOutAll as forgetHomes } from './homeserver.js';
+import { DEFAULT_HOMESERVER, probeDefault, defaultProbe, startLogin, handleCallback, isCallbackHash, currentSession, signInWith, signOut as forgetHome, signOutAll as forgetHomes, signOutAccount as forgetHomeAccount } from './homeserver.js';
 
 const STATE = 'ember_signin_state', BACK = 'ember_signin_back';
 export const hasNookara = () => !!getToken();
@@ -104,6 +104,11 @@ export const nookaraHandle = username => `${username}@${DEFAULT_HOMESERVER}`;
 // (the homeservers forget this device's pusher first, while the session can still ask them to: push.js)
 export const signOutHome = origin => { const go = () => forgetHome(origin); return import('../push.js').then(p => p.dropPushers()).catch(() => {}).then(go, go); };
 export const signOutHomes = () => forgetHomes();
+// sign out of one account (several can share a homeserver): its pushers go only when it is the one the app runs as
+export function signOutHomeAccount(s) {
+  const go = () => forgetHomeAccount(s.key);
+  return (s.active ? import('../push.js').then(p => p.dropPushers()).catch(() => {}) : Promise.resolve()).then(go, go);
+}
 function startNookaraSignIn(back = {}) {
   if (onEmberHost()) { popupSignIn(back); return; }
   if (!isWebEmber()) { location.href = `/login?next=${encodeURIComponent(clientPath())}`; return; }
