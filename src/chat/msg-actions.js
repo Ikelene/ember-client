@@ -26,7 +26,7 @@ export function messageCaps(view, m, { mine = false, canMod = false, canPost = t
     forward: saved,
     edit: !!mine && (channel || dm || saved_group || note),
     del: channel ? !!(mine || canMod) : !!mine && (dm || saved_group || note),
-    pin: saved && (channel ? row && !!canMod : dm || saved_group),
+    pin: saved && (channel ? row && (!!canMod || !!view.dm) : dm || saved_group), // (a homeserver DM: either person, like Nookara's)
     copyLink: channel || group,
   };
 }

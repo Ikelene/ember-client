@@ -1467,6 +1467,8 @@ function openSdm(msg, dm = sdmOf(msg?.channel)) {
   if (!dm || !msg?.enc) return Promise.resolve(msg);
   return E2EE.openDmMessage(msg, dm).then(sdmMsg).catch(() => ({ ...msg, body: '', sealed: { v: 2, state: 'failed' } }));
 }
+// messages of a channel fetched elsewhere (pins, search): a homeserver DM's opened on this device, others as they are
+export const openChannelMessages = list => Promise.all((list || []).map(m => openSdm(m)));
 const hdSends = new Map(); // nonce -> what went out, until the host took it (stale_keys: once more, with fresh keys)
 const freshAt = new Map(); // dm id -> when everyone's keys were last asked for afresh (held messages ask again and again)
 const hdDeps = () => ({

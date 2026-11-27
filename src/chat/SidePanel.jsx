@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bell, Bookmark, CheckCheck, Inbox as InboxIco, Pin, Search, Settings, UserRound, Users, UsersRound, X, Hash, ShieldCheck } from 'lucide-react';
 import { apiFetch } from '../api.js';
-import { useChat, getState, go, jumpToMessage, toast, errorText, isMuted, readNotifs, loadNotifs, closeNotifs, followNotifLink, markChannelRead, markServerRead } from './store.js';
+import { useChat, getState, go, jumpToMessage, toast, errorText, isMuted, readNotifs, loadNotifs, closeNotifs, followNotifLink, markChannelRead, markServerRead, keyOf } from './store.js';
 import { MemberList } from './Parts.jsx';
 import { serverUnreadCount } from './unread.js';
 import { PinsPanel } from './MsgTools.jsx';
@@ -71,7 +71,7 @@ export function SidePanel({ view, channel, detail, group, onUser, onLeaveGroup, 
             <button type="button" className="vc-more danger" onClick={onLeaveGroup}>Leave group</button>
           </div>
         )}
-        {cur === 'pins' && <div className="vc-panel-scroll"><PanelHead title="Pinned messages" /><PinsPanel channel={channel} sid={view.sid} view={isServer ? undefined : view} onClose={() => setTab('people')} embedded /></div>}
+        {cur === 'pins' && <div className="vc-panel-scroll"><PanelHead title="Pinned messages" /><PinsPanel channel={channel} sid={view.sid} view={isServer ? undefined : view} dm={!!view.dm} onClose={() => setTab('people')} embedded /></div>}
         {cur === 'inbox' && <Inbox />}
         {cur === 'search' && isServer && <SearchTab view={view} channel={channel} detail={detail} />}
       </div>
@@ -240,6 +240,12 @@ function SearchTab({ view, channel, detail }) {
     const text = q.trim();
     if (!text || !channel) { setRes(null); return; }
     setRes({ q: text, results: null });
+    if (view.dm) { // a homeserver DM is sealed: the homeserver can't search it, so this device searches what it has opened
+      const words = text.toLowerCase().split(/\s+/).filter(Boolean);
+      const list = (getState().msgs[keyOf(view)]?.list || []).filter(m => !m.pending && words.every(w => String(m.body || '').toLowerCase().includes(w))).reverse();
+      setRes({ q: text, results: list.map(m => ({ ...m, channel: m.channel || view.cid })), total: list.length, local: true });
+      return;
+    }
     try {
       const d = scope === 'server' ? await apiFetch(`/chat/servers/${view.sid}/search?q=${encodeURIComponent(text)}`) : await apiFetch(`/chat/channels/${channel.cid}/search?q=${encodeURIComponent(text)}`);
       setRes({ q: text, results: d.messages, total: d.total ?? d.messages.length });
@@ -250,20 +256,20 @@ function SearchTab({ view, channel, detail }) {
       <PanelHead title="Search" />
       <form className="vc-panel-search" onSubmit={run}>
         <Search size={15} />
-        <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder={scope === 'server' ? `Search ${detail?.server.name || 'this server'}` : `Search #${channel?.name || ''}`} />
+        <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder={view.dm ? 'Search this conversation' : scope === 'server' ? `Search ${detail?.server.name || 'this server'}` : `Search #${channel?.name || ''}`} />
         {q && <button type="button" className="vc-ico-btn" title="Clear" onClick={() => { setQ(''); setRes(null); }}><X size={14} /></button>}
       </form>
-      <div className="vc-panel-scope">
+      {!view.dm && <div className="vc-panel-scope">
         <button type="button" className={scope === 'server' ? 'on' : ''} onClick={() => setScope('server')}>Whole server</button>
         <button type="button" className={scope === 'channel' ? 'on' : ''} onClick={() => setScope('channel')}><Hash size={12} />{channel?.name || 'channel'}</button>
-      </div>
+      </div>}
       <div className="vc-panel-scroll">
         {!res && <div className="vc-results-tip">Filters: <code>from:name</code> <code>in:channel</code> <code>has:image</code> <code>has:file</code> <code>has:link</code></div>}
         {res && !res.results && <div className="vc-loading"><i /><i /><i /></div>}
-        {res?.results && <div className="vc-panel-sub">{res.total} result{res.total === 1 ? '' : 's'}</div>}
+        {res?.results && <div className="vc-panel-sub">{res.total} result{res.total === 1 ? '' : 's'}{res.local ? ' in messages loaded here (encrypted DMs are searched on this device)' : ''}</div>}
         {res?.results?.map(m => (
           <InboxRow key={m.id} face={m.author} title={shownName(m)} where={m.channel_name ? `#${m.channel_name}` : ''} time={stampOf(m.created_at)} text={snippet(m.body, view.sid) || (m.attachments?.length ? `[${m.attachments.length} attachment${m.attachments.length === 1 ? '' : 's'}]` : '')}
-            onClick={() => jumpToMessage({ kind: 'channel', sid: view.sid, cid: m.channel }, m.id)} />
+            onClick={() => jumpToMessage({ kind: 'channel', sid: view.sid, cid: m.channel, ...(view.dm ? { dm: view.dm } : {}) }, m.id)} />
         ))}
         {res?.results && !res.results.length && <Note icon={Search}>Nothing found.</Note>}
       </div>

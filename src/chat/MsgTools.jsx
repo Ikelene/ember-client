@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Hash, UsersRound, Pin, X, Forward } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { instOpt, instOf } from './ids.js';
-import { useChat, getState, sendMessage, refreshServer, toast, errorText, dmErrorText, keyOf, dropFailed, imToMsg, groupToMsg } from './store.js';
+import { useChat, getState, sendMessage, refreshServer, toast, errorText, dmErrorText, keyOf, dropFailed, imToMsg, groupToMsg, openChannelMessages } from './store.js';
 import { pinsKey, pinsPath, pinPath } from './msg-actions.js';
 import { openMessage } from './e2ee/session.js';
 import { forwardText, forwardLimit, forwardHasFiles, FORWARD_FILES_NOTE } from './forward.js';
@@ -111,7 +111,7 @@ export function PinsButton({ channel, sid, view }) {
   );
 }
 // a channel: Manage messages pins. A DM or group chat (view): anyone in it does.
-export function PinsPanel({ channel, sid, view, onClose, embedded = false }) {
+export function PinsPanel({ channel, sid, view, dm = false, onClose, embedded = false }) {
   const [list, setList] = useState(null);
   const key = view ? pinsKey(view) : channel.cid;
   const ver = useChat(s => s.pinsVersion[key] || 0);
@@ -120,7 +120,7 @@ export function PinsPanel({ channel, sid, view, onClose, embedded = false }) {
   const box = useRef(null);
   useEffect(() => {
     if (view) apiFetch(pinsPath(view)).then(async d => setList(view.kind === 'dm' ? (await Promise.all(d.messages.map(openMessage))).map(imToMsg) : d.messages.map(groupToMsg))).catch(() => setList([]));
-    else apiFetch(`/chat/channels/${channel.cid}/pins`).then(d => setList(d.messages)).catch(() => setList([]));
+    else apiFetch(`/chat/channels/${channel.cid}/pins`).then(d => openChannelMessages(d.messages)).then(setList).catch(() => setList([])); // (a homeserver DM's pins are sealed: opened here)
   }, [key, ver]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (embedded) return undefined; // (inside the side panel: it stays until another tab is picked)
@@ -140,7 +140,7 @@ export function PinsPanel({ channel, sid, view, onClose, embedded = false }) {
       {!embedded && <div className="vc-pins-head"><Pin size={15} /> <b>Pinned messages</b><span className="grow" /><button type="button" className="vc-ico-btn" onClick={onClose} title="Close"><X size={15} /></button></div>}
       <div className="vc-pins-list">
         {list === null && <div className="vc-loading"><i /><i /><i /></div>}
-        {list?.length === 0 && <div className="vc-empty-note">Nothing pinned {view ? 'here' : `in #${channel.name}`} yet.{canMod ? ' Right-click a message and pick Pin message.' : ''}</div>}
+        {list?.length === 0 && <div className="vc-empty-note">Nothing pinned {view || dm ? 'here' : `in #${channel.name}`} yet.{canMod ? ' Right-click a message and pick Pin message.' : ''}</div>}
         {list?.map((m, i) => (
           <div key={m.id} className="vc-pin vl-rise" style={{ '--i': Math.min(i, 10) }}>
             <div className="vc-pin-top">

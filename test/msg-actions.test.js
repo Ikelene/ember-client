@@ -83,3 +83,9 @@ test('personal notes: edit, delete and forward my own, nothing aimed at other pe
   assert.equal(sending.edit, false);
   assert.equal(sending.del, false);
 });
+
+test('a homeserver DM (a one-channel server): either person can pin, no Manage messages needed', () => {
+  const sdm = { kind: 'channel', sid: 'http://hs|d1', cid: 'http://hs|c1', dm: 'd1@hs.example' };
+  assert.equal(messageCaps(sdm, inChan, { mine: false, canMod: false }).pin, true);
+  assert.equal(messageCaps(chan, inChan, { mine: false, canMod: false }).pin, false);
+});
