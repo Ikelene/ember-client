@@ -7,7 +7,7 @@ import { createPortal } from 'react-dom';
 import { MessageCircle, Maximize2, X, UserPlus, Check, Clock, ExternalLink, Globe, Gamepad2, Music, Tv, Trophy, Radio, MoreHorizontal, Pencil, CalendarDays, LogIn, ShieldCheck, Crown, UserMinus, Ban, Link as LinkIcon, Plus } from 'lucide-react';
 import { apiFetch, getToken } from '../api.js';
 import { BotTag, AddBotButton, TrustedIn } from './Bots.jsx';
-import { useChat, lookup, go, wantPresence, toast, errorText, getState, setCustom, ask, loadFriends, toggleBlock, memberRef, faceOf, botPresenceOf, loadMembers, onUserUpdate, markBotPeer, cleanServerProfile, socialProfileOf, shownUser, fullHandle } from './store.js';
+import { useChat, lookup, go, wantPresence, toast, errorText, getState, setCustom, ask, loadFriends, toggleBlock, memberRef, faceOf, botPresenceOf, loadMembers, onUserUpdate, markBotPeer, cleanServerProfile, socialProfileOf, fullHandle } from './store.js';
 import { isInst, NOOKARA } from './ids.js';
 import { hasAccountProfile, accountTarget } from './accountProfileCore.js';
 import { ServerIcon } from './ServerIcon.jsx';
@@ -325,8 +325,8 @@ export function ProfileCard({ username, sid, who, dm = false, onExpand, onClose,
   const canMod = canKick || canBan;
   // display name big, @username small beside the pronouns (displayNames.js). An Ember server's own name for them wins there.
   // (in a DM: always username@domain, my own homeserver's people too)
-  const handle = dm ? fullHandle(plain ? who?.handle || p?.handle || username : p?.username || vname, plain ? who.inst : NOOKARA)
-    : plain ? shownUser(p?.handle || username) : p?.username || vname;
+  // always username@domain (Matrix-style): which homeserver someone is on is part of who they are, DM or server
+  const handle = fullHandle(plain ? who?.handle || p?.handle || username : p?.username || vname, plain ? who.inst : NOOKARA);
   const serverName = who?.inst && who?.display_name && who.display_name !== who.username ? who.display_name : '';
   const bigName = (plain ? who?.display_name : serverName || p?.display_name) || handle;
 
@@ -540,7 +540,7 @@ export function ProfileModal({ username: shown, from, sid, who, dm = false, onCl
         </div>
         <div className="vc-big-id">
           <h2 style={color ? { color } : undefined}>{bigName}{extra?.bot && <BotTag verified={!!extra.bot.bot?.verified} />}</h2>
-          <HandleLine name={bigName} handle={dm ? fullHandle(p?.username || username, plainOn(who) ? who.inst : NOOKARA) : p?.username || username} pronouns={!p?.private ? p?.pronouns : ''} />
+          <HandleLine name={bigName} handle={fullHandle(p?.username || username, plainOn(who) ? who.inst : NOOKARA)} pronouns={!p?.private ? p?.pronouns : ''} />
           {extra?.bot?.bot?.owner && <div className="vc-card-sub">Bot made by @{extra.bot.bot.owner}</div>}
           {extra?.bot?.bot && <TrustedIn n={extra.bot.bot.trusted_in} verified={!!extra.bot.bot.verified} />}
           {sub && <div className="vc-card-sub">{sub}</div>}

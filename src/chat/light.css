@@ -837,3 +837,6 @@ html.vc-rounded.vc-light .vp-sens input[type="range"]::-webkit-slider-thumb { ba
 html.vc-rounded.vc-light .vp-sens input[type="range"]::-moz-range-thumb { background: #ffffff; }
 html.vc-rounded.vc-light .vp-cam { background: #f9f9fc; }
 html.vc-rounded.vc-light .vc-badge-box { background: #f3f3f6; }
+html.vc-light .vc-hs-chip { background: rgba(0, 0, 0, .06); }
+html.vc-light .vc-side-tname .vc-hs-chip { background: none; }
+html.vc-light .vc-rail-hs { box-shadow: 0 0 0 2.5px var(--rail-bg, #eceef2); }

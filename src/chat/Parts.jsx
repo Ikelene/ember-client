@@ -13,7 +13,8 @@ import {
 
 import { RetryIn } from './Gate.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
-import { inviteLinkFor, fullHandle } from './store.js';
+import { inviteLinkFor, fullHandle, nookaraDomain } from './store.js';
+import { HomeChip, ForeignChip, useServerHome } from './homeLabels.jsx';
 import { nookaraDmRows } from './social.js';
 import { SocialDmRow } from './SocialHome.jsx';
 import { useName, NameText, personName, displayNameOf, useDisplayNamesVersion, wantDisplayNames, serverOwnName } from './displayNames.js';
@@ -116,6 +117,9 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
   const railOrder = savedOrder?.length ? savedOrder : localRailOrder();
   // an instance is one entry, or (a homeserver I'm in several servers on) one per server: addresses.js railEntries
   const entries = railEntries(instances, servers).map(e => ({ rail: e.id, inst: e.inst, server: e.server }));
+  // servers on 2+ homeservers: each icon carries a small badge of its homeserver (Matrix-style "which server is this on")
+  const homes = new Set([...(legacy.length ? [nookaraDomain()] : []), ...entries.map(e => homeDomainOf(e.inst, e.server))]);
+  const hsBadge = homes.size > 1 ? (domain, icon) => ({ domain, icon }) : () => null;
   const idOf = x => x.rail || `v:${x.sid}`;
   const ordered = (() => {
     const all = [...legacy, ...entries];
@@ -235,7 +239,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
   });
 
   const item = (s, i) => (
-    <RailItem key={s.sid} dnd={dnd(`v:${s.sid}`)} server={s.sid} active={view.sid === s.sid} unread={view.sid !== s.sid && loudUnreadOf(s)} title={s.name} style={{ '--i': i }} onClick={() => go({ kind: 'server', sid: s.sid })}
+    <RailItem key={s.sid} dnd={dnd(`v:${s.sid}`)} server={s.sid} hs={hsBadge(nookaraDomain(), null)} active={view.sid === s.sid} unread={view.sid !== s.sid && loudUnreadOf(s)} title={s.name} style={{ '--i': i }} onClick={() => go({ kind: 'server', sid: s.sid })}
       badge={isMuted(s.sid) ? 0 : (s.mentions || 0) + (srvMentions[s.sid] || 0)}
       onContextMenu={e => serverMenu(e, s, { onInvite: () => dialog('invite', s.sid), onSettings: () => dialog('settings', s.sid), onLeave: () => dialog('leave', s.sid) })}>
       <span className="vc-srv-ico"><ServerIcon src={s.icon} name={s.name} /></span>
@@ -249,7 +253,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
     const muted = s && isMuted(s.sid);
     const ask_ = async () => { if (await ask({ title: `Remove ${split ? homeDomainOf(inst, s) : name}?`, text: `${inst.v2 ? homeDomainOf(inst, s) : inst.host} leaves your server list${split ? ', with every server you are in on it,' : ''}${getToken() ? ' on every device' : ''}. Your account there stays as it is - you can add it again any time.`, confirm: 'Remove from list', danger: true })) removeInstance(inst.origin); };
     return (
-      <RailItem key={rail} dnd={dnd(rail)} active={active} unread={!active && !!s && loudUnreadOf(s)} title={`${name} · ${s?.address || (inst.v2 ? homeDomainOf(inst, s) : inst.host)}`} server={s?.sid} style={{ '--i': legacy.length + i }}
+      <RailItem key={rail} dnd={dnd(rail)} hs={hsBadge(homeDomainOf(inst, s), inst.homeserver?.icon_url || null)} active={active} unread={!active && !!s && loudUnreadOf(s)} title={`${name} · ${s?.address || (inst.v2 ? homeDomainOf(inst, s) : inst.host)}`} server={s?.sid} style={{ '--i': legacy.length + i }}
         status={inst.status !== 'open' ? inst.status : null} sleep={inst.sleep} badge={s && !muted ? (s.mentions || 0) + (srvMentions[s.sid] || 0) : 0}
         onClick={() => go(s && inst.status === 'open' ? { kind: 'server', sid: s.sid } : { kind: 'instance', inst: inst.origin, ...(split ? { then: { kind: 'server', sid: s.sid } } : {}) })}
         onContextMenu={e => instanceMenu(e, inst, s, {
@@ -292,12 +296,20 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
 }
 // open one of the page's dialogs from anywhere (Chat.jsx listens)
 export const dialog = (kind, sid, extra) => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind, sid, ...extra } }));
-function RailItem({ active, unread, title, onClick, children, style, badge, onContextMenu, server, dnd, status, sleep }) {
+// the homeserver badge on a rail icon: its icon, else the first letters of its domain on a color of its own
+const hsHue = d => [...String(d)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+function RailHome({ domain, icon }) {
+  const [bad, setBad] = useState(false);
+  const label = String(domain || '').replace(/^(www|chat)\./, '').split(/[.:]/)[0].slice(0, 2);
+  return <i className="vc-rail-hs" aria-hidden="true" style={{ '--hs-color': `hsl(${hsHue(domain)} 45% 38%)` }}>{icon && !bad ? <img src={icon} alt="" onError={() => setBad(true)} /> : label}</i>;
+}
+function RailItem({ active, unread, title, onClick, children, style, badge, onContextMenu, server, dnd, status, sleep, hs }) {
   const { cls = '', ...drag } = dnd || {};
   return (
     <div className={`vc-rail-item${active ? ' active' : ''}${unread ? ' unread' : ''}${status ? (status === 'connecting' ? ' inst-connecting' : ' inst-off') : ''}${cls}`} style={style} onContextMenu={onContextMenu} {...drag}>
       <i className="vc-pill" />
       <button type="button" onClick={onClick} data-tip={server ? undefined : title} data-tip-server={server} data-tip-side="right" aria-label={title}>{children}</button>
+      {hs && <RailHome {...hs} />}
       {badge > 0 && <span className="vc-rail-badge" key={badge}>{badge > 99 ? '99+' : badge}</span>}
       {status === 'connecting' && <i className="vc-ring vc-rail-ring" aria-hidden="true" />}
       {status === 'asleep' && <i className="vc-rail-sleep" aria-hidden="true">{sleep === 'manual' ? <Unplug size={18} /> : <Moon size={18} />}</i>}
@@ -316,6 +328,7 @@ export function ServerSidebar({ sid, onInvite, onSettings, onChannel, onLeave, o
   const people = useChat(s => s.people);
   const liveMentions = useChat(s => s.mentions);
   const instances = useChat(s => s.instances);
+  const home = useServerHome(sid); // the homeserver it lives on, under its name
   useChat(s => s.notify); // redraw when mute / notification settings change
   const [menu, setMenu] = useState(false);
   const listRef = useRef(null);
@@ -412,7 +425,7 @@ export function ServerSidebar({ sid, onInvite, onSettings, onChannel, onLeave, o
       <div className={`vc-side-head${d.server.banner ? ' banner' : ''}`} ref={menuRef} onContextMenu={e => serverMenu(e, d.server, { onInvite, onSettings, onLeave, admin: canSettings })}>
         {d.server.banner && <img className="vc-side-banner" src={d.server.banner} alt="" />}
         <button type="button" className="vc-side-title" onClick={() => setMenu(m => !m)}>
-          <span>{d.server.name}</span><ChevronDown size={16} className={menu ? 'flip' : ''} />
+          <span className="vc-side-tname"><span>{d.server.name}</span><HomeChip domain={home} title={`${d.server.address || d.server.name} lives on the homeserver ${home}`} /></span><ChevronDown size={16} className={menu ? 'flip' : ''} />
         </button>
         {/* Modern: quick actions on the banner (Classic keeps just the menu) */}
         <span className="vc-side-acts">
@@ -906,7 +919,7 @@ export function UserPanel({ onSettings, onEditProfile }) {
         <Avatar user={me} size={36} status={showConn ? 'offline' : status} />
         <span className="vc-me-txt">
           <b><NameText u={{ username: me.username }} fallback={me.username} /></b>
-          <small>{showConn ? (conn === 'closed' ? 'Reconnecting...' : 'Connecting...') : (subtitle(p) || STATUS_LABEL[status])}</small>
+          <small title={subtitle(p) || STATUS_LABEL[status]}>{showConn ? (conn === 'closed' ? 'Reconnecting...' : 'Connecting...') : fullHandle(me.username)}</small>
         </span>
       </button>
       <QuickVoiceBtns />
@@ -948,7 +961,7 @@ function MemberName({ sid, m: raw }) {
   const m = useFace(raw);
   const key = useNameStyle(sid, m);
   const shown = useName(m);
-  return <b style={colorFrom(key) ? { color: colorFrom(key) } : undefined}>{shown || m.username} <NameDecor sid={sid} user={m} />{m.bot && <BotTag small verified={!!m.verified} />}{m.role === 'owner' && <RoleChip role="owner" />}</b>;
+  return <b style={colorFrom(key) ? { color: colorFrom(key) } : undefined}>{shown || m.username}<ForeignChip sid={sid} username={m.username} /> <NameDecor sid={sid} user={m} />{m.bot && <BotTag small verified={!!m.verified} />}{m.role === 'owner' && <RoleChip role="owner" />}</b>;
 }
 
 // "who posted recently" (Modern, Settings > Text & layout): up to 3 faces of people who posted in the channel in the last
