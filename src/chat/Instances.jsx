@@ -21,6 +21,11 @@ import { joinLabel, joinHint } from './Community.jsx';
 import { EMBER_API, INST_REGISTER_NOOKARA, NOOKARA_WIRE, isNookara, accountsMode, nookaraInfo, nookaraUrl, nookaraRegistration, NOOKARA_URL_FIELD, SERVER_ENV } from '../compat.js';
 
 // why another homeserver wouldn't take my account (PROTOCOL 4b)
+// registering / logging in on a homeserver that hands out accounts by invite or by approval (PROTOCOL §4a Registration)
+const REG_TEXT = {
+  account_waiting: "Your account is waiting for an admin to approve it. Log in once they have.", account_pending: "Your account is still waiting for an admin to approve it.",
+  invite_required: 'This server needs an invite code to make an account.', invalid_invite: "That invite code doesn't work - it may be used up, expired or revoked.",
+};
 const homeConnectText = (code, host) => ({
   remote_accounts_off: `${host} doesn't take accounts from other homeservers.`, homeserver_not_allowed: `${host} doesn't take accounts from your homeserver.`, homeserver_denied: `${host} doesn't take accounts from your homeserver.`,
   banned: `You're banned from ${host}.`, homeserver_unreachable: `${host} couldn't reach your homeserver.`, homeserver_rate_limited: `${host} is getting too many sign-ins from your homeserver - try again in a bit.`,
@@ -49,6 +54,7 @@ export function AddInstance({ url, invite, server, onClose, onSetup }) {
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
   const [code, setCode] = useState(invite || '');
+  const [regCode, setRegCode] = useState(''); // a registration invite (registration "invite")
   const [joinPass, setJoinPass] = useState(''); // (a server with a join password)
   const [asked, setAsked] = useState(false);
   const conns = useChat(s => s.instances);
@@ -103,9 +109,10 @@ export function AddInstance({ url, invite, server, onClose, onSetup }) {
     e.preventDefault();
     setBusy(true); setErr('');
     try {
-      if (live) { await loginInstance(found.origin, tab, user.trim(), pass); if (found.info.claimed === false) onSetup?.(found.origin); else setStep('join'); }
-      else await authed(await localSession(found.origin, tab, user.trim(), pass));
-    } catch (er) { setErr(errorText(er.message)); }
+      const inv = tab === 'register' && regMode === 'invite' ? regCode.trim() : undefined;
+      if (live) { await loginInstance(found.origin, tab, user.trim(), pass, inv); if (found.info.claimed === false) onSetup?.(found.origin); else setStep('join'); }
+      else await authed(await localSession(found.origin, tab, user.trim(), pass, inv));
+    } catch (er) { setErr(REG_TEXT[er.message] || errorText(er.message)); }
     setBusy(false);
   }
   async function join(withCode) {
@@ -119,7 +126,8 @@ export function AddInstance({ url, invite, server, onClose, onSetup }) {
     } catch (e) { setAsked(false); toast(errorText(e.message)); } // (nothing was asked: no "Request sent")
     setBusy(false);
   }
-  const closedSignup = found && info.accounts_mode === 'local' && info.registration !== 'open' && info.claimed !== false;
+  const regMode = found ? info.accounts?.registration || info.registration : null; // open | invite | approval | closed
+  const closedSignup = found && info.accounts_mode === 'local' && !['open', 'invite', 'approval'].includes(regMode) && info.claimed !== false;
   const back = () => { setStep('url'); setFound(null); setErr(''); };
 
   return (
@@ -156,7 +164,8 @@ export function AddInstance({ url, invite, server, onClose, onSetup }) {
                   {closedSignup && <p className="vc-hint vc-gap-top">This server isn't taking new accounts.</p>}
                   <label className="vc-field vc-gap-top"><span>Username</span><input className="form-input" autoFocus autoComplete="username" value={user} onChange={e => setUser(e.target.value)} maxLength={32} /></label>
                   <label className="vc-field"><span>Password</span><input className="form-input" type="password" autoComplete={tab === 'login' ? 'current-password' : 'new-password'} value={pass} onChange={e => setPass(e.target.value)} /></label>
-                  {tab === 'register' && <p className="vc-hint">2-32 letters, numbers, _ or . for the name, and a password of at least 8 characters. This account only exists on this server.</p>}
+                  {tab === 'register' && regMode === 'invite' && <label className="vc-field"><span>Invite code</span><input className="form-input" autoComplete="off" autoCapitalize="none" spellCheck={false} value={regCode} onChange={e => setRegCode(e.target.value)} placeholder="from an admin" /></label>}
+                  {tab === 'register' && <p className="vc-hint">2-32 letters, numbers, _ or . for the name, and a password of at least 8 characters. This account only exists on this server.{regMode === 'approval' ? ' An admin has to approve it before you can sign in.' : ''}</p>}
                   {err && <p className="vc-err"><TriangleAlert size={14} /> {err}</p>}
                   <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" onClick={back}>Back</button><span className="grow" />
                     <button type="submit" className="btn btn-primary" disabled={busy || !user.trim() || !pass}>{busy ? 'Working...' : tab === 'login' ? 'Log in' : 'Create account'}</button></div>

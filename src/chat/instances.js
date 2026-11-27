@@ -183,7 +183,9 @@ export async function nookaraSession(origin) {
   catch (e) { throw restrictedErr(e) ? Object.assign(new Error('account_restricted'), { status: 403, restricted: true, text: e.error === 'account_restricted' ? e.message : '' }) : e; } // (Nookara won't sign new instance tokens while Ember is off for the account)
   return plain(origin, INST_AUTH_NOOKARA, { token: t.token });
 }
-export const localSession = (origin, kind, username, password) => plain(origin, `/api/v1/auth/${kind === 'register' ? 'register' : 'login'}`, { username, password });
+// register: { pending: true } (registration by approval) is no session: it says so as Error('account_waiting')
+export const localSession = (origin, kind, username, password, invite) => plain(origin, `/api/v1/auth/${kind === 'register' ? 'register' : 'login'}`, { username, password, ...(invite ? { invite } : {}) })
+  .then(r => { if (r?.pending && !r.session) throw Object.assign(new Error('account_waiting'), { pending: true }); return r; });
 async function authNookara(c) {
   try { const r = await nookaraSession(c.origin); adopt(c, r); return r; }
   catch (e) { if (e.restricted) restrict(c, e.text); throw e; }
@@ -196,10 +198,10 @@ function dropSession(c) {
 // Nookara sign-out: Nookara-login instances lose their session (local-account ones keep theirs)
 export function dropNookaraSessions() { for (const c of connections.values()) if (nookaraSignsIn(c.info) || c.source === 'nookara' || /^nk:/.test(loadSessionTags()[c.origin] || '')) dropSession(c); }
 // an existing (logged out) local-mode instance: log in again
-export async function loginInstance(origin, kind, username, password) {
+export async function loginInstance(origin, kind, username, password, invite) {
   const c = connections.get(origin);
   if (!c) throw new Error('instance_not_connected');
-  adopt(c, await localSession(origin, kind, username, password));
+  adopt(c, await localSession(origin, kind, username, password, invite));
   await me(c).catch(() => {});
   if (!c.ws) openSocket(c); else mirror();
 }
