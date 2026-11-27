@@ -8,7 +8,7 @@ import { apiFetch, getToken } from '../api.js';
 import { K, acctKey, registry, hooks, normOrigin, instOf, loadSessions, loadSessionTags, tokenTag, saveSession, fromInstance, parseK } from './ids.js';
 import { onInstClientsFrame, rewatchInstClients } from './instClients.js';
 import { SHORT } from '../version.js';
-import { getState, patchState, toast, handleEvent, socialEvent, homeConnected, RESTRICTED_TEXT, instanceVoiceClosed, voiceSocketReady, loadEmojis, go, catchUp, resumeInstanceView, backoff, instanceRestricted, instanceRestored, forgetServerCache } from './store.js';
+import { getState, patchState, toast, handleEvent, socialEvent, homeConnected, RESTRICTED_TEXT, instanceVoiceClosed, voiceSocketReady, loadEmojis, go, catchUp, resumeInstanceView, backoff, instanceRestricted, instanceRestored, forgetServerCache, dmRewrapped } from './store.js';
 import { isV2, communityOf, parseAddress, parseInviteUrl, createErrorText } from './addresses.js';
 import { locate, currentOrigin, onSignedOut } from './homeserver.js';
 import { sourceFor, tagFor, openSession } from './homeAuth.js';
@@ -481,6 +481,22 @@ function onFrame(c, m) {
     case 'social_friends_update': case 'social_presence': case 'social_dm_update': case 'social_dm_remove': case 'social_dm_activity':
       socialEvent(c.origin, m); // (as sent: these are not a server's events, nothing in them is namespaced)
       return;
+    case 'social_dm_rewrapped': // someone wrapped earlier messages again for my new key: open them again
+      dmRewrapped(m.dm);
+      return;
+    case 'homeserver_pending': { // (admins) someone asked for an account or a server: Manage shows the queue
+      const where = c.info?.homeserver?.domain || hostOf(c.origin);
+      toast(m.kind === 'server' ? `${m.request?.account?.username || 'Someone'} asked for a server on ${where}: ${m.request?.name || ''}` : `${m.account?.username || 'Someone'} asked for an account on ${where}.`, true);
+      dispatchEvent(new CustomEvent('ember-hs-pending', { detail: { origin: c.origin, kind: m.kind } }));
+      return;
+    }
+    case 'server_request_update': { // my server request was answered
+      const r = m.request || {};
+      toast(r.status === 'approved' ? `Your server ${r.name} was approved.` : r.status === 'rejected' ? `Your request for ${r.name} was declined${r.reason ? `: ${r.reason}` : '.'}` : `Your request for ${r.name} was updated.`, r.status === 'approved');
+      if (r.status === 'approved') loadInstanceData(c.origin).catch(() => {});
+      dispatchEvent(new CustomEvent('ember-server-request', { detail: { origin: c.origin, request: r } }));
+      return;
+    }
     case 'chat_ready':
       if (held) return; // (the account is locked: holdInstances(false) says hello again)
       c.restricted = null;
