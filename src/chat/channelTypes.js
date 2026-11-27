@@ -43,5 +43,7 @@ export function lockedTextFor(channel) {
   if (channel.type === 'logs' && channel.config?.mode === 'cloudlink') return "You can't send messages in this CloudLink channel.";
   if (channel.type === 'logs') return 'This is a logs channel - only webhooks (and admins) post here.';
   if (channel.type === 'welcome') return 'Join and leave messages show up here.';
+  // not locked, yet I can't post: the channel's permissions say so (an overwrite denies Send messages)
+  if (!channel.locked && channel.can_post === false) return "You don't have permission to send messages in this channel.";
   return null;
 }

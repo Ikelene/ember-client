@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Shield, Plus, Trash2, X, Slash, Check, RefreshCw, Search, UserCheck, Link2, TriangleAlert } from 'lucide-react';
 import { apiFetch } from '../api.js';
-import { useChat, ask, toast, refreshServer, loadMembers } from './store.js';
+import { useChat, ask, toast, refreshServer, loadMembers, fullHandle } from './store.js';
 import { instOf } from './ids.js';
 import { Card } from './SettingsShell.jsx';
 import { UnsavedBar } from './unsaved.jsx';
@@ -56,8 +56,9 @@ export function OverwritesEditor({ sid, channel = null, category = null, onDirty
   const who = o => {
     if (o.type === 'role') return o.everyone ? '@everyone' : roleOf(o.id)?.name || o.name || 'Deleted role';
     const m = memberOf(o.id);
-    const handle = m?.handle || (String(o.id).includes('@') ? m?.username : null) || m?.username || o.id;
-    return `${m?.display_name || o.display_name || m?.username || o.name || o.id}${handle && handle !== (m?.display_name || o.display_name) ? ` (${handle})` : ''}`;
+    // Display name (user@domain), people of this homeserver too
+    const handle = m?.handle || (m?.username ? fullHandle(m.username, inst) : o.id);
+    return `${m?.display_name || o.display_name || m?.username || o.name || o.id} (${handle})`;
   };
   // @everyone is always listed (an empty one is just "nothing changed")
   const shown = [...(rows.some(o => o.everyone) ? [] : [{ type: 'role', id: 'everyone', everyone: true, allow: 0, deny: 0 }]), ...rows]
