@@ -806,6 +806,11 @@ export async function joinCommunity(origin, code, password, which) {
     : await apiFetch(`/chat/servers/${K(origin, sid)}/join`, { method: 'POST', body: JSON.stringify(password ? { password } : {}) });
   if (d.pending) { c.pending = true; mirror(); return { pending: true }; }
   await loadInstanceData(origin);
+  // The server adds a socket to the new server's events only once that socket has finished its chat_hello. A join that lands
+  // while the socket is still saying hello (a server added and joined in one go) was left out, so nothing showed up live
+  // until a reload: say hello again, which subscribes the socket to every server it is in now.
+  const now = connections.get(origin);
+  if (now?.ws?.readyState === 1) sendTo(origin, { type: 'chat_hello' });
   return { sid: d.server.sid };
 }
 export const instanceConn = origin => connections.get(origin);
