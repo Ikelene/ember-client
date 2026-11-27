@@ -1,6 +1,6 @@
 // Server settings: the same dialog as Ember's own settings (SettingsDialog: sidebar of grouped pages + the page with its
 // title and a close X; on phones the list first, then a page slides in). Server / Members / Integrations, and for an
-// instance's admins its own pages (Instance). Nookara-hosted servers use the same shell with the pages they have.
+// homeserver's admins its own pages (Homeserver). Nookara-hosted servers use the same shell with the pages they have.
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ImageCropper from '../components/ImageCropper.jsx';
@@ -73,7 +73,7 @@ function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, 
       (canServer || instAdmin) && ['bridge', 'Bridge', ArrowLeftRight, ['Discord', 'Fluxer', 'Matrix', 'Bridge bots']],
       canServer && ['game', 'Game servers', Gamepad2, ['Minecraft', 'CloudLink', 'Audit log']],
     ]],
-    ['Instance', instAdmin ? [
+    ['Homeserver', instAdmin ? [
       ['accounts', 'Accounts', KeyRound, ['Accounts mode', 'Nookara accounts', 'Own accounts', 'Local accounts', 'Registration', 'Public address']],
       uploads,
       ['backups', 'Backups', Archive, ['Backup', 'Restore', 'Download', 'Save to Nookara', 'Export']],
@@ -104,7 +104,7 @@ export function ServerSettings({ sid, onClose, tab: startTab, autoUpdate = false
     <SettingsShell label="Server settings" crumb={srv?.name} groups={groups} startTab={startTab} onClose={onClose} gone={!d}
       head={srv && <>
         <span className="vc-srv-ico">{srv.icon ? <img src={srv.icon} alt="" /> : initials(srv.name)}</span>
-        <span><b>{srv.name}</b><small>{onInst ? <><Globe size={11} /> {inst?.host || origin}</> : 'Hosted by Nookara'}</small></span>
+        <span><b>{srv.name}</b><small>{onInst ? <><Globe size={11} /> {srv.address || inst?.host || origin}</> : 'Hosted by Nookara'}</small></span>
       </>}>
       {(page, { onDirty, goTo }) => <PlanCtx.Provider value={buildPlanCtx(inst, goTo)}>
         {page === 'overview' && <Overview sid={sid} origin={origin} instAdmin={instAdmin} onDirty={onDirty} goTo={goTo} />}
@@ -353,7 +353,7 @@ function DangerZone({ sid, origin, instAdmin, onClose }) {
       )}
       {instAdmin && (
         <Card title="Restart" icon={RefreshCw}>
-          <div className="cs-row"><div className="cs-text"><b>Restart the server</b><span>Everyone is disconnected for a moment. It only comes back by itself under something that restarts it (Docker, systemd).</span></div>
+          <div className="cs-row"><div className="cs-text"><b>Restart the homeserver</b><span>Everyone on every server it hosts is disconnected for a moment. It only comes back by itself under something that restarts it (Docker, systemd).</span></div>
             <button type="button" className="btn btn-surface" onClick={() => restartInstance(origin, instName)}><RefreshCw size={14} /> Restart</button></div>
         </Card>
       )}
