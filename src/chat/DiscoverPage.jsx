@@ -60,9 +60,9 @@ export default function DiscoverPage({ onClose, tab: tabIn = 'servers', onTab })
 
 // a server on a homeserver with many: I'm in it when its own key is in my list; an older one is its whole address
 const listedSid = r => { const url = normOrigin(r.url); return url && r.sid ? K(url, r.sid) : null; };
-// (a quiet connection is only there for my account or a DM on that homeserver: not a server I'm in)
-const inList = (mine, url) => mine.some(i => i.origin === url && !i.quiet);
-export const isListedAdded = (r, servers, mine) => (listedSid(r) ? servers.some(s => s.sid === listedSid(r)) : inList(mine, normOrigin(r.url)));
+// (a quiet connection is only there for my account or a DM on that homeserver: in a server there only when one is in my list)
+const inList = (mine, url, servers = []) => mine.some(i => i.origin === url && (!i.quiet || servers.some(s => s.inst === url)));
+export const isListedAdded = (r, servers, mine) => (listedSid(r) ? servers.some(s => s.sid === listedSid(r)) : inList(mine, normOrigin(r.url), servers));
 // a directory listing was picked: open it when I'm in it, otherwise join (the Add a server dialog only when it has to ask).
 // -> Promise<true when it opened or joined>
 export async function pickListed(r, servers, mine) {
@@ -72,7 +72,7 @@ export async function pickListed(r, servers, mine) {
     if (isListedAdded(r, servers, mine)) { go({ kind: 'server', sid: listedSid(r) }); return true; }
     return joinAndOpen(url, undefined, r.sid);
   }
-  if (inList(mine, url)) { go({ kind: 'instance', inst: url }); return true; }
+  if (inList(mine, url, servers)) { go({ kind: 'instance', inst: url }); return true; }
   return joinAndOpen(url);
 }
 // directory pictures are untrusted links: only https ones show (the banner across the top of the card, its tint where there's none)
