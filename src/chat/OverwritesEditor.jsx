@@ -2,7 +2,7 @@
 // overwrites on the left (@everyone, roles, members, people from other homeservers too), every channel permission on the
 // right with deny / inherit / allow, "Synced with category" and Sync, and a "Check a member" panel that asks the server what
 // someone may really do here. Saved together with the bulk PUT.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Shield, Plus, Trash2, X, Slash, Check, RefreshCw, Search, UserCheck, Link2, TriangleAlert } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { useChat, ask, toast, refreshServer, loadMembers, fullHandle } from './store.js';
@@ -42,8 +42,14 @@ export function OverwritesEditor({ sid, channel = null, category = null, onDirty
     }, e => setLoadErr(e.message));
   };
   useEffect(load, [path]); // eslint-disable-line react-hooks/exhaustive-deps
+  // changed elsewhere (another admin, a sync, a category rename: chat_channels_update / chat_perms_changed): load again, unless
+  // there are unsaved edits here
+  const liveKey = useChat(st => { const c = channel ? st.detail[sid]?.channels?.find(x => x.cid === channel.cid) : null; return c ? JSON.stringify([c.permission_overwrites, c.perms_synced, c.category]) : JSON.stringify(st.detail[sid]?.categories || []); });
+  const dirtyRef = useRef(false);
+  useEffect(() => { if (base && !dirtyRef.current) load(); }, [liveKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!members) loadMembers(sid); }, [sid]); // eslint-disable-line react-hooks/exhaustive-deps
   const dirty = !!rows && !!base && !sameRows(rows, base);
+  dirtyRef.current = dirty;
   const [bar, flashSaved] = useUnsaved(dirty, onDirty || undefined);
   const groups = useMemo(() => groupsFor(channel ? channel.type || 'text' : 'category'), [channel?.type]); // eslint-disable-line react-hooks/exhaustive-deps
 
