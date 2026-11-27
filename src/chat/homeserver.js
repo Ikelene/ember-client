@@ -89,6 +89,15 @@ async function wellKnown(origin) {
   return old ? { legacy: true } : null;
 }
 const str = (v, max = 200) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+// a domain's own discovery doc names where its accounts' DM messages are reported (social.reports_url), also when its homeserver
+// is somewhere else (nookara.cc names Nookara's route; its homeserver's doc may not). -> the URL on that domain | null
+export async function domainReportsUrl(domain) {
+  const p = parseHomeserver(domain);
+  if (!p?.origin) return null;
+  const doc = await getJson(`${p.origin}/.well-known/ember`).catch(() => null);
+  const u = safeUrl(doc?.social?.reports_url, `${p.origin}/`);
+  return u && (u.origin === p.origin || u.host === p.domain) && !u.search && !u.hash ? u.href : null;
+}
 // -> { domain, origin, name, icon_url, authorize_url, token_url, methods: [{ id, kind, name }], protocol, nookara_identity?: true }
 export async function resolve(input) {
   const p = input && typeof input === 'object' ? input : parseHomeserver(input);

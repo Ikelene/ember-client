@@ -23,7 +23,7 @@ import { setInviteHomes } from './inviteLink.js';
 import { myIdOn } from './tokens.js';
 import { readChannel as readMsgCache, writeChannel as writeMsgCache, dropChannels as dropMsgCache } from './msgCache.js';
 import { connections, sendTo, startInstances, loadInstanceData, retryInstances, resumeInstances, renewNookaraSession, holdInstances, forgetIfEmpty, wakeInstance, instanceWoke, recheckSleepers, joinByAddress, ensureHost } from './instances.js';
-import { homeFetch, onSignedOut, currentSession, DEFAULT_HOMESERVER, resolve as resolveHomeserver, homeInfo, remoteToken, isOwnUrl } from './homeserver.js';
+import { homeFetch, onSignedOut, currentSession, DEFAULT_HOMESERVER, resolve as resolveHomeserver, homeInfo, remoteToken, isOwnUrl, domainReportsUrl } from './homeserver.js';
 import { reportRoute, reportBody, canReportSealed } from './e2ee/report.js';
 import { social as socialApi, socialBase, socialFetch, createDm, setNookaraSocial, dmHostUrl } from './socialApi.js';
 import { emptySocial, friendLists, mergeDms, cleanDm, socialReduce, socialRefetch, dmTitle, splitHandle, stableId, cleanHandle, accountName, remoteFriendLists, splitNookaraDms, nookaraDmView, dmHandle } from './social.js';
@@ -1596,7 +1596,7 @@ export async function sendSdmReport(view, m, reason, details) {
   const info = await resolveHomeserver(route.domain).then(hs => homeInfo(hs.origin)).catch(() => null);
   if (route.to === 'nookara') {
     // a Nookara account: Nookara's report route, as the discovery document of its domain names it (social.reports_url)
-    const url = info?.reports_url;
+    const url = info?.reports_url || (await domainReportsUrl(route.domain).catch(() => null)); // (else the domain's own doc says)
     if (h.nookara && route.own) return apiFetch(url && new URL(url).origin === normOrigin(NOOKARA_ORIGIN) ? new URL(url).pathname : '/api/report/dm-message', { method: 'POST', body: JSON.stringify(body) });
     if (!url) throw Object.assign(new Error('no_reports_url'), { error: 'no_reports_url' });
     if (isOwnUrl(url)) { const res = await homeFetch(url, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) }); const d = await res.json().catch(() => ({})); if (!res.ok) throw Object.assign(new Error(d?.error || 'request_failed'), d); return d; }
@@ -3056,7 +3056,9 @@ const SOCIAL_TEXT = {
   dm_not_allowed: "They don't take messages from you.", already_member: "They're in the group already.", group_full: 'A group can have up to 10 people.', not_hosted_here: "That group's homeserver has to do that - try again in a moment.", invalid_members: "That won't work - pick up to 9 other people.", too_many_dms: 'They have too many conversations.', not_a_group: 'Only group chats can do that.', owner_only: 'Only the group owner can do that.',
   dm_not_found: "That conversation isn't there any more.", local_accounts_only: 'Friends and DMs need an account on this homeserver.', unreachable: "Couldn't reach your homeserver.", signed_out: 'Your sign-in ended - sign in again.',
 };
-export const socialErrorText = e => `${e?.member ? `${e.member}: ` : ''}${SOCIAL_TEXT[e?.error || e?.message] || "That didn't work - try again in a bit."}`; // (member: which person it was about)
+// e.member is the id the host knows them by (l:2@b.example): with the handles that were asked for, say it by name
+const whoOf = (member, handles = []) => { const d = String(member || '').split('@')[1]; const same = handles.filter(h => String(h).split('@')[1] === d); return same.length === 1 ? same[0] : member; };
+export const socialErrorText = (e, handles) => `${e?.member ? `${whoOf(e.member, handles)}: ` : ''}${SOCIAL_TEXT[e?.error || e?.message] || "That didn't work - try again in a bit."}`; // (member: which person it was about)
 export async function addSocialFriend(input, message) {
   const h = soc(), handle = cleanHandle(input, h?.domain);
   if (!h) return false;
@@ -3094,7 +3096,7 @@ export async function startSocialDm({ handles = [], ids = [], name, group } = {}
     set(st => ({ social: { ...st.social, dms: mergeLocal(st.social.dms, { ...(st.social.dms.find(x => x.id === dm.id) || {}), ...dm }) } }));
     go({ kind: 'sdm', id: dm.id });
     return dm;
-  } catch (e) { toast(socialErrorText(e)); return null; }
+  } catch (e) { toast(socialErrorText(e, members)); return null; }
 }
 // "New message" with the Nookara sign-in: a Nookara name opens its DM as ever (alice, alice@nookara.cc); name@another.homeserver
 // starts (or finds) the DM with them, which is made on nookara.cc's homeserver
@@ -3126,7 +3128,7 @@ export async function socialDmAction(what, id, arg) {
       : await apiFetch(`${at}/members/${encodeURIComponent(arg)}`, { method: 'DELETE', inst: host });
     if (d?.dm) socialEvent(host, { type: 'social_dm_update', dm: d.dm });
     return true;
-  } catch (e) { toast(socialErrorText(e)); return false; }
+  } catch (e) { toast(socialErrorText(e, Array.isArray(arg) ? arg : [])); return false; }
 }
 
 // me = null: signed out of Nookara (web Ember without a token) - only local-account instances work then
