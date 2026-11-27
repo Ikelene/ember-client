@@ -1,10 +1,13 @@
 // Home (no conversation open): a greeting, one suggestion, then tabs: Friends (recent chats + who's on and off), Requests,
 // Blocked, Group chats, Catch up (Dashboard.jsx: unread, servers, notifications) and Saved. One search box filters your
-// friends and adds someone by username.
+// friends and adds someone by username. People on other homeservers (name@their.homeserver) sit next to the Nookara ones:
+// they come from Nookara's /api/v2/social (store.js: state.social) and are shown with SocialHome.jsx's pieces.
 import { useEffect, useMemo, useState } from 'react';
 import { MessageCircle, UserPlus, Check, X, House, Users, Inbox, ShieldOff, UsersRound, Sparkles, Bookmark, Search, Compass, Plus, ChevronRight } from 'lucide-react';
 import { apiFetch } from '../api.js';
-import { useChat, go, loadFriends, toast, errorText, ask, toggleBlock, setHomeRequests } from './store.js';
+import { useChat, go, loadFriends, toast, errorText, ask, toggleBlock, setHomeRequests, addSocialFriend, socialFriendAction, startSocialDm } from './store.js';
+import { accountName, shownHandle, dmTitle, dmUnread, cleanHandle, nookaraDmRows } from './social.js';
+import { PersonCard, DmFace, face } from './SocialHome.jsx';
 import { NameText, displayNameOf } from './displayNames.js';
 import { Avatar, subtitle } from './Profile.jsx';
 import { NookaraConnNote } from './Parts.jsx';
@@ -32,6 +35,10 @@ export default function Home({ onUser }) {
   const servers = useChat(s => s.servers);
   const blocks = useChat(s => s.blocks);
   const people = useChat(s => s.people);
+  // people and DMs on other homeservers
+  const social = useChat(s => s.social);
+  const myDomain = useChat(s => s.nkHome?.domain || '');
+  const [card, setCard] = useState(null);
   const [tab, setTabRaw] = useState(() => { try { return localStorage.getItem('bf_home_tab') || 'friends'; } catch { return 'friends'; } });
   const setTab = t => { const k = { online: 'friends', all: 'friends', pending: 'requests', add: 'friends', home: 'catchup' }[t] || t; setTabRaw(k); try { localStorage.setItem('bf_home_tab', k); } catch { /* fine */ } };
   const [reqs, setReqs] = useState({ incoming: [], outgoing: [] });
@@ -52,8 +59,13 @@ export default function Home({ onUser }) {
     catch (e) { toast(errorText(e.message)); }
   }
   async function addFriend(name) {
-    const u = String(name || '').trim().replace(/^@/, '');
+    let u = String(name || '').trim().replace(/^@/, '');
     if (!u) return;
+    if (u.includes('@')) { // name@their.homeserver: asked through Nookara's social API (name@nookara.cc is a Nookara name)
+      const handle = cleanHandle(u, myDomain);
+      if (!handle || handle.includes('@')) { if (await addSocialFriend(u)) setQ(''); return; }
+      u = handle;
+    }
     try {
       const d = await apiFetch('/friends/request', { method: 'POST', body: JSON.stringify({ username: u }) });
       toast(d.status === 'accepted' ? `You and ${u} are friends now!` : `Friend request sent to ${u}.`, true);
@@ -82,10 +94,11 @@ export default function Home({ onUser }) {
   const online = shown.filter(f => st(f) !== 'offline').sort((a, b) => a.friend_username.localeCompare(b.friend_username));
   const offline = shown.filter(f => st(f) === 'offline').sort((a, b) => a.friend_username.localeCompare(b.friend_username));
   const onlineAll = friends.filter(f => st(f) !== 'offline').length;
-  // recent chats: the latest DM conversations (newest first, the server's order)
-  const recent = useMemo(() => dms.filter(c => c.username !== 'System' && (!needle || c.username.toLowerCase().includes(needle))).slice(0, 10), [dms, needle]);
-  const reqN = reqs.incoming.length + dmIn.length;
-  const unreadN = dms.reduce((n, c) => n + (c.unread || 0), 0);
+  const far = social.friends.filter(f => !needle || accountName(f, myDomain).toLowerCase().includes(needle) || String(f.handle || '').toLowerCase().includes(needle));
+  // recent chats: the latest DM conversations (newest first, the server's order), the ones on other homeservers among them
+  const recent = useMemo(() => nookaraDmRows(dms.filter(c => c.username !== 'System' && (!needle || c.username.toLowerCase().includes(needle))), social.dms.filter(d => !needle || dmTitle(d, myDomain).toLowerCase().includes(needle))).slice(0, 10), [dms, social.dms, needle, myDomain]);
+  const reqN = reqs.incoming.length + social.incoming.length + dmIn.length;
+  const unreadN = dms.reduce((n, c) => n + (c.unread || 0), 0) + dmUnread(social.dms);
 
   // one suggestion at a time: requests first, then finding a server
   const tip = reqN ? { icon: UserPlus, title: `${reqN} ${reqN === 1 ? 'person wants' : 'people want'} to connect`, text: 'Friend and message requests are waiting for you.', btn: 'Review', on: () => setTab('requests') }
@@ -93,9 +106,9 @@ export default function Home({ onUser }) {
       : { icon: Compass, title: 'Looking for somewhere new?', text: 'Discovery has servers made by the Ember community.', btn: 'Explore', on: () => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'discover' } })) };
 
   const tabs = [
-    ['friends', Users, 'Friends', friends.length, false],
+    ['friends', Users, 'Friends', friends.length + social.friends.length, false],
     ['requests', Inbox, 'Requests', reqN, true],
-    ['blocked', ShieldOff, 'Blocked', blocks?.length || 0, false],
+    ['blocked', ShieldOff, 'Blocked', (blocks?.length || 0) + social.blocked.length, false],
     ['groups', UsersRound, 'Group chats', 0, false],
     ['catchup', Sparkles, 'Catch up', unreadN, true],
     ['saved', Bookmark, 'Saved', 0, false],
@@ -115,6 +128,16 @@ export default function Home({ onUser }) {
       </div>
     );
   };
+  // someone on another homeserver (a friend, a request, a block): name, where they are, and what the row can do
+  const farRow = (f, sub, tools) => (
+    <div key={f.id} className="hm-friend vl-rise">
+      <button type="button" className="hm-friend-who" onClick={() => setCard(f)}>
+        <Avatar user={face(f)} size={34} status={sub == null ? social.presence[f.id] || 'offline' : undefined} />
+        <span><b>{accountName(f, myDomain)}</b><small>{sub ? `${sub} - ` : ''}{shownHandle(f, myDomain)}</small></span>
+      </button>
+      {tools}
+    </div>
+  );
   return (
     <div className="vc-home">
       <div className="vc-home-main">
@@ -145,7 +168,7 @@ export default function Home({ onUser }) {
             {tab === 'friends' && (
               <form className="hm-search" onSubmit={e => { e.preventDefault(); if (needle && !shown.length) addFriend(q); }}>
                 <Search size={16} />
-                <input value={q} onChange={e => setQ(e.target.value)} placeholder="Find a friend, or type a username to add them" aria-label="Find a friend or add someone" />
+                <input value={q} onChange={e => setQ(e.target.value)} placeholder="Find a friend, or add someone: alice or alice@example.org" aria-label="Find a friend or add someone" />
                 <button type="button" className="hm-search-add" title={q.trim() ? `Send a friend request to ${q.trim()}` : 'Type a username to add someone'} disabled={!q.trim()} onClick={() => addFriend(q)}><UserPlus size={16} /></button>
               </form>
             )}
@@ -157,28 +180,38 @@ export default function Home({ onUser }) {
                   <>
                     <div className="hm-sub">Recent chats</div>
                     <div className="hm-recent">
-                      {recent.map(c => (
+                      {recent.map(({ kind, c, dm }) => (kind === 'sdm' ? (
+                        <button type="button" key={dm.id} className="hm-tile vl-rise" onClick={() => go({ kind: 'sdm', id: dm.id })}>
+                          <DmFace dm={dm} size={44} presence={social.presence} />
+                          <b>{dmTitle(dm, myDomain)}</b>
+                          {dm.unread > 0 && <i>{dm.unread > 99 ? '99+' : dm.unread}</i>}
+                        </button>
+                      ) : (
                         <button type="button" key={c.username} className="hm-tile vl-rise" onClick={() => go({ kind: 'dm', username: c.username })}>
                           <Avatar user={{ username: c.username, pfp: c.pfp || people[c.username]?.pfp }} size={44} status={presence[c.username]?.status || 'offline'} />
                           <b><NameText u={{ username: c.username }} fallback={c.username} /></b>
                           {c.unread > 0 && <i>{c.unread > 99 ? '99+' : c.unread}</i>}
                         </button>
-                      ))}
+                      )))}
                     </div>
                   </>
                 )}
-                {friendsLoaded && !friends.length && <div className="hm-empty"><UserPlus size={28} /><b>No friends yet</b><span>Type someone's username above to send them a request.</span></div>}
-                {friends.length > 0 && needle && !shown.length && <div className="hm-empty"><Search size={24} /><b>None of your friends match "{q.trim()}"</b><button type="button" className="btn btn-primary" onClick={() => addFriend(q)}><UserPlus size={15} /> Add {q.trim()}</button></div>}
+                {friendsLoaded && !friends.length && !social.friends.length && <div className="hm-empty"><UserPlus size={28} /><b>No friends yet</b><span>Type someone's username above to send them a request. People on other homeservers are name@their.homeserver.</span></div>}
+                {friends.length > 0 && needle && !shown.length && !far.length && <div className="hm-empty"><Search size={24} /><b>None of your friends match "{q.trim()}"</b><button type="button" className="btn btn-primary" onClick={() => addFriend(q)}><UserPlus size={15} /> Add {q.trim()}</button></div>}
                 {(!friendsLoaded || (!friendsReady && friends.length > 0)) && <div className="vc-loading"><i /><i /><i /></div>}
                 {friendsReady && online.length > 0 && <><div className="hm-sub">Online - {online.length}</div><div className="hm-grid">{online.map(friendRow)}</div></>}
                 {friendsReady && offline.length > 0 && <><div className="hm-sub">Offline - {offline.length}</div><div className="hm-grid off">{offline.map(friendRow)}</div></>}
+                {far.length > 0 && <><div className="hm-sub">On other homeservers - {far.length}</div><div className="hm-grid">{far.map(f => farRow(f, null, <button type="button" className="hm-friend-msg" title={`Message ${accountName(f, myDomain)}`} onClick={() => startSocialDm({ ids: [f.id] })}><MessageCircle size={16} /></button>))}</div></>}
               </div>
             )}
 
             {tab === 'requests' && (
               <div className="hm-body" key="requests">
-                <div className="hm-sub">Wants to be your friend - {reqs.incoming.length}</div>
-                {!reqs.incoming.length && <div className="hm-none">Nobody right now.</div>}
+                <div className="hm-sub">Wants to be your friend - {reqs.incoming.length + social.incoming.length}</div>
+                {!reqs.incoming.length && !social.incoming.length && <div className="hm-none">Nobody right now.</div>}
+                {social.incoming.length > 0 && <div className="hm-grid">{social.incoming.map(r => farRow(r, r.message || 'Friend request', <>
+                  <button type="button" className="vc-round ok" title="Accept" onClick={() => socialFriendAction('accept', r.id).then(ok => ok && toast(`You and ${accountName(r, myDomain)} are friends now!`, true))}><Check size={16} /></button>
+                  <button type="button" className="vc-round no" title="Decline" onClick={() => socialFriendAction('remove', r.id)}><X size={16} /></button></>))}</div>}
                 <div className="hm-grid">{reqs.incoming.map(r => (
                   <div key={r.id} className="hm-friend"><span className="hm-friend-who"><Avatar user={{ username: r.from_username, pfp: r.pfp_url }} size={34} /><span><b>{r.from_username}</b><small>Friend request</small></span></span>
                     <button type="button" className="vc-round ok" title="Accept" onClick={() => answer(r.id, true)}><Check size={16} /></button>
@@ -189,8 +222,9 @@ export default function Home({ onUser }) {
                   <div key={r.id} className="hm-friend"><span className="hm-friend-who"><Avatar user={{ username: r.username, pfp: r.pfp }} size={34} /><span><b><NameText u={{ username: r.username }} fallback={r.username} /></b><small>Message request</small></span></span>
                     <button type="button" className="vc-round ok" title="Accept" onClick={() => answerDm(r.id, true)}><Check size={16} /></button>
                     <button type="button" className="vc-round no" title="Decline" onClick={() => answerDm(r.id, false)}><X size={16} /></button></div>))}</div>
-                <div className="hm-sub">You sent - {reqs.outgoing.length}</div>
-                {!reqs.outgoing.length && <div className="hm-none">No requests waiting on someone else.</div>}
+                <div className="hm-sub">You sent - {reqs.outgoing.length + social.outgoing.length}</div>
+                {!reqs.outgoing.length && !social.outgoing.length && <div className="hm-none">No requests waiting on someone else.</div>}
+                {social.outgoing.length > 0 && <div className="hm-grid">{social.outgoing.map(r => farRow(r, 'Waiting for them', <button type="button" className="vc-round no" title="Cancel request" aria-label={`Cancel the request to ${accountName(r, myDomain)}`} onClick={async () => { if (await ask({ title: `Cancel your request to ${accountName(r, myDomain)}?`, confirm: 'Cancel request', cancel: 'Keep it', danger: true })) socialFriendAction('remove', r.id); }}><X size={16} /></button>))}</div>}
                 <div className="hm-grid">{reqs.outgoing.map(r => (
                   <div key={r.id} className="hm-friend"><span className="hm-friend-who"><Avatar user={{ username: r.to_username }} size={34} /><span><b>{r.to_username}</b><small>Waiting for them</small></span></span>
                     <button type="button" className="vc-round no" title="Cancel request" aria-label={`Cancel the request to ${r.to_username}`} onClick={() => cancel(r)}><X size={16} /></button></div>))}</div>
@@ -202,10 +236,11 @@ export default function Home({ onUser }) {
 
             {tab === 'blocked' && (
               <div className="hm-body" key="blocked">
-                {!blocks?.length && <div className="hm-empty"><ShieldOff size={26} /><b>You haven't blocked anyone</b><span>People you block show up here.</span></div>}
+                {!blocks?.length && !social.blocked.length && <div className="hm-empty"><ShieldOff size={26} /><b>You haven't blocked anyone</b><span>People you block show up here.</span></div>}
                 <div className="hm-grid">{blocks?.map(b => (
                   <div key={b.username} className="hm-friend"><span className="hm-friend-who"><Avatar user={{ username: b.username, pfp: b.pfp_url || people[b.username]?.pfp }} size={34} /><span><b>{b.username}</b><small>Blocked</small></span></span>
-                    <button type="button" className="btn btn-surface btn-sm" onClick={() => unblock(b.username)}>Unblock</button></div>))}</div>
+                    <button type="button" className="btn btn-surface btn-sm" onClick={() => unblock(b.username)}>Unblock</button></div>))}
+                  {social.blocked.map(b => farRow(b, 'Blocked', <button type="button" className="btn btn-surface btn-sm" onClick={() => socialFriendAction('unblock', b.id)}>Unblock</button>))}</div>
               </div>
             )}
 
@@ -225,6 +260,7 @@ export default function Home({ onUser }) {
           </div>
         </div>
       </div>
+      {card && <PersonCard person={card} onClose={() => setCard(null)} />}
     </div>
   );
 }

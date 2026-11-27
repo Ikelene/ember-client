@@ -14,6 +14,8 @@ import {
 import { RetryIn } from './Gate.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
 import { linkFor } from './store.js';
+import { nookaraDmRows } from './social.js';
+import { SocialDmRow } from './SocialHome.jsx';
 import { useName, NameText, personName, displayNameOf, useDisplayNamesVersion, wantDisplayNames, serverOwnName } from './displayNames.js';
 import { useChat, retryNow, go, keyOf, setStatus, setCustom, isMuted, effectiveNotify, ask, refreshServer, toast, errorText, setDetailLayout, patchState, saveSettings, getState, statusOf, presenceFor, useFace, isBlockedPerson, isBlockedName, blockedFace, BLOCKED_NAME, loadMoreMembers, lastHomeView, bridgedTyper } from './store.js';
 import { P, has, ChannelIcon, useNameStyle, colorFrom, NameDecor } from './roles.jsx';
@@ -76,9 +78,10 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
   const instances = allInstances.filter(i => !(i.loaded && i.status === 'open' && !i.pending && !servers.some(x => x.inst === i.origin) && view.inst !== i.origin && !(view.sid && instOf(view.sid) === i.origin)));
   const unread = useChat(s => s.unread);
   const dms = useChat(s => s.dms);
+  const farUnread = useChat(s => s.social.dms.some(d => d.unread)); // (DMs on other homeservers)
   const homeRequests = useChat(s => s.homeRequests || 0); // friend + message requests waiting (a red count, like a mention)
-  const homeUnread = dms.some(c => c.unread) || Object.entries(unread).some(([k, v]) => v && (k.startsWith('d:') || k.startsWith('g:')));
-  const home = view.kind === 'home' || view.kind === 'dm' || view.kind === 'group' || view.kind === 'modmail' || view.kind === 'notes';
+  const homeUnread = farUnread || dms.some(c => c.unread) || Object.entries(unread).some(([k, v]) => v && (k.startsWith('d:') || k.startsWith('g:')));
+  const home = view.kind === 'home' || view.kind === 'dm' || view.kind === 'group' || view.kind === 'modmail' || view.kind === 'notes' || (view.kind === 'channel' && !!view.dm);
   const people = useChat(s => s.people);
   const srvMentions = useChat(s => s.srvMentions);
   // a server lights up only for unread channels I haven't muted (its own unread flag can't know my channel mutes)
@@ -529,6 +532,7 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
   const unread = useChat(s => s.unread);
   const presence = useChat(s => s.presence);
   const people = useChat(s => s.people);
+  const pointers = useChat(s => s.social.dms); // DMs on other homeservers (store.js: Nookara's /api/v2/social)
   const dmNodes = useRef(new Map());
   const listRef = useRef(null);
   const previousDmRects = useRef(new Map());
@@ -678,8 +682,8 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
           );
         })}
         <div className={`vc-cat-name static${outHere ? ' drop-out' : ''}`} onDragOver={outOver} onDrop={e => { e.preventDefault(); drop(); }}>Direct messages <span className="vc-cat-add" role="button" tabIndex={0} title="New message" onClick={onNewDM}><Plus size={14} /></span></div>
-        {dms.length === 0 && <div className="vc-side-empty">No messages yet. Start one with the + above.</div>}
-        {dms.filter(c => !pinned.has(dmKey(c.username))).map(c => dmRow(c, null))}
+        {dms.length + pointers.length === 0 && <div className="vc-side-empty">No messages yet. Start one with the + above.</div>}
+        {nookaraDmRows(dms.filter(c => !pinned.has(dmKey(c.username))), pointers).map(r => (r.kind === 'dm' ? dmRow(r.c, null) : <SocialDmRow key={r.dm.id} dm={r.dm} />))}
         <div className={`vc-cat-name static${outHere ? ' drop-out' : ''}`} onDragOver={outOver} onDrop={e => { e.preventDefault(); drop(); }}>Group chats <span className="vc-cat-add" role="button" tabIndex={0} title="New group chat" onClick={onNewGroup}><Plus size={14} /></span></div>
         {groups.length === 0 && <div className="vc-side-empty">No group chats.</div>}
         {groups.filter(g => !pinned.has(groupKey(g.room))).map(g => groupRow(g, null))}

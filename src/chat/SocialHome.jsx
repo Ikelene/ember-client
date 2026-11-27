@@ -1,9 +1,11 @@
 // Home, the sidebar and a DM's header while Ember runs on a v2 homeserver session (PROTOCOL 4c): friends, requests, blocks
 // and DMs come from the home homeserver's social API (store.js: state.social), not from Nookara. A DM here is a hidden
 // one-channel server on the homeserver that hosts it, so the conversation itself is the normal channel view.
+// Signed in with Nookara, Home.jsx and the sidebar in Parts.jsx stay as they are and borrow the pieces exported here for the
+// people and DMs on other homeservers (PersonCard, SocialDmRow, DmFace, SocialDmHead).
 import { useEffect, useMemo, useState } from 'react';
 import { MessageCircle, UserPlus, Check, X, House, Users, Inbox, ShieldOff, UsersRound, Search, Plus, LockOpen, Pencil, LogOut, UserMinus, Ban } from 'lucide-react';
-import { useChat, go, toast, ask, getState, addSocialFriend, socialFriendAction, startSocialDm, socialDmAction, socialProfileById } from './store.js';
+import { useChat, go, toast, ask, getState, addSocialFriend, socialFriendAction, startSocialDm, socialDmAction, socialProfileById, socialAccount } from './store.js';
 import { Avatar } from './Profile.jsx';
 import { Dialog } from './Dialogs.jsx';
 import { openMenu } from './Menu.jsx';
@@ -13,11 +15,11 @@ import './home.css';
 
 const STATUS = { online: 'Online', idle: 'Idle', dnd: 'Do not disturb', offline: 'Offline' };
 const hourWord = h => (h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening');
-const face = a => ({ username: a.display_name || a.handle || a.id, pfp: a.avatar_url || null }); // (the name gives the letter and colour when there's no picture)
-const useDomain = () => useChat(s => s.home?.domain || '');
+export const face = a => ({ username: a.display_name || a.handle || a.id, pfp: a.avatar_url || null }); // (the name gives the letter and colour when there's no picture)
+export const useDomain = () => useChat(s => socialAccount(s)?.domain || '');
 
 // someone's card: what their homeserver says about them (GET /social/profile/:id), and what I can do
-function PersonCard({ person, onClose }) {
+export function PersonCard({ person, onClose }) {
   const domain = useDomain();
   const social = useChat(s => s.social);
   const [p, setP] = useState(null);
@@ -72,7 +74,7 @@ function NewDm({ onClose }) {
 }
 
 const dmMenu = (e, dm, domain) => {
-  const me = getState().home?.id;
+  const me = socialAccount(getState())?.id;
   const title = dmTitle(dm, domain);
   openMenu(e, [
     { label: 'Open', onClick: () => go({ kind: 'sdm', id: dm.id }) },
@@ -81,18 +83,29 @@ const dmMenu = (e, dm, domain) => {
     dm.group && { label: 'Leave group', icon: LogOut, danger: true, onClick: async () => { if (await ask({ title: `Leave ${title}?`, text: 'Someone in the group will have to add you back.', confirm: 'Leave group', danger: true })) socialDmAction('leave', dm.id); } },
   ]);
 };
-function DmFace({ dm, size, presence }) {
+export function DmFace({ dm, size, presence }) {
   if (dm.group || !dm.others.length) return <span className="vc-av vc-grp-av" style={{ width: size, height: size }}><UsersRound size={Math.round(size / 2)} /></span>;
   const o = dm.others[0];
   return <Avatar user={face(o)} size={size} status={presence[o.id] || 'offline'} />;
+}
+// one DM in a sidebar list
+export function SocialDmRow({ dm }) {
+  const on = useChat(s => s.view.dm === dm.id);
+  const presence = useChat(s => s.social.presence);
+  const domain = useDomain();
+  return (
+    <button type="button" className={`vc-dm${on ? ' on' : ''}${!on && dm.unread ? ' unread' : ''}`} onClick={() => go({ kind: 'sdm', id: dm.id })} onContextMenu={e => dmMenu(e, dm, domain)}>
+      <DmFace dm={dm} size={32} presence={presence} />
+      <span className="vc-dm-txt"><b>{dmTitle(dm, domain)}</b><small>{dm.group ? `${dm.members.length} members` : !dm.hosted_here && dm.host && dm.host !== domain ? `on ${dm.host}` : dm.preview && !on ? dm.preview : ''}</small></span>
+      {dm.unread > 0 && !on && <span className="vc-count">{dm.unread > 99 ? '99+' : dm.unread}</span>}
+    </button>
+  );
 }
 
 export function SocialSidebar() {
   const view = useChat(s => s.view);
   const dms = useChat(s => s.social.dms);
-  const presence = useChat(s => s.social.presence);
   const reqs = useChat(s => s.social.incoming.length);
-  const domain = useDomain();
   const [fresh, setFresh] = useState(false);
   return (
     <div className="vc-side">
@@ -100,16 +113,7 @@ export function SocialSidebar() {
       <div className="vc-side-scroll">
         <div className="vc-side-list">
           <button type="button" className={`vc-ch vc-home-link${view.kind === 'home' ? ' on' : ''}`} onClick={() => go({ kind: 'home' })}><House size={18} /> <span>Home</span>{reqs > 0 && <span className="vc-count">{reqs}</span>}</button>
-          {dms.map(dm => {
-            const on = view.dm === dm.id;
-            return (
-              <button type="button" key={dm.id} className={`vc-dm${on ? ' on' : ''}${!on && dm.unread ? ' unread' : ''}`} onClick={() => go({ kind: 'sdm', id: dm.id })} onContextMenu={e => dmMenu(e, dm, domain)}>
-                <DmFace dm={dm} size={32} presence={presence} />
-                <span className="vc-dm-txt"><b>{dmTitle(dm, domain)}</b><small>{dm.group ? `${dm.members.length} members` : !dm.hosted_here && dm.host && dm.host !== domain ? `on ${dm.host}` : dm.preview && !on ? dm.preview : ''}</small></span>
-                {dm.unread > 0 && !on && <span className="vc-count">{dm.unread > 99 ? '99+' : dm.unread}</span>}
-              </button>
-            );
-          })}
+          {dms.map(dm => <SocialDmRow key={dm.id} dm={dm} />)}
           {!dms.length && <div className="vc-side-empty">No conversations yet. Start one with a friend, or with anyone by their name.</div>}
         </div>
       </div>

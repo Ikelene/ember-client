@@ -611,7 +611,7 @@ function ChatPage() {
         <div className="vc-side-col">
           <div className="vc-side-swap" key={sideKey}>
             {discover ? <DiscoverSidebar tab={discoverTab} onTab={setDiscoverTab} />
-              : sdm ? <SocialSidebar />
+              : sdm ? (signedIn ? <HomeSidebar onNewDM={() => setDialog({ kind: 'dm' })} onNewGroup={() => setDialog({ kind: 'group' })} onQuick={() => setDialog({ kind: 'quick' })} /> : <SocialSidebar />) // (a DM on a homeserver; signed in with Nookara it sits in the usual list)
               : view.kind === 'channel'
               ? <ServerSidebar sid={view.sid} onInvite={() => setDialog({ kind: 'invite' })} onSettings={() => setDialog({ kind: 'settings' })} onChannel={c => setDialog({ kind: 'channel', channel: c })} onLeave={leaveServer} onUser={openMini} />
               : view.kind === 'instance' ? <div className="vc-side" /> // a server that isn't connected yet: no channel list

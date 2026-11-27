@@ -7,7 +7,7 @@ import { Users, Copy, Check, Upload, Trash2, Hash, Search, Globe, ShieldCheck, B
 import { joinAndOpen } from './instances.js';
 import { BotGallery } from './BotGallery.jsx';
 import { apiFetch } from '../api.js';
-import { getState, useChat, go, loadServersOf, refreshServer, loadGroups, toast, errorText, ask, answerAsk, loadFriends, sendMessage, linkFor } from './store.js';
+import { getState, useChat, go, messageSomeone, loadServersOf, refreshServer, loadGroups, toast, errorText, ask, answerAsk, loadFriends, sendMessage, linkFor } from './store.js';
 import { NameText, displayNameOf } from './displayNames.js';
 import { NOOKARA, instOf, isInst, fromInstance, normOrigin } from './ids.js';
 import { imgHint, warnImage } from './imgHints.js';
@@ -318,8 +318,8 @@ function PeoplePicker({ multi, onDone, button }) {
 }
 export function NewDM({ onClose }) {
   return (
-    <Dialog title="New message" sub="Pick a friend, or anyone on Nookara." onClose={onClose}>
-      {close => <PeoplePicker onDone={([u]) => { close(); go({ kind: 'dm', username: u }); }} />}
+    <Dialog title="New message" sub="Pick a friend, anyone on Nookara, or type name@their.homeserver for someone elsewhere." onClose={onClose}>
+      {close => <PeoplePicker onDone={([u]) => { close(); messageSomeone(u); }} />}
     </Dialog>
   );
 }
