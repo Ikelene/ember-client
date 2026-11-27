@@ -417,6 +417,10 @@ function AdminsTab({ hs }) {
 const remoteForm = r => ({ mode: r?.mode || 'none', list: (r?.list || []).join('\n') });
 const dateOf = t => (t ? new Date(t).toLocaleString() : '');
 const KEEP_RETIRED = 7 * 24 * 3600 * 1000; // how long a retired key stays published (ember-server keys.js)
+// what a hold / throttle refused, by action: { joins: 3, exchanges: 12 } -> "12 sign-ins, 3 joins"
+const ACTION_WORDS = { exchanges: 'sign-ins', joins: 'joins', messages: 'messages', reports: 'reports', s2s: 'server requests', friend_requests: 'friend requests', dms: 'DMs started' };
+const refusedText = r => (r && typeof r === 'object' ? Object.entries(r).filter(([, n]) => n > 0).sort((x, y) => y[1] - x[1]).map(([k, n]) => `${n} ${ACTION_WORDS[k] || k.replace(/_/g, ' ')}`).join(', ') : '');
+const ordinal = n => `${n}${n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`;
 function FederationTab({ hs, onDirty }) {
   const { origin } = hs;
   const [view, setView] = useState(null);   // GET /api/v2/homeserver/federation
@@ -501,6 +505,7 @@ function FederationTab({ hs, onDirty }) {
   const q = filter.trim().toLowerCase();
   const shownDeny = q ? f.deny.filter(x => x.toLowerCase().includes(q)) : f.deny;
   const held = view.held || [];
+  const throttled = view.throttled || [];
   const seen = view.homeservers || [];
   const count = n => `${n} ${n === 1 ? 'entry' : 'entries'}`;
 
@@ -576,8 +581,19 @@ function FederationTab({ hs, onDirty }) {
           <div className="vc-field hsx-block"><span><Gauge size={13} className="vc-inline-ico" /> On hold now</span>
             {held.map(h => (
               <div className="sx-list-row" key={h.domain}>
-                <div className="sx-row-txt"><b>{h.domain}</b><span>Ran into its limits too often. Everything from it is refused until {new Date(h.until).toLocaleTimeString()}.</span></div>
-                <div className="sx-row-ctl"><button type="button" className="btn btn-surface btn-sm" disabled={!!busy} onClick={() => act(h.domain, { release: [h.domain] })}>Lift hold</button></div>
+                <div className="sx-row-txt"><b>{h.domain}{h.level > 1 && <i className="hsx-tag">{ordinal(h.level)} hold today</i>}</b>
+                  <span>Ran into its limits too often{h.since ? ` (held ${ago(h.since)}` : ''}{h.since && h.minutes ? `, for ${h.minutes} min)` : h.since ? ')' : ''}. Everything from it is refused until {new Date(h.until).toLocaleTimeString()}.{refusedText(h.refused) && ` Refused: ${refusedText(h.refused)}.`}</span></div>
+                <div className="sx-row-ctl"><button type="button" className="btn btn-surface btn-sm" disabled={!!busy} onClick={() => act(h.domain, null, `/api/v2/homeserver/federation/holds/${encodeURIComponent(h.domain)}`, 'DELETE').then(v => v && toast(`${h.domain} isn't held any more.`, true))}>{busy === h.domain ? 'Lifting...' : 'Lift'}</button></div>
+              </div>
+            ))}
+          </div>
+        )}
+        {throttled.length > 0 && (
+          <div className="vc-field hsx-block"><span><Gauge size={13} className="vc-inline-ico" /> Told to wait lately</span>
+            {throttled.map(h => (
+              <div className="sx-list-row" key={h.domain}>
+                <div className="sx-row-txt"><b>{h.domain}{h.known && <i className="hsx-tag">Known peer</i>}</b>
+                  <span>Over a limit{h.last ? `, last ${ago(h.last)}` : ''}.{refusedText(h.refused) && ` Refused: ${refusedText(h.refused)}.`}{h.known ? ' A homeserver people here deal with is never put on hold.' : ''}</span></div>
               </div>
             ))}
           </div>
