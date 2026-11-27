@@ -18,7 +18,8 @@ import { applyIdentity, applyNick } from './identity.js';
 import { applyUserUpdate, instancesWithAccount } from './userUpdate.js';
 import { findPending, dropSettled, wireText, settle } from './pending.js';
 import { NOOKARA, K, parseK, instOf, bare, isInst, normOrigin, acctKey } from './ids.js';
-import { parseAddress, addressHash } from './addresses.js';
+import { parseAddress, addressHash, inviteUrl, inviteBase, parseProtocolLink, openRouteLink } from './addresses.js';
+import { setInviteHomes } from './inviteLink.js';
 import { myIdOn } from './tokens.js';
 import { readChannel as readMsgCache, writeChannel as writeMsgCache, dropChannels as dropMsgCache } from './msgCache.js';
 import { connections, sendTo, startInstances, loadInstanceData, retryInstances, resumeInstances, renewNookaraSession, holdInstances, forgetIfEmpty, wakeInstance, instanceWoke, recheckSleepers, joinByAddress, ensureHost } from './instances.js';
@@ -124,6 +125,13 @@ function set(patch) {
   subs.forEach(f => f());
 }
 const subscribe = f => { subs.add(f); return () => subs.delete(f); };
+// the homeservers this device uses: their invite links (by address) show as invite cards (inviteLink.js addressInviteRef)
+let homesOf = null;
+subs.add(() => {
+  if (state.instances === homesOf) return;
+  homesOf = state.instances;
+  setInviteHomes((homesOf || []).filter(i => i.v2).map(i => { const domain = i.homeserver?.domain || i.host; return { domain, bases: [inviteBase(domain, i.invites), `${i.origin}/i/`] }; }));
+});
 export const getState = () => state;
 // a custom emoji's picture: an instance's own (from its emoji list), else Nookara's
 // an emoji Ember doesn't know yet is looked for on Nookara (personal emojis and Nookara servers' emojis live there);
@@ -2333,12 +2341,24 @@ export function hashFor(v) {
 }
 // invites and Ember servers get the short form (shortLinks.js) on the real Ember host; everything else the #/ link
 export const linkFor = v => { const long = shareLink(hashFor(v)); return (long.startsWith(EMBER_ORIGIN + '/') && shortLinkFor(v)) || long; };
+// the link to share for an invite to a server: one with an address (slug@domain) gets its homeserver's invite link, which any
+// app can open (https://<domain>/i/<slug>/<code>, or where its discovery doc says they start); others the Ember link as before
+export function inviteLinkFor(sid, code) {
+  if (!code) return '';
+  const io = instOf(sid);
+  const srv = state.servers.find(x => x.sid === sid);
+  const a = io && io !== NOOKARA ? parseAddress(srv?.address || state.detail[sid]?.server?.address || '') : null;
+  if (!a) return linkFor({ kind: 'invite', code, inst: io });
+  return inviteUrl({ ...a, code }, state.instances.find(i => i.origin === io)?.invites);
+}
 export function go(v, { replace = false } = {}) {
   const hash = hashFor(v);
   if (location.hash !== hash) history[replace ? 'replaceState' : 'pushState'](null, '', clientUrl(hash));
   open(v);
 }
 export function readHash() {
+  // #/open?u=web+ember:invite?address=slug@domain&code=X: a link the browser handed over (Settings > Advanced registers Ember for them)
+  if (location.hash.startsWith('#/open?')) { const a = parseProtocolLink(openRouteLink(location.hash)); return a ? { kind: 'address', slug: a.slug, domain: a.domain, code: a.code } : { kind: 'home' }; }
   const parts = location.hash.split('/');
   if (parts[1] === 'i' && parts[2]) {
     let inst = null;

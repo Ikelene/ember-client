@@ -13,7 +13,7 @@ import {
 
 import { RetryIn } from './Gate.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
-import { linkFor } from './store.js';
+import { inviteLinkFor } from './store.js';
 import { nookaraDmRows } from './social.js';
 import { SocialDmRow } from './SocialHome.jsx';
 import { useName, NameText, personName, displayNameOf, useDisplayNamesVersion, wantDisplayNames, serverOwnName } from './displayNames.js';
@@ -974,7 +974,7 @@ function RecentPosters({ cid, base }) {
 
 // the banner's share button: the system share sheet where there is one, otherwise copy the invite link
 function shareInvite(server, sid) {
-  const link = linkFor({ kind: 'invite', code: server.invite, inst: instOf(sid) });
+  const link = inviteLinkFor(sid, server.invite);
   if (navigator.share && matchMedia('(pointer: coarse)').matches) { navigator.share({ title: server.name, url: link }).catch(() => {}); return; }
   navigator.clipboard?.writeText(link).then(() => toast('Invite link copied.', true), () => toast("Couldn't copy the link."));
 }

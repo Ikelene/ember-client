@@ -7,7 +7,7 @@ import { Users, Copy, Check, Upload, Trash2, Hash, Search, Globe, ShieldCheck, B
 import { joinAndOpen } from './instances.js';
 import { BotGallery } from './BotGallery.jsx';
 import { apiFetch } from '../api.js';
-import { getState, useChat, go, messageSomeone, loadServersOf, refreshServer, loadGroups, toast, errorText, ask, answerAsk, loadFriends, sendMessage, linkFor } from './store.js';
+import { getState, useChat, go, messageSomeone, loadServersOf, refreshServer, loadGroups, toast, errorText, ask, answerAsk, loadFriends, sendMessage, inviteLinkFor } from './store.js';
 import { NameText, displayNameOf } from './displayNames.js';
 import { NOOKARA, instOf, isInst, fromInstance, normOrigin } from './ids.js';
 import { parseAddress } from './addresses.js';
@@ -123,7 +123,7 @@ export function Invite({ sid, onClose }) {
   const inst = instOf(sid);
   // a server on a homeserver is invited to by its address (slug@domain/code), not by the homeserver's own address
   const address = parseAddress(useChat(s => s.servers.find(x => x.sid === sid)?.address) || d?.server.address || '');
-  const link = !code ? '' : address ? linkFor({ kind: 'address', slug: address.slug, domain: address.domain, code }) : linkFor({ kind: 'invite', code, inst });
+  const link = inviteLinkFor(sid, code);
   const copy = (t, what) => { navigator.clipboard?.writeText(t); setCopied(what); setTimeout(() => setCopied(''), 1500); };
   return (
     <Dialog title={`Invite people to ${d?.server.name || 'this server'}`} sub={inst === NOOKARA ? "Send them this link. They'll need a Nookara account." : address ? `Send them this link. They join ${address.address} with their homeserver account.` : `Send them this link. They'll need an account on ${inst.replace(/^https?:\/\//, '')}.`} onClose={onClose}>

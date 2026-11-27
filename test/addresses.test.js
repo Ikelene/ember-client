@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseAddress, addressHash, slugIssue, validSlug, slugFrom, createErrorText, railEntries, railOrigin, railPos, isV2, communityOf } from '../src/chat/addresses.js';
+import { parseAddress, addressHash, slugIssue, validSlug, slugFrom, createErrorText, railEntries, railOrigin, railPos, isV2, communityOf, inviteBase, inviteUrl, parseInviteUrl, parseProtocolLink, openRouteLink } from '../src/chat/addresses.js';
+import { addressInviteRef, setInviteHomes, isHiddenInviteLine, embedLabel } from '../src/chat/inviteLink.js';
 
 test('addresses: slug@domain, with and without a code', () => {
   assert.deepEqual(parseAddress('cool@nookara.cc'), { slug: 'cool', domain: 'nookara.cc', address: 'cool@nookara.cc', code: null });
@@ -99,4 +100,51 @@ test('the rail: a homeserver only there for my account or a DM has no entry unti
   assert.deepEqual(railEntries([home, other], []).map(e => e.id), ['i:https://b.example']);
   const mine = [{ sid: 'https://a.example|s1', inst: 'https://a.example' }];
   assert.deepEqual(railEntries([home, other], mine).map(e => e.id), ['i:https://a.example', 'i:https://b.example']);
+});
+
+test("invite links: built from the homeserver's url_base, else https://<domain>/i/", () => {
+  const a = { slug: 'cabin', domain: 'b.test', code: 'Ab12' };
+  assert.equal(inviteUrl(a), 'https://b.test/i/cabin/Ab12');
+  assert.equal(inviteUrl(a, {}), 'https://b.test/i/cabin/Ab12');
+  assert.equal(inviteUrl(a, { url_base: 'http://localhost:4102/i/' }), 'http://localhost:4102/i/cabin/Ab12');
+  assert.equal(inviteUrl(a, { url_base: 'https://join.example/x/i' }), 'https://join.example/x/i/cabin/Ab12');
+  assert.equal(inviteBase('b.test', { url_base: 'javascript:alert(1)' }), 'https://b.test/i/');
+  assert.equal(inviteBase('b.test', { url_base: 'https://x.example/i/?a=1' }), 'https://b.test/i/');
+  assert.equal(inviteBase('b.test', { url_base: 42 }), 'https://b.test/i/');
+});
+test('invite links: any host, resolved through its discovery doc', () => {
+  assert.deepEqual(parseInviteUrl('http://localhost:4102/i/cabin/abc'), { slug: 'cabin', code: 'abc', origin: 'http://localhost:4102' });
+  assert.deepEqual(parseInviteUrl('https://join.example/x/i/Cabin/abc/'), { slug: 'cabin', code: 'abc', origin: 'https://join.example' });
+  assert.equal(parseInviteUrl('http://localhost:4102/i/cabin'), null);
+  assert.equal(parseInviteUrl('http://localhost:4102/i/cabin/abc?x=1'), null);
+  assert.equal(parseInviteUrl('ftp://localhost/i/cabin/abc'), null);
+  assert.equal(parseInviteUrl('https://x.example/i/-bad/abc'), null);
+  assert.equal(parseAddress('http://localhost:4102/i/cabin/abc'), null); // (not a domain: it goes through parseInviteUrl)
+});
+test("invite links: web+ember: links from the browser's protocol handler", () => {
+  const want = { slug: 'cabin', domain: 'b.test', address: 'cabin@b.test', code: 'X1' };
+  assert.deepEqual(parseProtocolLink('web+ember:invite?address=cabin@b.test&code=X1'), want);
+  assert.deepEqual(parseProtocolLink('web+ember:invite?address=cabin%40b.test&code=X1'), want);
+  assert.deepEqual(parseProtocolLink('web+ember://invite/?address=cabin@b.test&code=X1'), want);
+  assert.equal(parseProtocolLink('web+ember:invite?address=cabin@b.test').code, null);
+  assert.equal(parseProtocolLink('web+ember:invite?address=nope'), null);
+  assert.equal(parseProtocolLink('web+ember:dm?address=cabin@b.test'), null);
+  assert.equal(parseProtocolLink('https://b.test/i/cabin/X1'), null);
+  const hash = `#/open?u=${encodeURIComponent('web+ember:invite?address=cabin@b.test&code=X1')}`;
+  assert.deepEqual(parseProtocolLink(openRouteLink(hash)), want);
+  assert.equal(openRouteLink('#/home'), null);
+});
+test('invite links: cards in messages, hidden only for homeservers this device uses', () => {
+  setInviteHomes([]);
+  assert.deepEqual(addressInviteRef('https://b.test/i/cabin/Ab12'), { slug: 'cabin', domain: 'b.test', address: 'cabin@b.test', code: 'Ab12', sure: false });
+  assert.equal(addressInviteRef('https://ember.nookara.cc/#/i/cabin@b.test/Ab12').sure, true);
+  assert.equal(addressInviteRef('http://localhost:4102/i/cabin/Ab12'), null);
+  assert.equal(addressInviteRef('https://b.test/i/cabin'), null); // (no code: not an invite)
+  assert.equal(isHiddenInviteLine('https://b.test/i/cabin/Ab12'), false);
+  setInviteHomes([{ domain: 'b.test', bases: ['http://localhost:4102/i/'] }]);
+  assert.equal(addressInviteRef('https://b.test/i/cabin/Ab12').sure, true);
+  assert.deepEqual(addressInviteRef('http://localhost:4102/i/cabin/Ab12'), { slug: 'cabin', code: 'Ab12', origin: 'http://localhost:4102', sure: true });
+  assert.equal(isHiddenInviteLine('http://localhost:4102/i/cabin/Ab12'), true);
+  assert.equal(embedLabel('https://b.test/i/cabin/Ab12'), 'Server Invite');
+  setInviteHomes([]);
 });

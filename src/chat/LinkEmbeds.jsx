@@ -6,12 +6,12 @@ import { VideoPlayer, fmtTime } from './MediaPlayer.jsx';
 import { viewPicture } from './MediaViewer.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { Play, Download, ShieldCheck, Eye, Loader2, Users, ExternalLink, BookmarkPlus, BookmarkCheck, Coins, Heart, Clock, HardDrive, Folder, File as FileIcon, FileArchive, FileCode, FileText, Image as ImageIcon, Film, Music, MessagesSquare, MessageSquare, ArrowBigUp, Pin, Lock, Ban, Globe, KeyRound, FileX } from 'lucide-react';
-import { joinAndOpen } from './instances.js';
+import { joinAndOpen, joinByAddress } from './instances.js';
 import { apiFetch } from '../api.js';
 import { useChat, getState, toast, errorText, openLink, saveSettings, loadMedia, hashFor, ask } from './store.js';
 import { K } from './ids.js';
 import { openFile as openSealedFile } from './e2ee/session.js';
-import { inviteRef, paymentRef, glintRef, driveRef, forumRef, siteRef, loadSiteHosts, onSiteHosts } from './inviteLink.js';
+import { inviteRef, addressInviteRef, paymentRef, glintRef, driveRef, forumRef, siteRef, loadSiteHosts, onSiteHosts } from './inviteLink.js';
 import { GlintMark, GLINT_DOWNLOAD, clipLikes, setClipLike, openOutside } from './glint.jsx';
 import { fmtSize, RISKY, KIND_OF } from './fileKinds.js';
 import { NOOKARA_WIRE, isNookara, NOOKARA_INST, desktopBridge } from '../compat.js';
@@ -53,7 +53,7 @@ function useSiteHosts() {
 export function LinkEmbeds({ urls, inst, priv }) {
   useSiteHosts();
   if (!urls?.length) return null;
-  return urls.slice(0, 3).map(u => <OneEmbed key={u} url={u} inst={inst} priv={priv} />);
+  return urls.slice(0, 3).map(u => (addressInviteRef(u) ? <AddressInviteEmbed key={u} r={addressInviteRef(u)} /> : <OneEmbed key={u} url={u} inst={inst} priv={priv} />));
 }
 // A link's card in a homeserver DM. Nothing is fetched for it: the sender's device made it and it came inside the sealed
 // message (e2ee/homedm.js). Its picture is a sealed upload, opened here like any other file of the message.
@@ -357,6 +357,46 @@ function InviteEmbed({ e }) {
           <span><Users size={13} /> {line}</span>
         </div>
       )}
+    </div>
+  );
+}
+// An invite by a server's address. Its homeserver is asked for the card (GET /api/v1/invite/<code>, public) only when this device
+// already uses that homeserver; for any other, nothing is fetched until Join, and the card says just the address.
+const addrCards = new Map(); // origin|code -> promise of { server } | { invalid: true } | null
+function AddressInviteEmbed({ r }) {
+  const origin = useChat(s => r.origin || (s.instances || []).find(i => i.v2 && (i.homeserver?.domain || i.host) === r.domain)?.origin || null);
+  const known = !!origin && r.sure;
+  const [e, setE] = useState(undefined);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!known) { setE(null); return undefined; }
+    let live = true;
+    const k = `${origin}|${r.code}`;
+    if (!addrCards.has(k)) {
+      addrCards.set(k, fetch(`${origin}/api/v1/invite/${encodeURIComponent(r.code)}`, { credentials: 'omit', headers: { Accept: 'application/json' } })
+        .then(res => (res.ok ? res.json() : res.status === 404 ? { invalid: true } : null)).catch(() => null));
+    }
+    addrCards.get(k).then(d => { if (live) setE(d || null); });
+    return () => { live = false; };
+  }, [known, origin, r.code]);
+  const s = e?.server;
+  const mine = useChat(st => (s && origin ? st.servers.some(x => x.sid === K(origin, s.sid)) : false));
+  if (e?.invalid) return <div className="vc-invite-card bad vl-rise"><b>Invalid invite</b><span>This invite link doesn't work any more.</span></div>;
+  const address = s?.address || r.address || (r.domain ? `${r.slug}@${r.domain}` : r.slug);
+  const abs = u => { try { return u ? new URL(u, origin).href : null; } catch { return null; } };
+  const icon = abs(s?.icon), banner = abs(s?.banner);
+  return (
+    <div className="vc-invite-card vl-rise">
+      {banner && <div className="vc-invite-banner" style={{ backgroundImage: `url(${banner})` }} />}
+      <small className="vc-invite-kicker">You've been invited to join a server</small>
+      <div className="vc-invite-main">
+        <span className="vc-srv-ico lg">{icon ? <img src={icon} alt="" /> : (s?.name || r.slug).slice(0, 2)}</span>
+        <div className="vc-invite-info">
+          <b>{s?.name || address}</b>
+          <span>{s && <><i className="dot" /> {s.member_count} member{s.member_count === 1 ? '' : 's'} </>}<small className="vc-invite-host">{address}</small></span>
+        </div>
+        <button type="button" className="btn btn-primary" disabled={busy} onClick={async () => { setBusy(true); await joinByAddress(r); setBusy(false); }}>{busy ? 'Joining...' : mine ? 'Open' : 'Join'}</button>
+      </div>
     </div>
   );
 }

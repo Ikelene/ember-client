@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Check, Copy, Download, Trash2, UserCheck, UserX, Plus } from 'lucide-react';
 import { apiFetch, downloadFetch } from '../api.js';
-import { useChat, refreshServer, toast, errorText, ask, linkFor } from './store.js';
+import { useChat, refreshServer, toast, errorText, ask, inviteLinkFor } from './store.js';
 import { instOf, bare } from './ids.js';
 import { Toggle } from './roles.jsx';
 import { Avatar } from './Profile.jsx';
@@ -45,7 +45,7 @@ export function JoinInvites({ sid, requestsOnly }) {
       setMax(''); loadInvites();
     } catch (e) { fail(e); }
   };
-  const copy = (code) => { navigator.clipboard?.writeText(linkFor({ kind: 'invite', code, inst: instOf(sid) })); setCopied(code); setTimeout(() => setCopied(''), 1500); };
+  const copy = (code) => { navigator.clipboard?.writeText(inviteLinkFor(sid, code)); setCopied(code); setTimeout(() => setCopied(''), 1500); };
   return (
     <div className="vc-settings">
       {!requestsOnly && <PlanUsage what="member_cap" used={people ? people.filter(m => !m.bot).length : undefined} label="People" />}

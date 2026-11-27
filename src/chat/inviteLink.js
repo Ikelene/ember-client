@@ -4,6 +4,7 @@
 //   https://<instance>/invite/<code>                                  (the instance's own invite page)
 // The server (unfurl.js) makes the card data - the instance is asked from Nookara, never from the browser.
 import { shortLinkHash } from './shortLinks.js';
+import { parseAddress, parseInviteUrl } from './addresses.js';
 const NOOKARA_HOST =/^(www\.)?((?:ember\.)?nookara\.cc|velora\.ikelene\.net)$/i;
 const CODE = '[A-Za-z0-9]{4,32}';
 const HASH_OWN = new RegExp(`^#/invite/(${CODE})/?$`);
@@ -105,9 +106,29 @@ export function siteRef(href) {
   const h = u.hostname.toLowerCase();
   return (/^s-[a-z0-9](?:[a-z0-9-]{0,59}[a-z0-9])?\.nookara\.cc$/.test(h) && !/--/.test(h)) || customSiteHosts.has(h) ? { service: 'site', sure: false } : null;
 }
+// Invites to a server by its address (addresses.js), shown as an invite card (LinkEmbeds.jsx AddressInviteEmbed):
+//   https://<domain>/i/<slug>/<code>                  (any client can open it: the homeserver's page lists them)
+//   <a homeserver's invites.url_base><slug>/<code>    (one whose links aren't on its domain, e.g. http://localhost:4102/i/)
+//   https://<an Ember app>/#/i/<slug>@<domain>/<code>
+// A homeserver this device uses is known (setInviteHomes): its links hide behind the card. Anyone can have /i/ paths on a
+// site, so an unknown domain's https://<domain>/i/... gets the card but keeps its link in the text.
+let inviteHomes = { domains: new Set(), bases: [] };
+// homes: [{ domain, bases: [url prefixes its invite links start with] }] (store.js keeps it in step with the connected homeservers)
+export function setInviteHomes(homes) {
+  inviteHomes = { domains: new Set(homes.map(h => h.domain).filter(Boolean)), bases: homes.flatMap(h => h.bases || []).filter(Boolean) };
+}
+// -> { slug, domain?, origin?, code, sure } or null
+export function addressInviteRef(href) {
+  const s = String(href || '');
+  if (!/^https?:\/\/\S+$/i.test(s)) return null;
+  const a = parseAddress(s);
+  if (a?.code) return { slug: a.slug, domain: a.domain, address: a.address, code: a.code, sure: /#\/i\//.test(s) || inviteHomes.domains.has(a.domain) };
+  const l = parseInviteUrl(s);
+  return l && inviteHomes.bases.some(b => s.startsWith(b)) ? { ...l, sure: true } : null;
+}
 // what a link to a card is called where the card itself isn't shown (a reply preview)
 export function embedLabel(href) {
-  if (inviteRef(href)?.sure) return 'Server Invite';
+  if (inviteRef(href)?.sure || addressInviteRef(href)?.sure) return 'Server Invite';
   if (paymentRef(href)) return 'Payment';
   if (glintRef(href)) return 'Glint Clip';
   if (driveRef(href)) return 'Nookara Drive';
@@ -118,5 +139,5 @@ export function embedLabel(href) {
 export function isHiddenInviteLine(line) {
   const t = String(line || '').trim();
   if (!/^https?:\/\/\S+$/.test(t)) return false;
-  return !!(inviteRef(t)?.sure || paymentRef(t) || glintRef(t) || driveRef(t)?.sure || forumRef(t));
+  return !!(inviteRef(t)?.sure || addressInviteRef(t)?.sure || paymentRef(t) || glintRef(t) || driveRef(t)?.sure || forumRef(t));
 }

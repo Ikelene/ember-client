@@ -36,7 +36,7 @@ import { SettingsShell, Card } from './SettingsShell.jsx';
 import { useUnsaved, UnsavedBar } from './unsaved.jsx';
 import './SettingsDialog.css';
 import QRCode from 'qrcode';
-import { linkFor } from './store.js';
+import { linkFor, inviteLinkFor } from './store.js';
 import { OperatorTermsNotice } from './OperatorTerms.jsx';
 import { slugIssue, createErrorText } from './addresses.js';
 import { pictureAccept } from './accept.js';
@@ -439,7 +439,7 @@ function AddressCard({ sid, srv }) {
 function ServerCard({ sid, srv, origin, goTo }) {
   const [qr, setQr] = useState('');
   // the invite link, or (no invite, e.g. an Ember server reached by its address) a link straight to the server
-  const link = srv?.invite ? linkFor({ kind: 'invite', code: srv.invite, inst: instOf(sid) }) : isInst(sid) ? linkFor({ kind: 'instance', inst: instOf(sid) }) : sid ? linkFor({ kind: 'server', sid }) : '';
+  const link = srv?.invite ? inviteLinkFor(sid, srv.invite) : isInst(sid) ? linkFor({ kind: 'instance', inst: instOf(sid) }) : sid ? linkFor({ kind: 'server', sid }) : '';
   useEffect(() => { if (!link) return; QRCode.toString(link, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#111111', light: '#ffffff' } }).then(setQr).catch(() => setQr('')); }, [link]);
   if (!srv) return null;
   const copy = (t, what) => navigator.clipboard?.writeText(t).then(() => toast(`${what} copied.`, true), () => toast("Couldn't copy that."));
