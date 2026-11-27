@@ -40,6 +40,7 @@ import { MePopout } from './ProfilePopout.jsx';
 import { PinCategoryHost } from './DmPins.jsx';
 import { cleanPins, pinnedSet, dmKey, groupKey, viewKeyOf } from './dmPinsCore.js';
 import { pinMenuItems, catMenuItems, pinItem, unpinItem, moveCategory } from './dmPinActions.js';
+import { useHiddenServers, hideServer } from './hiddenRail.js';
 import { PinItemRow } from './PinItems.jsx';
 import { UnreadPills } from './UnreadPills.jsx';
 // which pinned DM categories are folded (this device only)
@@ -116,7 +117,8 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
   const savedOrder = useChat(s => s.settings?.rail_order);
   const railOrder = savedOrder?.length ? savedOrder : localRailOrder();
   // an instance is one entry, or (a homeserver I'm in several servers on) one per server: addresses.js railEntries
-  const entries = railEntries(instances, servers).map(e => ({ rail: e.id, inst: e.inst, server: e.server }));
+  const hidden = useHiddenServers(); // ("Hide from list": the rail entry goes, the server and its homeserver stay)
+  const entries = railEntries(instances, servers).filter(e => !(e.server && hidden.has(e.server.sid))).map(e => ({ rail: e.id, inst: e.inst, server: e.server }));
   // servers on 2+ homeservers: each icon carries a small badge of its homeserver (Matrix-style "which server is this on")
   const homes = new Set([...(legacy.length ? [nookaraDomain()] : []), ...entries.map(e => homeDomainOf(e.inst, e.server))]);
   const hsBadge = homes.size > 1 ? (domain, icon) => ({ domain, icon }) : () => null;
@@ -258,6 +260,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
         onClick={() => go(s && inst.status === 'open' ? { kind: 'server', sid: s.sid } : { kind: 'instance', inst: inst.origin, ...(split ? { then: { kind: 'server', sid: s.sid } } : {}) })}
         onContextMenu={e => instanceMenu(e, inst, s, {
           onInvite: () => dialog('invite', s.sid), onSettings: () => dialog('settings', s.sid), onLeave: () => dialog('leave', s.sid), onRemove: ask_,
+          onHide: s ? () => { hideServer(s.sid); toast(`${name} is hidden from your list. Settings › Homeservers shows it again.`, true); if (active) go({ kind: 'home' }); } : undefined,
           onReconnect: () => reconnectInstance(inst.origin),
           onDisconnect: () => disconnectInstance(inst.origin),
           onLogin: () => (inst.needsNookara ? startSignIn() : inst.v2 && inst.source ? dialog('chat-settings', null, { page: 'homeservers' }) : dialog('add-instance', null, { url: inst.origin })),

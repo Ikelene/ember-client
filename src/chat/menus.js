@@ -1,7 +1,7 @@
 // The right-click menus' items (servers, channels, messages, people) and openMenu, which shows one; Menu.jsx draws them.
 import { getState, setMenu, toast, markServerRead, markChannelRead, linkFor, saveToMedia, sdmReportRoute, go, toggleBlock, notifyOf, setNotify } from './store.js';
 import { has, P, canNick, changeNick, nickMenuItems, profileMenuItems, roleMenuItems, modMenuItems } from './perms.js';
-import { CheckCheck, UserPlus, Settings, LogOut, Code2, LogIn, RefreshCw, Pencil, AtSign, Trash2, BellRing, Link2, Plug, Unplug, ShieldCheck, Copy, Image as ImageIcon, Pin, ExternalLink, BookmarkPlus, Info, Flag, Download, Reply, Forward, SmilePlus, Users, BookmarkCheck, Bookmark, Languages, Ellipsis, User, MessageCircle, Ban, Bell, BellOff } from 'lucide-react';
+import { CheckCheck, UserPlus, Settings, LogOut, Code2, LogIn, RefreshCw, Pencil, AtSign, Trash2, BellRing, Link2, Plug, Unplug, ShieldCheck, Copy, Image as ImageIcon, Pin, ExternalLink, BookmarkPlus, Info, Flag, Download, Reply, Forward, SmilePlus, Users, BookmarkCheck, Bookmark, Languages, Ellipsis, User, MessageCircle, Ban, Bell, BellOff, EyeOff } from 'lucide-react';
 import { bare, instOf, isInst } from './ids.js';
 import { homeDomainOf, homeLine } from './homeservers.js';
 import { setInstancePrefs } from './instances.js';
@@ -77,7 +77,7 @@ export function serverMenu(e, s, { onInvite, onSettings, onLeave, admin: isAdmin
 // right-click on a server on a homeserver (its icon on the rail). srv = the server once I'm in it, whatever state the connection
 // is in. Only things about this one server: the connection belongs to the whole homeserver, so it shows up here only as
 // "Reconnect to <domain>" while it is down (Settings > Homeservers has the rest).
-export function homeServerMenu(e, inst, srv, { onInvite, onSettings, onLeave, onLogin, onRemove, onReconnect }) {
+export function homeServerMenu(e, inst, srv, { onInvite, onSettings, onLeave, onLogin, onRemove, onReconnect, onHide }) {
   const name = srv?.name || inst.community?.name || inst.name;
   const domain = homeDomainOf(inst, srv);
   const here = srv && inst.status === 'open';
@@ -98,6 +98,7 @@ export function homeServerMenu(e, inst, srv, { onInvite, onSettings, onLeave, on
     admin && { label: 'Server settings', icon: Settings, onClick: onSettings },
     srv?.address && { label: 'Copy address', icon: AtSign, onClick: () => copy(srv.address, 'Server address copied') },
     'sep',
+    srv && onHide && { label: 'Hide from list', icon: EyeOff, hint: 'You stay in it', onClick: onHide },
     here && srv.role !== 'owner' && { label: 'Leave server', icon: LogOut, danger: true, onClick: onLeave },
     !srv && { label: 'Remove from list', icon: Trash2, danger: true, onClick: onRemove }, // (not in a server there yet: nothing else to do with it)
     srv && 'sep',

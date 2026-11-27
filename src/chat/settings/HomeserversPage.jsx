@@ -5,9 +5,10 @@
 // HomeserverReports.jsx), and while it is connected as an instance also Voice, Backups, Nookara and Server info (with
 // restart / update). Everything here is the whole homeserver's; one server's own settings are in its Server settings.
 import { useEffect, useRef, useState } from 'react';
-import { Building2, ArrowLeft, Globe, LogOut, AtSign, Users, KeyRound, ShieldCheck, TriangleAlert, RefreshCw, Trash2, Network, Crown, Settings2, Server, UserPlus, Ban, Gauge, Plus, X, RotateCw, ListChecks, Hourglass, Flag, Upload, ArrowLeftRight, Mic, Archive, Info, CircleArrowUp, Palette } from 'lucide-react';
+import { Building2, ArrowLeft, Globe, LogOut, AtSign, Users, KeyRound, ShieldCheck, TriangleAlert, RefreshCw, Trash2, Network, Crown, Settings2, Server, UserPlus, Ban, Gauge, Plus, X, RotateCw, ListChecks, Hourglass, Flag, Upload, ArrowLeftRight, Mic, Archive, Info, CircleArrowUp, Palette, Eye, EyeOff } from 'lucide-react';
 import { ReportsTab } from './HomeserverReports.jsx';
 import { BrandingTab } from './BrandingTab.jsx';
+import { useHiddenServers, showServers } from '../hiddenRail.js';
 import { RegistrationQueue, ServerRequestsQueue } from './HomeQueues.jsx';
 import { SettingsPage, SCard, SRow, Switch } from './ui.jsx';
 import { LoginMethods } from './LoginMethods.jsx';
@@ -180,6 +181,7 @@ function MyHomeservers({ admins, onManage }) {
   // (signed in with Nookara, the servers connect as that account even with a homeserver sign-in next to it)
   const homeHandle = (signedIn && me ? nookaraHandle(me.username) : null) || home?.account?.handle || null;
   const rows = homeserverRows(sessions, instances, servers, { homeHandle, norm: normOrigin });
+  const hidden = useHiddenServers(); // (servers taken off the rail with "Hide from list")
   async function signOut(r) {
     if (!(await ask({ title: `Sign out of ${r.domain}?`, text: `Ember forgets its sign-in for ${r.handle || r.domain} on this device.${r.servers.length ? ' Your servers there stay in your list, signed out, until you sign in again or forget it.' : ''}`, confirm: 'Sign out', danger: true }))) return;
     await signOutHome(r.origin);
@@ -206,6 +208,10 @@ function MyHomeservers({ admins, onManage }) {
                 <span className="ac-host"><Globe size={12} /> {r.domain}{r.legacy ? ' - one server on its own' : ''}</span>
                 {r.handle && <span className="ac-who"><AtSign size={12} /> {r.handle}</span>}
                 <span className={`ac-state ${r.status[0]}`}>{r.status[1]}{r.servers.length ? ` - ${r.servers.length} ${r.servers.length === 1 ? 'server' : 'servers'}` : ''}</span>
+                {(() => {
+                  const hid = (servers || []).filter(x => x.inst === r.origin && hidden.has(x.sid));
+                  return hid.length > 0 && <span className="ac-who"><EyeOff size={12} /> Hidden from your list: {hid.map(x => x.name).join(', ')} <button type="button" className="btn btn-surface btn-sm" onClick={() => showServers(hid.map(x => x.sid))}><Eye size={13} /> Show again</button></span>;
+                })()}
               </div>
               <div className="sx-row-ctl ac-acts">
                 {admin && <button type="button" className="btn btn-primary btn-sm" onClick={() => onManage(admin)}><Settings2 size={13} /> Manage</button>}
