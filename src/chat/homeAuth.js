@@ -12,9 +12,16 @@ export const sourceFor = (origin, info, legacy, ownLogin = false) => tokenSource
 export const tagFor = (origin, info, legacy, nookaraKey) => { const source = sourceFor(origin, info, legacy); return source === 'nookara' ? nookaraTag(nookaraKey) : sessionTag(source, getSession(currentOrigin())?.account); };
 // A Nookara session on another homeserver: ask(audience) gets the token from Nookara (POST /api/v2/auth/remote-token with the
 // Nookara token), the homeserver trades it for a session. One trip at a time per homeserver.
-const trading = new Map();
+const trading = (globalThis.__emberNookaraTrade ||= new Map()); // (survives the module being evaluated again, like remoteSignIn's)
+const tradeBusy = (globalThis.__emberNookaraBusy ||= new Map());
 export function nookaraSignIn(origin, remoteUrl, ask) {
-  if (!trading.has(origin)) trading.set(origin, (async () => remoteExchange(origin, await ask(origin), remoteUrl))().finally(() => trading.delete(origin)));
+  const wait = (tradeBusy.get(origin) || 0) - Date.now();
+  if (wait > 0) return Promise.reject(Object.assign(new Error('homeserver_rate_limited'), { code: 'homeserver_rate_limited', status: 429, retry_after: Math.ceil(wait / 1000) }));
+  if (!trading.has(origin)) {
+    trading.set(origin, (async () => remoteExchange(origin, await ask(origin), remoteUrl))()
+      .catch(e => { if (e?.retry_after) tradeBusy.set(origin, Date.now() + e.retry_after * 1000); throw e; })
+      .finally(() => trading.delete(origin)));
+  }
   return trading.get(origin);
 }
 // -> { source, session (the token the server takes), account, tag }. renew: the one we had was refused (401) - home's is

@@ -29,6 +29,9 @@ export class HomeserverError extends Error {
   constructor(code, description, status) { super(description || code); this.name = 'HomeserverError'; this.code = code; if (status != null) this.status = status; }
 }
 const fail = (code, description, status) => new HomeserverError(code, description, status);
+// 429 homeserver_rate_limited says how long to wait: retry_after (seconds) in the body, or a Retry-After header
+const retryAfterOf = (res, d) => { const n = Number(d?.retry_after ?? res?.headers?.get?.('Retry-After')); return Number.isFinite(n) && n > 0 ? Math.min(Math.ceil(n), 3600) : 0; };
+const withRetry = (e, res, d) => { const s = retryAfterOf(res, d); if (s) e.retry_after = s; return e; };
 
 // ── what was typed ──
 const isLocal = h => h === 'localhost' || h === '127.0.0.1';
@@ -385,7 +388,7 @@ export async function remoteToken(audience, { origin = currentOrigin() } = {}) {
   try { res = await homeFetch(info.remote_token_url, { origin, method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ audience: aud }) }); }
   catch (e) { if (e instanceof HomeserverError) throw e; throw fail('unreachable'); }
   const d = await res.json().catch(() => null);
-  if (!res.ok || typeof d?.token !== 'string' || !d.token) throw fail(str(d?.error) || 'failed', str(d?.reason || d?.error_description, 300), res.status);
+  if (!res.ok || typeof d?.token !== 'string' || !d.token) throw withRetry(fail(str(d?.error) || 'failed', str(d?.reason || d?.error_description, 300), res.status), res, d);
   return d.token;
 }
 // the other homeserver's side: the token becomes a session there. remoteUrl: its federation.remote_url (default: the usual path)
@@ -396,14 +399,23 @@ export async function remoteExchange(target, token, remoteUrl) {
   let res;
   try { res = await env.fetch(url.href, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ token }) }); } catch { throw fail('unreachable'); }
   const d = await res.json().catch(() => null);
-  if (!res.ok || typeof d?.access_token !== 'string' || !d.access_token) throw Object.assign(fail(str(d?.error) || 'failed', str(d?.error_description, 300), res.status), d && typeof d === 'object' ? { data: d } : {});
+  if (!res.ok || typeof d?.access_token !== 'string' || !d.access_token) throw withRetry(Object.assign(fail(str(d?.error) || 'failed', str(d?.error_description, 300), res.status), d && typeof d === 'object' ? { data: d } : {}), res, d);
   return { access_token: d.access_token, refresh_token: typeof d.refresh_token === 'string' ? d.refresh_token : null, expires_at: Number(d.expires_in) > 0 ? Date.now() + Number(d.expires_in) * 1000 : null, account: d.account && typeof d.account === 'object' ? d.account : null };
 }
-// both steps. One at a time per homeserver (a socket and three requests noticing a 401 together make one trip)
-const signingIn = new Map();
+// both steps. One at a time per homeserver (a socket and three requests noticing a 401 together make one trip), and none
+// before a 429's retry_after is over (the same answer comes back at once instead). Both maps live on globalThis so a module
+// that is evaluated again (a dev reload, a second copy of this file) can't start a second trip or forget the wait.
+const signingIn = (globalThis.__emberRemoteSignIn ||= new Map());
+const busyUntil = (globalThis.__emberRemoteBusy ||= new Map());
 export function remoteSignIn(target, { origin = currentOrigin(), remoteUrl } = {}) {
   const key = `${origin}>${target}`;
-  if (!signingIn.has(key)) signingIn.set(key, (async () => remoteExchange(target, await remoteToken(target, { origin }), remoteUrl))().finally(() => signingIn.delete(key)));
+  const wait = (busyUntil.get(key) || 0) - Date.now();
+  if (wait > 0) return Promise.reject(Object.assign(fail('homeserver_rate_limited', '', 429), { retry_after: Math.ceil(wait / 1000) }));
+  if (!signingIn.has(key)) {
+    signingIn.set(key, (async () => remoteExchange(target, await remoteToken(target, { origin }), remoteUrl))()
+      .catch(e => { if (e?.retry_after) busyUntil.set(key, Date.now() + e.retry_after * 1000); throw e; })
+      .finally(() => signingIn.delete(key)));
+  }
   return signingIn.get(key);
 }
 

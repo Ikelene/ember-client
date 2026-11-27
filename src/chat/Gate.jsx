@@ -134,8 +134,9 @@ export function InstanceGate({ origin }) {
   if (status === 'banned') return <Box icon={<TriangleAlert size={34} />} title={`You're banned from ${host}`}><div className="vc-gate-btns">{remove}</div></Box>;
   if (status !== 'open') { // (also while it retries by itself: the box stays put until a try works)
     return (
-      <Box icon={<Server size={34} />} title={`Couldn't reach ${host}`}>
-        {inst.error && inst.error !== 'instance_unreachable' && <p>{errorText(inst.error === 'insufficient_scope' ? 'inst_scope' : inst.error)}</p>}
+      <Box icon={<Server size={34} />} title={inst.error === 'homeserver_rate_limited' ? `${host} is busy` : `Couldn't reach ${host}`}>
+        {inst.error === 'homeserver_rate_limited' && <p>It's getting a lot of sign-ins right now. It's tried again once it says it's ready.</p>}
+        {inst.error && inst.error !== 'instance_unreachable' && inst.error !== 'homeserver_rate_limited' && <p>{errorText(inst.error === 'insufficient_scope' ? 'inst_scope' : inst.error)}</p>}
         <RetryIn at={inst.retryAt} busy={status === 'connecting'} />
         <div className="vc-gate-btns"><button type="button" className="btn btn-primary" onClick={() => reconnect(origin)}><RefreshCw size={15} /> Retry now</button>{statusIdForHost(inst.host) && <StatusLink id={statusIdForHost(inst.host)} className="btn btn-surface" size={15} />}{remove}</div>
       </Box>
