@@ -303,7 +303,8 @@ function RailItem({ active, unread, title, onClick, children, style, badge, onCo
     </div>
   );
 }
-export const initials = name => String(name || '?').split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase();
+import { initials } from './initials.js';
+export { initials };
 
 // ── the server's sidebar: header (banner), categories, channels ─────────────
 export function ServerSidebar({ sid, onInvite, onSettings, onChannel, onLeave, onUser }) {

@@ -58,6 +58,21 @@ export default function DiscoverPage({ onClose, tab: tabIn = 'servers', onTab })
   );
 }
 
+// a server on a homeserver with many: I'm in it when its own key is in my list; an older one is its whole address
+const listedSid = r => { const url = normOrigin(r.url); return url && r.sid ? K(url, r.sid) : null; };
+export const isListedAdded = (r, servers, mine) => (listedSid(r) ? servers.some(s => s.sid === listedSid(r)) : mine.some(i => i.origin === normOrigin(r.url)));
+// a directory listing was picked: open it when I'm in it, otherwise join (the Add a server dialog only when it has to ask).
+// -> Promise<true when it opened or joined>
+export async function pickListed(r, servers, mine) {
+  const url = normOrigin(r.url);
+  if (!url) return r.address ? joinByAddress(r.address) : false;
+  if (listedSid(r)) {
+    if (isListedAdded(r, servers, mine)) { go({ kind: 'server', sid: listedSid(r) }); return true; }
+    return joinAndOpen(url, undefined, r.sid);
+  }
+  if (mine.some(i => i.origin === url)) { go({ kind: 'instance', inst: url }); return true; }
+  return joinAndOpen(url);
+}
 // directory pictures are untrusted links: only https ones show (the banner across the top of the card, its tint where there's none)
 const safeImg = u => /^https:\/\//i.test(u || '');
 function ServerResults({ q, onClose }) {
@@ -71,20 +86,8 @@ function ServerResults({ q, onClose }) {
   const load = (page = 1) => loadDirectory(getJson, EMBER_API, { q: deb, page })
     .then(x => { setErr(false); setD(cur => (page > 1 && cur ? { ...x, groups: mergeGroups(cur.groups, x.groups) } : x)); }).catch(() => setErr(true));
   useEffect(() => { setD(null); load(1); }, [deb]); // eslint-disable-line react-hooks/exhaustive-deps
-  // a server on a homeserver with many: I'm in it when its own key is in my list; an older one is its whole address
-  const sidOf = r => { const url = normOrigin(r.url); return url && r.sid ? K(url, r.sid) : null; };
-  const isAdded = r => (sidOf(r) ? servers.some(s => s.sid === sidOf(r)) : mine.some(i => i.origin === normOrigin(r.url)));
-  const pick = r => {
-    const url = normOrigin(r.url);
-    if (!url) { if (r.address) joinByAddress(r.address).then(ok => { if (ok) onClose(); }); return; }
-    if (sidOf(r)) {
-      if (isAdded(r)) { onClose(); go({ kind: 'server', sid: sidOf(r) }); return; }
-      joinAndOpen(url, undefined, r.sid).then(ok => { if (ok) onClose(); });
-      return;
-    }
-    if (mine.some(i => i.origin === url)) { onClose(); go({ kind: 'instance', inst: url }); return; }
-    joinAndOpen(url).then(ok => { if (ok) onClose(); }); // straight in (the Add a server dialog only when it has to ask)
-  };
+  const isAdded = r => isListedAdded(r, servers, mine);
+  const pick = r => { pickListed(r, servers, mine).then(ok => { if (ok) onClose(); }); };
   // the grouped listing may come whole: the search then filters it here too, across every homeserver
   const groups = d ? (d.grouped ? filterGroups(d.groups, deb) : d.groups) : [];
   const total = groups.reduce((n, g) => n + g.communities.length, 0);

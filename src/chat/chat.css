@@ -2820,3 +2820,23 @@ html.vc-rounded .vc-drawer-badge { border-radius: 999px; }
 .vc-ext-name { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; }
 .vc-ext-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .vc-ext-mark { flex: none; }
+
+/* the "+" dialog (CreateOnHomeserver.jsx): Join / Create tabs, and rows of homeservers or suggested servers: icon, name and domain, chevron */
+.vc-ch-tabs { display: flex; gap: 4px; padding: 3px; margin-bottom: 12px; background: #0f0f11; border: 1px solid var(--border); }
+.vc-ch-tabs button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 10px; background: none; border: 0; color: var(--dim); font: inherit; font-weight: 600; cursor: pointer; }
+.vc-ch-tabs button.on { background: var(--accent-dim); color: #fff; }
+.vc-ch-row { display: flex; align-items: center; gap: 12px; }
+.vc-ch-row .vc-list-txt { flex: 1; min-width: 0; }
+.vc-ch-row .vc-list-txt b { white-space: normal; overflow-wrap: anywhere; }
+.vc-ch-row .vc-list-txt small { flex-wrap: wrap; }
+.vc-ch-row:disabled { opacity: .6; cursor: default; }
+.vc-ch-ico { width: 40px; height: 40px; flex: none; display: grid; place-items: center; overflow: hidden; background: var(--surface-3); border: 1px solid var(--border-2); font-weight: 700; font-size: 14px; color: var(--dim); }
+.vc-ch-ico img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vc-ch-ico.act { color: var(--accent); }
+.vc-ch-chev { flex: none; color: var(--muted); }
+.vc-ch-sugg-head { margin: 16px 0 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+html.vc-rounded .vc-ch-tabs { border-radius: var(--r-md); }
+html.vc-rounded .vc-ch-tabs button { border-radius: calc(var(--r-md) - 3px); }
+html.vc-rounded .vc-ch-ico { border-radius: 12px; }
+html.vc-light .vc-ch-tabs { background: #f2f2f5; }
+html.vc-light .vc-ch-tabs button.on { color: var(--text, #111); }

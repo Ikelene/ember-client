@@ -2,14 +2,19 @@
 // and it is made there (POST /api/v1/servers). The homeservers offered are the ones in your list that host many, plus the
 // one you signed in on. Whether you may create one isn't in a homeserver's discovery: its answer to the request says.
 // Hosting a whole new server with Nookara (Hosting.jsx) stays one click away, and is not affected by any of this.
+// The "+" dialog: Join (first) takes anything joining takes, and suggests a few servers from Discovery; Create is the above.
 import { useEffect, useState } from 'react';
-import { ChevronRight, Globe, Plus, Server, TriangleAlert } from 'lucide-react';
+import { ChevronRight, Globe, Plus, Server, TriangleAlert, LogIn, AtSign, Users } from 'lucide-react';
 import { apiFetch } from '../api.js';
+import { EMBER_API } from '../compat.js';
+import { loadDirectory } from './directory.js';
+import { pickListed, isListedAdded } from './DiscoverPage.jsx';
+import { joinTarget } from './joinInput.js';
 import { Dialog } from './Dialogs.jsx';
 import { initials } from './Parts.jsx';
 import { useChat, go } from './store.js';
 import { K, normOrigin } from './ids.js';
-import { discover, addInstance, nookaraSession, instanceConn, loadInstanceData, hostOf, canHomeConnect, homeConnect, nookaraSignsIn } from './instances.js';
+import { discover, addInstance, nookaraSession, instanceConn, loadInstanceData, hostOf, canHomeConnect, homeConnect, nookaraSignsIn, joinByAddress } from './instances.js';
 import { hasNookara } from './session.js';
 import { currentSession, currentOrigin } from './homeserver.js';
 import { isV2, slugIssue, slugFrom, createErrorText } from './addresses.js';
@@ -28,8 +33,9 @@ export const useCreateHosts = () => createHosts(useChat(s => s.instances));
 
 const POLICIES = [['open', 'Anyone can join'], ['request', 'People ask to join'], ['invite', 'Only with an invite']];
 
-export function CreateOnHomeserver({ onClose, onOther }) {
+export function CreateOnHomeserver({ onClose, onOther, start = 'join' }) {
   const hosts = useCreateHosts();
+  const [tab, setTab] = useState(start); // join | create
   const [host, setHost] = useState(null);
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -66,43 +72,112 @@ export function CreateOnHomeserver({ onClose, onOther }) {
     finally { setBusy(false); }
   }
 
+  const picking = tab === 'join' || !host;
   return (
-    <Dialog title="Create a server" sub={host ? `It will live on ${host.domain}. You can change all of this later.` : 'Pick the homeserver it will live on.'} onClose={onClose} wide className="vc-create-hs">
-      {close => (!host ? (
+    <Dialog title={tab === 'join' ? 'Join a server' : 'Create a server'} sub={tab === 'join' ? "Paste an invite, or type a server's address." : host ? `It will live on ${host.domain}. You can change all of this later.` : 'Pick the homeserver it will live on.'} onClose={onClose} wide className="vc-create-hs">
+      {close => (
         <>
-          <div className="vc-rows">
-            {hosts.map(h => (
-              <button type="button" key={h.origin} className="vc-list-row bf-backup-pick" onClick={() => { setHost(h); setErr(''); }}>
-                <span className="vc-srv-ico">{h.icon ? <img src={h.icon} alt="" /> : initials(h.name)}</span>
-                <span className="vc-list-txt"><b>{h.name}</b><small>{h.domain}{h.home ? ' - your homeserver' : ''}</small></span>
-                <span className="grow" /><ChevronRight size={16} />
-              </button>
-            ))}
-            {onOther && (
-              <button type="button" className="vc-list-row bf-backup-pick" onClick={() => { close(); setTimeout(onOther, 200); }}>
-                <span className="vc-srv-ico act"><Server size={18} /></span>
-                <span className="vc-list-txt"><b>A server of its own</b><small>Hosted by Nookara or by you, or add one by its address</small></span>
-                <span className="grow" /><ChevronRight size={16} />
-              </button>
-            )}
-          </div>
-          <div className="vc-dialog-btns"><span className="grow" /><button type="button" className="btn btn-surface" onClick={close}>Cancel</button></div>
+          {picking && (
+            <div className="vc-ch-tabs" role="tablist">
+              {[['join', 'Join', LogIn], ['create', 'Create', Plus]].map(([id, label, Icon]) => (
+                <button type="button" role="tab" key={id} aria-selected={tab === id} className={tab === id ? 'on' : ''} onClick={() => { setTab(id); setErr(''); }}><Icon size={15} /> {label}</button>
+              ))}
+            </div>
+          )}
+          {tab === 'join' ? <JoinPane close={close} /> : !host ? (
+            <>
+              <div className="vc-rows">
+                {hosts.map(h => (
+                  <button type="button" key={h.origin} className="vc-list-row bf-backup-pick vc-ch-row" onClick={() => { setHost(h); setErr(''); }}>
+                    <span className="vc-ch-ico">{h.icon ? <img src={h.icon} alt="" /> : initials(h.name)}</span>
+                    <span className="vc-list-txt"><b>{h.name}</b><small>{h.domain}{h.home ? ' - your homeserver' : ''}</small></span>
+                    <ChevronRight size={16} className="vc-ch-chev" />
+                  </button>
+                ))}
+                {onOther && (
+                  <button type="button" className="vc-list-row bf-backup-pick vc-ch-row" onClick={() => { close(); setTimeout(onOther, 200); }}>
+                    <span className="vc-ch-ico act"><Server size={18} /></span>
+                    <span className="vc-list-txt"><b>A server of its own</b><small>Hosted by Nookara or by you, or add one by its address</small></span>
+                    <ChevronRight size={16} className="vc-ch-chev" />
+                  </button>
+                )}
+              </div>
+              <div className="vc-dialog-btns"><span className="grow" /><button type="button" className="btn btn-surface" onClick={close}>Cancel</button></div>
+            </>
+          ) : (
+            <form onSubmit={create}>
+              <label className="vc-field"><span>Name</span><input className="form-input" autoFocus maxLength={60} value={name} onChange={e => { setName(e.target.value); setErr(''); }} /></label>
+              <label className="vc-field"><span>Address (optional)</span>
+                <div className="vc-row"><input className="form-input" maxLength={32} autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="picked for you" aria-invalid={!!issue} value={slug}
+                  onChange={e => { setTouched(true); setSlug(e.target.value.toLowerCase().replace(/\s+/g, '-')); setErr(''); }} /><span className="bf-ss-addr-at">@{host.domain}</span></div>
+                {issue ? <small className="vc-hint bf-ss-addr-bad">{issue}</small> : <small className="vc-hint"><Globe size={12} className="vc-inline-ico" /> {slug ? `People will find it as ${slug}@${host.domain}.` : '3-32 lowercase letters, numbers and dashes. Leave it empty and the homeserver picks one.'}</small>}
+              </label>
+              <label className="vc-field"><span>Who can join</span>
+                <select className="form-input" value={policy} onChange={e => setPolicy(e.target.value)}>{POLICIES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
+              {err && <p className="vc-err"><TriangleAlert size={14} /> {err}</p>}
+              <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" onClick={() => { setHost(null); setErr(''); }}>Back</button><span className="grow" />
+                <button type="submit" className="btn btn-primary" disabled={!name.trim() || !!issue || busy}><Plus size={15} /> {busy ? 'Creating...' : 'Create server'}</button></div>
+            </form>
+          )}
         </>
-      ) : (
-        <form onSubmit={create}>
-          <label className="vc-field"><span>Name</span><input className="form-input" autoFocus maxLength={60} value={name} onChange={e => { setName(e.target.value); setErr(''); }} /></label>
-          <label className="vc-field"><span>Address (optional)</span>
-            <div className="vc-row"><input className="form-input" maxLength={32} autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="picked for you" aria-invalid={!!issue} value={slug}
-              onChange={e => { setTouched(true); setSlug(e.target.value.toLowerCase().replace(/\s+/g, '-')); setErr(''); }} /><span className="bf-ss-addr-at">@{host.domain}</span></div>
-            {issue ? <small className="vc-hint bf-ss-addr-bad">{issue}</small> : <small className="vc-hint"><Globe size={12} className="vc-inline-ico" /> {slug ? `People will find it as ${slug}@${host.domain}.` : '3-32 lowercase letters, numbers and dashes. Leave it empty and the homeserver picks one.'}</small>}
-          </label>
-          <label className="vc-field"><span>Who can join</span>
-            <select className="form-input" value={policy} onChange={e => setPolicy(e.target.value)}>{POLICIES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
-          {err && <p className="vc-err"><TriangleAlert size={14} /> {err}</p>}
-          <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" onClick={() => { setHost(null); setErr(''); }}>Back</button><span className="grow" />
-            <button type="submit" className="btn btn-primary" disabled={!name.trim() || !!issue || busy}><Plus size={15} /> {busy ? 'Creating...' : 'Create server'}</button></div>
-        </form>
-      ))}
+      )}
     </Dialog>
+  );
+}
+
+// Join: one field for everything joining takes (slug@domain, slug@domain/code, https://domain/i/slug/code, an old invite link or
+// code, an instance's address), and a few listed servers from Discovery I'm not in yet
+const getJson = url => fetch(url).then(r => (r.ok ? r.json() : Promise.reject(Object.assign(new Error('request_failed'), { status: r.status }))));
+function JoinPane({ close }) {
+  const [text, setText] = useState('');
+  const [err, setErr] = useState('');
+  const [listed, setListed] = useState(null); // null = loading
+  const [busy, setBusy] = useState('');
+  const servers = useChat(s => s.servers);
+  const mine = useChat(s => s.instances);
+  useEffect(() => {
+    let live = true;
+    loadDirectory(getJson, EMBER_API, {}).then(d => { if (live) setListed(d.groups.flatMap(g => g.communities)); }).catch(() => { if (live) setListed([]); });
+    return () => { live = false; };
+  }, []);
+  const suggested = (listed || []).filter(r => (r.url || r.address) && !isListedAdded(r, servers, mine)).slice(0, 5);
+  function submit(e) {
+    e.preventDefault();
+    const t = joinTarget(text);
+    if (!t) { setErr("Paste an invite link, or type a server's address like name@example.com."); return; }
+    close();
+    setTimeout(() => {
+      if (t.kind === 'address') joinByAddress(t.address);
+      else if (t.kind === 'invite') dispatchEvent(new CustomEvent('vc-invite', { detail: { code: t.code, inst: t.inst } }));
+      else dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'add-instance', url: t.url } }));
+    }, 200);
+  }
+  async function pick(r) {
+    setBusy(r.key);
+    const ok = await pickListed(r, servers, mine).catch(() => false);
+    setBusy('');
+    if (ok) close();
+  }
+  return (
+    <form onSubmit={submit}>
+      <label className="vc-field"><span>Invite or address</span>
+        <input className="form-input" autoFocus autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="name@example.com, or an invite link" value={text} onChange={e => { setText(e.target.value); setErr(''); }} />
+        <small className="vc-hint"><AtSign size={12} className="vc-inline-ico" /> A server's address (name@example.com), an invite link or code, or the address of a server of its own.</small>
+      </label>
+      {err && <p className="vc-err"><TriangleAlert size={14} /> {err}</p>}
+      <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" onClick={close}>Cancel</button><span className="grow" />
+        <button type="submit" className="btn btn-primary" disabled={!text.trim()}><LogIn size={15} /> Join</button></div>
+      {(listed === null || suggested.length > 0) && <div className="vc-ch-sugg-head">Suggested from Discovery</div>}
+      {listed === null && <div className="vc-loading"><i /><i /><i /></div>}
+      <div className="vc-rows">
+        {suggested.map(r => (
+          <button type="button" key={r.key} className="vc-list-row bf-backup-pick vc-ch-row" disabled={!!busy} onClick={() => pick(r)}>
+            <span className="vc-ch-ico">{/^https:\/\//i.test(r.icon_url || '') ? <img src={r.icon_url} alt="" /> : initials(r.name)}</span>
+            <span className="vc-list-txt"><b>{r.name}</b><small>{r.address || hostOf(r.url)} - <Users size={11} /> {r.member_count}</small></span>
+            {busy === r.key ? <i className="vc-gate-spin" /> : <ChevronRight size={16} className="vc-ch-chev" />}
+          </button>
+        ))}
+      </div>
+    </form>
   );
 }
