@@ -289,7 +289,7 @@ export function MessageRulesPage({ sid, onDirty, goTo }) {
         <Toggle label="Show link previews" hint="A card with the page's title and picture under messages with links." on={m.link_previews} onChange={v => set('messages', 'link_previews', v)} />
         <label className="vc-field vc-gap-top"><span>Preview proxy {!s.instance_admin && <Lock size={12} className="vc-inline-ico" />}</span>
           <input className="form-input" maxLength={500} placeholder="https://proxy.example/fetch?url={url}" disabled={!s.instance_admin || !m.link_previews} value={m.preview_proxy} onChange={e => set('messages', 'preview_proxy', e.target.value)} />
-          <small className="vc-hint">Optional. Previews are fetched through this address instead of from the server itself: {'{url}'} is replaced with the link (or it's added as ?url=).{s.instance_admin ? '' : ' Only the instance admins can change it.'}</small></label>
+          <small className="vc-hint">Optional. Previews are fetched through this address instead of from the server itself: {'{url}'} is replaced with the link (or it's added as ?url=).{s.instance_admin ? '' : ' Only the homeserver admins can change it.'}</small></label>
       </Card>
       {r.ui}
     </div>
@@ -405,7 +405,7 @@ export function AutoModPage({ sid, onDirty }) {
           <small className="vc-hint">One per line, up to 1000. Each can be up to 64 characters.</small></label>
         <label className="vc-field"><span>Word list file on the server {!s.instance_admin && <Lock size={12} className="vc-inline-ico" />}</span>
           <input className="form-input" maxLength={300} placeholder="automod/words.txt" disabled={!s.instance_admin || !a.words_enabled} value={a.word_file} onChange={e => am('word_file', e.target.value)} />
-          <small className="vc-hint">Optional: a text file in the server's data folder, one word per line (lines starting with # are skipped). It's read again when it changes.{s.instance_admin ? '' : ' Only the instance admins can change it.'}</small></label>
+          <small className="vc-hint">Optional: a text file in the server's data folder, one word per line (lines starting with # are skipped). It's read again when it changes.{s.instance_admin ? '' : ' Only the homeserver admins can change it.'}</small></label>
         <Toggle label="Whole words only" hint={'On: "ass" doesn\'t block "class". Off: it blocks the letters anywhere.'} disabled={!a.words_enabled} on={a.whole_word} onChange={v => am('whole_word', v)} />
         <Toggle label="Match case" hint="On: capital letters have to match too." disabled={!a.words_enabled} on={a.match_case} onChange={v => am('match_case', v)} />
         <NumField label="Time out the sender for" unit="seconds (0: just block the message)" min={0} max={2419200} disabled={!a.words_enabled} value={a.timeout_seconds} onChange={v => am('timeout_seconds', v)} />
