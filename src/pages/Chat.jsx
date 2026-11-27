@@ -20,7 +20,8 @@ import { api, getToken, cachedMe, apiFetch, isWebEmber } from '../api.js';
 import { applyAccentColor } from '../theme.js';
 import { jumpToMessage, loginAgain, retryNow, useBotPeer, isMobileDevice, cachedMessages, fullHandle } from '../chat/store.js';
 import { BotTag } from '../chat/Bots.jsx';
-import { useChat, init, open, go, readHash, keyOf, loadGroups, loadMembers, toast, errorText, getState, ask, unreadTotals, meFromHome, homeFrom } from '../chat/store.js';
+import { useChat, init, open, go, readHash, keyOf, loadGroups, loadMembers, toast, errorText, getState, ask, unreadTotals, meFromHome, homeFrom, socialAccount } from '../chat/store.js';
+import { dmTitle } from '../chat/social.js';
 import SocialHome, { SocialSidebar, SocialDmHead } from '../chat/SocialHome.jsx';
 import { Rail, ServerSidebar, HomeSidebar, MemberList, UserPanel, VoiceQuotaNote, OutdatedNote, useConnLost } from '../chat/Parts.jsx';
 
@@ -546,11 +547,12 @@ function ChatPage() {
   const dmIsBot = useBotPeer(view.kind === 'dm' ? view.username : null);
   const unreadCount = useTabBadge();
   const gateName = useChat(s => (view.kind === 'instance' ? s.instances.find(i => i.origin === view.inst)?.name : null));
-  useEffect(() => { document.title = `${unreadCount ? `(${unreadCount > 999 ? '999+' : unreadCount}) ` : ''}${sdm ? sdmName || 'Conversation' : channel ? `#${channel.name} - ${detail.server.name}` : view.kind === 'instance' ? gateName || 'Server' : view.kind === 'dm' ? `@${fullHandle(view.username)}` : view.kind === 'notes' ? 'Personal Notes' : group ? group.name : 'Home'} | Ember`; }, [unreadCount, channel, detail, view, group, gateName]);
+  useEffect(() => { document.title = `${unreadCount ? `(${unreadCount > 999 ? '999+' : unreadCount}) ` : ''}${sdm ? sdmName || 'Conversation' : channel ? `#${channel.name} - ${detail.server.name}` : view.kind === 'instance' ? gateName || 'Server' : view.kind === 'dm' ? `@${fullHandle(view.username)}` : view.kind === 'notes' ? 'Personal Notes' : group ? group.name : 'Home'} | Ember`; }, [unreadCount, channel, detail, view, group, gateName, sdmName]);
   const signedIn = useChat(s => s.signedIn);
   const homeMode = useChat(s => !!s.home); // on a v2 homeserver session (SocialHome.jsx)
   const sdm = view.kind === 'channel' && view.dm ? view.dm : null; // a DM on a homeserver: a one-channel server underneath
-  const sdmName = useChat(s => (sdm ? s.detail[view.sid]?.server?.name : null));
+  // a homeserver DM's name: who it is with (username@domain), from the DM list; the host's own name for it until that's there
+  const sdmName = useChat(s => { if (!sdm) return null; const d = s.social.dms.find(x => x.id === sdm); return (d && dmTitle(d, socialAccount(s)?.domain || '')) || s.detail[view.sid]?.server?.name || null; });
   const locked = useChat(s => s.locked); // staff switched Ember and DMs off for the account (store.js lockAccount)
   const waking = view.kind === 'channel' && !!detail?.cached; // its kept channel list: still connecting
   const wakeStatus = useChat(s => { if (!waking || !isInst(view.sid)) return null; const i = s.instances.find(x => x.origin === instOf(view.sid)); return i && ['insufficient_scope', 'unauthorized', 'invalid_session'].includes(i.error) ? 'error' : i?.status; });
