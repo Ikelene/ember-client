@@ -5,6 +5,7 @@ import { siteHref } from './hosts.js';
 import { VideoPlayer, fmtTime } from './MediaPlayer.jsx';
 import { viewPicture } from './MediaViewer.jsx';
 import { useEffect, useRef, useState } from 'react';
+import { HomeChip } from './homeLabels.jsx';
 import { Play, Download, ShieldCheck, Eye, Loader2, Users, ExternalLink, BookmarkPlus, BookmarkCheck, Coins, Heart, Clock, HardDrive, Folder, File as FileIcon, FileArchive, FileCode, FileText, Image as ImageIcon, Film, Music, MessagesSquare, MessageSquare, ArrowBigUp, Pin, Lock, Ban, Globe, KeyRound, FileX } from 'lucide-react';
 import { joinAndOpen, joinByAddress } from './instances.js';
 import { apiFetch } from '../api.js';
@@ -392,7 +393,7 @@ function AddressInviteEmbed({ r }) {
       <div className="vc-invite-main">
         <span className="vc-srv-ico lg">{icon ? <img src={icon} alt="" /> : (s?.name || r.slug).slice(0, 2)}</span>
         <div className="vc-invite-info">
-          <b>{s?.name || address}</b>
+          <b>{s?.name || address} <HomeChip domain={String(address).split('@')[1] || ''} /></b>
           <span>{s && <><i className="dot" /> {s.member_count} member{s.member_count === 1 ? '' : 's'} </>}<small className="vc-invite-host">{address}</small></span>
         </div>
         <button type="button" className="btn btn-primary" disabled={busy} onClick={async () => { setBusy(true); await joinByAddress(r); setBusy(false); }}>{busy ? 'Joining...' : mine ? 'Open' : 'Join'}</button>

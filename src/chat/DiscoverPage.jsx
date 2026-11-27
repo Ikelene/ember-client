@@ -2,6 +2,7 @@
 // the search, then Servers / Bots. Servers come in sections, one per homeserver (nookara.cc first, then the biggest).
 // The directory listings are untrusted text (shown as text; a card only opens Add a server).
 import { useEffect, useState } from 'react';
+import { HomeChip } from './homeLabels.jsx';
 import { ArrowLeft, AtSign, Bot, Compass, Globe, Search, ShieldCheck, Users, X } from 'lucide-react';
 import { joinAndOpen, joinByAddress } from './instances.js';
 import { loadDirectory, mergeGroups, filterGroups } from './directory.js';
@@ -113,6 +114,7 @@ function ServerResults({ q, onClose }) {
               return (
                 <div key={r.key} className="vc-disc-card vl-rise" style={{ '--i': Math.min(n++, 12) }}>
                   <div className="vc-disc-banner" style={{ '--hue': hueOf(r.name) }}>{safeImg(r.banner_url) && <img src={r.banner_url} alt="" loading="lazy" onError={e => { e.currentTarget.hidden = true; }} />}</div>
+                  <HomeChip domain={r.address ? r.address.split('@')[1] : g.domain} className="on-banner" />
                   <span className="vc-srv-ico lg">{safeImg(r.icon_url) ? <img src={r.icon_url} alt="" /> : initials(r.name)}</span>
                   <div className="vc-disc-body">
                     <b>{r.name}{r.trusted && <ShieldCheck size={14} className="vc-inline-ico vc-disc-trusted" title="Trusted by Nookara" />}</b>

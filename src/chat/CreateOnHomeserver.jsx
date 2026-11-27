@@ -9,6 +9,7 @@ import { EMBER_API } from '../compat.js';
 import { loadDirectory } from './directory.js';
 import { pickListed, isListedAdded } from './DiscoverPage.jsx';
 import { joinTarget } from './joinInput.js';
+import { HomeChip } from './homeLabels.jsx';
 import { Dialog } from './Dialogs.jsx';
 import { initials } from './Parts.jsx';
 import { useChat, go } from './store.js';
@@ -89,7 +90,7 @@ export function CreateOnHomeserver({ onClose, start = 'join' }) {
                 {hosts.map(h => (
                   <button type="button" key={h.origin} className="vc-list-row bf-backup-pick vc-ch-row" onClick={() => { setHost(h); setErr(''); }}>
                     <span className="vc-ch-ico">{h.icon ? <img src={h.icon} alt="" /> : initials(h.name)}</span>
-                    <span className="vc-list-txt"><b>{h.name}</b><small>{h.domain}{h.home ? ' - your homeserver' : ''}</small></span>
+                    <span className="vc-list-txt"><b>{h.name}</b><small><HomeChip domain={h.domain} />{h.home ? ' your homeserver' : ''}</small></span>
                     <ChevronRight size={16} className="vc-ch-chev" />
                   </button>
                 ))}
@@ -167,7 +168,7 @@ function JoinPane({ close }) {
         {suggested.map(r => (
           <button type="button" key={r.key} className="vc-list-row bf-backup-pick vc-ch-row" disabled={!!busy} onClick={() => pick(r)}>
             <span className="vc-ch-ico">{/^https:\/\//i.test(r.icon_url || '') ? <img src={r.icon_url} alt="" /> : initials(r.name)}</span>
-            <span className="vc-list-txt"><b>{r.name}</b><small>{r.address || hostOf(r.url)} - <Users size={11} /> {r.member_count}</small></span>
+            <span className="vc-list-txt"><b>{r.name} <HomeChip domain={r.address ? r.address.split('@')[1] : hostOf(r.url)} /></b><small>{r.address || hostOf(r.url)} - <Users size={11} /> {r.member_count}</small></span>
             {busy === r.key ? <i className="vc-gate-spin" /> : <ChevronRight size={16} className="vc-ch-chev" />}
           </button>
         ))}

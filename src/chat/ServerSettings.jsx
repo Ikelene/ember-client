@@ -14,7 +14,8 @@ import {
 
 } from 'lucide-react';
 import { apiFetch, uploadFetch } from '../api.js';
-import { useChat, go, ask, toast, errorText, refreshServer, loadServersOf, loadMembers, useFace } from './store.js';
+import { useChat, go, ask, toast, errorText, refreshServer, loadServersOf, loadMembers, useFace, nookaraDomain } from './store.js';
+import { HomeChip } from './homeLabels.jsx';
 import { instOf, isInst } from './ids.js';
 import { imgHint, warnImage, imgSpec } from './imgHints.js';
 import { initials } from './Parts.jsx';
@@ -92,7 +93,7 @@ export function ServerSettings({ sid, onClose, tab: startTab }) {
     <SettingsShell label="Server settings" crumb={srv?.name} groups={groups} startTab={startTab} onClose={onClose} gone={!d}
       head={srv && <>
         <span className="vc-srv-ico">{srv.icon ? <img src={srv.icon} alt="" /> : initials(srv.name)}</span>
-        <span><b>{srv.name}</b><small>{onInst ? <><Globe size={11} /> {srv.address || inst?.host || origin}</> : 'Hosted by Nookara'}</small></span>
+        <span><b>{srv.name}</b><small>{onInst ? <><Globe size={11} /> {srv.address || inst?.homeserver?.domain || inst?.host || origin}</> : `Hosted by Nookara (${nookaraDomain()})`}</small></span>
       </>}>
       {(page, { onDirty, goTo }) => <PlanCtx.Provider value={buildPlanCtx(inst, goTo)}>
         {page === 'overview' && <Overview sid={sid} origin={origin} instAdmin={instAdmin} onDirty={onDirty} goTo={goTo} />}
@@ -398,6 +399,7 @@ function AdvancedCard({ sid }) {
 function AddressCard({ sid, srv }) {
   const owner = useChat(s => (s.servers.find(x => x.sid === sid)?.role || srv.role) === 'owner');
   const domain = String(srv.address || '').split('@')[1] || '';
+  const hsName = useChat(s => s.instances.find(i => i.origin === instOf(sid))?.homeserver?.name || '');
   const [slug, setSlug] = useState(srv.slug || '');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -420,6 +422,9 @@ function AddressCard({ sid, srv }) {
         <div className="vc-row"><input className="form-input vc-info-mono" readOnly value={address} aria-label="Server address" onFocus={e => e.target.select()} />
           <button type="button" className="btn btn-surface" onClick={copy}><Copy size={14} /> Copy</button></div>
         <small className="vc-hint">People can join with this address, or with an invite made from it.</small></div>
+      {domain && <div className="vc-field"><span>Homeserver</span>
+        <div className="bf-ss-home"><HomeChip domain={domain} />{hsName && hsName !== domain && <b>{hsName}</b>}</div>
+        <small className="vc-hint">This server lives on {domain}. People from other homeservers join it with their own homeserver account, and show with their homeserver next to their name.</small></div>}
       {owner && (
         <form className="vc-field" onSubmit={save}><span>Change the name</span>
           <div className="vc-row"><input className="form-input" value={slug} maxLength={32} autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-invalid={!!issue} aria-label="Address name"

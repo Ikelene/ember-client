@@ -2,7 +2,8 @@
 // Join with my homeserver account. Signed out: the homeserver sign-in first. The invite is kept (sessionStorage) across the
 // sign-in, also a full-page trip, and Chat.jsx finishes the join once it is back signed in.
 import { useEffect, useState } from 'react';
-import { Users, Globe, LogIn } from 'lucide-react';
+import { Users, LogIn } from 'lucide-react';
+import { HomeChip } from './homeLabels.jsx';
 import { Dialog } from './Dialogs.jsx';
 import { initials } from './Parts.jsx';
 import { useChat, go } from './store.js';
@@ -54,7 +55,7 @@ export function AddressInvite({ address, onClose }) {
         <>
           <div className="vc-invite-srv">
             <span className="vc-srv-ico lg">{s.icon ? <img src={s.icon} alt="" /> : initials(s.name)}</span>
-            <div><b>{s.name}</b><small>{s.members != null && <><Users size={13} /> {s.members} member{s.members === 1 ? '' : 's'} - </>}<Globe size={13} /> {s.address}</small></div>
+            <div><b>{s.name} <HomeChip domain={String(s.address).split('@')[1] || ''} /></b><small>{s.members != null && <><Users size={13} /> {s.members} member{s.members === 1 ? '' : 's'} - </>}{s.address}</small></div>
           </div>
           {s.description && <p className="vc-dialog-sub">{s.description}</p>}
           {signedIn ? (
