@@ -236,7 +236,7 @@ body:has(.vc-sign-banner) .vc-notify-banner { top: 52px; } /* (the notifications
 .vc-msg-name:hover { text-decoration: underline; }
 .vc-time { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
 .vc-pronouns { font-size: 11.5px; color: var(--muted); opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; max-width: 14em; }
-.vc-text { font-size: 15px; line-height: 1.45; color: #dcdce0; overflow-wrap: anywhere; }
+.vc-text { font-size: 15px; line-height: 1.45; color: #dcdce0; overflow-wrap: break-word; } /* (break-word, not anywhere: anywhere also shrinks a fit-content bubble to its narrowest word) */
 .vc-text a { color: #8ab4f8; }
 .vc-edited { font-size: 10.5px; color: var(--muted); margin-left: 6px; }
 .vc-code { padding: 0 4px; background: #0a0a0c; border: 1px solid var(--border); font-family: Consolas, 'Cascadia Code', monospace; font-size: 13px; }
@@ -2864,3 +2864,5 @@ html.vc-light .vc-ch-tabs button.on { color: var(--text, #111); }
 .vc-hs-chip.tinted svg { color: var(--hs-accent); opacity: 1; }
 .vc-disc-card .vc-hs-chip.on-banner.tinted { background: color-mix(in srgb, var(--hs-accent) 70%, rgba(0, 0, 0, .55)); color: var(--hs-ink); }
 .vc-srv-ico.tinted { background: var(--hs-accent); color: var(--hs-ink); }
+/* a mention stays whole: it moves to the next line as one piece, never "@ALICE" / "AS" */
+.vc-text .vc-mention { white-space: nowrap; }
