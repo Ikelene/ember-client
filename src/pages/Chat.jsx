@@ -18,7 +18,7 @@ import { Hash, Lock, Users, Menu, ChevronLeft, Search, X, AtSign, UsersRound, Lo
 import { reportDmUser } from '../chat/report.js';
 import { api, getToken, cachedMe, apiFetch, isWebEmber } from '../api.js';
 import { applyAccentColor } from '../theme.js';
-import { jumpToMessage, loginAgain, retryNow, useBotPeer, isMobileDevice, cachedMessages } from '../chat/store.js';
+import { jumpToMessage, loginAgain, retryNow, useBotPeer, isMobileDevice, cachedMessages, fullHandle } from '../chat/store.js';
 import { BotTag } from '../chat/Bots.jsx';
 import { useChat, init, open, go, readHash, keyOf, loadGroups, loadMembers, toast, errorText, getState, ask, unreadTotals, meFromHome, homeFrom } from '../chat/store.js';
 import SocialHome, { SocialSidebar, SocialDmHead } from '../chat/SocialHome.jsx';
@@ -132,7 +132,7 @@ function DesktopTitle() {
   const pfp = useChat(s => (view.kind === 'dm' && view.username !== 'System' ? s.people[view.username]?.pfp || s.dms.find(c => c.username === view.username)?.pfp : null));
   const group = useChat(s => (view.kind === 'group' ? s.groups.find(g => g.room === view.room)?.name : null));
   const text = view.kind === 'channel' || view.kind === 'server' ? server || ''
-    : view.kind === 'dm' ? (view.username === 'System' ? 'Nookara' : `@${view.username}`)
+    : view.kind === 'dm' ? (view.username === 'System' ? 'Nookara' : `@${fullHandle(view.username)}`)
       : view.kind === 'group' ? group || 'Group chat'
         : view.kind === 'modmail' ? 'Nookara Moderator Chat'
           : view.kind === 'notes' ? 'Personal Notes'
@@ -540,7 +540,7 @@ function ChatPage() {
   const dmIsBot = useBotPeer(view.kind === 'dm' ? view.username : null);
   const unreadCount = useTabBadge();
   const gateName = useChat(s => (view.kind === 'instance' ? s.instances.find(i => i.origin === view.inst)?.name : null));
-  useEffect(() => { document.title = `${unreadCount ? `(${unreadCount > 999 ? '999+' : unreadCount}) ` : ''}${sdm ? sdmName || 'Conversation' : channel ? `#${channel.name} - ${detail.server.name}` : view.kind === 'instance' ? gateName || 'Server' : view.kind === 'dm' ? `@${view.username}` : view.kind === 'notes' ? 'Personal Notes' : group ? group.name : 'Home'} | Ember`; }, [unreadCount, channel, detail, view, group, gateName]);
+  useEffect(() => { document.title = `${unreadCount ? `(${unreadCount > 999 ? '999+' : unreadCount}) ` : ''}${sdm ? sdmName || 'Conversation' : channel ? `#${channel.name} - ${detail.server.name}` : view.kind === 'instance' ? gateName || 'Server' : view.kind === 'dm' ? `@${fullHandle(view.username)}` : view.kind === 'notes' ? 'Personal Notes' : group ? group.name : 'Home'} | Ember`; }, [unreadCount, channel, detail, view, group, gateName]);
   const signedIn = useChat(s => s.signedIn);
   const homeMode = useChat(s => !!s.home); // on a v2 homeserver session (SocialHome.jsx)
   const sdm = view.kind === 'channel' && view.dm ? view.dm : null; // a DM on a homeserver: a one-channel server underneath
