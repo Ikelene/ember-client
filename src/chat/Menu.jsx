@@ -20,6 +20,7 @@ import { canReportDm } from './dm-report.js';
 import { reactionId } from './msg-actions.js';
 import { myReactions } from './msg-actions.js';
 import { setInstancePrefs } from './instances.js';
+import { homeDomainOf, homeLine } from './homeservers.js';
 import { roleMenuItems, modMenuItems, nickMenuItems, profileMenuItems, changeNick, canNick, P, has } from './roles.jsx';
 import { viewPicture, copyImage, downloadImage } from './MediaViewer.jsx';
 import { saveToMedia, sdmReportRoute } from './store.js';
@@ -186,8 +187,40 @@ export function serverMenu(e, s, { onInvite, onSettings, onLeave, admin: isAdmin
     { label: 'Copy server ID', icon: Code2, dev: true, onClick: () => copy(bare(s.sid), 'Server ID copied') },
   ]);
 }
-// right-click on a server of an instance (its icon on the rail). srv = the community once I'm in it, whatever state the connection is in.
-export function instanceMenu(e, inst, srv, { onInvite, onSettings, onLeave, onLogin, onRemove, onReconnect, onDisconnect }) {
+// right-click on a server on a homeserver (its icon on the rail). srv = the server once I'm in it, whatever state the connection
+// is in. Only things about this one server: the connection belongs to the whole homeserver, so it shows up here only as
+// "Reconnect to <domain>" while it is down (Settings > Homeservers has the rest).
+export function homeServerMenu(e, inst, srv, { onInvite, onSettings, onLeave, onLogin, onRemove, onReconnect }) {
+  const name = srv?.name || inst.community?.name || inst.name;
+  const domain = homeDomainOf(inst, srv);
+  const here = srv && inst.status === 'open';
+  const admin = here && (has(srv.perms, P.MANAGE_SERVER) || has(srv.perms, P.MANAGE_ROLES) || inst.isAdmin);
+  const line = homeLine(inst);
+  openMenu(e, [
+    { type: 'head', label: `${name} · ${srv?.address || domain}` },
+    line && (line.action === 'signin'
+      ? { label: `Sign in to ${domain}`, icon: LogIn, hint: line.hint, onClick: onLogin }
+      : { label: `Reconnect to ${domain}`, icon: RefreshCw, hint: line.hint, onClick: onReconnect }),
+    line && 'sep',
+    srv && { label: 'Mark as read', icon: CheckCheck, onClick: () => markServerRead(srv.sid) },
+    srv && 'sep',
+    ...(srv ? notifyItems(srv.sid, false) : []),
+    srv && 'sep',
+    here && { label: 'Invite people', icon: UserPlus, onClick: onInvite },
+    here && inst.user && canNick(srv.sid, true) && { label: 'Change nickname', icon: Pencil, onClick: () => changeNick(srv.sid, getState().members[srv.sid]?.find(x => x.id === inst.user.id) || { ...inst.user, nick: null }, true) },
+    admin && { label: 'Server settings', icon: Settings, onClick: onSettings },
+    srv?.address && { label: 'Copy address', icon: AtSign, onClick: () => copy(srv.address, 'Server address copied') },
+    'sep',
+    here && srv.role !== 'owner' && { label: 'Leave server', icon: LogOut, danger: true, onClick: onLeave },
+    !srv && { label: 'Remove from list', icon: Trash2, danger: true, onClick: onRemove }, // (not in a server there yet: nothing else to do with it)
+    srv && 'sep',
+    srv && { label: 'Copy server ID', icon: Code2, dev: true, onClick: () => copy(bare(srv.sid), 'Server ID copied') },
+  ]);
+}
+// right-click on an older Ember server that is one server on its own (protocol 1): the server and its connection are the same thing
+export function instanceMenu(e, inst, srv, opts) {
+  if (inst.v2) { homeServerMenu(e, inst, srv, opts); return; }
+  const { onInvite, onSettings, onLeave, onLogin, onRemove, onReconnect, onDisconnect } = opts;
   const name = srv?.name || inst.community?.name || inst.name;
   const here = srv && inst.status === 'open';
   const admin = here && (has(srv.perms, P.MANAGE_SERVER) || has(srv.perms, P.MANAGE_ROLES) || inst.isAdmin);

@@ -25,6 +25,7 @@ import { NOOKARA, instOf, isInst, normOrigin } from './ids.js';
 import { loudUnread, needsChannelCount } from './unread.js';
 import { getLook, subscribeLook } from './look.js';
 import { railEntries, railPos, railOrigin } from './addresses.js';
+import { homeDomainOf } from './homeservers.js';
 import { removeInstance, reorderInstances, reconnect as reconnectInstance, disconnectInstance } from './instances.js';
 import { startSignIn } from './session.js';
 import { useHomeSession } from './HomeserverLogin.jsx';
@@ -246,16 +247,16 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
     const icon = s?.icon || inst.community?.icon_url || inst.icon;
     const active = split ? view.sid === s.sid : view.inst === inst.origin || (!!view.sid && instOf(view.sid) === inst.origin);
     const muted = s && isMuted(s.sid);
-    const ask_ = async () => { if (await ask({ title: `Remove ${split ? inst.host : name}?`, text: `${inst.host} leaves your server list${split ? ', with every server you are in on it,' : ''}${getToken() ? ' on every device' : ''}. Your account there stays as it is - you can add it again any time.`, confirm: 'Remove from list', danger: true })) removeInstance(inst.origin); };
+    const ask_ = async () => { if (await ask({ title: `Remove ${split ? homeDomainOf(inst, s) : name}?`, text: `${inst.v2 ? homeDomainOf(inst, s) : inst.host} leaves your server list${split ? ', with every server you are in on it,' : ''}${getToken() ? ' on every device' : ''}. Your account there stays as it is - you can add it again any time.`, confirm: 'Remove from list', danger: true })) removeInstance(inst.origin); };
     return (
-      <RailItem key={rail} dnd={dnd(rail)} active={active} unread={!active && !!s && loudUnreadOf(s)} title={`${name} · ${inst.host}`} server={s?.sid} style={{ '--i': legacy.length + i }}
+      <RailItem key={rail} dnd={dnd(rail)} active={active} unread={!active && !!s && loudUnreadOf(s)} title={`${name} · ${s?.address || (inst.v2 ? homeDomainOf(inst, s) : inst.host)}`} server={s?.sid} style={{ '--i': legacy.length + i }}
         status={inst.status !== 'open' ? inst.status : null} sleep={inst.sleep} badge={s && !muted ? (s.mentions || 0) + (srvMentions[s.sid] || 0) : 0}
         onClick={() => go(s && inst.status === 'open' ? { kind: 'server', sid: s.sid } : { kind: 'instance', inst: inst.origin, ...(split ? { then: { kind: 'server', sid: s.sid } } : {}) })}
         onContextMenu={e => instanceMenu(e, inst, s, {
           onInvite: () => dialog('invite', s.sid), onSettings: () => dialog('settings', s.sid), onLeave: () => dialog('leave', s.sid), onRemove: ask_,
           onReconnect: () => reconnectInstance(inst.origin),
           onDisconnect: () => disconnectInstance(inst.origin),
-          onLogin: () => (inst.needsNookara ? startSignIn() : dialog('add-instance', null, { url: inst.origin })),
+          onLogin: () => (inst.needsNookara ? startSignIn() : inst.v2 && inst.source ? dialog('chat-settings', null, { page: 'homeservers' }) : dialog('add-instance', null, { url: inst.origin })),
         })}>
         <span className="vc-srv-ico"><ServerIcon src={icon} name={name} /></span>
       </RailItem>
