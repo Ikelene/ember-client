@@ -145,7 +145,7 @@ function Unlock({ onDone, onCancel }) {
   };
   return (
     <form onSubmit={submit} className="e2-fields">
-      <p>{usePass ? `Enter your DM ${p?.type === 'password' ? 'password' : 'PIN'} to read your DMs on this device.` : 'Enter your recovery code.'}</p>
+      <p>{usePass ? `Enter your DM ${p?.type === 'password' ? (S.secretHome().nookara ? 'password' : 'passphrase') : 'PIN'} to read your DMs on this device.` : 'Enter your recovery code.'}</p>
       {locked && mode === 'passcode' && <p className="e2-warn"><AlertTriangle size={15} /> Too many wrong tries, so PIN and password unlock is off.</p>}
       <input className="form-input" autoFocus type={usePass ? 'password' : 'text'} inputMode={usePass && p?.type === 'pin' ? 'numeric' : undefined} autoComplete="off" value={v} onChange={e => setV(e.target.value)} placeholder={usePass ? '' : 'XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XX'} aria-label={usePass ? 'PIN or password' : 'Recovery code'} />
       {err && <p className="e2-err">{err}</p>}
@@ -155,7 +155,7 @@ function Unlock({ onDone, onCancel }) {
       </div>
       <div className="e2-links">
         {usePass ? <button type="button" onClick={() => { setMode('recovery'); setV(''); setErr(''); }}>Use my recovery code</button>
-          : !locked && <button type="button" onClick={() => { setMode('passcode'); setV(''); setErr(''); }}>Use my {p?.type === 'password' ? 'password' : 'PIN'}</button>}
+          : !locked && <button type="button" onClick={() => { setMode('passcode'); setV(''); setErr(''); }}>Use my {p?.type === 'password' ? (S.secretHome().nookara ? 'password' : 'passphrase') : 'PIN'}</button>}
         <button type="button" onClick={() => setMode('link')}>Link from another device</button>
         <button type="button" onClick={() => setMode('replace')}>I lost everything, start again</button>
       </div>
@@ -188,8 +188,27 @@ function NewPasscode({ onDone, intro }) {
 export function E2eeGate() {
   const open = useChat(s => s.e2eeGate);
   const status = useChat(s => s.e2eeStatus);
-  if (!open || status === 'loading') return null;
+  if (!open) return null;
+  if (status === 'loading') return open === 'auto' ? null : <KeysLoading />; // (asked for by a click: say so while the key home answers)
   return <GateDialog first={status === 'none'} />;
+}
+// Unlock was clicked before this device heard from the key home (Nookara's /im/keys, or the homeserver's /social/e2ee): ask it
+// now, and once it answers the unlock or setup screen takes over
+function KeysLoading() {
+  const [failed, setFailed] = useState(false);
+  const load = () => { setFailed(false); S.init().then(st => { if (st === 'loading') setFailed(true); }, () => setFailed(true)); };
+  useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const done = () => closeE2eeGate();
+  return (
+    <Dialog title="Unlock your DMs" onClose={done}>
+      {failed ? (
+        <div className="e2-fields">
+          <p className="e2-err">Couldn't reach {S.secretHome().name || 'your homeserver'} to open your keys. Check your connection and try again.</p>
+          <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" onClick={done}>Later</button><button type="button" className="btn btn-primary" onClick={load}>Try again</button></div>
+        </div>
+      ) : <div className="vc-loading"><i /><i /><i /></div>}
+    </Dialog>
+  );
 }
 // (what it opened as stays: setting up makes the status "ready" while the recovery code is still on screen)
 function GateDialog({ first }) {

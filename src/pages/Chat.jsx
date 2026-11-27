@@ -743,7 +743,7 @@ function ChatPage() {
       {dialog?.kind === 'chat-settings' && <SettingsDialog key={`${dialog.page || 'settings'}${dialog.target || ''}`} page={dialog.page} target={dialog.target} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'forward' && <ForwardDialog message={dialog.message} from={dialog.from} onClose={() => setDialog(null)} />}
       <AskHost />
-      {signedIn && <E2eeGate />}
+      {(signedIn || homeMode) && <E2eeGate />}
       <UploadDestHost />
     </div>
   );

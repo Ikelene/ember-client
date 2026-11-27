@@ -398,7 +398,8 @@ export function connect() {
   if (sock && sock.readyState <= 1) return;
   if (!getToken()) return;
   set({ conn: 'connecting', connRetryAt: 0 });
-  const s = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
+  // (`npm run dev`: the page's own root is vite's hot-reload socket, so Nookara's is reached through the /ws proxy in vite.config.js)
+  const s = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${import.meta.env?.DEV ? '/ws' : ''}`);
   sock = s;
   sockStarted = Date.now();
   // never opened: let it go and run its close handling ourselves (the normal retry with backoff), not waiting on the browser to
@@ -1613,7 +1614,7 @@ E2EE.onChange(st => {
   }
 });
 E2EE.onKeyChange(username => set(s => ({ e2eeKeyChanged: { ...s.e2eeKeyChanged, [String(username).toLowerCase()]: true } })));
-export const openE2eeGate = (mode = 'auto') => set({ e2eeGate: mode });
+export const openE2eeGate = (mode = 'ask') => set({ e2eeGate: mode }); // ('auto': the once-a-visit nudge, below)
 export const closeE2eeGate = () => set({ e2eeGate: null });
 export const dismissKeyChange = username => set(s => { const k = { ...s.e2eeKeyChanged }; delete k[String(username).toLowerCase()]; return { e2eeKeyChanged: k }; });
 const SIGN_REFUSED = new Set(['bad_signature', 'signing_unavailable']);
@@ -3070,7 +3071,7 @@ export function init(me, home = null) {
   desktopBridge()?.onWindowFocus?.(v => { desktopFocused = v; if (v) markViewRead(); });
   startInstances(); // (held while locked: nothing connects until it's lifted)
   if (nk) setupSigning();
-  if (nk && !state.locked) loadAccount();
+  if (nk && !state.locked) { loadAccount(); E2EE.init().catch(() => {}); } // (the keys are plain requests to Nookara: no waiting for its socket)
   if (home) startHome();
   window.addEventListener('popstate', () => open(readHash()));
   const markFocusedViewRead = () => {
