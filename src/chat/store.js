@@ -1565,11 +1565,20 @@ export async function sendSdmReport(view, m, reason, details) {
   }
   // any other homeserver's own account: its admins. My own home takes it with the session I have; another one with the
   // session my home (or Nookara) gets me there
-  if (route.own && !h.nookara) return socialFetch('/social/reports', { method: 'POST', body });
-  if (!info) throw Object.assign(new Error('homeserver_unreachable'), { error: 'homeserver_unreachable' });
-  const at = new URL(`${info.api_url}/social/reports`), host = normOrigin(at.origin);
-  if (!(await ensureHost(host))) throw Object.assign(new Error('homeserver_unreachable'), { error: 'homeserver_unreachable' });
-  return apiFetch(at.pathname, { inst: host, method: 'POST', body: JSON.stringify(body) });
+  try {
+    if (route.own && !h.nookara) return await socialFetch('/social/reports', { method: 'POST', body });
+    if (!info) throw Object.assign(new Error('homeserver_unreachable'), { error: 'homeserver_unreachable' });
+    const at = new URL(`${info.api_url}/social/reports`), host = normOrigin(at.origin);
+    if (!(await ensureHost(host))) throw Object.assign(new Error('homeserver_unreachable'), { error: 'homeserver_unreachable' });
+    return await apiFetch(at.pathname, { inst: host, method: 'POST', body: JSON.stringify(body) });
+  } catch (e) {
+    // 409 report_elsewhere { url }: the sender's account is managed somewhere else (a Nookara account, or another homeserver):
+    // send the same report there once, never further
+    const url = (e?.error || e?.message) === 'report_elsewhere' && (e.url || e.body?.url);
+    if (!url || !/^https?:\/\//.test(url)) throw e;
+    if (h.nookara && normOrigin(new URL(url).origin) === normOrigin(NOOKARA_ORIGIN)) return apiFetch(new URL(url).pathname, { method: 'POST', body: JSON.stringify(body) });
+    return jsonPost(url, body, await remoteToken(new URL(url).origin));
+  }
 }
 // who a held message waits for, by name
 export function waitingNames(dmId, missing) {
