@@ -122,6 +122,10 @@ export function createErrorText(e) {
   const limit = Number(e?.limit);
   switch (code) {
     case 'creation_requires_approval': return 'This homeserver only lets admins create servers.';
+    case 'request_pending': return 'You already have a server request waiting - cancel it first or wait for the answer.';
+    case 'requests_not_used': return "This homeserver doesn't take server requests right now.";
+    case 'request_not_found': return 'That request was answered or cancelled already.';
+    case 'name_required': return 'Give it a name.';
     case 'creation_limit': return Number.isFinite(limit) && limit >= 0 ? `You've reached this homeserver's limit of ${limit} server${limit === 1 ? '' : 's'}.` : "You've reached this homeserver's limit of servers.";
     case 'slug_taken': return 'That address is already taken on this homeserver.';
     case 'invalid_slug': return "That address won't work: 3-32 lowercase letters, numbers and dashes.";

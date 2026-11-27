@@ -12,11 +12,12 @@ import { joinTarget } from './joinInput.js';
 import { HomeChip } from './homeLabels.jsx';
 import { Dialog } from './Dialogs.jsx';
 import { initials } from './Parts.jsx';
-import { useChat, go } from './store.js';
+import { useChat, go, toast } from './store.js';
 import { K, normOrigin } from './ids.js';
 import { discover, addInstance, nookaraSession, instanceConn, loadInstanceData, hostOf, canHomeConnect, homeConnect, nookaraSignsIn, joinByAddress } from './instances.js';
 import { hasNookara } from './session.js';
 import { currentSession, currentOrigin } from './homeserver.js';
+import { discoveryDoc } from './homeApi.js';
 import { isV2, slugIssue, slugFrom, createErrorText } from './addresses.js';
 
 // the homeservers a server can be made on: [{ origin, domain, name, icon, count, listed }]
@@ -43,6 +44,22 @@ export function CreateOnHomeserver({ onClose, start = 'join' }) {
   const [policy, setPolicy] = useState('open');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  // creation "on request" (PROTOCOL §5a): the same form asks an admin instead, and lists what you asked for
+  const [asking, setAsking] = useState(false);
+  const [note, setNote] = useState('');
+  const [desc, setDesc] = useState('');
+  const [mine, setMine] = useState(null);
+  const admin = useChat(s => !!host && !!s.instances.find(i => i.origin === host.origin)?.isAdmin);
+  useEffect(() => {
+    setAsking(false); setMine(null);
+    if (!host) return undefined;
+    let live = true;
+    discoveryDoc(host.origin).then(d => { if (live && d?.creation?.mode === 'request' && !admin) setAsking(true); }).catch(() => {});
+    return () => { live = false; };
+  }, [host?.origin, admin]); // eslint-disable-line react-hooks/exhaustive-deps
+  const loadMine = () => apiFetch('/api/v2/server-requests', { inst: host.origin }).then(d => setMine(Array.isArray(d?.requests) ? d.requests : []), () => setMine([]));
+  useEffect(() => { if (asking && host && instanceConn(host.origin)?.session) loadMine(); }, [asking, host?.origin]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const f = e => { if (host && e.detail?.origin === host.origin) loadMine(); }; addEventListener('ember-server-request', f); return () => removeEventListener('ember-server-request', f); }, [host?.origin]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!touched) setSlug(slugFrom(name)); }, [name]); // eslint-disable-line react-hooks/exhaustive-deps
   const issue = slug ? slugIssue(slug) : null;
 
@@ -63,12 +80,22 @@ export function CreateOnHomeserver({ onClose, start = 'join' }) {
     setBusy(true); setErr('');
     try {
       if (!(await ready(host))) return;
+      if (asking) {
+        await apiFetch('/api/v2/server-requests', { inst: host.origin, method: 'POST', body: JSON.stringify({ name: name.trim(), ...(slug ? { slug } : {}), ...(desc.trim() ? { description: desc.trim() } : {}), ...(note.trim() ? { note: note.trim() } : {}) }) });
+        toast(`Asked for ${name.trim()}. You'll hear when an admin answers.`, true);
+        setName(''); setNote(''); setDesc(''); setTouched(false);
+        loadMine();
+        return;
+      }
       const d = await apiFetch('/api/v1/servers', { inst: host.origin, method: 'POST', body: JSON.stringify({ name: name.trim(), ...(slug ? { slug } : {}), join_policy: policy }) });
       const sid = d?.server?.sid ?? d?.sid; // (already origin|sid: apiFetch namespaces what an instance answers)
       await loadInstanceData(host.origin);
       onClose();
       if (sid) setTimeout(() => go({ kind: 'server', sid: String(sid).includes('|') ? sid : K(host.origin, sid) }), 200);
-    } catch (er) { setErr(createErrorText(er)); }
+    } catch (er) {
+      if ((er.error || er.message) === 'creation_requires_approval') { setAsking(true); setErr('This homeserver makes servers on request: send it as a request below.'); }
+      else setErr(createErrorText(er));
+    }
     finally { setBusy(false); }
   }
 
@@ -107,11 +134,26 @@ export function CreateOnHomeserver({ onClose, start = 'join' }) {
                   onChange={e => { setTouched(true); setSlug(e.target.value.toLowerCase().replace(/\s+/g, '-')); setErr(''); }} /><span className="bf-ss-addr-at">@{host.domain}</span></div>
                 {issue ? <small className="vc-hint bf-ss-addr-bad">{issue}</small> : <small className="vc-hint"><Globe size={12} className="vc-inline-ico" /> {slug ? `People will find it as ${slug}@${host.domain}.` : '3-32 lowercase letters, numbers and dashes. Leave it empty and the homeserver picks one.'}</small>}
               </label>
-              <label className="vc-field"><span>Who can join</span>
-                <select className="form-input" value={policy} onChange={e => setPolicy(e.target.value)}>{POLICIES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
+              {asking ? <>
+                <label className="vc-field"><span>What it's for (optional)</span><input className="form-input" maxLength={300} value={desc} onChange={e => setDesc(e.target.value)} /></label>
+                <label className="vc-field"><span>Note to the admins (optional)</span><textarea className="form-textarea" rows={2} maxLength={500} value={note} onChange={e => setNote(e.target.value)} /></label>
+                <p className="vc-hint">{host.domain} makes servers on request: an admin looks at it, and you hear the answer here.</p>
+              </> : <label className="vc-field"><span>Who can join</span>
+                <select className="form-input" value={policy} onChange={e => setPolicy(e.target.value)}>{POLICIES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>}
               {err && <p className="vc-err"><TriangleAlert size={14} /> {err}</p>}
               <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" onClick={() => { setHost(null); setErr(''); }}>Back</button><span className="grow" />
-                <button type="submit" className="btn btn-primary" disabled={!name.trim() || !!issue || busy}><Plus size={15} /> {busy ? 'Creating...' : 'Create server'}</button></div>
+                <button type="submit" className="btn btn-primary" disabled={!name.trim() || !!issue || busy}><Plus size={15} /> {busy ? (asking ? 'Asking...' : 'Creating...') : asking ? 'Request server' : 'Create server'}</button></div>
+              {asking && mine && mine.length > 0 && (
+                <div className="vc-rows vc-gap-top">
+                  <div className="vc-ch-sugg-head">Your requests</div>
+                  {mine.map(r => (
+                    <div key={r.id} className="vc-list-row vc-ch-row">
+                      <span className="vc-list-txt"><b>{r.name}</b><small>{r.status === 'pending' ? 'Waiting for an admin' : r.status === 'approved' ? 'Approved - it is in your list' : r.status === 'rejected' ? `Declined${r.reason ? `: ${r.reason}` : ''}` : 'Cancelled'}</small></span>
+                      {r.status === 'pending' && <button type="button" className="btn btn-surface btn-sm" onClick={() => apiFetch(`/api/v2/server-requests/${r.id}`, { inst: host.origin, method: 'DELETE' }).then(d => setMine(Array.isArray(d?.requests) ? d.requests : []), er => toast(createErrorText(er)))}>Cancel</button>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </form>
           )}
         </>
