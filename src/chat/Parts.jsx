@@ -14,7 +14,7 @@ import {
 import { RetryIn } from './Gate.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
 import { inviteLinkFor, fullHandle, nookaraDomain } from './store.js';
-import { HomeChip, ForeignChip, useServerHome } from './homeLabels.jsx';
+import { HomeChip, useServerHome } from './homeLabels.jsx';
 import { deviceAccounts, switchToAccount } from './accountSwitch.js';
 import { nookaraDmRows } from './social.js';
 import { SocialDmRow } from './SocialHome.jsx';
@@ -973,7 +973,7 @@ function MemberName({ sid, m: raw }) {
   const m = useFace(raw);
   const key = useNameStyle(sid, m);
   const shown = useName(m);
-  return <b style={colorFrom(key) ? { color: colorFrom(key) } : undefined}>{shown || m.username}<ForeignChip sid={sid} username={m.username} /> <NameDecor sid={sid} user={m} />{m.bot && <BotTag small verified={!!m.verified} />}{m.role === 'owner' && <RoleChip role="owner" />}</b>;
+  return <b style={colorFrom(key) ? { color: colorFrom(key) } : undefined}>{shown || m.username} <NameDecor sid={sid} user={m} />{m.bot && <BotTag small verified={!!m.verified} />}{m.role === 'owner' && <RoleChip role="owner" />}</b>;
 }
 
 // "who posted recently" (Modern, Settings > Text & layout): up to 3 faces of people who posted in the channel in the last

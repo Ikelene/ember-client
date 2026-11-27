@@ -2844,7 +2844,6 @@ html.vc-light .vc-ch-tabs button.on { color: var(--text, #111); }
 /* which homeserver things are on (homeLabels.jsx): a quiet chip, like Matrix's server names */
 .vc-hs-chip { display: inline-flex; align-items: center; gap: 3px; width: max-content; max-width: 16em; align-self: flex-start; padding: 2px 6px; border-radius: 999px; background: rgba(255, 255, 255, .07); color: var(--muted); font-size: 11px; font-weight: 600; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; text-shadow: none; flex: none; }
 .vc-hs-chip svg { flex: none; opacity: .8; }
-.vc-hs-chip.sm { padding: 1px 5px; font-size: 10.5px; font-weight: 500; margin-left: 4px; }
 .vc-side-tname { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
 .vc-side-tname > span:first-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vc-side-tname .vc-hs-chip { padding: 0; background: none; font-size: 11px; font-weight: 500; opacity: .85; }

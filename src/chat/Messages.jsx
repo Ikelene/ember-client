@@ -5,7 +5,6 @@ import { saveMedia } from './mediaDownload.js';
 import { canAttachInChannel } from './attachment-permissions.js';
 import { apiFetch } from '../api.js';
 import { instOpt, isInst, instOf, NOOKARA } from './ids.js';
-import { ForeignChip } from './homeLabels.jsx';
 import { isLegacyMessage } from './tokens.js';
 import { sigId } from './signing.js';
 import { VideoPlayer, AudioPlayer, VoicePlayer } from './MediaPlayer.jsx';
@@ -632,7 +631,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
             {hook ? <><span className="vc-msg-name hook">{name}</span>{m.author.staff ? <><span className="vc-app-tag staff">STAFF</span>{m.staffBy && <small className="vc-staff-by">sent by {m.staffBy} (only staff see this)</small>}</> : m.author.bridge === 'cloudlink' ? <><span className="vc-app-tag cl" title="This message came in over the channel's CloudLink bridge.">CLOUDLINK</span>{m.author.bridge_from && <span className="vc-game-tag" title="The chat it came from before CloudLink">{m.author.bridge_from}</span>}</> : m.author.bridge ? <><span className="vc-plat-tag" title={m.author.bridge === 'minecraft' ? 'Sent from the linked Minecraft server.' : m.author.bridge === 'matrix' ? 'This message was sent from the linked Matrix room.' : `This message was sent from the linked ${PLATFORM_NAMES[m.author.bridge] || m.author.bridge} community.`}><PlatformIcon p={m.author.bridge} size={16} /></span>{m.author.bridge_from && <span className="vc-game-tag" title="The server it was sent from">{m.author.bridge_from}</span>}</> : <span className="vc-app-tag">APP</span>}</> : <>
             {blockedAuthor
               ? <><button type="button" className="vc-msg-name vc-blocked-name" onClick={e => onUser(name, e.currentTarget)}>{BLOCKED_NAME}</button><BlockedMark /></>
-              : <><button type="button" className="vc-msg-name" style={colorFrom(nameKey) && distrust !== 'bad' ? { color: colorFrom(nameKey) } : undefined} onClick={e => onUser(name, e.currentTarget)} title={!alias && shown !== (ctx?.handleOf?.(name) || name) ? `@${ctx?.handleOf?.(name) || name}` : undefined}>{alias ? alias.name : shown || name}</button>{!alias && !view.dm && isInst(view.sid || '') && <ForeignChip sid={view.sid} username={name} />}
+              : <><button type="button" className="vc-msg-name" style={colorFrom(nameKey) && distrust !== 'bad' ? { color: colorFrom(nameKey) } : undefined} onClick={e => onUser(name, e.currentTarget)} title={!alias && shown !== (ctx?.handleOf?.(name) || name) ? `@${ctx?.handleOf?.(name) || name}` : undefined}>{alias ? alias.name : shown || name}</button>
                 {alias && !unmarked ? <AliasMark alias={alias} by={author} /> : <NameDecor sid={view.sid} user={aliasMember || author} />}</>}{m.author?.bot && !unmarked && <BotTag verified={!!m.author.verified} />}<SigBadge m={m} />{m.via && <ViaBadge via={m.via} inst={m.inst} />}</>}
             {pronouns && <span className="vc-pronouns" title="Pronouns">{pronouns}</span>}
             <span className="vc-time" title={new Date(m.created_at).toLocaleString()}>{stampOf(m.created_at)}</span>
