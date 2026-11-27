@@ -2196,6 +2196,9 @@ export function statusOf(sid, m, s = state) {
   if (m.kind === 'bot') return botPresenceOf(m);
   const here = hereConnected(m);
   if (here === false) return 'offline';
+  // me: I'm here, whatever the server says (it may not list my own presence, e.g. in a homeserver DM)
+  const mine = connections.get(instOf(sid))?.user;
+  if (here === null && mine && String(mine.id) === String(m.id)) { const p = s.presence[s.me?.username]?.status; return p && p !== 'invisible' ? p : p === 'invisible' ? 'offline' : 'online'; }
   if (!isNookara(m.kind) || !s.signedIn) return here ? 'online' : null;
   const p = s.presence[s.nookaraNames[nookaraId(m)] || m.username];
   if (here) return p && p.status !== 'offline' ? p.status : p ? 'offline' : 'online'; // (offline on Nookara while connected here = invisible)
@@ -2206,6 +2209,8 @@ export const presenceFor = (sid, m, s = state) => {
   if (m.kind === 'bot') return botPresenceOf(m) ? { status: botPresenceOf(m) } : null;
   const here = hereConnected(m);
   if (here === false) return { status: 'offline' };
+  const mine = connections.get(instOf(sid))?.user;
+  if (here === null && mine && String(mine.id) === String(m.id)) return s.presence[s.me?.username] || { status: 'online' }; // (me)
   const p = isNookara(m.kind) && s.signedIn ? s.presence[s.nookaraNames[nookaraId(m)] || m.username] : null;
   if (here && (!p || p.status === 'offline')) return p ? { status: 'offline' } : { status: 'online' };
   return p || null;
