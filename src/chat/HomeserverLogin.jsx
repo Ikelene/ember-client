@@ -6,10 +6,14 @@ import { ShieldCheck, Globe, TriangleAlert, ArrowLeft, ArrowRight } from 'lucide
 import { DEFAULT_HOMESERVER, parseHomeserver, resolve, probeDefault, recentHomeservers } from './homeserver.js';
 import { startSignIn, signInOn } from './session.js';
 import { RESOLVE_TEXT } from './homeSessions.js';
+import { useHomeTint, homeTint } from './homeTint.js';
 
 export function HomeserverIcon({ hs, className = 'lg' }) {
   const [bad, setBad] = useState(false);
-  return <span className={`vc-srv-ico ${className}`}>{hs.icon_url && !bad ? <img src={hs.icon_url} alt="" onError={() => setBad(true)} /> : String(hs.name || hs.domain || '?').slice(0, 2).toUpperCase()}</span>;
+  const known = useHomeTint(hs.domain || null);
+  const tint = hs.theme || hs.accent ? homeTint(hs) : known; // (its own colours behind its initials, when it has no picture)
+  const pic = hs.icon_url && !bad;
+  return <span className={`vc-srv-ico ${className}${tint && !pic ? ' tinted' : ''}`} style={tint && !pic ? tint : undefined}>{hs.icon_url && !bad ? <img src={hs.icon_url} alt="" onError={() => setBad(true)} /> : String(hs.name || hs.domain || '?').slice(0, 2).toUpperCase()}</span>;
 }
 
 // the two ways in. back = where a full-page trip should come back to (session.js startSignIn)

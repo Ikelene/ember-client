@@ -2859,3 +2859,8 @@ html.vc-light .vc-ch-tabs button.on { color: var(--text, #111); }
   body:has(.vc-sign-banner) .vc-notify-banner { top: auto; }
 }
 .vc-pick-handle { color: var(--muted); font-size: 12px; font-weight: 400; }
+/* a homeserver's own accent (homeTint.js): a tint under the app's text, so it reads whatever colour it is */
+.vc-hs-chip.tinted { background: color-mix(in srgb, var(--hs-accent) 24%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hs-accent) 45%, transparent); color: var(--text, inherit); }
+.vc-hs-chip.tinted svg { color: var(--hs-accent); opacity: 1; }
+.vc-disc-card .vc-hs-chip.on-banner.tinted { background: color-mix(in srgb, var(--hs-accent) 70%, rgba(0, 0, 0, .55)); color: var(--hs-ink); }
+.vc-srv-ico.tinted { background: var(--hs-accent); color: var(--hs-ink); }
