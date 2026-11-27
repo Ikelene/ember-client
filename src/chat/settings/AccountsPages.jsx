@@ -11,6 +11,8 @@ import { HomeserverLogin, HomeserverIcon, useHomeSessions } from '../HomeserverL
 import { signOut, savedAccounts, switchTo } from '../ProfilePopout.jsx';
 import { Avatar } from '../Profile.jsx';
 import { siteHref } from '../hosts.js';
+import { switchToAccount } from '../accountSwitch.js';
+import { currentOrigin } from '../homeserver.js';
 import './accounts-pages.css';
 import { isNookara, desktopBridge } from '../../compat.js';
 
@@ -84,7 +86,10 @@ export function AccountsPage({ onHomeservers }) {
           {homes.map(s => (
             <div className="sx-list-row" key={s.origin}>
               {s.account.avatar_url ? <Avatar user={{ username: s.account.username, pfp: s.account.avatar_url }} size={36} /> : <HomeserverIcon hs={s} className="ac-ico" />}
-              <div className="sx-row-txt"><b>{s.account.handle}</b><span>{s.account.display_name !== s.account.username ? `${s.account.display_name} - ` : ''}{s.name}</span></div>
+              <div className="sx-row-txt"><b>{s.account.handle}</b><span>{s.account.display_name !== s.account.username ? `${s.account.display_name} - ` : ''}{s.name}{!signedIn && s.origin === currentOrigin() ? ' - in use' : ''}</span></div>
+              {(signedIn || s.origin !== currentOrigin()) && <div className="sx-row-ctl">
+                <button type="button" className="btn btn-surface btn-sm" disabled={!!busy} onClick={() => { setBusy(s.origin); switchToAccount({ kind: 'home', origin: s.origin }, signedIn && me ? { kind: 'nookara', handle: nookaraHandle(me.username), pfp: me.pfp } : null); }}><Repeat size={13} /> {busy === s.origin ? 'Switching...' : 'Switch'}</button>
+              </div>}
             </div>
           ))}
           {onHomeservers && <div className="ac-btns end"><button type="button" className="btn btn-surface btn-sm" onClick={onHomeservers}><ArrowRight size={13} /> Manage homeservers</button></div>}
