@@ -92,7 +92,8 @@ export function cleanDm(dm, { from = null, home = null, me = null, domain = '' }
     ...(typeof dm.preview === 'string' ? { preview: dm.preview } : {}),
   };
 }
-export const dmTitle = (dm, myDomain) => dm?.name || (dm?.others?.length ? dm.others.map(m => String(m?.display_name || '').trim() || dmHandle(m, myDomain) || String(m?.id || '')).join(', ') : dm?.group ? 'Group chat' : 'Just you');
+// a DM's name: the group's own name, else the people in it as username@domain (display names can be anything, so not those)
+export const dmTitle = (dm, myDomain) => dm?.name || (dm?.others?.length ? dm.others.map(m => dmHandle(m, myDomain) || String(m?.display_name || '').trim() || String(m?.id || '')).join(', ') : dm?.group ? 'Group chat' : 'Just you');
 const newest = (a, b) => (b.updated_at - a.updated_at) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 export const sortDms = list => [...list].sort(newest);
 // Lists from one or more homeservers -> one list, newest activity first. sources: [{ origin, dms }], home's own list first or

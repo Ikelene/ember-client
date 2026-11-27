@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MessageCircle, UserPlus, Check, X, House, Users, Inbox, ShieldOff, UsersRound, Sparkles, Bookmark, Search, Compass, Plus, ChevronRight } from 'lucide-react';
 import { apiFetch } from '../api.js';
-import { useChat, go, loadFriends, toast, errorText, ask, toggleBlock, setHomeRequests, addSocialFriend, socialFriendAction, startSocialDm } from './store.js';
+import { useChat, go, fullHandle, loadFriends, toast, errorText, ask, toggleBlock, setHomeRequests, addSocialFriend, socialFriendAction, startSocialDm } from './store.js';
 import { accountName, shownHandle, dmTitle, dmUnread, cleanHandle, nookaraDmRows } from './social.js';
 import { PersonCard, DmFace, face } from './SocialHome.jsx';
 import { NameText, displayNameOf } from './displayNames.js';
@@ -189,7 +189,7 @@ export default function Home({ onUser }) {
                       ) : (
                         <button type="button" key={c.username} className="hm-tile vl-rise" onClick={() => go({ kind: 'dm', username: c.username })}>
                           <Avatar user={{ username: c.username, pfp: c.pfp || people[c.username]?.pfp }} size={44} status={presence[c.username]?.status || 'offline'} />
-                          <b><NameText u={{ username: c.username }} fallback={c.username} /></b>
+                          <b>{fullHandle(c.username)}</b>
                           {c.unread > 0 && <i>{c.unread > 99 ? '99+' : c.unread}</i>}
                         </button>
                       )))}

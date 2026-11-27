@@ -13,7 +13,7 @@ import {
 
 import { RetryIn } from './Gate.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
-import { inviteLinkFor } from './store.js';
+import { inviteLinkFor, fullHandle } from './store.js';
 import { nookaraDmRows } from './social.js';
 import { SocialDmRow } from './SocialHome.jsx';
 import { useName, NameText, personName, displayNameOf, useDisplayNamesVersion, wantDisplayNames, serverOwnName } from './displayNames.js';
@@ -604,7 +604,7 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
         onContextMenu={e => (sys ? openMenu(e, [{ label: 'Open', onClick: () => go({ kind: 'dm', username: c.username }) }, 'sep', ...pinMenuItems(k)]) : userMenu(e, c.username, { onProfile: () => dispatchEvent(new CustomEvent('vc-open-big', { detail: { username: c.username, dm: true } })), extra: ['sep', ...pinMenuItems(k)] }))}
         onClick={() => go({ kind: 'dm', username: c.username })}>
         {sys ? <span className="vc-av vc-sys-av" style={{ width: 32, height: 32 }}><Logo size={18} /></span> : <Avatar user={{ username: c.username, pfp: c.pfp || people[c.username]?.pfp }} size={32} status={p?.status || 'offline'} />}
-        <span className="vc-dm-txt"><b>{sys ? 'Nookara' : <NameText u={{ username: c.username }} />}{c.bot && <BotTag small />}</b>{!sys && subtitle(p) && <small>{subtitle(p)}</small>}</span>
+        <span className="vc-dm-txt"><b>{sys ? 'Nookara' : fullHandle(c.username)}{c.bot && <BotTag small />}</b>{!sys && subtitle(p) && <small>{subtitle(p)}</small>}</span>
         {!on && <TypingMark names={typersOf(typing, k)} people={people} />}
         {(c.unread > 0) && !on && <span className="vc-count">{c.unread > 99 ? '99+' : c.unread}</span>}
       </button>
@@ -892,7 +892,7 @@ export function UserPanel({ onSettings, onEditProfile }) {
       <div className="vc-me">
         {u ? (editable ? <button type="button" className="vc-me-who" title="Edit your profile on this server" onClick={() => openProfileEditor(accountTarget(here.origin))}>{who}</button> : <div className="vc-me-who">{who}</div>)
           : home ? <HomeWho home={home} me={me} />
-          : <button type="button" className="vc-me-who" onClick={() => startSignIn()} title="Sign in with Nookara"><span className="vc-av vc-sys-av" style={{ width: 36, height: 36 }}><UserRound size={19} /></span><span className="vc-me-txt"><b>Not signed in</b><small>Sign in with Nookara</small></span></button>}
+          : <button type="button" className="vc-me-who" onClick={() => go({ kind: 'home' })} title="Sign in on Home"><span className="vc-av vc-sys-av" style={{ width: 36, height: 36 }}><UserRound size={19} /></span><span className="vc-me-txt"><b>Not signed in</b><small>Sign in on Home</small></span></button>}
         <QuickVoiceBtns />
         <button type="button" className="vc-ico-btn" onClick={onSettings} title="Settings"><Settings size={17} /></button>
       </div>

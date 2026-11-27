@@ -98,7 +98,7 @@ export function SocialDmRow({ dm }) {
   return (
     <button type="button" className={`vc-dm${on ? ' on' : ''}${!on && dm.unread ? ' unread' : ''}`} onClick={() => go({ kind: 'sdm', id: dm.id })} onContextMenu={e => dmMenu(e, dm, domain)}>
       <DmFace dm={dm} size={32} presence={presence} />
-      <span className="vc-dm-txt"><b>{dmTitle(dm, domain)}</b><small>{dm.group ? `${dm.members.length} members` : !dm.hosted_here && dm.host && dm.host !== domain ? `on ${dm.host}` : dm.unread > 0 && !on ? 'New message' : ''}</small></span>
+      <span className="vc-dm-txt"><b>{dmTitle(dm, domain)}</b><small>{dm.group ? `${dm.members.length} members` : dm.unread > 0 && !on ? 'New message' : ''}</small></span>
       {dm.unread > 0 && !on && <span className="vc-count">{dm.unread > 99 ? '99+' : dm.unread}</span>}
     </button>
   );
@@ -132,6 +132,8 @@ export function SocialDmHead({ id }) {
   const [card, setCard] = useState(null);
   if (!dm) return <b className="vc-head-name">Conversation</b>;
   const one = !dm.group && dm.others[0];
+  const nick = one && String(one.display_name || '').trim();
+  const shownNick = nick && nick.toLowerCase() !== dmHandle(one, domain).split('@')[0].toLowerCase() ? nick : '';
   return (
     <>
       <button type="button" className="vc-head-user" onClick={e => (one ? setCard(one) : dmMenu(e, dm, domain))}>
@@ -139,7 +141,8 @@ export function SocialDmHead({ id }) {
         <b className="vc-head-name">{dmTitle(dm, domain)}</b>
       </button>
       <SdmHeadLock dm={dm} />
-      {!dm.hosted_here && dm.host && <span className="vc-head-topic">on {dm.host}</span>}
+      {/* (a DM with one person: they are username@their homeserver in the name, not where the DM is kept) */}
+      {one ? shownNick && <span className="vc-head-topic">{nick}</span> : !dm.hosted_here && dm.host && <span className="vc-head-topic">on {dm.host}</span>}
       {card && <PersonCard person={card} dm onClose={() => setCard(null)} />}
     </>
   );
