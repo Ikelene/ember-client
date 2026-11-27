@@ -1,7 +1,6 @@
 // Create a server on a homeserver that hosts many (ember-server protocol_version 2): pick the homeserver, name the server,
 // and it is made there (POST /api/v1/servers). The homeservers offered are the ones in your list that host many, plus the
 // one you signed in on. Whether you may create one isn't in a homeserver's discovery: its answer to the request says.
-// Hosting a whole new server with Nookara (Hosting.jsx) stays one click away, and is not affected by any of this.
 // The "+" dialog: Join (first) takes anything joining takes, and suggests a few servers from Discovery; Create is the above.
 import { useEffect, useState } from 'react';
 import { ChevronRight, Globe, Plus, Server, TriangleAlert, LogIn, AtSign, Users } from 'lucide-react';
@@ -33,7 +32,7 @@ export const useCreateHosts = () => createHosts(useChat(s => s.instances));
 
 const POLICIES = [['open', 'Anyone can join'], ['request', 'People ask to join'], ['invite', 'Only with an invite']];
 
-export function CreateOnHomeserver({ onClose, onOther, start = 'join' }) {
+export function CreateOnHomeserver({ onClose, start = 'join' }) {
   const hosts = useCreateHosts();
   const [tab, setTab] = useState(start); // join | create
   const [host, setHost] = useState(null);
@@ -94,13 +93,7 @@ export function CreateOnHomeserver({ onClose, onOther, start = 'join' }) {
                     <ChevronRight size={16} className="vc-ch-chev" />
                   </button>
                 ))}
-                {onOther && (
-                  <button type="button" className="vc-list-row bf-backup-pick vc-ch-row" onClick={() => { close(); setTimeout(onOther, 200); }}>
-                    <span className="vc-ch-ico act"><Server size={18} /></span>
-                    <span className="vc-list-txt"><b>A server of its own</b><small>Hosted by Nookara or by you, or add one by its address</small></span>
-                    <ChevronRight size={16} className="vc-ch-chev" />
-                  </button>
-                )}
+                {!hosts.length && <div className="sx-empty"><Server size={28} /><b>No homeserver to create it on</b><span>Sign in to a homeserver first (Settings &gt; Homeservers).</span></div>}
               </div>
               <div className="vc-dialog-btns"><span className="grow" /><button type="button" className="btn btn-surface" onClick={close}>Cancel</button></div>
             </>
@@ -126,7 +119,7 @@ export function CreateOnHomeserver({ onClose, onOther, start = 'join' }) {
 }
 
 // Join: one field for everything joining takes (slug@domain, slug@domain/code, https://domain/i/slug/code, an old invite link or
-// code, an instance's address), and a few listed servers from Discovery I'm not in yet
+// code, a homeserver's address), and a few listed servers from Discovery I'm not in yet
 const getJson = url => fetch(url).then(r => (r.ok ? r.json() : Promise.reject(Object.assign(new Error('request_failed'), { status: r.status }))));
 function JoinPane({ close }) {
   const [text, setText] = useState('');
@@ -162,7 +155,7 @@ function JoinPane({ close }) {
     <form onSubmit={submit}>
       <label className="vc-field"><span>Invite or address</span>
         <input className="form-input" autoFocus autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="name@example.com, or an invite link" value={text} onChange={e => { setText(e.target.value); setErr(''); }} />
-        <small className="vc-hint"><AtSign size={12} className="vc-inline-ico" /> A server's address (name@example.com), an invite link or code, or the address of a server of its own.</small>
+        <small className="vc-hint"><AtSign size={12} className="vc-inline-ico" /> A server's address (name@example.com), or an invite link or code.</small>
       </label>
       {err && <p className="vc-err"><TriangleAlert size={14} /> {err}</p>}
       <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" onClick={close}>Cancel</button><span className="grow" />

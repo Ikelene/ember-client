@@ -5,7 +5,6 @@ import { Server, ShieldCheck, KeyRound, Users, Check, Trash2, RefreshCw, Plus, T
 
 import { apiFetch } from '../api.js';
 import { Dialog } from './Dialogs.jsx';
-import { CreateTabs } from './Hosting.jsx';
 import { initials } from './Parts.jsx';
 import { Avatar } from './Profile.jsx';
 import { useChat, go, toast, errorText, ask } from './store.js';
@@ -39,7 +38,7 @@ function InstanceCard({ origin, info }) {
 }
 
 // server: which server there, on a homeserver with several (it came from an address or a Discover card)
-export function AddInstance({ url, invite, server, onClose, onSetup, onCreate }) {
+export function AddInstance({ url, invite, server, onClose, onSetup }) {
   const [text, setText] = useState(url || '');
   const [found, setFound] = useState(null); // { origin, info }
   const [step, setStep] = useState(url ? 'look' : 'url'); // url | auth | join
@@ -123,10 +122,9 @@ export function AddInstance({ url, invite, server, onClose, onSetup, onCreate })
   const back = () => { setStep('url'); setFound(null); setErr(''); };
 
   return (
-    <Dialog title={onCreate ? 'Create a server' : 'Add a server'} sub="Every server has its own address. Enter it to find the server, log in and join - it then shows up in the list on the left." onClose={onClose} wide className="vc-inst-dialog">
+    <Dialog title="Join a server" sub="Enter a server's address (name@example.com) or its homeserver's address to find it, sign in and join - it then shows up in the list on the left." onClose={onClose} wide className="vc-inst-dialog">
       {close => (
         <>
-          {onCreate && (step === 'url' || step === 'look') && <CreateTabs on="address" onPick={() => { close(); setTimeout(onCreate, 200); }} />}
           {(step === 'url' || step === 'look') && (
             <form onSubmit={e => { e.preventDefault(); look(); }}>
               <label className="vc-field"><span>Server address</span>
