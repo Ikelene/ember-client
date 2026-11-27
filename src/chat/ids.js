@@ -86,7 +86,7 @@ export function nsTop(inst, d, path = '') {
   if (o.server != null) o.server = typeof o.server === 'string' ? K(inst, o.server) : nsServer(inst, o.server);
   if (Array.isArray(o.channels)) o.channels = o.channels.map(c => nsChannel(inst, c));
   if (o.channel != null) o.channel = typeof o.channel === 'string' ? K(inst, o.channel) : nsChannel(inst, o.channel);
-  if (Array.isArray(o.messages)) o.messages = o.messages.map(m => nsMessage(inst, m));
+  if (Array.isArray(o.messages)) o.messages = o.messages.map(m => (m && typeof m === 'object' ? nsMessage(inst, m) : m)); // (a list of bare ids, e.g. a DM's rewrap answer, stays as it is)
   if (o.message && typeof o.message === 'object') o.message = nsMessage(inst, o.message);
   if (typeof o.sid === 'string') o.sid = K(inst, o.sid);
   if (o.voice && typeof o.voice === 'object' && !Array.isArray(o.voice) && !path.startsWith('/instance')) o.voice = mapKeys(o.voice, k => K(inst, k));

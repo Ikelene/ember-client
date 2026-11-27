@@ -10,6 +10,7 @@ const ERR = {
   wrong_passcode: 'That is not right.', passcode_locked: 'Too many wrong tries, so PIN and password unlock is off. Use your recovery code.',
   wrong_recovery_code: "That recovery code isn't right.", link_not_found: "That code isn't waiting, or it expired.", link_mismatch: "That code doesn't match the device asking. Don't approve it, and try again.",
   passphrase_required: 'This homeserver needs a passphrase of 12 characters or more (not only digits). A PIN is not enough here.', weak_kdf: "This app's settings are too weak for this homeserver. Update Ember and try again.",
+  unreachable: "Couldn't reach your homeserver - check your connection and try again.", instance_unreachable: "Couldn't reach your homeserver - check your connection and try again.", request_failed: "Couldn't reach your homeserver - try again.",
   link_denied: 'That was denied on your other device.', link_expired: 'That code expired. Start again.', rate_limited: 'Too many tries. Wait a bit and try again.',
 };
 const say = e => ERR[e?.message] || errorText(e?.message);
