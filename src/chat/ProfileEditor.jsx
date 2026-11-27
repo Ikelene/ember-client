@@ -72,7 +72,9 @@ export default function ProfileEditor({ onDirty, target: open }) {
   const choose = async v => { if (v === target) return; if (dirtyRef.current && !(await askLeave())) return; dirtyRef.current = false; onDirty?.(false); setTarget(v); };
   const cur = targets.find(t => t.sid === target) || (signedIn ? null : targets.find(t => t.sid === homeTarget) || targets[0]) || null; // (a server that went away: back to the global one)
   // where the account lives (Matrix-style: the homeserver is part of who you are)
-  const lives = useChat(s => (s.home ? { domain: s.home.domain, handle: s.home.account?.handle } : s.signedIn && s.me ? { domain: nookaraDomain(), handle: fullHandle(s.me.username) } : null));
+  const livesOn = useChat(s => (s.home ? s.home.domain : s.signedIn && s.me ? nookaraDomain() : ''));
+  const livesAs = useChat(s => (s.home ? s.home.account?.handle || '' : s.signedIn && s.me ? fullHandle(s.me.username) : '')); // (strings: a new object each time would redraw forever)
+  const lives = livesOn ? { domain: livesOn, handle: livesAs } : null;
   if (!cur && !signedIn) return <div className="inline-msg">{homeTarget ? 'Your homeserver is still connecting, or it has no profiles to edit. Try again in a moment.' : 'Sign in with Nookara to edit your profile.'}</div>;
   return (
     <>
