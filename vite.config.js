@@ -23,7 +23,7 @@ const versionFile = () => ({
 
 // `npm run dev` proxies everything that is not the client itself to a running Nookara (NOOKARA_ORIGIN, default http://localhost:3100)
 const target = process.env.NOOKARA_ORIGIN || process.env.VELORA_ORIGIN || 'http://localhost:3100'
-const proxied = ['/chat/', '/api', '/bonfire', '/assets', '/u', '/me', '/im', '/groups', '/friends', '/account', '/push', '/media', '/admin', '/login', '/build.json']
+const proxied = ['/chat/', '/api', '/bonfire', '/assets', '/u', '/me', '/im', '/groups', '/friends', '/account', '/push', '/media', '/admin', '/login', '/build.json', '/ember/', '/oauth/', '/_ember/', '/.well-known/', '/locales/', '/stats', '^/auth/(?!callback\\.html)']
 const proxy = Object.fromEntries(proxied.map(p => [p, { target, changeOrigin: true }]))
 proxy['/ws'] = { target, ws: true, changeOrigin: true }
 
