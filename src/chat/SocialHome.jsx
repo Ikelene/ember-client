@@ -4,7 +4,8 @@
 // Signed in with Nookara, Home.jsx and the sidebar in Parts.jsx stay as they are and borrow the pieces exported here for the
 // people and DMs on other homeservers (PersonCard, SocialDmRow, DmFace, SocialDmHead).
 import { useEffect, useMemo, useState } from 'react';
-import { MessageCircle, UserPlus, Check, X, House, Users, Inbox, ShieldOff, UsersRound, Search, Plus, LockOpen, Pencil, LogOut, UserMinus, Ban } from 'lucide-react';
+import { MessageCircle, UserPlus, Check, X, House, Users, Inbox, ShieldOff, UsersRound, Search, Plus, Pencil, LogOut, UserMinus, Ban, Lock } from 'lucide-react';
+import { SdmHeadLock } from './E2eeMessage.jsx';
 import { useChat, go, toast, ask, getState, addSocialFriend, socialFriendAction, startSocialDm, socialDmAction, socialProfileById, socialAccount } from './store.js';
 import { Avatar } from './Profile.jsx';
 import { Dialog } from './Dialogs.jsx';
@@ -65,7 +66,7 @@ function NewDm({ onClose }) {
           ))}</div>}
           <label className="vc-field"><span>{friends.length ? 'Anyone else' : 'Who'}</span><input value={typed} onChange={e => setTyped(e.target.value)} placeholder="alice, bob@example.org" autoFocus={!friends.length} /></label>
           {n > 1 && <label className="vc-field"><span>Group name (optional)</span><input value={name} maxLength={60} onChange={e => setName(e.target.value)} /></label>}
-          <p className="vc-hint sh-noe2ee"><LockOpen size={13} /> Conversations on homeservers are not end-to-end encrypted yet.</p>
+          <p className="vc-hint"><Lock size={13} /> End-to-end encrypted: only the people in it can read it. Messages wait on your device until everyone has set up encryption.</p>
           <div className="dialog-actions"><button type="button" className="btn btn-surface" onClick={close}>Cancel</button><button type="submit" className="btn btn-primary" disabled={!n || busy}>{n > 1 ? 'Create group' : 'Message'}</button></div>
         </form>
       )}
@@ -96,7 +97,7 @@ export function SocialDmRow({ dm }) {
   return (
     <button type="button" className={`vc-dm${on ? ' on' : ''}${!on && dm.unread ? ' unread' : ''}`} onClick={() => go({ kind: 'sdm', id: dm.id })} onContextMenu={e => dmMenu(e, dm, domain)}>
       <DmFace dm={dm} size={32} presence={presence} />
-      <span className="vc-dm-txt"><b>{dmTitle(dm, domain)}</b><small>{dm.group ? `${dm.members.length} members` : !dm.hosted_here && dm.host && dm.host !== domain ? `on ${dm.host}` : dm.preview && !on ? dm.preview : ''}</small></span>
+      <span className="vc-dm-txt"><b>{dmTitle(dm, domain)}</b><small>{dm.group ? `${dm.members.length} members` : !dm.hosted_here && dm.host && dm.host !== domain ? `on ${dm.host}` : dm.unread > 0 && !on ? 'New message' : ''}</small></span>
       {dm.unread > 0 && !on && <span className="vc-count">{dm.unread > 99 ? '99+' : dm.unread}</span>}
     </button>
   );
@@ -136,7 +137,7 @@ export function SocialDmHead({ id }) {
         <DmFace dm={dm} size={26} presence={presence} />
         <b className="vc-head-name">{dmTitle(dm, domain)}</b>
       </button>
-      <span className="vc-head-topic sh-noe2ee" title="Homeservers can read conversations they host. End-to-end encryption for them is not there yet."><LockOpen size={13} /> Not end-to-end encrypted</span>
+      <SdmHeadLock dm={dm} />
       {!dm.hosted_here && dm.host && <span className="vc-head-topic">on {dm.host}</span>}
       {card && <PersonCard person={card} onClose={() => setCard(null)} />}
     </>

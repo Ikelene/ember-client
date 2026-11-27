@@ -15,14 +15,14 @@ import { apiFetch } from '../api.js';
 import { plainText } from './tokens.js';
 import { useChat, getState, setMenu, toggleBlock, toast, setNotify, notifyOf, go, markServerRead, markChannelRead, linkFor } from './store.js';
 import { bare, instOpt, isInst, instOf } from './ids.js';
-import { reportTo, reportDmMessage } from './report.js';
+import { reportTo, reportDmMessage, reportSdmMessage } from './report.js';
 import { canReportDm } from './dm-report.js';
 import { reactionId } from './msg-actions.js';
 import { myReactions } from './msg-actions.js';
 import { setInstancePrefs } from './instances.js';
 import { roleMenuItems, modMenuItems, nickMenuItems, profileMenuItems, changeNick, canNick, P, has } from './roles.jsx';
 import { viewPicture, copyImage, downloadImage } from './MediaViewer.jsx';
-import { saveToMedia } from './store.js';
+import { saveToMedia, sdmReportRoute } from './store.js';
 import { QuickReactions } from './Reactions.jsx';
 import { userScrolled } from './userscroll.js';
 import { appsItems } from './commands.js';
@@ -267,7 +267,8 @@ export function messageMenu(e, m, view, { onReply, onEdit, onDelete, canDelete, 
     pic && { label: 'Open picture', icon: ImageIcon, onClick: () => viewPicture(pic.src) },
     mediaUrl && { label: 'Save to Saved Media', icon: BookmarkPlus, onClick: () => saveToMedia(mediaUrl, mediaName) },
     onInfo && { label: 'Message info', icon: Info, onClick: onInfo }, // Manage messages: the real sender (aliases included)
-    view.kind === 'channel' && isInst(view.sid) && !canEdit && !m.system && /^\d+$/.test(String(m.id)) && { label: 'Report message', icon: Flag, danger: true, onClick: () => reportTo(view.sid, { message_id: m.id }, 'this message', { target: m.author, message: m }) },
+    view.dm && sdmReportRoute(view, m) && { label: 'Report message', icon: Flag, danger: true, onClick: () => reportSdmMessage(view, m) },
+    !view.dm && view.kind === 'channel' && isInst(view.sid) && !canEdit && !m.system && /^\d+$/.test(String(m.id)) && { label: 'Report message', icon: Flag, danger: true, onClick: () => reportTo(view.sid, { message_id: m.id }, 'this message', { target: m.author, message: m }) },
     canReportDm(view, m, getState().me?.username) && { label: 'Report message', icon: Flag, danger: true, onClick: () => reportDmMessage(view, m) },
   ].flat().filter(Boolean);
   openMenu(e, [

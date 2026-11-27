@@ -1,7 +1,9 @@
 // Settings > Homeservers: the homeservers you are an admin or the owner of, and for each one its settings in tabs:
-// Accounts & sign-in (PROTOCOL §4a), Servers (who may create them, §5a), Admins, and Federation (§4b).
+// Accounts & sign-in (PROTOCOL §4a), Servers (who may create them, §5a), Admins, Federation (§4b), and Reports (§4d:
+// reported DM messages, HomeserverReports.jsx).
 import { useEffect, useRef, useState } from 'react';
-import { Building2, ArrowLeft, Globe, Users, KeyRound, ShieldCheck, TriangleAlert, RefreshCw, Trash2, Network, Crown, Settings2, Server, UserPlus, Ban, Gauge, Plus, X, RotateCw, ListChecks, Hourglass } from 'lucide-react';
+import { Building2, ArrowLeft, Globe, Users, KeyRound, ShieldCheck, TriangleAlert, RefreshCw, Trash2, Network, Crown, Settings2, Server, UserPlus, Ban, Gauge, Plus, X, RotateCw, ListChecks, Hourglass, Flag } from 'lucide-react';
+import { ReportsTab } from './HomeserverReports.jsx';
 import { SettingsPage, SCard, SRow, Switch } from './ui.jsx';
 import { LoginMethods } from './LoginMethods.jsx';
 import { ask, toast } from '../store.js';
@@ -17,7 +19,7 @@ import { DEFAULT_DENYLIST, MAX_DENYLISTS, MAX_DENY, RATE_FIELDS, FLOOR_MAX, DENY
 import './accounts-pages.css';
 import './homeservers.css';
 
-const TABS = [['accounts', 'Accounts & sign-in', KeyRound], ['servers', 'Servers', Server], ['admins', 'Admins', ShieldCheck], ['federation', 'Federation', Network]];
+const TABS = [['accounts', 'Accounts & sign-in', KeyRound], ['servers', 'Servers', Server], ['admins', 'Admins', ShieldCheck], ['federation', 'Federation', Network], ['reports', 'Reports', Flag]];
 const Loading = () => <div className="vc-loading"><i /><i /><i /></div>;
 const Choices = ({ name, value, options, onPick, disabled }) => (
   <div className="bf-pe-vis">
@@ -74,6 +76,7 @@ export default function HomeserversPage({ onDirty }) {
       {tab === 'servers' && <ServersTab key={hs.origin} hs={hs} onDirty={note} />}
       {tab === 'admins' && (viaInstance(hs.origin) ? <div className="hsx-admins"><InstanceTab key={hs.origin} origin={hs.origin} tab="admins" /></div> : <AdminsTab key={hs.origin} hs={hs} />)}
       {tab === 'federation' && <FederationTab key={hs.origin} hs={hs} onDirty={note} />}
+      {tab === 'reports' && <ReportsTab key={hs.origin} hs={hs} />}
     </div>
   );
 }

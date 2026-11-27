@@ -1,9 +1,10 @@
 // Encrypted DMs where they meet the message list and the composer. Separate from Messages.jsx so E2ee.jsx's dialogs stay out of its imports.
 import { useEffect, useRef, useState } from 'react';
 import { Lock, LockOpen, AlertTriangle, Clock, File as FileIcon, Download, Link2, Film, Music, Image as ImageIcon, Play, RefreshCw } from 'lucide-react';
-import { useChat, openE2eeGate, dismissKeyChange, dropFailed, useBotPeer } from './store.js';
+import { useChat, openE2eeGate, dismissKeyChange, dropFailed, useBotPeer, waitingNames } from './store.js';
+import { nameList, memberName } from './e2ee/homedm.js';
 import { LinkEmbeds } from './LinkEmbeds.jsx';
-import { openSafety, E2eeLockedPanel } from './E2ee.jsx';
+import { openSafety, openSafetyId, E2eeLockedPanel } from './E2ee.jsx';
 import * as E2EE from './e2ee/session.js';
 import { opensByItself, autoMax } from './e2ee/files.js';
 import { shownName } from './spoiler.js';
@@ -15,6 +16,10 @@ export { E2eeLockedPanel };
 export function E2eeMessageNote({ m, view }) {
   const s = m.sealed;
   const status = useChat(st => st.e2eeStatus);
+  // a homeserver DM: it stays on this device until everyone in it can read it, and never goes any other way
+  if (m.waiting && view.dm) return (
+    <div className="e2-msg-note"><Clock size={13} /> <span>Waiting for {nameList(waitingNames(view.dm, m.missing)) || 'everyone'} to set up encryption. It sends by itself once they have, while Ember is open on this device. <button type="button" onClick={() => dropFailed(view, m.nonce)}>Remove</button></span></div>
+  );
   if (m.waiting) return (
     <div className="e2-msg-note"><Clock size={13} /> <span>Waiting for @{view.username} to set up encrypted DMs. It sends by itself once they have, while Ember is open on this device. <button type="button" onClick={() => dropFailed(view, m.nonce)}>Remove</button></span></div>
   );
@@ -126,7 +131,49 @@ export function E2eeHeadLock({ view }) {
   );
 }
 
+// A homeserver DM: the lock beside its name. One other person: click to compare keys with them.
+export function SdmHeadLock({ dm }) {
+  const one = !dm.group && dm.others?.length === 1 ? dm.others[0] : null;
+  const tip = dm.group ? 'Only the people in this group can read it, not the homeservers it passes through.' : 'Only you two can read this, not the homeservers it passes through.';
+  if (!one) return <span className="e2-head-lock" tabIndex={0} role="img" aria-label={`End-to-end encrypted. ${tip}`} data-tip={tip} data-tip-title="End-to-end encrypted" data-tip-kind="ok" data-tip-side="bottom"><Lock size={16} /></span>;
+  return (
+    <button type="button" className="e2-head-lock" onClick={() => openSafetyId(one.id, memberName(dm, one.id))} aria-label="End-to-end encrypted. Compare keys"
+      data-tip={`${tip} Click to compare keys.`} data-tip-title="End-to-end encrypted" data-tip-kind="ok" data-tip-side="bottom"><Lock size={16} /></button>
+  );
+}
+// above the composer of a homeserver DM: someone's key changed; the people in it changed (the host says who is in a
+// conversation, and new messages are sealed to whoever it lists: so a change is always said)
+function SdmComposerNotes({ view }) {
+  const dm = useChat(s => s.social.dms.find(x => x.id === view.dm));
+  const changedKeys = useChat(s => s.e2eeKeyChanged);
+  const status = useChat(s => s.e2eeStatus);
+  const [, bump] = useState(0);
+  if (!dm) return null;
+  const c = status === 'ready' ? E2EE.membersOf(dm) : { added: [], removed: [] };
+  const who = ids => nameList(ids.map(id => memberName(dm, id)));
+  const keyChanged = dm.members.filter(m => changedKeys[String(m.id).toLowerCase()]);
+  return (
+    <>
+      {c.error === 'dm_members_changed' && <div className="e2-keychange"><AlertTriangle size={14} /><span>The homeserver now lists different people in this conversation than it started with. Nothing you write here is sent.</span></div>}
+      {!c.error && (c.added.length > 0 || c.removed.length > 0) && (
+        <div className="e2-keychange"><AlertTriangle size={14} />
+          <span>{c.added.length > 0 && `${who(c.added)} ${c.added.length > 1 ? 'were' : 'was'} added and can read new messages. `}{c.removed.length > 0 && `${who(c.removed)} left and can't read new messages. `}<button type="button" onClick={() => { E2EE.rememberMembers(dm); bump(n => n + 1); }}>OK</button></span>
+        </div>
+      )}
+      {keyChanged.map(m => (
+        <div key={m.id} className="e2-keychange"><AlertTriangle size={14} />
+          <span>{memberName(dm, m.id)}'s encryption key changed. They may have started over or lost their old one. <button type="button" onClick={() => openSafetyId(m.id, memberName(dm, m.id))}>Compare keys</button> <button type="button" onClick={() => dismissKeyChange(m.id)}>Dismiss</button></span>
+        </div>
+      ))}
+    </>
+  );
+}
+
 export function E2eeComposerNotes({ view }) {
+  if (view.dm) return <SdmComposerNotes view={view} />;
+  return <NookaraComposerNotes view={view} />;
+}
+function NookaraComposerNotes({ view }) {
   const changed = useChat(s => (view.kind === 'dm' ? s.e2eeKeyChanged[String(view.username).toLowerCase()] : false));
   if (view.kind !== 'dm' && view.kind !== 'group') return null;
   if (view.kind === 'dm' && view.username === 'System') return null;

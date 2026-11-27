@@ -332,7 +332,9 @@ function ownUrl(s, url) {
 export const isOwnUrl = (u, origin = currentOrigin()) => { try { return ownUrl(getSession(origin), new URL(u)); } catch { return false; } };
 
 // ── what else the homeserver's discovery says (PROTOCOL 3, 4a-4c, 20) ──
-// -> { origin, domain, api_url (the social API's base), account_url, remote_token_url, remote_url, accepts_remote, pushers_url }
+// -> { origin, domain, api_url (the social API's base), reports_url, account_url, remote_token_url, remote_url, accepts_remote, pushers_url }
+// reports_url: where a message of one of this homeserver's accounts in a DM hosted elsewhere is reported, when it is not
+// <api_url>/social/reports (Nookara names its own report route)
 // Every address has to be on the homeserver's origin (api_url: or its domain's); one that isn't is left out (null).
 const docs = new Map(); // origin -> { at, p }
 export function homeInfo(origin = currentOrigin(), { fresh = false } = {}) {
@@ -348,6 +350,7 @@ export function homeInfo(origin = currentOrigin(), { fresh = false } = {}) {
     return {
       origin, domain,
       api_url: at(doc.social?.api_url, true) || `${origin}/api/v2`,
+      reports_url: at(doc.social?.reports_url, true) || null,
       account_url: at(doc.login?.account_url) || null,
       remote_token_url: at(f.remote_token_url) || (f.remote_token_url === null ? null : `${origin}/api/v2/auth/remote-token`),
       remote_url: at(f.remote_url) || null,

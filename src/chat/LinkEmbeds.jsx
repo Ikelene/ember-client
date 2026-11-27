@@ -10,6 +10,7 @@ import { joinAndOpen } from './instances.js';
 import { apiFetch } from '../api.js';
 import { useChat, getState, toast, errorText, openLink, saveSettings, loadMedia, hashFor, ask } from './store.js';
 import { K } from './ids.js';
+import { openFile as openSealedFile } from './e2ee/session.js';
 import { inviteRef, paymentRef, glintRef, driveRef, forumRef, siteRef, loadSiteHosts, onSiteHosts } from './inviteLink.js';
 import { GlintMark, GLINT_DOWNLOAD, clipLikes, setClipLike, openOutside } from './glint.jsx';
 import { fmtSize, RISKY, KIND_OF } from './fileKinds.js';
@@ -53,6 +54,29 @@ export function LinkEmbeds({ urls, inst, priv }) {
   useSiteHosts();
   if (!urls?.length) return null;
   return urls.slice(0, 3).map(u => <OneEmbed key={u} url={u} inst={inst} priv={priv} />);
+}
+// A link's card in a homeserver DM. Nothing is fetched for it: the sender's device made it and it came inside the sealed
+// message (e2ee/homedm.js). Its picture is a sealed upload, opened here like any other file of the message.
+export function SealedPreview({ p }) {
+  const [img, setImg] = useState(null);
+  useEffect(() => {
+    let live = true;
+    setImg(null);
+    if (p?.image) openSealedFile(p.image, { max: 2 * 1024 * 1024 }).then(u => { if (live) setImg(u); }).catch(() => {});
+    return () => { live = false; };
+  }, [p?.image]);
+  if (!p) return null;
+  let site = ''; try { site = new URL(p.url).hostname.replace(/^www\./, ''); } catch { return null; }
+  return (
+    <div className="vc-embed vc-link-embed vl-rise">
+      <div className="vc-embed-main">
+        <div className="vc-embed-site">{site}</div>
+        {p.title && <a className="vc-embed-title" href={p.url} target="_blank" rel="noopener noreferrer nofollow">{p.title}</a>}
+        {p.description && <div className="vc-embed-desc">{p.description}</div>}
+      </div>
+      {img && <img className="vc-embed-thumb vc-viewable" src={img} alt="" onClick={() => viewPicture(img)} />}
+    </div>
+  );
 }
 function OneEmbed({ url, inst, priv }) {
   const service = driveRef(url) || forumRef(url) || siteRef(url);

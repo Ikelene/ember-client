@@ -11,6 +11,7 @@ import { apiFetch, getToken, onScopeError, onAuthLost, isWebEmber, uploadFetch, 
 import { endSession, startSignIn } from './session.js';
 import * as E2EE from './e2ee/session.js';
 import { fileKindOfMime } from './e2ee/files.js';
+import { sendOrHold, flushHeld, firstLink, parseOg, cleanPreview, memberIds } from './e2ee/homedm.js';
 import { rememberedDest, TEMP_LINK, tempId } from './upload-dest.js';
 import { callLinePlain } from './callText.js';
 import { applyIdentity, applyNick } from './identity.js';
@@ -21,8 +22,9 @@ import { parseAddress, addressHash } from './addresses.js';
 import { myIdOn } from './tokens.js';
 import { readChannel as readMsgCache, writeChannel as writeMsgCache, dropChannels as dropMsgCache } from './msgCache.js';
 import { connections, sendTo, startInstances, loadInstanceData, retryInstances, resumeInstances, renewNookaraSession, holdInstances, forgetIfEmpty, wakeInstance, instanceWoke, recheckSleepers, joinByAddress, ensureHost } from './instances.js';
-import { homeFetch, onSignedOut, currentSession, DEFAULT_HOMESERVER } from './homeserver.js';
-import { social as socialApi, socialBase, createDm, setNookaraSocial, dmHostUrl } from './socialApi.js';
+import { homeFetch, onSignedOut, currentSession, DEFAULT_HOMESERVER, resolve as resolveHomeserver, homeInfo, remoteToken, isOwnUrl } from './homeserver.js';
+import { reportRoute, reportBody, canReportSealed } from './e2ee/report.js';
+import { social as socialApi, socialBase, socialFetch, createDm, setNookaraSocial, dmHostUrl } from './socialApi.js';
 import { emptySocial, friendLists, mergeDms, cleanDm, socialReduce, socialRefetch, dmTitle, splitHandle, stableId, cleanHandle, accountName, remoteFriendLists, splitNookaraDms, nookaraDmView } from './social.js';
 import { attachmentRefs } from './signing-payload.js';
 import { spoilerName } from './spoiler.js';
@@ -447,7 +449,7 @@ setInterval(() => send({ type: 'ping' }), 25000);
 
 // one event from the home socket (inst = nookara) or from an instance's (already in Ember's shapes, ids namespaced)
 // an instance may only say what PROTOCOL.md §7 lets it: nothing that is Nookara's own (DMs, kicks, presence, calls...)
-const INSTANCE_EVENTS = new Set(['chat_message', 'chat_message_update', 'chat_message_delete', 'chat_reactions', 'chat_typing', 'chat_pins_update', 'chat_server_update', 'chat_server_removed', 'chat_roles_update', 'chat_perms_changed', 'chat_channels_update', 'chat_member_update', 'chat_presence', 'chat_members_stale', 'chat_emojis_update', 'chat_stickers_update', 'chat_identity_update', 'chat_ack', 'chat_error', 'chat_ephemeral', 'chat_join_request', 'chat_join_result', 'chat_report', 'chat_timeout', 'chat_server_added', 'chat_starboard', 'chat_shop_update', 'chat_commands_update', 'chat_interaction_message', 'chat_interaction_modal', 'game_status', 'game_console', 'game_linked', 'game_unlinked', 'voice_sound', 'voice_sound_failed']);
+const INSTANCE_EVENTS = new Set(['chat_message', 'chat_message_update', 'chat_message_delete', 'chat_reactions', 'chat_typing', 'chat_pins_update', 'chat_server_update', 'chat_server_removed', 'chat_roles_update', 'chat_perms_changed', 'chat_channels_update', 'chat_member_update', 'chat_presence', 'chat_members_stale', 'chat_emojis_update', 'chat_stickers_update', 'chat_identity_update', 'chat_ack', 'chat_error', 'chat_ephemeral', 'chat_join_request', 'chat_join_result', 'chat_report', 'chat_timeout', 'chat_server_added', 'chat_starboard', 'chat_shop_update', 'chat_commands_update', 'chat_interaction_message', 'chat_interaction_modal', 'game_status', 'game_console', 'game_linked', 'game_unlinked', 'voice_sound', 'voice_sound_failed', 'e2ee_keys_changed', 'e2ee_link_request', 'e2ee_link_done']);
 const INSTANCE_VOICE = /^(chat_rtc_|chat_voice_state$)/;
 const LOCKED_EVENTS = new Set(['auth_success', 'auth_error', 'restrictions', 'error', 'kicked', 'ember_update', OLD_EMBER_UPDATE, 'web_build']); // (what still matters while locked)
 // "who posted recently" (channel list, Modern): people who posted in a channel lately, newest first. The server's list comes
@@ -514,7 +516,9 @@ function onEvent(m, inst = NOOKARA) {
       catchUp();
       loadNotifCount(); // (anything that happened while the socket was down)
       break;
-    case 'chat_message': addMessage(`c:${m.message.channel}`, m.message); notePoster(m.message); break;
+    case 'chat_message':
+      if (m.message?.enc) { openSdm(m.message).then(o => addMessage(`c:${o.channel}`, o)); break; } // a homeserver DM: opened here first
+      addMessage(`c:${m.message.channel}`, m.message); notePoster(m.message); break;
     // Nookara: somebody I can see changed their profile (picture, colour, name, bio ...): patch every cache that holds them, refresh any open
     // profile card, and ask the instances they are on to re-read it too (instances otherwise pick it up on their own 10-15 min schedule)
     case 'user_update':
@@ -552,6 +556,7 @@ function onEvent(m, inst = NOOKARA) {
       break;
     }
     case 'chat_message_update':
+      if (m.message?.enc) { openSdm(m.message).then(o => set(s => ({ msgs: upd(s.msgs, `c:${o.channel}`, b => b && { ...b, list: b.list.map(x => (x.id === o.id ? { ...o, reactions: o.reactions || x.reactions } : x)) }) }))); break; }
       set(s => ({ msgs: upd(s.msgs, `c:${m.message.channel}`, b => b && { ...b, list: b.list.map(x => (x.id === m.message.id ? { ...m.message, reactions: m.message.reactions || x.reactions } : x)) }) }));
       watchSignature(m.message);
       break;
@@ -576,9 +581,12 @@ function onEvent(m, inst = NOOKARA) {
       });
       break;
     case 'e2ee_keys_changed': // someone's keys or linked clients changed (or they just set up, so messages held for them can go)
-      if (m.username) { E2EE.forgetBundle(m.username); E2EE.flushOutbox(m.username); dispatchEvent(new CustomEvent('e2ee-keys-changed', { detail: m.username })); }
+      // (a homeserver says it by stable id: mine, or someone I share a DM with there)
+      if (typeof m.id === 'string' && m.id.includes('@')) { E2EE.forgetDoc(m.id); freshAt.clear(); if (inst !== NOOKARA && state.home?.id === m.id && inst === state.home.origin) E2EE.init().catch(() => {}); E2EE.flushOutbox(); dispatchEvent(new CustomEvent('e2ee-keys-changed', { detail: m.id })); }
+      if (inst === NOOKARA && m.username) { E2EE.forgetBundle(m.username); E2EE.flushOutbox(m.username); dispatchEvent(new CustomEvent('e2ee-keys-changed', { detail: m.username })); }
       break;
     case 'e2ee_link_request':
+      if (inst !== NOOKARA && inst !== state.home?.origin) break; // (only my own home speaks for my keys)
       if (state.e2eeStatus === 'ready') toast(m.kind === 'device' ? 'A device is asking to read your DMs. To approve it, go to Settings, Privacy.' : `${m.label} is asking to read your DMs. To approve it, go to Settings, Privacy.`);
       break;
     case 'im_pins_update': // pinned or unpinned in a DM (m.with = the other person)
@@ -611,11 +619,20 @@ function onEvent(m, inst = NOOKARA) {
       const key = pendingAcks.get(m.nonce);
       pendingAcks.delete(m.nonce);
       signedSends.delete(m.nonce);
+      hdSends.delete(m.nonce);
+      if (key && m.message?.enc) { openSdm(m.message).then(o => set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: settle(b.list, m.nonce, o) }) }))); break; }
       if (key) set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: settle(b.list, m.nonce, m.message) }) }));
       if (m.message?.signature) watchSignature(m.message);
       break;
     }
     case 'chat_error': {
+      // a homeserver DM whose host has newer keys of someone than I sealed to: theirs are asked for again, and it goes once more
+      if (m.error === 'stale_keys' && hdSends.has(m.nonce)) {
+        const d = hdSends.get(m.nonce);
+        hdSends.delete(m.nonce);
+        if (!d.retried) { (Array.isArray(m.members) ? m.members : []).forEach(id => E2EE.forgetDoc(id)); freshAt.delete(d.dm); sendSdm({ ...d, retried: true }); break; }
+      }
+      hdSends.delete(m.nonce);
       if (m.error === 'bad_signature') refreshSigningKey(); // (a rotated key: "try again" then signs with the new one)
       // the server turned the signature down: same choice as when signing fails here. The message stays pending while they decide
       const resend = SIGN_REFUSED.has(m.error) && signedSends.get(m.nonce);
@@ -862,7 +879,8 @@ function addMessage(key, msg) {
       const sid = msg.server;
       set(s => ({ servers: s.servers.map(x => (x.sid === sid ? { ...x, unread: true } : x)), unreadN: { ...s.unreadN, [msg.channel]: { sid, n: (s.unreadN[msg.channel]?.n || 0) + 1 } } }));
     }
-    if (!n || n.level !== 'none') ping(key, msg, n?.level === 'all' || !!sdm, packActive());
+    // (a sealed DM's notification never carries what it says: it is read where it is opened)
+    if (!n || n.level !== 'none') ping(key, sdm && msg.enc ? { ...msg, body: 'New message', attachments: [] } : msg, n?.level === 'all' || !!sdm, packActive());
     // a red count on the channel + server for mentions (replies to you count)
     if (key.startsWith('c:') && mentionsMe(msg)) {
       set(s => ({ mentions: { ...s.mentions, [msg.channel]: (s.mentions[msg.channel] || 0) + 1 }, srvMentions: { ...s.srvMentions, [msg.server]: (s.srvMentions[msg.server] || 0) + 1 } }));
@@ -1083,8 +1101,9 @@ export async function loadMessages(v, { older = false } = {}) {
     let list = [], hasMore = false;
     const first = older ? b.list.find(x => !x.pending) : null;
     if (v.kind === 'channel') {
-      const d = await apiFetch(`/chat/channels/${v.cid}/messages?limit=50${first ? `&before=${first.id}` : ''}`);
-      list = d.messages; hasMore = d.has_more;
+      const sdm = isInst(v.cid) ? sdmOf(v.cid) : null, kid = sdm ? E2EE.myKid() : null; // a homeserver DM: only my own wraps are asked for
+      const d = await apiFetch(`/chat/channels/${v.cid}/messages?limit=50${first ? `&before=${first.id}` : ''}${kid ? `&kids=${kid}` : ''}`);
+      list = sdm ? await Promise.all(d.messages.map(x => openSdm(x, sdm))) : d.messages; hasMore = d.has_more;
     } else if (v.kind === 'dm') {
       if (!older) checkBotPeer(v.username);
       const d = await apiFetch(`/im/with/${encodeURIComponent(v.username)}?limit=50${first ? `&before=${first.imId}` : ''}`);
@@ -1159,7 +1178,7 @@ export async function catchUp(inst = NOOKARA) {
     if (!b.loaded) continue;
     const last = [...b.list].reverse().find(x => !x.pending && !x.failed);
     if (!last) continue;
-    apiFetch(`/chat/channels/${key.slice(2)}/messages?after=${last.id}&limit=100`).then(d => d.messages.forEach(m => addMessage(key, m))).catch(() => {});
+    apiFetch(`/chat/channels/${key.slice(2)}/messages?after=${last.id}&limit=100`).then(async d => { for (const m of d.messages) addMessage(key, await openSdm(m)); }).catch(() => {});
   }
   const v = state.view;
   if (v.kind !== 'home' && (v.kind !== 'channel' ? inst === NOOKARA : instOf(v.cid) === inst)) loadMessages(v);
@@ -1334,7 +1353,15 @@ export function sendMessage(v, text, { replyTo, attachments, uploads, noStatusRe
       .catch(e => set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? { ...x, failed: e.message } : x)) }) })));
     return n;
   }
-  if (v.kind === 'channel') {
+  const sdm = v.kind === 'channel' && isInst(v.cid) ? sdmOf(v.cid) : null;
+  if (sdm) { // a DM on a homeserver: sealed first (or held on this device while someone in it has no keys), never sent as it is
+    ok = true;
+    sendSdm({ nonce: n, dm: sdm.id, me: E2EE.mySid(), key, cid: v.cid, wire: wireText(text, attachments), reply_to: replyTo?.id, quote: replyTo ? { from: replyTo.author?.display_name || replyTo.author?.username || '', s: String(replyTo.body || '').slice(0, 200) } : null, created_at: retry?.at || Date.now() });
+  } else if (v.kind === 'channel' && isDmServer(v)) { // a DM I can't find the members of: nothing leaves as plain text, ever
+    ok = true;
+    pendingAcks.delete(n);
+    set(s => ({ msgs: upd(s.msgs, key, b => b && { ...b, list: b.list.map(x => (x.nonce === n ? { ...x, failed: 'dm_not_found' } : x)) }) }));
+  } else if (v.kind === 'channel') {
     const info = signingInfo(v.sid);
     const frame = signature => send({ type: 'chat_send', channel: v.cid, message: text, reply_to: replyTo?.id, attachments, signature, nonce: n });
     if (isInst(v.sid)) { // saved files must live on this instance before their hashes can be signed
@@ -1418,14 +1445,146 @@ async function sendDm(d) {
   }
 }
 E2EE.setOutboxSender(h => sendDm({ ...h, key: `d:${String(h.to).toLowerCase()}` }));
+
+// ── a DM on a homeserver (two people or a group): sealed to every member's keys (e2ee/homedm.js) ──
+// Nookara's own DMs above are untouched. These are a homeserver's one-channel "servers" (seedDm): every message in them is
+// an envelope, and nothing is ever sent to the host any other way.
+const sdmOf = cid => (soc() && cid ? dmOfChannel(cid) : null);
+// is this view / message in a DM's one-channel server, whether or not the DM list has it right now
+const isDmServer = v => !!(v?.dm || state.detail[v?.sid || v?.server]?.server?.dm);
+const sdmMsg = o => (o?.sealed ? { ...o, attachments: sealedAtts(o) } : o);
+// a message of a DM's channel as the list keeps it: opened here, when this device can
+function openSdm(msg, dm = sdmOf(msg?.channel)) {
+  if (!dm || !msg?.enc) return Promise.resolve(msg);
+  return E2EE.openDmMessage(msg, dm).then(sdmMsg).catch(() => ({ ...msg, body: '', sealed: { v: 2, state: 'failed' } }));
+}
+const hdSends = new Map(); // nonce -> what went out, until the host took it (stale_keys: once more, with fresh keys)
+const freshAt = new Map(); // dm id -> when everyone's keys were last asked for afresh (held messages ask again and again)
+const hdDeps = () => ({
+  dmOf: id => state.social.dms.find(x => x.id === id) || null,
+  bundlesFor(dm, { fresh = false } = {}) {
+    const f = fresh && Date.now() - (freshAt.get(dm.id) || 0) > 60000;
+    if (f) freshAt.set(dm.id, Date.now());
+    return E2EE.bundlesForDm(dm, { fresh: f });
+  },
+  seal: ({ dm, bundles, text, quote, preview }) => E2EE.sealDm(dm, text, { replyQuote: quote, preview, bundles }),
+  // the only thing that reaches the host: an envelope
+  async post(dm, enc, item) {
+    const host = dmHostOf(dm), cid = K(host, dm.channel);
+    if (!host || !dm.channel || !(await ensureHost(host))) throw new Error('offline');
+    hdSends.set(item.nonce, item);
+    if (!send({ type: 'chat_send', channel: cid, enc, reply_to: item.reply_to, nonce: item.nonce })) { hdSends.delete(item.nonce); throw new Error('offline'); }
+    pendingAcks.set(item.nonce, item.key || `c:${cid}`);
+    sdmPatch(item, x => (x.waiting ? { ...x, waiting: false, missing: undefined } : x));
+  },
+  hold: item => E2EE.hold(item),
+  release: nonce => E2EE.release(nonce),
+});
+const sdmPatch = (d, f) => set(s => ({ msgs: upd(s.msgs, d.key, b => b && { ...b, list: b.list.map(x => (x.nonce === d.nonce ? f(x) : x)) }) }));
+async function sendSdm(d) {
+  try {
+    const dm = hdDeps().dmOf(d.dm);
+    // the link preview is made here, on this device, and goes inside the message (no server is asked about the link)
+    if (dm && d.preview === undefined) d.preview = state.settings?.link_previews !== false ? await makePreview(d.wire, dm).catch(() => null) : null;
+    const r = await sendOrHold(d, hdDeps(), { fresh: !!d.retried });
+    if (r.held) { pendingAcks.delete(d.nonce); sentOk(d.nonce); sdmPatch(d, x => ({ ...x, waiting: true, missing: r.missing, failed: undefined, queued: undefined, inflight: undefined })); }
+  } catch (e) {
+    pendingAcks.delete(d.nonce); hdSends.delete(d.nonce);
+    if (isNetworkError(e) && queueOffline(d.nonce)) return;
+    sdmPatch(d, x => ({ ...x, failed: e.message }));
+  }
+}
+E2EE.setDmOutboxSender(items => flushHeld(items, E2EE.mySid() || '', hdDeps()));
+E2EE.setNookaraSid(() => state.nkHome?.id || null);
+// what a page says about itself, as far as a browser is allowed to read it (most sites don't allow it: then there is no preview)
+async function makePreview(wire, dm) {
+  const url = firstLink(wire);
+  if (!url || !/^https:/i.test(url)) return null;
+  const get = async (u, max) => {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 4000);
+    try {
+      const r = await fetch(u, { credentials: 'omit', referrerPolicy: 'no-referrer', signal: ctl.signal });
+      if (!r.ok || Number(r.headers.get('content-length') || 0) > max) return null;
+      const blob = await r.blob();
+      return blob.size <= max ? blob : null;
+    } catch { return null; } finally { clearTimeout(t); }
+  };
+  const page = await get(url, 1024 * 1024);
+  if (!page || !/html/i.test(page.type)) return null;
+  const og = parseOg(await page.text(), url);
+  let image = '';
+  if (og.image && /^https:/i.test(og.image)) {
+    const pic = await get(og.image, 512 * 1024);
+    if (pic && /^image\/(png|jpeg|gif|webp)$/i.test(pic.type)) {
+      try { image = (await uploadSealed(dm, new File([pic], 'preview', { type: pic.type }))).url; } catch { /* no picture then */ }
+    }
+  }
+  return cleanPreview({ url, title: og.title, description: og.description, image });
+}
+// a file of a homeserver DM: encrypted here, kept by the host as bytes it can't open; its key travels inside the message
+async function uploadSealed(dm, file, opts = {}) {
+  const host = dmHostOf(dm);
+  const { upload, key, iv } = await E2EE.sealFile(file);
+  const fd = new FormData();
+  fd.append('file', upload);
+  const d = await uploadFetch(`/chat/media/upload?sid=${K(host, dm.sid)}&cid=${K(host, dm.channel)}&sealed=1`, fd, opts);
+  const at = absUrl(host, d.url);
+  if (!at) throw new Error('upload_failed');
+  return { url: E2EE.fileLink(at, { key, iv, name: file.name, mime: file.type }), sealed: true, type: fileKindOfMime(file.type), name: file.name, size: file.size };
+}
+// ── reporting a message of a homeserver DM (e2ee/report.js): to whoever manages the SENDER's account ──
+// where this message's report would go, or null when it can't be reported from here (mine, not opened on this device)
+export function sdmReportRoute(view, m) {
+  const h = soc();
+  if (!h?.id || !view?.dm || !m?.sealed) return null;
+  return canReportSealed(m, m.sealed.from, { id: h.id }) ? reportRoute(m.sealed.from, { id: h.id }) : null;
+}
+const jsonPost = async (url, body, token) => {
+  let res;
+  try { res = await fetch(url, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body) }); }
+  catch { throw Object.assign(new Error('unreachable'), { error: 'unreachable' }); }
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(d?.error || 'request_failed'), d && typeof d === 'object' ? d : {}, { status: res.status });
+  return d || {};
+};
+// -> the answer ({ duplicate? }). The report holds the sealed message and its one key: nothing else of the conversation
+export async function sendSdmReport(view, m, reason, details) {
+  const h = soc(), route = sdmReportRoute(view, m);
+  const body = route && reportBody(route, { dm: view.dm, id: m.id, from: m.sealed.from, envelope: m.enc, key: m.sealed.key, reason, details });
+  if (!body) throw new Error('cannot_report');
+  // the sender's homeserver, by its domain's discovery document
+  const info = await resolveHomeserver(route.domain).then(hs => homeInfo(hs.origin)).catch(() => null);
+  if (route.to === 'nookara') {
+    // a Nookara account: Nookara's report route, as the discovery document of its domain names it (social.reports_url)
+    const url = info?.reports_url;
+    if (h.nookara && route.own) return apiFetch(url && new URL(url).origin === normOrigin(NOOKARA_ORIGIN) ? new URL(url).pathname : '/api/report/dm-message', { method: 'POST', body: JSON.stringify(body) });
+    if (!url) throw Object.assign(new Error('no_reports_url'), { error: 'no_reports_url' });
+    if (isOwnUrl(url)) { const res = await homeFetch(url, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) }); const d = await res.json().catch(() => ({})); if (!res.ok) throw Object.assign(new Error(d?.error || 'request_failed'), d); return d; }
+    // from another homeserver: a token my home signs for Nookara, good for this one report
+    return jsonPost(url, body, await remoteToken(new URL(url).origin));
+  }
+  // any other homeserver's own account: its admins. My own home takes it with the session I have; another one with the
+  // session my home (or Nookara) gets me there
+  if (route.own && !h.nookara) return socialFetch('/social/reports', { method: 'POST', body });
+  if (!info) throw Object.assign(new Error('homeserver_unreachable'), { error: 'homeserver_unreachable' });
+  const at = new URL(`${info.api_url}/social/reports`), host = normOrigin(at.origin);
+  if (!(await ensureHost(host))) throw Object.assign(new Error('homeserver_unreachable'), { error: 'homeserver_unreachable' });
+  return apiFetch(at.pathname, { inst: host, method: 'POST', body: JSON.stringify(body) });
+}
+// who a held message waits for, by name
+export function waitingNames(dmId, missing) {
+  const dm = state.social.dms.find(x => x.id === dmId);
+  return (missing || []).map(id => { const m = dm?.members.find(x => x.id === id); return m?.display_name || String(m?.handle || id).split('@')[0]; });
+}
 // held messages show in their conversation again after a reload
 async function showHeld() {
   for (const h of await E2EE.held()) {
-    const key = `d:${String(h.to).toLowerCase()}`;
+    if (h.dm && (h.me !== E2EE.mySid() || !h.key)) continue; // (a homeserver DM's, of another account on this device)
+    const key = h.dm ? h.key : `d:${String(h.to).toLowerCase()}`;
     if (state.msgs[key]?.list.some(x => x.nonce === h.nonce)) continue;
     const lines = String(h.wire).split('\n');
     const links = lines.filter(l => E2EE.parseFileLink(l.trim()));
-    const temp = { id: h.nonce, nonce: h.nonce, pending: true, waiting: true, body: lines.filter(l => !E2EE.parseFileLink(l.trim())).join('\n'), wire: h.wire, attachments: sealedAtts({ sealed: { files: links.map(l => l.trim()) } }), system: false, author: { username: state.me?.username, pfp: state.me?.pfp, color: state.me?.color, rank: state.me?.rank }, created_at: h.created_at };
+    const temp = { id: h.nonce, nonce: h.nonce, pending: true, waiting: true, ...(h.dm ? { missing: h.missing || [], channel: h.cid } : {}), body: lines.filter(l => !E2EE.parseFileLink(l.trim())).join('\n'), wire: h.wire, attachments: sealedAtts({ sealed: { files: links.map(l => l.trim()) } }), system: false, author: { username: state.me?.username, pfp: state.me?.pfp, color: state.me?.color, rank: state.me?.rank }, created_at: h.created_at };
     set(s => ({ msgs: upd(s.msgs, key, b => ({ list: [], hasMore: false, ...(b || {}), list: [...(b?.list || []), temp] })) }));
   }
 }
@@ -1433,11 +1592,11 @@ E2EE.onChange(st => {
   const was = state.e2eeStatus;
   set({ e2eeStatus: st });
   if (st === 'ready' && was !== 'ready') { // what was locked can be opened now
-    set(s => ({ msgs: Object.fromEntries(Object.entries(s.msgs).filter(([k]) => !k.startsWith('d:'))) }));
-    if (state.view?.kind === 'dm') loadMessages(state.view);
-    loadDMs();
+    set(s => ({ msgs: Object.fromEntries(Object.entries(s.msgs).filter(([k]) => !k.startsWith('d:') && !(k.startsWith('c:') && sdmOf(k.slice(2))))) }));
+    if (state.view?.kind === 'dm' || state.view?.dm) loadMessages(state.view);
+    if (state.signedIn) loadDMs();
     showHeld();
-    flushOutbox(NOOKARA); // (queued DMs waited for the keys)
+    if (state.signedIn) flushOutbox(NOOKARA); // (queued DMs waited for the keys)
   }
   if (st === 'none' || st === 'locked') { // says so once a visit, and "Later" is always there
     let seen = true; try { seen = !!sessionStorage.getItem('ember.e2eeAsked'); sessionStorage.setItem('ember.e2eeAsked', '1'); } catch { /* private mode: ask each load */ seen = false; }
@@ -1559,6 +1718,14 @@ export async function editMessage(id, text, m) {
     return;
   }
   const inst = m?.channel ? instOf(m.channel) : NOOKARA;
+  const sdm = m?.channel && inst !== NOOKARA ? sdmOf(m.channel) : null;
+  if (sdm) { // a homeserver DM: sealed again, signed as an edit of this message (the files and the reply quote stay)
+    const wire = [text, ...(m?.sealed?.files || [])].filter(Boolean).join('\n');
+    const enc = await E2EE.sealDm(sdm, wire, { replyQuote: m.sealed?.quote || null, preview: m.sealed?.preview && text.includes(m.sealed.preview.url) ? m.sealed.preview : null, editOf: id, fresh: true });
+    await apiFetch(`/chat/messages/${id}`, { method: 'PATCH', body: JSON.stringify({ enc }), inst });
+    return;
+  }
+  if (isDmServer(m)) throw new Error('dm_not_found'); // (never as plain text)
   let signature;
   const info = m?.channel ? signingInfo(m.server) : null;
   if (info?.can) {
@@ -1747,6 +1914,9 @@ async function prepareAttachments(v, attachments) {
 // a file for the conversation you're in: an instance community keeps it on that instance (and hashes it for signing), the rest goes through Nookara
 // opts: { onProgress(sent, total), signal }
 export async function uploadAttachment(v, file, opts = {}) {
+  const sdm = v.kind === 'channel' && isInst(v.cid) ? sdmOf(v.cid) : null;
+  if (sdm) return uploadSealed(sdm, file, opts);
+  if (isDmServer(v)) throw new Error('dm_not_found'); // (a DM's files only ever go up sealed)
   if (v.kind === 'channel' && isInst(v.sid)) {
     const fd = new FormData();
     fd.append('file', file);
@@ -2363,6 +2533,12 @@ export function errorText(code) {
   if (code === 'sender_no_keys') return 'Set up encrypted DMs to send messages.';
   if (code === 'cannot_dm_persona') return "This account doesn't take DMs.";
   if (code === 'e2ee_locked') return 'Unlock your DMs on this device first.';
+  if (code === 'dm_members_changed') return 'The people in this conversation changed, so this was not sent.';
+  if (code === 'dm_not_found' || code === 'not_a_member') return "This conversation isn't available right now, so this was not sent.";
+  if (code === 'bad_key_list') return "Someone's encryption keys didn't check out, so this was not sent.";
+  if (code === 'too_many_wraps') return 'Too many devices in this conversation to encrypt for.';
+  if (code === 'e2ee_required') return 'This conversation only takes encrypted messages.';
+  if (code === 'stale_keys') return "Someone's encryption keys changed - try again.";
   if (code === 'bad_key_list') return "That person's encryption keys don't check out, so nothing was sent. Try again later.";
   if (code === 'server_creation_paused') return `${serverCreationPolicy.title}. ${serverCreationPolicy.notice.join(' ')}`;
   return ({
@@ -2627,12 +2803,26 @@ function startNookaraSocial() {
     loadSocial();
   }).catch(() => {});
 }
+// my keys, their backups and device links are at my home: <social.api_url>/social/e2ee (a Nookara account signed in through
+// a homeserver is sent on to Nookara, which has the same routes); other people's key documents come through it too
+function startHomeKeys() {
+  const body = b => (typeof b === 'string' ? JSON.parse(b) : b);
+  E2EE.setHome({
+    name: state.home?.domain || 'your homeserver',
+    req: (path, { method = 'GET', body: b } = {}) => socialFetch(`/social/e2ee${path}`, { method, ...(b !== undefined ? { body: body(b) } : {}) }),
+    keys: (id, { fresh = false } = {}) => socialFetch(`/social/keys/${encodeURIComponent(id)}${fresh ? '?fresh=1' : ''}`),
+    sid: () => state.home?.id || null,
+    username: () => state.me?.username || '',
+  });
+  E2EE.init().catch(() => {});
+}
 function startHome() {
-  refreshHomeMe(); loadSocial();
+  refreshHomeMe(); loadSocial(); startHomeKeys();
   onSignedOut(() => { // the homeserver ended the session (or Sign out): back to signed out
     if (!state.home) return;
     if (currentSession() && normOrigin(currentSession().origin) === state.home.origin) return;
     set({ me: null, home: null, social: emptySocial(), homeRequests: 0 });
+    E2EE.setHome(null);
     if (isHomeView(state.view) && state.view.kind !== 'home') go({ kind: 'home' }, { replace: true });
   });
 }
@@ -2647,7 +2837,7 @@ async function refreshHomeMe() {
   } catch { /* offline: what the sign-in said stays */ }
 }
 // the home homeserver's socket is up (instances.js): what changed while it was down
-export function homeConnected(origin) { if (state.home?.origin === origin) { refreshHomeMe(); loadSocial(); } }
+export function homeConnected(origin) { if (state.home?.origin === origin) { refreshHomeMe(); loadSocial(); if (state.e2eeStatus === 'loading') E2EE.init().catch(() => {}); else E2EE.flushOutbox(); } }
 // the four lists as state.social keeps them (signed in with Nookara: without the Nookara accounts, which Home lists itself)
 function setSocialLists(d, h) {
   const lists = h.nookara ? remoteFriendLists(d, h.domain) : friendLists(d, h.domain);

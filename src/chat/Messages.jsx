@@ -16,6 +16,7 @@ import { createPortal } from 'react-dom';
 import { AudioLines, Eye, EyeOff, Reply, Pencil, Trash2, Copy, Plus, X, SmilePlus, Lock, SendHorizontal, AlertCircle, ImageIcon, CornerUpRight, Music, Film, ArrowRight, ArrowLeft, Webhook, Phone, Pin, ChevronUp, Star, Upload, CloudUpload, RotateCw, Camera } from 'lucide-react';
 import { Embeds } from './ChannelTypes.jsx';
 import { LinkEmbeds } from './LinkEmbeds.jsx';
+import { SealedPreview } from './LinkEmbeds.jsx';
 import { E2eeMessageNote, OpenedAttachments, PreviewOnAsk, E2eeComposerNotes, E2eeLockedPanel } from './E2eeMessage.jsx';
 import { GameInvites } from './GameInvite.jsx';
 import { inviteSummary } from './gameInvite.js';
@@ -644,7 +645,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
         {tr && <Translation tr={tr} ctx={ctx} onHide={() => setTr(null)} />}
         <GameInvites invites={invites} />
         <Embeds list={m.embeds} ctx={ctx} />
-        {!m.embeds?.length && !m.pending && (linkPreviews ? <LinkEmbeds urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group' || view.kind === 'notes'} /> : <PreviewOnAsk urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group' || view.kind === 'notes'} />)}
+        {m.sealed?.v === 2 ? <SealedPreview p={m.sealed.preview} /> : !view.dm && !m.embeds?.length && !m.pending && (linkPreviews ? <LinkEmbeds urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group' || view.kind === 'notes'} /> : <PreviewOnAsk urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group' || view.kind === 'notes'} />)}
         <E2eeMessageNote m={m} view={view} />
         {(m.sticker || pSticker) && <StickerView s={m.sticker || pSticker} sid={m.sticker ? view.sid : null} />}
         <OpenedAttachments list={[...(m.attachments || []), ...media]} extra={images} m={m} Attachments={Attachments} />
@@ -959,7 +960,7 @@ export function Composer(props) {
   const { view } = props;
   const dm = view.kind === 'dm' && view.username !== 'System';
   const bot = useBotPeer(dm ? view.username : null); // (a bot DM is never encrypted: no unlock needed)
-  if (dm && !bot && status !== 'ready') return <E2eeLockedPanel />;
+  if ((view.dm || (dm && !bot)) && status !== 'ready') return <E2eeLockedPanel />; // (view.dm: a homeserver DM, sealed like Nookara's)
   return <><E2eeComposerNotes view={view} /><ComposerBox {...props} /></>;
 }
 // a sticker in a message (an Ember server's, or a personal one = a message that is just its link): bigger than an emoji,

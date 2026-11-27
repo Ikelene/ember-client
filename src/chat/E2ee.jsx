@@ -9,11 +9,29 @@ import './E2ee.css';
 const ERR = {
   wrong_passcode: 'That is not right.', passcode_locked: 'Too many wrong tries, so PIN and password unlock is off. Use your recovery code.',
   wrong_recovery_code: "That recovery code isn't right.", link_not_found: "That code isn't waiting, or it expired.", link_mismatch: "That code doesn't match the device asking. Don't approve it, and try again.",
+  passphrase_required: 'This homeserver needs a passphrase of 12 characters or more (not only digits). A PIN is not enough here.', weak_kdf: "This app's settings are too weak for this homeserver. Update Ember and try again.",
   link_denied: 'That was denied on your other device.', link_expired: 'That code expired. Start again.', rate_limited: 'Too many tries. Wait a bit and try again.',
 };
 const say = e => ERR[e?.message] || errorText(e?.message);
 
+// on a homeserver that is not Nookara the keys are locked with a passphrase: whoever runs it could try every PIN in hours
+const firstKind = () => (S.secretHome().nookara ? 'pin' : 'passphrase');
+function PassphraseFields({ a, setA, b, setB }) {
+  const h = S.secretHome(), min = Math.max(12, h.min || 0);
+  return (
+    <div className="e2-fields">
+      <label>Choose a passphrase ({min} characters or more)
+        <input className="form-input" type="password" autoComplete="new-password" value={a} onChange={e => setA(e.target.value)} />
+      </label>
+      <label>Type it again
+        <input className="form-input" type="password" autoComplete="new-password" value={b} onChange={e => setB(e.target.value)} />
+      </label>
+      <p className="vc-dialog-sub">A few words you'll remember work well. Use it only for your encrypted messages, not as your sign-in password. {h.name} keeps a locked copy of your keys, and whoever runs it could try short secrets one after another, so a PIN isn't allowed here. Nobody can reset it for you: keep the recovery code you get next.</p>
+    </div>
+  );
+}
 function PasscodeFields({ type, setType, a, setA, b, setB }) {
+  if (!S.secretHome().nookara) return <PassphraseFields {...{ a, setA, b, setB }} />;
   return (
     <div className="e2-fields">
       <div className="e2-kinds" role="radiogroup" aria-label="What to use">
@@ -50,7 +68,7 @@ function RecoveryCode({ code, onDone }) {
 }
 
 function Setup({ replace, onDone, onCancel }) {
-  const [type, setType] = useState('pin');
+  const [type, setType] = useState(firstKind);
   const [a, setA] = useState('');
   const [b, setB] = useState('');
   const [busy, setBusy] = useState(false);
@@ -67,7 +85,7 @@ function Setup({ replace, onDone, onCancel }) {
     <>
       {replace
         ? <p className="e2-warn"><AlertTriangle size={15} /> New keys can't open your old encrypted messages. They stay locked for good, and the people you talk to will see that your key changed.</p>
-        : <p>Your DMs are now end-to-end encrypted: only you and the person you're talking to can read them, not even Nookara. Choose how you'll unlock them on a new device.</p>}
+        : <p>Your DMs are now end-to-end encrypted: only you and the people you're talking to can read them, not even {S.secretHome().nookara ? 'Nookara' : S.secretHome().name}. Choose how you'll unlock them on a new device.</p>}
       <PasscodeFields {...{ type, setType, a, setA, b, setB }} />
       {err && <p className="e2-err">{err}</p>}
       <div className="vc-dialog-btns">
@@ -146,7 +164,7 @@ function Unlock({ onDone, onCancel }) {
 }
 
 function NewPasscode({ onDone, intro }) {
-  const [type, setType] = useState('pin');
+  const [type, setType] = useState(firstKind);
   const [a, setA] = useState('');
   const [b, setB] = useState('');
   const [busy, setBusy] = useState(false);
@@ -199,7 +217,7 @@ export function E2eeLockedPanel() {
       <Lock size={22} />
       <div>
         <b>{status === 'none' ? 'Set up encrypted DMs to reply' : 'Unlock your DMs on this device'}</b>
-        <p>{status === 'none' ? "Messages to you aren't encrypted until you do. Once you've set up, only you and the person you talk to can read your DMs, not even Nookara." : 'Your messages are encrypted. This device needs your PIN, password or recovery code, or a link from another device.'}</p>
+        <p>{status === 'none' ? `${S.secretHome().nookara ? "Messages to you aren't encrypted until you do" : "Nobody can message you until you do"}. Once you've set up, only you and the people you talk to can read your DMs, not even ${S.secretHome().nookara ? 'Nookara' : 'your homeserver'}.` : `Your messages are encrypted. This device needs your ${S.secretHome().nookara ? 'PIN, password' : 'passphrase'} or recovery code, or a link from another device.`}</p>
       </div>
       <button type="button" className="btn btn-primary" onClick={() => openE2eeGate()}>{status === 'none' ? 'Set up' : 'Unlock'}</button>
     </div>
@@ -216,6 +234,19 @@ export async function openSafety(username) {
     text: code
       ? `Compare these numbers with @${username} somewhere outside Nookara, like in person or on a call. If they match, nobody is listening in, not even Nookara.\n\n${code.join(' ')}`
       : `@${username} hasn't set up encrypted DMs yet, so there's nothing to compare.`,
+    confirm: 'Done',
+  });
+}
+
+// the same for someone in a homeserver DM (id = their stable id)
+export async function openSafetyId(id, name) {
+  let code = null;
+  try { code = await S.safetyWithId(id); } catch { /* shown below */ }
+  await ask({
+    title: `Your keys with ${name}`,
+    text: code
+      ? `Compare these numbers with ${name} somewhere else, like in person or on a call. If they match, nobody is listening in, not even the homeservers in between.\n\n${code.join(' ')}`
+      : `${name} hasn't set up encryption yet, so there's nothing to compare.`,
     confirm: 'Done',
   });
 }

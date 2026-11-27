@@ -2,7 +2,8 @@
 // Nookara's staff (/api/report/submit, the same as nookara.cc/report) when it breaks Nookara's rules. Nookara can
 // only act on Nookara accounts, so that choice is off on servers that don't sign in with Nookara.
 import { apiFetch, uploadFetch } from '../api.js';
-import { ask, toast, errorText, getState, linkFor } from './store.js';
+import { ask, toast, errorText, getState, linkFor, sdmReportRoute, sendSdmReport } from './store.js';
+import { hsReportError } from './e2ee/report.js';
 import { instOf } from './ids.js';
 import { hasNookara } from './session.js';
 import { DM_REPORT_REASONS, dmReportNote, dmReportBody, dmReportError } from './dm-report.js';
@@ -86,6 +87,27 @@ export async function reportDmMessage(view, m) {
     const r = await apiFetch('/api/report/dm-message', { method: 'POST', body: JSON.stringify(body) });
     toast(r.duplicate ? "You've already reported that message - Nookara staff have it." : 'Thanks - Nookara staff will take a look.', true);
   } catch (e) { toast(dmReportError(e.error || e.message, e.message)); }
+}
+
+// "Report message" in a DM on a homeserver. It is end-to-end encrypted, so this device hands over that one message's key,
+// with the sealed message, to whoever manages the sender's account: Nookara for a Nookara account, their homeserver's
+// admins for everyone else (store.js sendSdmReport, e2ee/report.js).
+export async function reportSdmMessage(view, m) {
+  const route = sdmReportRoute(view, m);
+  if (!route) return;
+  const who = route.to === 'nookara' ? 'Nookara staff' : `the admins of ${route.domain}`;
+  const a = await ask({
+    title: 'Report message',
+    text: `This conversation is end-to-end encrypted. If you send this report, your app unlocks this one message and sends it to ${who}, who manage the account that sent it. Nothing else in the conversation is unlocked.`,
+    select: { label: "What's wrong?", options: DM_REPORT_REASONS },
+    input: { placeholder: 'Anything they should know? (optional)', value: '', optional: true, multiline: true, max: 1000 },
+    confirm: 'Send report', danger: true,
+  });
+  if (!a) return;
+  try {
+    const r = await sendSdmReport(view, m, a.select, a.text);
+    toast(r?.duplicate ? "You've already reported that message." : `Thanks - ${who} will take a look.`, true);
+  } catch (e) { toast(hsReportError(e.error || e.message, e.message)); }
 }
 
 // "Report" on the person in a DM's header: a report about their account (the same as nookara.cc/report)

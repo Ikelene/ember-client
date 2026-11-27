@@ -22,6 +22,8 @@ const NOOKARA_HOME = {
   sid: () => null,
 };
 let home = NOOKARA_HOME;
+export const setNookaraSid = fn => { NOOKARA_HOME.sid = fn; };
+export const myKid = () => keys?.kid || null;
 
 // what stretches a DM passcode. 64 MB makes guessing expensive, on a phone it takes a second or two.
 const ARGON = { m: 65536, t: 3, p: 1 };
@@ -406,6 +408,7 @@ export async function bundlesForDm(dm, { fresh = false } = {}) {
 // -> the envelope. Throws no_keys (.missing = who), dm_members_changed, e2ee_locked
 export async function sealDm(dm, text, { replyQuote = null, preview = null, editOf = 0, fresh = false, bundles = null } = {}) {
   if (!keys) throw new Error('e2ee_locked');
+  membersOf(dm); // (the first time this device sees the DM: who is in it is remembered)
   const got = bundles || (await bundlesForDm(dm, { fresh })).bundles;
   return HD.sealDm({ dm, me: mySid(), bundles: got, signer: { kid: keys.kid, sigPriv: keys.sigPriv }, text, quote: replyQuote, preview, editOf, known: knownMembers(dm.id) });
 }
@@ -415,7 +418,7 @@ export async function openDmMessage(m, dm) {
   if (!m?.enc) return m;
   if (!keys) return { ...m, body: '', sealed: { v: 2, state: 'locked' } };
   const from = HD.senderId(m.author, dm);
-  const cacheKey = `2:${dm.id}:${m.id}:${m.edited_at || 0}:${String(m.enc.ct).slice(0, 44)}`;
+  const cacheKey = `2:${dm.id}:${from}:${m.id}:${m.edited_at || 0}:${String(m.enc.ct).slice(0, 44)}`;
   let got = opened.get(cacheKey);
   if (!got) {
     got = await HD.openDm(m.enc, { dm: dm.id, from, kid: keys.kid, encPriv: keys.encPriv });
