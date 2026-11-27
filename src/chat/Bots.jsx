@@ -7,7 +7,7 @@ import { ServerIcon } from './ServerIcon.jsx';
 import { apiFetch, uploadFetch } from '../api.js';
 import { confirmBox } from '../components/confirmBox.jsx';
 import { useChat } from './store.js';
-import { bare } from './ids.js';
+import { bare, NOOKARA } from './ids.js';
 import { imgHint, warnImage } from './imgHints.js';
 import { P, has } from './roles.jsx';
 import { BotGallerySection } from './BotGalleryDev.jsx';
@@ -141,7 +141,7 @@ export function AddBotButton({ username, info, onDone, className = 'btn btn-prim
           {list.map(s => (
             <button type="button" key={s.sid} disabled={!!done[s.sid] || !!busy} onClick={() => add(s)}>
               <span className="vc-srv-ico sm"><ServerIcon src={s.icon} name={s.name} /></span>
-              <span className="grow">{s.name}{s.inst && <small className="vc-addbot-host"> {s.inst.replace(/^https?:\/\//, '')}</small>}</span>
+              <span className="grow">{s.name}{s.inst && s.inst !== NOOKARA && <small className="vc-addbot-host"> {s.inst.replace(/^https?:\/\//, '')}</small>}</span>
               {busy === s.sid && <RefreshCw size={13} className="vc-spin" />}
               {done[s.sid] && <><Check size={14} />{done[s.sid] === 'test' && <small>test</small>}</>}
             </button>

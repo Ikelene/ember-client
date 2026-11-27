@@ -7,7 +7,7 @@ import { ServerIcon } from './ServerIcon.jsx';
 import { Dialog } from './Dialogs.jsx';
 import { apiFetch, getToken } from '../api.js';
 import { useChat, go, loadMembers } from './store.js';
-import { bare, normOrigin } from './ids.js';
+import { bare, normOrigin, NOOKARA } from './ids.js';
 import { moderate } from './roles.jsx';
 import { useAddTargets, errText } from './Bots.jsx';
 import { EMBER_API, ADMIN_EMBER_API } from '../compat.js';
@@ -155,7 +155,7 @@ export function TestBotDialog({ id, onClose }) {
             {targets.map(s => (
               <div className="bt-srv" key={s.sid}>
                 <span className="vc-srv-ico sm"><ServerIcon src={s.icon} name={s.name} /></span>
-                <span className="grow">{s.name}{s.inst && <small className="vc-addbot-host"> {s.inst.replace(/^https?:\/\//, '')}</small>}</span>
+                <span className="grow">{s.name}{s.inst && s.inst !== NOOKARA && <small className="vc-addbot-host"> {s.inst.replace(/^https?:\/\//, '')}</small>}</span>
                 {isIn(s) ? (
                   <>
                     <span className="bt-in"><Check size={14} /> In this server</span>
