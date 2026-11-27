@@ -2,7 +2,7 @@
 // A homeserver you are connected to as an instance is asked through the instance session (api.js); the one you signed in
 // on the v2 way (homeserver.js) through homeFetch. The words for what comes back are in homeAdmin.js.
 import { useEffect, useState } from 'react';
-import { apiFetch } from '../api.js';
+import { apiFetch, uploadFetch } from '../api.js';
 import { registry } from './ids.js';
 import { useChat } from './store.js';
 import { homeFetch, getSession, sessions, popupRedirectUri, HomeserverError } from './homeserver.js';
@@ -33,6 +33,16 @@ export const viaInstance = origin => !!registry.get(origin)?.session;
 export function hsCall(origin, path, { method = 'GET', body } = {}) {
   if (viaInstance(origin)) return apiFetch(path, { inst: origin, method, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }).catch(e => { throw Object.assign(e, { error: e.error || e.message }); });
   return homeJson(path, { origin, method, body });
+}
+// a multipart upload to a homeserver's API, the same two ways as hsCall -> the JSON it answers
+export async function hsUpload(origin, path, form) {
+  if (viaInstance(origin)) return uploadFetch(path, form, { inst: origin }).catch(e => { throw Object.assign(e, { error: e.error || e.message }); });
+  let res;
+  try { res = await homeFetch(path, { origin, method: 'POST', credentials: 'omit', headers: { Accept: 'application/json' }, body: form }); }
+  catch (e) { if (e instanceof HomeserverError) throw Object.assign(new Error(e.code), { error: e.code, status: e.status ?? 0 }); throw Object.assign(new Error('unreachable'), { error: 'unreachable', status: 0 }); }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw refused(data, res.status);
+  return data || {};
 }
 // the public discovery doc (who it is, the servers it lists, how many it has)
 export async function discoveryDoc(origin) {

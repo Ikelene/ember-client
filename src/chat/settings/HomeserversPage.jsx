@@ -5,8 +5,9 @@
 // HomeserverReports.jsx), and while it is connected as an instance also Voice, Backups, Nookara and Server info (with
 // restart / update). Everything here is the whole homeserver's; one server's own settings are in its Server settings.
 import { useEffect, useRef, useState } from 'react';
-import { Building2, ArrowLeft, Globe, LogOut, AtSign, Users, KeyRound, ShieldCheck, TriangleAlert, RefreshCw, Trash2, Network, Crown, Settings2, Server, UserPlus, Ban, Gauge, Plus, X, RotateCw, ListChecks, Hourglass, Flag, Upload, ArrowLeftRight, Mic, Archive, Info, CircleArrowUp } from 'lucide-react';
+import { Building2, ArrowLeft, Globe, LogOut, AtSign, Users, KeyRound, ShieldCheck, TriangleAlert, RefreshCw, Trash2, Network, Crown, Settings2, Server, UserPlus, Ban, Gauge, Plus, X, RotateCw, ListChecks, Hourglass, Flag, Upload, ArrowLeftRight, Mic, Archive, Info, CircleArrowUp, Palette } from 'lucide-react';
 import { ReportsTab } from './HomeserverReports.jsx';
+import { BrandingTab } from './BrandingTab.jsx';
 import { RegistrationQueue, ServerRequestsQueue } from './HomeQueues.jsx';
 import { SettingsPage, SCard, SRow, Switch } from './ui.jsx';
 import { LoginMethods } from './LoginMethods.jsx';
@@ -40,7 +41,7 @@ import './homeservers.css';
 const TABS = [
   ['accounts', 'Accounts & sign-in', KeyRound], ['servers', 'Servers', Server, 'v2'], ['admins', 'Admins', ShieldCheck],
   ['uploads', 'Uploads', Upload], ['bridges', 'Bridges', ArrowLeftRight], ['voice', 'Voice', Mic, 'inst'], ['backups', 'Backups', Archive, 'inst'],
-  ['nookara', 'Nookara', Globe, 'inst'], ['federation', 'Federation', Network, 'v2'], ['reports', 'Reports', Flag, 'v2'], ['info', 'Server info', Info, 'inst'],
+  ['nookara', 'Nookara', Globe, 'inst'], ['federation', 'Federation', Network, 'v2'], ['branding', 'Branding', Palette, 'v2'], ['reports', 'Reports', Flag, 'v2'], ['info', 'Server info', Info, 'inst'],
 ];
 const tabsFor = inst => TABS.filter(([, , , when]) => (when !== 'inst' || !!inst) && (when !== 'v2' || !inst || inst.v2));
 const Loading = () => <div className="vc-loading"><i /><i /><i /></div>;
@@ -97,6 +98,7 @@ export default function HomeserversPage({ onDirty, start }) {
         {shown === 'bridges' && <BridgesTab key={hs.origin} hs={hs} />}
         {['voice', 'nookara'].includes(shown) && <div className="hsx-inst"><InstanceTab key={`${hs.origin}-${shown}`} origin={hs.origin} tab={shown} onDirty={note} /></div>}
         {shown === 'backups' && <div className="hsx-inst"><BackupsPage key={hs.origin} origin={hs.origin} /></div>}
+        {shown === 'branding' && <BrandingTab key={hs.origin} hs={hs} onDirty={note} />}
         {shown === 'federation' && <FederationTab key={hs.origin} hs={hs} onDirty={note} />}
         {shown === 'reports' && <ReportsTab key={hs.origin} hs={hs} />}
         {shown === 'info' && <InfoTab key={hs.origin} hs={hs} inst={inst} autoUpdate={!!start?.autoUpdate && start.tab === 'info'} onDirty={note} />}
