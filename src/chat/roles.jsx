@@ -10,9 +10,9 @@ import { isInst } from './ids.js';
 import { imgHint, warnImage } from './imgHints.js';
 import { userScrolled } from './userscroll.js';
 import { pictureAccept } from './accept.js';
-import { CHANNEL_ICONS, useNameStyle, useCan, P, PERM_LIST, has } from './perms.js';
+import { CHANNEL_ICONS, useNameStyle, useCan, P, PERM_LIST, has, INSTANCE_CHANNEL_PERMS } from './perms.js';
 
-const INST_ONLY_PERMS = new Set(['UNMARKED_ALIASES', 'CHANGE_NICKNAME', 'MANAGE_NICKNAMES', 'CUSTOMIZE_PROFILE']); // Nookara's own servers don't have these
+const INST_ONLY_PERMS = new Set(['UNMARKED_ALIASES', 'CHANGE_NICKNAME', 'MANAGE_NICKNAMES', 'CUSTOMIZE_PROFILE', ...INSTANCE_CHANNEL_PERMS]); // Nookara's own servers don't have these
 
 // a channel's icon: its own (a lucide name or a picture), else # / lock / megaphone
 export function ChannelIcon({ c, size = 17 }) {
@@ -220,7 +220,7 @@ export function RolesEditor({ sid }) {
           {PERM_LIST.filter(([k]) => (isInst(sid) || !INST_ONLY_PERMS.has(k)) && (k !== 'UNMARKED_ALIASES' || unmarkedOn)).map(([k, label, hint, instHint]) => (
             <Toggle key={k} label={label} hint={isInst(sid) && instHint ? instHint : hint} on={has(r.permissions, P[k])}
               disabled={!editable || (!has(perms, P[k]) && !isOwner)}
-              onChange={v => save({ permissions: v ? (r.permissions | P[k]) : (r.permissions & ~P[k]) })} />
+              onChange={v => save({ permissions: v ? (r.permissions | P[k]) : (r.permissions & ~P[k]), ...(isInst(sid) ? { full_permissions: true } : {}) })} />
           ))}
           {!r.is_default && editable && <div className="vc-dialog-btns"><button type="button" className="btn btn-danger" onClick={remove}><Trash2 size={14} /> Delete role</button></div>}
         </div>

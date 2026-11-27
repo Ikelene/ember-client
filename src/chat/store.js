@@ -1108,12 +1108,13 @@ export async function loadMessages(v, { older = false } = {}) {
   if (b?.loading || (older && !b?.hasMore) || (!older && b?.loaded)) return;
   set(s => ({ msgs: { ...s.msgs, [key]: { list: [], hasMore: false, ...(s.msgs[key] || {}), loading: true } } }));
   try {
-    let list = [], hasMore = false;
+    let list = [], hasMore = false, noHistory = false;
     const first = older ? b.list.find(x => !x.pending) : null;
     if (v.kind === 'channel') {
       const sdm = isInst(v.cid) ? sdmOf(v.cid) : null, kid = sdm ? E2EE.myKid() : null; // a homeserver DM: only my own wraps are asked for
       const d = await apiFetch(`/chat/channels/${v.cid}/messages?limit=50${first ? `&before=${first.id}` : ''}${kid ? `&kids=${kid}` : ''}`);
       list = sdm ? await Promise.all(d.messages.map(x => openSdm(x, sdm))) : d.messages; hasMore = d.has_more;
+      noHistory = d.read_history === false; // (no Read message history there: only what arrives from now on)
     } else if (v.kind === 'dm') {
       if (!older) checkBotPeer(v.username);
       const d = await apiFetch(`/im/with/${encodeURIComponent(v.username)}?limit=50${first ? `&before=${first.imId}` : ''}`);
@@ -1136,7 +1137,7 @@ export async function loadMessages(v, { older = false } = {}) {
       const cur = s.msgs[key] || { list: [] };
       const ids = new Set(list.map(m => m.id));
       const live = dropSettled(cur.list.filter(m => !ids.has(m.id)), list, isMine);
-      return { msgs: { ...s.msgs, [key]: { list: ordered(older ? [...list, ...cur.list] : [...list, ...live]), hasMore, loading: false, loaded: true } } };
+      return { msgs: { ...s.msgs, [key]: { list: ordered(older ? [...list, ...cur.list] : [...list, ...live]), hasMore, loading: false, loaded: true, noHistory } } };
     });
     // my queued ones: a copy the reload matched to a real message went (dropSettled), one that wasn't on screen shows again
     const now = state.msgs[key]?.list || [];
@@ -2668,6 +2669,8 @@ export function errorText(code) {
     storage_limit_exceeded: 'Your Nookara storage is full.', images_only: 'Only pictures (PNG, JPG, GIF, WebP) can be attached.', upload_suspended: 'Uploads are suspended on your account.',
     media_import_failed: "Couldn't download that media. Try downloading it and attaching the file.", invalid_media_url: 'Media links must use HTTPS without login credentials.', upload_failed: "Couldn't upload that file. Please try again.", external_upload_failed: "The file host didn't take that file. Please try again.", file_type_blocked: "That kind of file can't be uploaded.", temp_daily_quota: "You've sent as much to temporary storage as you can today - try again tomorrow, or use your account storage.", temp_storage_full: "Nookara's temporary storage is full right now - try again later, or use your account storage.", pro_required: 'Picking when a temporary file expires comes with Nookara Pro.', invalid_expiry: "That expiry doesn't work - pick another one.", uploads_disabled: 'File uploads are disabled in this server.',
     file_too_large: 'That file exceeds the upload size limit.', dms_friends_only: 'They only take messages from friends.', status_changed: 'Their status changed - take another look.', cannot_reply_own_status: "That's your own status.", cannot_dm_bot: "Bots can't be messaged.", unsupported_file: 'Only pictures, videos (MP4, WebM, MOV) and audio files can be saved.', gifs_not_configured: "GIF search isn't set up yet.", too_many_saved: 'Saved Media is full (500 GIFs).', too_many_emojis: 'This server has as many emojis as it can have (50).', bad_gif: "That GIF can't be saved.", no_send_permission: "You don't have permission to send messages here.", no_attach_permission: "You can't attach files here.", role_too_high: "That role is above your own highest role.", role_not_found: "That role doesn't exist any more.", too_many_roles: 'A server can have up to 100 roles.', user_not_found: "That person doesn't exist.", mailbox_full: 'Their inbox is full.', message_too_long: 'That message is too long.',
+    no_external_emojis: "Emojis from other servers aren't allowed in this channel.", no_voice_permission: "You can't use that in this voice channel.", no_soundboard_permission: "You can't play soundboard sounds in this channel.",
+    no_connect_permission: "You can't join this voice channel.", no_reaction_permission: "You can't add reactions in this channel.", no_pin_permission: "You can't pin messages in this channel.",
     last_channel: "A server needs at least one channel.", not_allowed: "You can't do that here.", owner_only: 'Only the owner can do that.', offline: "Couldn't send it - you were offline.",
     scope_disabled: 'An admin has turned this off for your account.', account_restricted: RESTRICTED_TEXT, insufficient_scope: SCOPE_TEXT, name_required: 'It needs a name.',
     instance_not_linked: "That Minecraft server isn't linked to this Ember server.", already_linked: 'That Minecraft server is already linked.', too_many_instances: 'An Ember server can link up to 10 Minecraft servers.',

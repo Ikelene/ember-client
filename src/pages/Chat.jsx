@@ -51,6 +51,8 @@ import SettingsDialog from '../chat/SettingsDialog.jsx';
 import { useDesktopMac } from '../components/tabs/chatSettings.js';
 import { ServerSettings } from '../chat/ServerSettings.jsx';
 import { ChannelSettings } from '../chat/ChannelSettings.jsx';
+import { OverwritesEditor } from '../chat/OverwritesEditor.jsx';
+import { channelBits } from '../chat/channelPerms.js';
 import { ExportButton } from '../chat/Community.jsx';
 
 import { isInst, instOf } from '../chat/ids.js';
@@ -64,7 +66,7 @@ import { AddAccount } from '../chat/AddAccount.jsx';
 const forgetLeft = sid => { const o = instOf(sid); setTimeout(() => forgetIfEmpty(o), 400); };
 
 
-import { Discover, Invite, JoinInvite, ChannelEditor, NewDM, NewGroup, QuickSwitcher, AskHost } from '../chat/Dialogs.jsx';
+import { Discover, Invite, JoinInvite, ChannelEditor, NewDM, NewGroup, QuickSwitcher, AskHost, Dialog } from '../chat/Dialogs.jsx';
 import { UploadDestHost } from '../chat/UploadDest.jsx';
 import Home from '../chat/Home.jsx';
 import { TestBotDialog } from '../chat/BotTest.jsx';
@@ -594,7 +596,11 @@ function ChatPage() {
   const sysDM = view.kind === 'dm' && view.username === 'System';
   const modView = view.kind === 'modmail';
   const notesView = view.kind === 'notes';
-  const canMod = ((detail?.server.perms || 0) & 64) === 64; // Manage messages
+  // this channel's permissions, overwrites applied (channelPerms.js); the server's own where they aren't known
+  const chBits = isServer && view.sid && view.cid ? channelBits(getState(), view.sid, view.cid) : null;
+  const canMod = ((chBits ?? detail?.server.perms ?? 0) & 64) === 64; // Manage messages
+  const canPinHere = chBits == null ? canMod : (chBits & (64 | 1048576)) !== 0; // Manage messages or Pin messages
+  const canReactHere = chBits == null || (chBits & 65536) !== 0; // Add reactions
   const canPost = channel ? channel.can_post !== false && !detail?.server?.read_only : true; // the server works it out per channel type (a read-only server: nobody)
 
   const ChIcon = ({ size, className }) => <span className={className} style={{ display: 'inline-flex' }}><ChannelIcon c={channel} size={size} /></span>; // the channel's own icon / type icon
@@ -716,7 +722,7 @@ function ChatPage() {
                 ) : <>
                 {!waking && channel?.type === 'game' && <GameChatStrip channel={channel} />}
                 <div className="vc-convo-stack">
-                  {!waking && <MessageList view={view} onUser={openMini} onReply={setReplyTo} canPost={canPost} canMod={canMod} channels={detail?.channels} title={title} />}
+                  {!waking && <MessageList view={view} onUser={openMini} onReply={setReplyTo} canPost={canPost} canMod={canMod} canPin={canPinHere} canReact={canReactHere} channels={detail?.channels} title={title} />}
                   {(isServer || sdm) && <WakeOverlay view={view} title={title} waking={waking} />}
                 </div>
                 {!waking && channel?.type === 'game' && <GameOfflineNote channel={channel} />}
@@ -770,6 +776,7 @@ function ChatPage() {
       {dialog?.kind === 'address-invite' && <AddressInvite address={dialog.address} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'add-account' && <AddAccount onClose={() => setDialog(null)} />}
       {dialog?.kind === 'settings' && <ServerSettings key={`${dialog.sid || view.sid}-${dialog.tab || ''}`} sid={dialog.sid || view.sid} tab={dialog.tab} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'cat-perms' && <Dialog title={`${dialog.category}: permissions`} sub="Channels that follow this category (Synced) use these. A channel with its own permissions keeps them." wide onClose={() => setDialog(null)}>{() => <OverwritesEditor sid={dialog.sid} category={dialog.category} />}</Dialog>}
       {dialog?.kind === 'channel' && (dialog.channel?.cid
         ? <ChannelSettings key={dialog.channel.cid} sid={dialog.sid || view.sid} channel={dialog.channel} tab={dialog.tab} onClose={() => setDialog(null)} />
         : <ChannelEditor sid={dialog.sid || view.sid} channel={dialog.channel} onClose={() => setDialog(null)} />)}

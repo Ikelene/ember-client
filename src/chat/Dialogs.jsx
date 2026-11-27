@@ -266,7 +266,8 @@ export function ChannelEditor({ sid, channel, onClose }) {
           </div>}
           <TypeSettings type={type} config={config} setConfig={setConfig} sid={sid} channel={channel} />
           {editing && (channel.type || 'text') === 'text' && type === 'text' && has(getState().detail[sid]?.server.perms, P.MANAGE_SERVER) && <ChannelBridge sid={sid} channel={channel} />}
-          {editing && <ChannelPerms sid={sid} channel={channel} />}
+          {editing && !isInst(sid) && <ChannelPerms sid={sid} channel={channel} />}
+          {editing && isInst(sid) && <small className="vc-hint">Permissions: Channel settings › Permissions.</small>}
           <div className="vc-dialog-btns">
             {editing && <button type="button" className="btn btn-danger" onClick={async () => {
               if (!(await ask({ title: `Delete #${channel.name}?`, text: 'The channel and all of its messages go for good.', confirm: 'Delete channel', danger: true }))) return;

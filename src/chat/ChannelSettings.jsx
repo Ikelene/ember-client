@@ -13,6 +13,7 @@ import { TypePicker, TypeSettings } from './ChannelTypes.jsx';
 import { TYPES } from './channelTypes.js';
 import { ChannelBridge } from './Bridge.jsx';
 import { ChannelPerms } from './ChannelPerms.jsx';
+import { OverwritesEditor } from './OverwritesEditor.jsx';
 import { SettingsShell, Card } from './SettingsShell.jsx';
 import { UnsavedBar } from './unsaved.jsx';
 import { useUnsaved } from './useUnsaved.js';
@@ -41,7 +42,7 @@ export function ChannelSettings({ sid, channel: opened, onClose, tab }) {
       </>}>
       {(page, { onDirty, close }) => channel && (<>
         {page === 'overview' && <Overview sid={sid} channel={channel} onDirty={onDirty} />}
-        {page === 'perms' && <ChannelPerms sid={sid} channel={channel} onDirty={onDirty} />}
+        {page === 'perms' && (isInst(sid) ? <OverwritesEditor key={channel.cid} sid={sid} channel={channel} onDirty={onDirty} /> : <ChannelPerms sid={sid} channel={channel} onDirty={onDirty} />)}
         {page === 'bridge' && <div className="bf-ss-page"><Card title="Bridge" icon={ArrowLeftRight} className="bf-ss-bridge"><ChannelBridge sid={sid} channel={channel} /></Card></div>}
         {page === 'danger' && <DeleteChannel sid={sid} channel={channel} close={close} />}
       </>)}

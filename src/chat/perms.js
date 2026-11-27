@@ -11,7 +11,12 @@ export const P = {
   UNMARKED_ALIASES: 4096, // instances only: a bot's alias messages show unmarked while the server's Danger zone allows it
   CHANGE_NICKNAME: 8192, MANAGE_NICKNAMES: 16384, // instances only: your own server nickname / anyone's below you
   CUSTOMIZE_PROFILE: 32768, // instances only: your own picture, banner, colour, bio and pronouns on that server
+  // instances only, also channel permissions (ember-server PROTOCOL §6.5): @everyone has them all by default except Pin messages
+  ADD_REACTIONS: 65536, EMBED_LINKS: 131072, READ_HISTORY: 262144, USE_EXTERNAL_EMOJIS: 524288, PIN_MESSAGES: 1048576,
+  CONNECT: 2097152, SPEAK: 4194304, VIDEO: 8388608, STREAM: 16777216, USE_SOUNDBOARD: 33554432,
 };
+// the channel-permission bits a role editor that knows them sends whole (full_permissions: true)
+export const INSTANCE_CHANNEL_PERMS = ['ADD_REACTIONS', 'EMBED_LINKS', 'READ_HISTORY', 'USE_EXTERNAL_EMOJIS', 'PIN_MESSAGES', 'CONNECT', 'SPEAK', 'VIDEO', 'STREAM', 'USE_SOUNDBOARD'];
 
 export const PERM_LIST = [
   ['ADMIN', 'Administrator', 'Every permission, and can do anything in the server. Be careful who gets this.'],
@@ -26,6 +31,16 @@ export const PERM_LIST = [
   ['MENTION_EVERYONE', 'Mention @everyone, @here and all roles', 'Ping the whole server, or roles that are not mentionable.'],
   ['SEND', 'Send messages', 'Post in channels that let everyone send messages.'],
   ['ATTACH', 'Attach files', 'Send pictures with their messages.'],
+  ['EMBED_LINKS', 'Embed links', 'Links in their messages get previews.'],
+  ['ADD_REACTIONS', 'Add reactions', 'Add new reactions to messages (taking their own off always works).'],
+  ['USE_EXTERNAL_EMOJIS', 'Use emojis from other servers', 'Custom emojis that belong to other servers, in their messages.'],
+  ['READ_HISTORY', 'Read message history', 'See messages sent before they opened a channel, pins and search.'],
+  ['PIN_MESSAGES', 'Pin messages', 'Pin and unpin messages.'],
+  ['CONNECT', 'Connect to voice', 'Join voice channels.'],
+  ['SPEAK', 'Speak', 'Use their microphone in voice channels.'],
+  ['VIDEO', 'Video', 'Turn on their camera in voice channels.'],
+  ['STREAM', 'Share screen', 'Share their screen in voice channels.'],
+  ['USE_SOUNDBOARD', 'Use soundboard', 'Play soundboard sounds in voice channels.'],
   ['CHANGE_NICKNAME', 'Change nickname', 'Set their own nickname on this server.'],
   ['CUSTOMIZE_PROFILE', 'Customize profile in this server', 'Set their own picture, banner, name color, bio and pronouns for this server only (Settings > Profile, pick this server). Off for everyone unless you turn it on.'],
   ['UNMARKED_ALIASES', 'Use unmarked aliases', "For bots: while the server owner has turned on unmarked aliases (Server settings > Danger zone > Advanced), this bot's alias messages look exactly like a member's, with no alias mark. Only give it to bots you trust."],

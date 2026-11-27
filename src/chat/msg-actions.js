@@ -10,7 +10,8 @@
 //   pin           Manage msgs               yes (either person)        yes (any member)
 //   copy link     the channel               no (#/dm/<name> means      the group (members only)
 //                                           someone else to the reader)
-export function messageCaps(view, m, { mine = false, canMod = false, canPost = true } = {}) {
+// canPin / canReact: the channel's permissions (Pin or Manage messages; Add reactions), true where they aren't known
+export function messageCaps(view, m, { mine = false, canMod = false, canPost = true, canPin = canMod, canReact = true } = {}) {
   const none = { reply: false, react: false, forward: false, edit: false, del: false, pin: false, copyLink: false };
   if (!view || !m) return none;
   const live = !m.system && !m.ephemeral;
@@ -22,11 +23,11 @@ export function messageCaps(view, m, { mine = false, canMod = false, canPost = t
   const note = view.kind === 'notes' && !!m.noteId; // Personal Notes: all mine, nobody to reply to or react for
   return {
     reply: live && (channel ? !!canPost : group ? !!m.gid : dm),
-    react: saved && (row || dm || saved_group),
+    react: saved && (row || dm || saved_group) && (!channel || canReact !== false),
     forward: saved,
     edit: !!mine && (channel || dm || saved_group || note),
     del: channel ? !!(mine || canMod) : !!mine && (dm || saved_group || note),
-    pin: saved && (channel ? row && (!!canMod || !!view.dm) : dm || saved_group), // (a homeserver DM: either person, like Nookara's)
+    pin: saved && (channel ? row && (!!canPin || !!view.dm) : dm || saved_group), // (a homeserver DM: either person, like Nookara's)
     copyLink: channel || group,
   };
 }

@@ -2,6 +2,7 @@ import { siteHref } from './hosts.js';
 // The conversation: messages (grouped by person, with day dividers), the composer and who's typing.
 import { SAVEABLE } from './uploadLinks.js';
 import { canAttachInChannel } from './attachment-permissions.js';
+import { canIn } from './channelPerms.js';
 import { apiFetch } from '../api.js';
 import { instOpt, isInst, instOf, NOOKARA } from './ids.js';
 import { isLegacyMessage } from './tokens.js';
@@ -462,7 +463,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
   const masked = blockedAuthor && !unmasked && blockMode !== 'show';
   const mine = !hook && isMineMsg(m);
   // what this message can do here (menu + hover toolbar): msg-actions.js
-  const caps = messageCaps(view, m, { mine, canMod, canPost: ctx.canPost });
+  const caps = messageCaps(view, m, { mine, canMod, canPost: ctx.canPost, canPin: ctx.canPin ?? canMod, canReact: ctx.canReact });
   const canReplyHere = caps.reply, canReact = caps.react;
   const reactId = reactionId(m);
   const starHere = useStarboardFor(view.sid, view.cid) && canReact && view.kind === 'channel';
@@ -589,7 +590,7 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
         {tr && <Translation tr={tr} ctx={ctx} onHide={() => setTr(null)} />}
         <GameInvites invites={invites} />
         <Embeds list={m.embeds} ctx={ctx} />
-        {m.sealed?.v === 2 ? <SealedPreview p={m.sealed.preview} /> : !view.dm && !m.embeds?.length && !m.pending && (linkPreviews ? <LinkEmbeds urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group' || view.kind === 'notes'} /> : <PreviewOnAsk urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group' || view.kind === 'notes'} />)}
+        {m.sealed?.v === 2 ? <SealedPreview p={m.sealed.preview} /> : !view.dm && !m.embeds?.length && !m.pending && !m.suppress_embeds && ( /* (suppress_embeds: the author can't embed links there) */linkPreviews ? <LinkEmbeds urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group' || view.kind === 'notes'} /> : <PreviewOnAsk urls={links} inst={view.kind === 'dm' ? undefined : instOpt(m.channel)} priv={view.kind === 'dm' || view.kind === 'group' || view.kind === 'notes'} />)}
         <E2eeMessageNote m={m} view={view} />
         {(m.sticker || pSticker) && <StickerView s={m.sticker || pSticker} sid={m.sticker ? view.sid : null} />}
         <OpenedAttachments list={[...(m.attachments || []), ...media]} extra={images} m={m} Attachments={Attachments} />
@@ -651,7 +652,7 @@ function Translation({ tr, ctx, onHide }) {
 const motionOK = el => { try { return !el.closest('.vc.still') && !matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
 
 // frozen: messages kept from the last visit (msgCache.js), shown greyed while the server connects - nothing loads or reacts
-export function MessageList({ view, onUser, onReply, canPost, canMod, channels, title, frozen = null }) {
+export function MessageList({ view, onUser, onReply, canPost, canMod, canPin, canReact = true, channels, title, frozen = null }) {
   const key = keyOf(view);
   const live = useChat(s => s.msgs[key]);
   const box = frozen ? { list: frozen, loaded: true, hasMore: true } : live;
@@ -690,7 +691,7 @@ export function MessageList({ view, onUser, onReply, canPost, canMod, channels, 
   const blocks = useChat(s => s.blocks);
   const members = useChat(s => (view.sid ? s.members[view.sid] : null));
   const ctx = useMemo(() => ({
-    me, canPost, channels, linkImages, roles, sid: view.sid || null, inst: view.sid ? instOf(view.sid) : NOOKARA,
+    me, canPost, canPin, canReact, channels, linkImages, roles, sid: view.sid || null, inst: view.sid ? instOf(view.sid) : NOOKARA,
     onUser: (u, el) => onUser(u, el),
     onChannel: c => go({ kind: 'channel', sid: view.sid, cid: c.cid }),
     onLink: openLink,
@@ -698,7 +699,7 @@ export function MessageList({ view, onUser, onReply, canPost, canMod, channels, 
     // @mentions show the display name: the server's member (an Ember server's own name wins there), else Nookara's (displayNames.js)
     handleOf: view.kind === 'dm' || view.kind === 'group' || view.dm ? n => fullHandle(n, view.sid ? instOf(view.sid) : NOOKARA) : null, // in DMs: username@domain
     personOf: n => members?.find(x => x.username.toLowerCase() === String(n).toLowerCase()) || (view.sid && isInst(view.sid) ? { username: n, kind: 'local', inst: true } : { username: n }),
-  }), [me, canPost, channels, view.sid, view.kind, view.dm, linkImages, roles, blocks, members]); // eslint-disable-line react-hooks/exhaustive-deps
+  }), [me, canPost, canPin, canReact, channels, view.sid, view.kind, view.dm, linkImages, roles, blocks, members]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // opening a conversation always starts at the bottom; unread messages get a "New" line and a banner at the top
   // to jump up to them (it goes away by itself after 5 s if you leave it)
@@ -839,7 +840,8 @@ export function MessageList({ view, onUser, onReply, canPost, canMod, channels, 
       )}
       <div className="vc-msgs" ref={content} onPointerMove={onHoverMove} onPointerLeave={onHoverLeave}><div className="vc-msgs-col" ref={column}>
         <div className="vc-tools-float" ref={setToolsEl} />
-        {box?.loaded && !box.hasMore && (
+        {box?.noHistory && <div className="vc-empty-note vc-nohistory"><Clock size={14} /> You can't read earlier messages in this channel. New ones show up here as they're sent.</div>}
+        {box?.loaded && !box.hasMore && !box.noHistory && (
           <div className="vc-start vl-in">
             <div className="vc-start-ico">{title.icon}</div>
             <h2>{title.big}</h2>
@@ -944,7 +946,8 @@ function ComposerBox({ view, placeholder, locked: lockedBy, lockedText, replyTo,
   useEffect(() => { if (srActive) ta.current?.focus(); }, [srActive]);
   useEffect(() => { const f = () => ta.current?.focus(); addEventListener('vc-focus-composer', f); return () => removeEventListener('vc-focus-composer', f); }, []);
   const sid = view.kind === 'channel' ? view.sid : null;
-  const canAttach = useChat(s => (view.kind === 'channel' ? canAttachInChannel(s.detail[view.sid], view.cid, s.members[view.sid], isInst(view.sid) ? s.instances.find(i => i.origin === instOf(view.sid))?.user?.username : s.me?.username) : true));
+  // (an Ember server's channel with full overwrites: worked out like the server does, channelPerms.js)
+  const canAttach = useChat(s => (view.kind === 'channel' && isInst(view.sid) && Array.isArray(s.detail[view.sid]?.channels?.find(c => c.cid === view.cid)?.permission_overwrites) ? s.detail[view.sid].server.allow_uploads !== false && canIn(s, view.sid, view.cid, 'attach_files') : view.kind === 'channel' ? canAttachInChannel(s.detail[view.sid], view.cid, s.members[view.sid], isInst(view.sid) ? s.instances.find(i => i.origin === instOf(view.sid))?.user?.username : s.me?.username) : true));
   const [mq, setMq] = useState(null); // the @word being typed
   const [cmd, setCmd] = useState(null); // the slash command being filled in
   const [csel, setCsel] = useState(0);

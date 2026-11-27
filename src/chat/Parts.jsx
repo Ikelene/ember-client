@@ -9,7 +9,7 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyn
 import { createPortal } from 'react-dom';
 import {
   Share2, Hash, Lock, Plus, Compass, ChevronDown, Settings, UserPlus, LogOut, House, MessageCircle, Home,
-  Pencil, Trash2, Check, X, Circle, Moon, MinusCircle, EyeOff, Smile, UsersRound, Megaphone, FolderPlus, ShieldCheck, Download, Server, UserRound, Volume2, CircleArrowUp, NotebookPen, Unplug, Repeat } from 'lucide-react';
+  Pencil, Trash2, Check, X, Circle, Moon, MinusCircle, EyeOff, Smile, UsersRound, Megaphone, FolderPlus, ShieldCheck, Download, Server, UserRound, Volume2, CircleArrowUp, NotebookPen, Unplug, Repeat, Shield } from 'lucide-react';
 
 import { RetryIn } from './RetryIn.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
@@ -419,6 +419,7 @@ export function ServerSidebar({ sid, onInvite, onSettings, onChannel, onLeave, o
     canChannels && 'sep',
     canChannels && { label: 'Create channel here', icon: Plus, onClick: () => onChannel({ category: name }) },
     canChannels && { label: 'Rename category', icon: Pencil, onClick: () => renameCategory(name) },
+    canChannels && isInst(sid) && { label: 'Category permissions', icon: Shield, onClick: () => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'cat-perms', sid, category: name } })) },
     canChannels && { label: 'Create category', icon: FolderPlus, onClick: newCategory },
     canChannels && { label: 'Delete category', icon: Trash2, danger: true, onClick: () => deleteCategory(name) },
   ]);
