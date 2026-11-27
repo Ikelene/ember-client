@@ -9,6 +9,7 @@ import {
 import { apiFetch } from '../api.js';
 import { useChat, toast, errorText, refreshServer, jumpToMessage, loadMembers } from './store.js';
 import { instOf, K } from './ids.js';
+import { openHomeserverSettings } from './homeservers.js';
 import { Toggle, P, has, modRights, moderate, RoleAddMenu } from './roles.jsx';
 import { Avatar } from './Profile.jsx';
 import { stampOf } from './text.jsx';
@@ -228,7 +229,7 @@ export function JoiningPage({ sid, onDirty, goTo, instAdmin }) {
         <NumField label="Member limit" value={j.max_members} nullable fallback={100} cap={cap} max={10000000} onChange={v => set('join', 'max_members', v)}
           hint={`${people ? (n => `${n.toLocaleString()} ${n === 1 ? 'person' : 'people'} now. `)(people.filter(m => !m.bot).length) : ''}When the server is full, no one else can join until someone leaves. Bots don't count.`} />
         <RolePicker sid={sid} label="Roles new members get" value={j.default_roles} onChange={v => set('join', 'default_roles', v)} hint="Given to everyone who joins from now on (not bots). You can only pick roles below your own." />
-        {instAdmin && <div className="cs-row"><div className="cs-text"><b>Sign-in methods</b><span>Nookara accounts, this server's own accounts and who can register.</span></div><button type="button" className="btn btn-surface" onClick={() => goTo('accounts')}><KeyRound size={14} /> Accounts</button></div>}
+        {instAdmin && <div className="cs-row"><div className="cs-text"><b>Sign-in methods</b><span>Nookara accounts, this server's own accounts and who can register.</span></div><button type="button" className="btn btn-surface" onClick={() => openHomeserverSettings(instOf(sid), 'accounts')}><KeyRound size={14} /> Accounts</button></div>}
       </Card>
       {j.remote_accounts && <RemoteJoin j={j} floor={s.remote_min_age_floor_days || 0} set={(k, v) => set('join', k, v)} host={host} setHost={setHost} />}
       <Card title="Requests & invites" icon={Link2}><JoinInvites sid={sid} requestsOnly /></Card>

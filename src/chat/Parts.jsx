@@ -25,7 +25,7 @@ import { NOOKARA, instOf, isInst, normOrigin } from './ids.js';
 import { loudUnread, needsChannelCount } from './unread.js';
 import { getLook, subscribeLook } from './look.js';
 import { railEntries, railPos, railOrigin } from './addresses.js';
-import { homeDomainOf } from './homeservers.js';
+import { homeDomainOf, openHomeserverSettings } from './homeservers.js';
 import { removeInstance, reorderInstances, reconnect as reconnectInstance, disconnectInstance } from './instances.js';
 import { startSignIn } from './session.js';
 import { useHomeSession } from './HomeserverLogin.jsx';
@@ -805,7 +805,7 @@ export function VoiceQuotaNote() {
   try { seen = !!localStorage.getItem(quotaKey(origin, level)); } catch { /* fine */ }
   if (seen) return null;
   const dismiss = () => { try { localStorage.setItem(quotaKey(origin, level), '1'); } catch { /* fine */ } redraw(n => n + 1); };
-  const open = tab => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'settings', sid: view.sid, tab } }));
+  const open = tab => openHomeserverSettings(origin, tab);
   return (
     <div className={`vc-quota-note ${level}`} role="status">
       <button type="button" className="vc-quota-x" aria-label="Dismiss" onClick={dismiss}><X size={14} /></button>
@@ -833,7 +833,7 @@ export function OutdatedNote() {
   try { seen = !!sessionStorage.getItem(key); } catch { /* fine */ }
   if (seen) return null;
   const dismiss = () => { try { sessionStorage.setItem(key, '1'); } catch { /* fine */ } redraw(n => n + 1); };
-  const open = (autoUpdate = false) => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'settings', sid: view.sid, tab: 'serverinfo', autoUpdate } }));
+  const open = (autoUpdate = false) => openHomeserverSettings(origin, 'info', { autoUpdate });
   const oneClick = !!u.one_click && !inst.managed; // Ember can run the update itself (the server's host agent is set up)
   return (
     <div className="vc-quota-note near" role="status">

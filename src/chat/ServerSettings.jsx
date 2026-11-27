@@ -1,13 +1,14 @@
 // Server settings: the same dialog as Ember's own settings (SettingsDialog: sidebar of grouped pages + the page with its
-// title and a close X; on phones the list first, then a page slides in). Server / Members / Integrations, and for an
-// homeserver's admins its own pages (Homeserver). Nookara-hosted servers use the same shell with the pages they have.
+// title and a close X; on phones the list first, then a page slides in). Server / Members / Moderation / Integrations and the
+// owner's danger zone. The homeserver's own settings (accounts, uploads limit, bridge bots, voice, backups, restart...) are
+// in Settings > Homeservers. Nookara-hosted servers use the same shell with the pages they have.
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ImageCropper from '../components/ImageCropper.jsx';
 import { cropToFile, keepsAnimation, inMemory } from './cropImage.js';
 import {
   Search, LayoutGrid, Shield, Smile, Volume2, Upload, Users, DoorOpen, Bot, ArrowLeftRight, Gamepad2,
-  KeyRound, Mic, Globe, UserCog, TriangleAlert, Trash2, RefreshCw, Check, Ban, UserMinus, Compass, Download, Archive, Info, Copy, CircleArrowUp,
+  Globe, TriangleAlert, Trash2, RefreshCw, Check, Ban, UserMinus, Compass, Download, Copy,
   MessageSquare, Flag, ShieldAlert, ScrollText, ChartLine, Sticker,
 
 
@@ -29,10 +30,7 @@ import { BotsManager } from './Bots.jsx';
 import { ExportButton } from './Community.jsx';
 import { InsightsPage } from './Insights.jsx';
 import { StorageCards, JoiningPage, MessageRulesPage, ReportsPage, AutoModPage, AuditLogPage, UploadRulesPage } from './ServerRules.jsx';
-import { InstanceTab, BridgeBots, restartInstance } from './Instances.jsx';
-import { UpdateServerRow } from './UpdateServer.jsx';
-import { BackupsPage } from './Backups.jsx';
-import { ServerInfoPage } from './ServerInfo.jsx';
+import { openHomeserverSettings } from './homeservers.js';
 import { PlanCtx, buildPlanCtx, PlanUsage, PlanGate, usePlan } from './PlanGate.jsx';
 import { SettingsShell, Card } from './SettingsShell.jsx';
 import { useUnsaved, UnsavedBar } from './unsaved.jsx';
@@ -47,7 +45,7 @@ import { INST_REGISTER_NOOKARA, isNookara, nookaraInfo, nookaraRegistration } fr
 // [id, label, icon, words the search box answers to]
 function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, owner, legacyDefault }) {
   const uploads = ['uploads', 'Uploads', Upload, ['Files', 'Biggest file', 'MB', 'File types', 'Expire', 'Storage', 'Compression', 'Per minute']];
-  const danger = (owner && !legacyDefault) || instAdmin ? ['danger', 'Danger zone', TriangleAlert, ['Delete server', 'Export', 'Restart', 'Update', 'Backup', 'Advanced', 'Unmarked aliases']] : null;
+  const danger = owner && !legacyDefault ? ['danger', 'Danger zone', TriangleAlert, ['Delete server', 'Export', 'Advanced', 'Unmarked aliases']] : null;
   return [
     ['Server', [
       canServer && ['overview', 'Overview', LayoutGrid, ['Name', 'Icon', 'Banner', 'Description', 'Accent colour', 'Invite code', 'QR code', 'Discover', 'Directory', 'Tags', 'List']],
@@ -57,7 +55,7 @@ function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, 
       onInst && canServer && ['stickers', 'Stickers', Sticker, ['Sticker', 'Big emoji']],
       canServer && ['sounds', 'Soundboard', Volume2, ['Sounds']],
       onInst && canServer && ['messages', 'Message rules', MessageSquare, ['Message length', 'Search results', 'Reactions', 'Link previews', 'Proxy']],
-      onInst && canServer && !instAdmin && uploads, // (the instance's admins find it under Instance)
+      onInst && canServer && uploads,
     ]],
     ['Members', [
       canMod && ['members', onInst ? 'Members & bans' : 'Members', Users, ['Kick', 'Remove', 'Ban', 'Unban']],
@@ -70,24 +68,14 @@ function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, 
     ] : []],
     ['Integrations', [
       onInst && (canServer || instAdmin) && ['bots', 'Bots', Bot, ['Bot accounts', 'Token']],
-      (canServer || instAdmin) && ['bridge', 'Bridge', ArrowLeftRight, ['Discord', 'Fluxer', 'Matrix', 'Bridge bots']],
+      canServer && ['bridge', 'Bridge', ArrowLeftRight, ['Discord', 'Fluxer', 'Matrix', 'Linked servers']],
       canServer && ['game', 'Game servers', Gamepad2, ['Minecraft', 'CloudLink', 'Audit log']],
     ]],
-    ['Homeserver', instAdmin ? [
-      ['accounts', 'Accounts', KeyRound, ['Accounts mode', 'Nookara accounts', 'Own accounts', 'Local accounts', 'Registration', 'Public address']],
-      uploads,
-      ['backups', 'Backups', Archive, ['Backup', 'Restore', 'Download', 'Save to Nookara', 'Export']],
-      ['voice', 'Voice', Mic, ['Cloudflare', 'Realtime', 'TURN']],
-      ['nookara', 'Nookara', Globe, ['Registration', 'Register', 'Payouts', 'Push', 'Directory', 'Voice minutes']],
-      ['admins', 'Admins', UserCog, ['Instance admins', 'Owner']],
-      ['serverinfo', 'Server info', Info, ['Version', 'Commit', 'Build', 'Update', 'Outdated', 'Uptime', 'Node', 'Stats', 'Database', 'Uploads']],
-      danger,
-    ] : []],
-    ['Owner', onInst ? [] : [danger]], // (Nookara-hosted servers: no Instance pages)
+    ['Owner', [danger]],
   ].map(([g, items]) => [g, items.filter(Boolean)]).filter(([, items]) => items.length);
 }
 
-export function ServerSettings({ sid, onClose, tab: startTab, autoUpdate = false }) {
+export function ServerSettings({ sid, onClose, tab: startTab }) {
   const d = useChat(s => s.detail[sid]);
   const onInst = isInst(sid);
   const origin = onInst ? instOf(sid) : null;
@@ -121,23 +109,21 @@ export function ServerSettings({ sid, onClose, tab: startTab, autoUpdate = false
         {page === 'members' && <MembersPage sid={sid} />}
         {page === 'join' && <JoiningPage sid={sid} onDirty={onDirty} goTo={goTo} instAdmin={instAdmin} />}
         {page === 'bots' && <BotsManager inst={origin} sid={sid} />}
-        {page === 'bridge' && <BridgePage sid={sid} origin={origin} instAdmin={instAdmin} canServer={canServer} />}
+        {page === 'bridge' && <BridgePage sid={sid} />}
         {page === 'game' && <GameServersSettings sid={sid} />}
-        {['accounts', 'voice', 'nookara', 'admins'].includes(page) && <InstanceTab key={page} origin={origin} tab={page} onDirty={onDirty} />}
-        {page === 'serverinfo' && <ServerInfoPage origin={origin} autoUpdate={autoUpdate && startTab === 'serverinfo'} />}
-        {page === 'backups' && <BackupsPage origin={origin} />}
-        {page === 'danger' && <DangerZone sid={sid} origin={origin} instAdmin={instAdmin} onClose={onClose} />}
+        {page === 'danger' && <DangerZone sid={sid} origin={origin} onClose={onClose} />}
       </PlanCtx.Provider>}
     </SettingsShell>
   );
 }
 
-// Bridge: a plan without bridges answers every bridge call with plan_limit, so the page is one "not in your plan" panel (not two errors)
-function BridgePage({ sid, origin, instAdmin, canServer }) {
+// Bridge: a plan without bridges answers every bridge call with plan_limit, so the page is one "not in your plan" panel (not two
+// errors). The bots it bridges with are the homeserver's (Settings > Homeservers > Bridges).
+function BridgePage({ sid }) {
   const plan = usePlan('bridges');
   const [hit, setHit] = useState(null);
   const gate = plan.gate || hit;
-  return <PlanGate block={gate}>{instAdmin && <BridgeBots origin={origin} onPlan={setHit} gated={!!gate} />}{canServer && <>{instAdmin && <h3 className="vc-game-sec-title">Linked servers</h3>}<BridgeSettings sid={sid} gated={!!gate} onPlan={setHit} /></>}</PlanGate>;
+  return <PlanGate block={gate}><BridgeSettings sid={sid} gated={!!gate} onPlan={setHit} /></PlanGate>;
 }
 
 // ── Overview: name, icon, banner, description; Show in Discover + tags (instance admins), accent colours, invite code ──
@@ -254,7 +240,7 @@ function Overview({ sid, origin, instAdmin, onDirty, goTo }) {
                 <button type="button" role="switch" aria-label="Show in Discover" aria-checked={!!cfg.listed} className={`cs-switch${cfg.listed ? ' on' : ''}`} disabled={off || busy === 'listed'} onClick={() => setListed(!cfg.listed)}><i /></button>
               </div>
               <div className={`bf-ss-reg${off || !v.registered ? ' warn' : ' ok'}`}>
-                {off ? <><TriangleAlert size={14} /><span>Nookara's services are off for this server, so it can't be listed.</span><button type="button" className="btn btn-surface btn-sm" onClick={() => goTo('nookara')}>Nookara settings</button></>
+                {off ? <><TriangleAlert size={14} /><span>Nookara's services are off for this server, so it can't be listed.</span><button type="button" className="btn btn-surface btn-sm" onClick={() => openHomeserverSettings(origin, 'nookara')}>Nookara settings</button></>
                   : !v.registered ? <><TriangleAlert size={14} /><span><b>Not registered with Nookara yet.</b> Discover lists only registered servers.{v.last_error ? ` (${errorText(v.last_error) === 'Something went wrong.' ? v.last_error : errorText(v.last_error)})` : ''}</span><button type="button" className="btn btn-primary btn-sm" disabled={!!busy} onClick={register}><RefreshCw size={13} /> {busy === 'register' ? 'Registering...' : 'Register now'}</button></>
                   : <><Check size={14} /><span><b>Registered with Nookara</b>{v.trusted ? ' - trusted' : ''}. {dir.hidden_by_staff ? "Nookara's staff have hidden the listing." : cfg.listed ? (dir.last_error ? `The listing didn't update: ${dir.last_error}` : dir.pushed_at ? `Listed - updated ${stampOf(dir.pushed_at)}.` : 'Listing it now...') : 'Not listed.'}</span></>}
               </div>
@@ -335,9 +321,8 @@ function MembersPage({ sid }) {
 }
 
 // ── Danger zone: restart the instance (its admins), export / delete the server (its owner) ──
-function DangerZone({ sid, origin, instAdmin, onClose }) {
+function DangerZone({ sid, origin, onClose }) {
   const srv = useChat(s => s.detail[sid]?.server);
-  const instName = useChat(s => s.instances.find(i => i.origin === origin)?.name);
   if (!srv) return null;
   const owner = srv.role === 'owner' && !srv.is_default;
   const del = async () => {
@@ -349,17 +334,6 @@ function DangerZone({ sid, origin, instAdmin, onClose }) {
       {owner && (
         <Card title="Export" icon={Download}>
           <div className="cs-row"><div className="cs-text"><b>Download a copy</b><span>A zip with the channels, roles, members, emojis, files and every message.{origin ? '' : " Servers hosted by Nookara are moving to Ember servers of their own - you can import it into one."}</span></div><ExportButton sid={sid} /></div>
-        </Card>
-      )}
-      {instAdmin && (
-        <Card title="Restart" icon={RefreshCw}>
-          <div className="cs-row"><div className="cs-text"><b>Restart the homeserver</b><span>Everyone on every server it hosts is disconnected for a moment. It only comes back by itself under something that restarts it (Docker, systemd).</span></div>
-            <button type="button" className="btn btn-surface" onClick={() => restartInstance(origin, instName)}><RefreshCw size={14} /> Restart</button></div>
-        </Card>
-      )}
-      {instAdmin && (
-        <Card title="Update" icon={CircleArrowUp}>
-          <UpdateServerRow origin={origin} name={instName} />
         </Card>
       )}
       {owner && (

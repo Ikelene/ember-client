@@ -11,6 +11,7 @@ import serverCreationPolicy from '../server-creation-policy.json';
 import { Toggle } from './roles.jsx';
 import { PlatformIcon } from './platforms.jsx';
 import { instOpt, bare } from './ids.js';
+import { openHomeserverSettings } from './homeservers.js';
 // bridge links name channels by the server's own id; Ember keeps an Ember server's ids as origin|id (ids.js)
 const sameCh = (a, b) => String(bare(a)) === String(bare(b));
 import { usePlan, PlanGate, PlanNotice, planOf } from './PlanGate.jsx';
@@ -32,7 +33,7 @@ const ERR = {
 };
 // an instance's bridge runs on its owner's own bot, not Nookara's
 const INST_ERR = {
-  bot_not_in_server: "Your bot isn't in that server - add it first.", bridge_not_set_up: "That platform's bot isn't set up on this server yet - its admins add the bot's token in Server settings > Bridge.",
+  bot_not_in_server: "Your bot isn't in that server - add it first.", bridge_not_set_up: "That platform's bot isn't set up on this homeserver yet - its admins add bridge bots in Settings > Homeservers.",
   bot_needs_webhooks: 'Your bot needs the Manage webhooks permission in that channel.', unreachable: "Can't reach the platform right now.",
   room_encrypted: "That room is encrypted, so the bot can't read or post there. Only rooms without encryption can be bridged.",
   channel_not_found: "The bot isn't in that room any more.", platform_unreachable: "Can't reach the platform right now.",
@@ -299,6 +300,7 @@ export function BridgeSettings({ sid, gated, onPlan }) {
           </div>
         </div>
       ))}
+      {inst && !gated && !block && <BotHint inst={inst} available={available} />}
       {linking ? <>
         <button type="button" className="vc-br-back" onClick={() => setLinking(false)}><ArrowLeft size={14} /> Back</button>
         <GuildPicker pickLabel="Link" inst={inst} exclude={bridges.map(b => b.platform)} onPick={async (p, g) => {
@@ -307,11 +309,26 @@ export function BridgeSettings({ sid, gated, onPlan }) {
       </> : available.length > 0 && <div className="vc-br-empty">
         <ArrowLeftRight size={28} />
         <b>{bridges.length ? 'Link another server' : `Bridge this server with Discord${matrix ? ', Fluxer or Matrix' : ' or Fluxer'}`}</b>
-        <p>Link a Discord server, a Fluxer server{matrix ? ', Matrix rooms,' : ''} or {matrix ? 'all of them' : 'both'}. Pick which channels talk to each other in each channel's settings. Messages, replies, edits and deletes go both ways.{inst ? " This server uses its own bots - its admins set them up at the top of this page." : ''}</p>
+        <p>Link a Discord server, a Fluxer server{matrix ? ', Matrix rooms,' : ''} or {matrix ? 'all of them' : 'both'}. Pick which channels talk to each other in each channel's settings. Messages, replies, edits and deletes go both ways.{inst ? " It bridges with its homeserver's own bots." : ''}</p>
         <button type="button" className="btn btn-primary" onClick={() => setLinking(true)}><Link2 size={14} /> Link a server</button>
       </div>}
     </div>
     </PlanGate>
+  );
+}
+
+// the homeserver's bots bridge every server on it: a platform without one yet points at where its admins add it
+function BotHint({ inst, available }) {
+  const admin = useChat(s => !!s.instances?.find(i => i.origin === inst)?.isAdmin);
+  const [plats] = useLoad('/chat/bridge/platforms', [], inst);
+  const missing = (plats.data?.platforms || []).filter(p => !p.ready && available.includes(p.id)).map(p => p.name);
+  if (!missing.length) return null;
+  const names = missing.length > 1 ? `${missing.slice(0, -1).join(', ')} or ${missing[missing.length - 1]}` : missing[0];
+  return (
+    <div className="vc-br-note vc-br-nobot">
+      <p><TriangleAlert size={14} className="vc-inline-ico" /> No {names} bot yet. Your homeserver's admins add bridge bots in Settings › Homeservers.</p>
+      {admin && <button type="button" className="btn btn-surface btn-sm" onClick={() => openHomeserverSettings(inst, 'bridges')}><ArrowLeftRight size={13} /> Open bridge bots</button>}
+    </div>
   );
 }
 
