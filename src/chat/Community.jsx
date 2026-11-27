@@ -90,10 +90,11 @@ export function JoinInvites({ sid, requestsOnly }) {
 
 export function UploadsTab({ sid }) {
   const srv = useChat(s => s.detail[sid]?.server);
-  const admin = useChat(s => !!s.instances.find(i => i.origin === instOf(sid))?.isAdmin);
+  // an older Ember server is one server: its own limit and the instance's ceiling are the same thing, so its admins set both
+  // together. On a homeserver with many servers the ceiling is the homeserver's, and one server's settings leave it alone.
+  const admin = useChat(s => { const i = s.instances.find(x => x.origin === instOf(sid)); return !!i?.isAdmin && !i.v2; });
   const [mb, setMb] = useState(String(srv?.upload_max_mb ?? 25));
-  // one number for people: the server's own limit and the instance's ceiling are the same server now (one community per
-  // instance), so its admins set both together; a plan from Nookara hosting can cap it lower
+  // (a homeserver's plan can cap it lower)
   const [cfg, setCfg] = useState(null);
   const plan = usePlan('max_upload_mb');
   useEffect(() => { if (admin) apiFetch('/api/v1/instance/settings', { inst: instOf(sid) }).then(setCfg).catch(() => {}); }, [admin, sid]);
