@@ -8,6 +8,8 @@ test('join: addresses, with and without a code, and their links', () => {
   assert.deepEqual(joinTarget('garden@nookara.cc'), { kind: 'address', address: { slug: 'garden', domain: 'nookara.cc', address: 'garden@nookara.cc', code: null } });
   assert.equal(joinTarget(' cabin@b.test/Ab12Cd ').address.code, 'Ab12Cd');
   assert.equal(joinTarget('https://b.test/i/cabin/Ab12Cd').address.address, 'cabin@b.test');
+  // a link whose host isn't the domain: the homeserver there says which domain it is
+  assert.deepEqual(joinTarget('http://localhost:4102/i/cabin/Ab12Cd'), { kind: 'address', address: { slug: 'cabin', code: 'Ab12Cd', origin: 'http://localhost:4102' } });
 });
 test('join: old invite links and codes', () => {
   assert.deepEqual(joinTarget('https://ember.nookara.cc/#/invite/Xy12Ab'), { kind: 'invite', code: 'Xy12Ab', inst: null });

@@ -11,7 +11,7 @@ import { useChat, go, toast, errorText, ask } from './store.js';
 import { Toggle } from './roles.jsx';
 import { PlatformIcon } from './platforms.jsx';
 import { discover, nookaraSession, localSession, addInstance, loginInstance, instanceConn, refreshInstance, joinCommunity, joinByAddress, hostOf, canHomeConnect, homeConnect, nookaraSignsIn } from './instances.js';
-import { communityOf, parseAddress } from './addresses.js';
+import { communityOf, parseAddress, parseInviteUrl } from './addresses.js';
 import { K } from './ids.js';
 import { startSignIn, hasNookara } from './session.js';
 import { useUnsaved, UnsavedBar } from './unsaved.jsx';
@@ -60,7 +60,7 @@ export function AddInstance({ url, invite, server, onClose, onSetup }) {
   const member = found && mine.find(m => m.inst === found.origin && (server == null || m.sid === K(found.origin, server)));
 
   async function look(value = text) {
-    const at = parseAddress(value); // name@example.com (with or without an invite code): found by its address instead
+    const at = parseAddress(value) || parseInviteUrl(value); // name@example.com (with or without an invite code): found by its address instead
     if (at) { onClose(); joinByAddress(at); return; }
     setBusy(true); setErr('');
     try {
@@ -109,7 +109,7 @@ export function AddInstance({ url, invite, server, onClose, onSetup }) {
     setBusy(false);
   }
   async function join(withCode) {
-    const at = withCode && parseAddress(withCode); // an invite to a server by its address, maybe on another homeserver
+    const at = withCode && (parseAddress(withCode) || parseInviteUrl(withCode)); // an invite to a server by its address, maybe on another homeserver
     if (at) { onClose(); joinByAddress(at); return; }
     setBusy(true);
     try {

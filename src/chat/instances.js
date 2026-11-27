@@ -9,7 +9,7 @@ import { K, acctKey, registry, hooks, normOrigin, instOf, loadSessions, loadSess
 import { onInstClientsFrame, rewatchInstClients } from './instClients.js';
 import { SHORT } from '../version.js';
 import { getState, patchState, toast, handleEvent, socialEvent, homeConnected, RESTRICTED_TEXT, instanceVoiceClosed, voiceSocketReady, loadEmojis, go, catchUp, resumeInstanceView, backoff, instanceRestricted, instanceRestored, forgetServerCache } from './store.js';
-import { isV2, communityOf, parseAddress, createErrorText } from './addresses.js';
+import { isV2, communityOf, parseAddress, parseInviteUrl, createErrorText } from './addresses.js';
 import { locate, currentOrigin, onSignedOut } from './homeserver.js';
 import { sourceFor, tagFor, openSession } from './homeAuth.js';
 import { SOCIAL_EVENTS, isTradedTag } from './social.js';
@@ -43,6 +43,7 @@ export const instView = c => ({
   origin: c.origin, host: hostOf(c.origin), name: c.info?.name || savedLabels()[c.origin]?.name || hostOf(c.origin), icon: c.info?.icon_url || savedLabels()[c.origin]?.icon || null, description: c.info?.description || '',
   // a homeserver with many servers (protocol_version 2): the ones it lists, and what it calls itself
   v2: isV2(c.info), communities: Array.isArray(c.info?.communities) ? c.info.communities : [], homeserver: c.info?.homeserver && typeof c.info.homeserver === 'object' ? c.info.homeserver : null,
+  invites: c.info?.invites && typeof c.info.invites === 'object' ? c.info.invites : null, // where its invite links point (url_base) and the apps that open them
   community: c.info?.community || null, mode: c.info?.accounts_mode || null, status: c.peeking && c.status !== 'open' ? 'asleep' : c.status, claimed: c.info?.claimed !== false, features: c.info?.features || {},
   registration: c.info?.registration || 'closed', isAdmin: !!c.isAdmin, isOwner: !!c.isOwner, user: c.user || null, error: c.error || null, restricted: c.restricted || null,
   needsNookara: isNookara(c.info?.accounts_mode) && !getToken() && srcOf(c) === 'legacy', pending: !!c.pending, failed: !!c.failed,
@@ -887,11 +888,13 @@ export async function joinAndOpen(origin, code, sid) {
 
 // ── servers by address (slug@domain, on a homeserver with many servers) ──
 // the domain's homeserver (its /.well-known/ember may point somewhere else), then that homeserver's id for the slug
+// (an invite link whose host isn't the domain, { slug, origin }: that origin's discovery doc says which homeserver it is)
 // -> { origin, sid, slug, address }; throws an Error whose message createErrorText (addresses.js) puts in plain words
-export async function resolveAddress({ slug, domain }) {
+export async function resolveAddress({ slug, domain, origin: at }) {
   let hs;
-  try { hs = await locate(domain); }
+  try { hs = await locate(at ? { origin: normOrigin(at), domain: domain || hostOf(at) } : domain); }
   catch (e) { throw new Error(e?.code === 'unreachable' ? 'instance_unreachable' : 'not_an_instance'); }
+  if (!domain) domain = (hs.doc?.homeserver && typeof hs.doc.homeserver === 'object' && hs.doc.homeserver.domain) || hostOf(at);
   const origin = normOrigin(hs.origin);
   if (!origin) throw new Error('not_an_instance');
   const path = `/api/v1/servers/resolve?address=${encodeURIComponent(`${slug}@${domain}`)}`;
@@ -907,8 +910,8 @@ export async function resolveAddress({ slug, domain }) {
 // typed, pasted or opened (#/i/slug@domain/code): find the server, then the usual join (straight in when it can, the Add a
 // server dialog when it has to ask). -> true when it went somewhere, false when it isn't an address or didn't work (a toast says why)
 export async function joinByAddress(input) {
-  const a = typeof input === 'string' ? parseAddress(input) : input;
-  if (!a?.slug || !a.domain) return false;
+  const a = typeof input === 'string' ? parseAddress(input) || parseInviteUrl(input) : input;
+  if (!a?.slug || !(a.domain || a.origin)) return false;
   let at;
   try { at = await resolveAddress(a); } catch (e) { toast(createErrorText(e)); return false; }
   const mine = connections.get(at.origin) && getState().servers.find(x => x.sid === K(at.origin, at.sid));

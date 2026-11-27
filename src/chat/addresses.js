@@ -73,6 +73,49 @@ export function parseAddress(input) {
 // the #/ route of an address invite (store.js hashFor / readHash)
 export const addressHash = ({ slug, domain, code }) => `#/i/${slug}@${domain}${code ? `/${code}` : ''}`;
 
+// ── invite links any client can open (the homeserver's own page lists the apps that open them) ──
+// where a homeserver's invite links start: its discovery doc's invites.url_base, else https://<domain>/i/
+export function inviteBase(domain, invites) {
+  const b = typeof invites?.url_base === 'string' ? invites.url_base.trim() : '';
+  let u = null;
+  try { u = b ? new URL(b) : null; } catch { u = null; }
+  if (u && /^https?:$/.test(u.protocol) && !u.username && !u.password && !u.search && !u.hash) return u.href.endsWith('/') ? u.href : `${u.href}/`;
+  return `https://${domain}/i/`;
+}
+// the link to share for an invite to slug@domain (invites: that homeserver's discovery doc block, when known)
+export const inviteUrl = ({ slug, domain, code }, invites) => `${inviteBase(domain, invites)}${slug}/${code}`;
+// an invite link on any host, also one whose url_base isn't on the homeserver's domain (http://localhost:4102/i/cabin/abc):
+// -> { slug, code, origin } (origin: where to ask /.well-known/ember who the homeserver is), or null
+export function parseInviteUrl(input) {
+  const s = String(input ?? '').trim();
+  if (!/^https?:\/\//i.test(s)) return null;
+  let u;
+  try { u = new URL(s); } catch { return null; }
+  if (u.username || u.password || u.search || u.hash) return null;
+  const m = /^(?:\/[^/]+)*\/i\/([^/]+)\/([^/]+)\/?$/.exec(u.pathname);
+  if (!m) return null;
+  const slug = m[1].toLowerCase(), code = m[2];
+  if (!validSlug(slug) || !CODE.test(code)) return null;
+  return { slug, code, origin: u.origin };
+}
+// web+ember:invite?address=slug@domain&code=X, as the browser hands it over (the protocol handler opens #/open?u=<it>)
+// -> { slug, domain, address, code | null } or null
+export function parseProtocolLink(input) {
+  const s = String(input ?? '').trim();
+  const m = /^web\+ember:(?:\/\/)?([a-z]+)\/?(?:\?(.*))?$/i.exec(s);
+  if (!m || m[1].toLowerCase() !== 'invite') return null;
+  const q = new URLSearchParams(m[2] || '');
+  const a = parseAddress(q.get('address') || '');
+  if (!a) return null;
+  const code = q.get('code') || a.code;
+  return code ? build(a.slug, a.domain, code) : a;
+}
+// #/open?u=<link>: the link (or null)
+export function openRouteLink(hash) {
+  const m = /^#\/open\?(.*)$/.exec(String(hash ?? ''));
+  return m ? new URLSearchParams(m[1]).get('u') : null;
+}
+
 // ── what a homeserver says when it won't make or rename a server ──
 export function createErrorText(e) {
   const code = typeof e === 'string' ? e : e?.error || e?.message || '';
