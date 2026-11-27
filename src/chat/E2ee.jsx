@@ -16,7 +16,7 @@ const say = e => ERR[e?.message] || errorText(e?.message);
 
 // on a homeserver that is not Nookara the keys are locked with a passphrase: whoever runs it could try every PIN in hours
 const firstKind = () => (S.secretHome().nookara ? 'pin' : 'passphrase');
-function PassphraseFields({ a, setA, b, setB }) {
+function PassphraseFields({ a, setA, b, setB, changing = false }) {
   const h = S.secretHome(), min = Math.max(12, h.min || 0);
   return (
     <div className="e2-fields">
@@ -26,12 +26,12 @@ function PassphraseFields({ a, setA, b, setB }) {
       <label>Type it again
         <input className="form-input" type="password" autoComplete="new-password" value={b} onChange={e => setB(e.target.value)} />
       </label>
-      <p className="vc-dialog-sub">A few words you'll remember work well. Use it only for your encrypted messages, not as your sign-in password. {h.name} keeps a locked copy of your keys, and whoever runs it could try short secrets one after another, so a PIN isn't allowed here. Nobody can reset it for you: keep the recovery code you get next.</p>
+      <p className="vc-dialog-sub">A few words you'll remember work well. Use it only for your encrypted messages, not as your sign-in password. {h.name} keeps a locked copy of your keys, and whoever runs it could try short secrets one after another, so a PIN isn't allowed here. Nobody can reset it for you: {changing ? 'your recovery code stays the same, so keep it too.' : 'keep the recovery code you get next.'}</p>
     </div>
   );
 }
-function PasscodeFields({ type, setType, a, setA, b, setB }) {
-  if (!S.secretHome().nookara) return <PassphraseFields {...{ a, setA, b, setB }} />;
+function PasscodeFields({ type, setType, a, setA, b, setB, changing = false }) {
+  if (!S.secretHome().nookara) return <PassphraseFields {...{ a, setA, b, setB, changing }} />;
   return (
     <div className="e2-fields">
       <div className="e2-kinds" role="radiogroup" aria-label="What to use">
@@ -177,7 +177,7 @@ function NewPasscode({ onDone, intro }) {
   return (
     <>
       {intro && <p>{intro}</p>}
-      <PasscodeFields {...{ type, setType, a, setA, b, setB }} />
+      <PasscodeFields {...{ type, setType, a, setA, b, setB }} changing />
       {err && <p className="e2-err">{err}</p>}
       <div className="vc-dialog-btns"><button type="button" className="btn btn-primary" disabled={!S.validPasscode(type, a) || a !== b || busy} onClick={go}>{busy ? 'Saving...' : 'Save'}</button></div>
     </>
@@ -338,7 +338,7 @@ export function E2eeSettings() {
       <p><ShieldCheck size={15} /> Your DMs are end-to-end encrypted and this device is unlocked.</p>
       <div className="e2-row">
         <button type="button" className="btn btn-surface" onClick={() => setDlg('approve')}><Smartphone size={15} /> Approve a device</button>
-        <button type="button" className="btn btn-surface" onClick={() => setDlg('passcode')}><KeyRound size={15} /> Change PIN or password</button>
+        <button type="button" className="btn btn-surface" onClick={() => setDlg('passcode')}><KeyRound size={15} /> {S.secretHome().nookara ? 'Change PIN or password' : 'Change passphrase'}</button>
         <button type="button" className="btn btn-surface" onClick={genRecovery}><KeyRound size={15} /> New recovery code</button>
       </div>
       <h4>Linked apps</h4>
@@ -350,7 +350,7 @@ export function E2eeSettings() {
       <h4>What encryption doesn't hide</h4>
       <p className="vc-dialog-sub">Nookara still sees who you message, when, how big messages and files are, reactions and pins, and that a call happened. If you report a message, your app unlocks it and the messages around it for moderators.</p>
       {dlg === 'approve' && <Dialog title="Approve a device or app" onClose={close}><ApproveLink onClose={close} /></Dialog>}
-      {dlg === 'passcode' && <Dialog title="Change PIN or password" onClose={close}><NewPasscode onDone={close} /></Dialog>}
+      {dlg === 'passcode' && <Dialog title={S.secretHome().nookara ? 'Change PIN or password' : 'Change passphrase'} onClose={close}><NewPasscode onDone={close} /></Dialog>}
       {dlg === 'recovery' && recovery && <Dialog title="New recovery code" onClose={close}><RecoveryCode code={recovery} onDone={close} /></Dialog>}
     </div>
   );
