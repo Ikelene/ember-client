@@ -45,7 +45,7 @@ export default function HomeAccountPage() {
   if (!s) {
     return (
       <SettingsPage icon={CircleUserRound} title="My account" sub="The account you're signed in to on your homeserver.">
-        <SCard><div className="sx-empty"><CircleUserRound size={28} /><b>Not signed in to a homeserver</b><span>Sign in from Signed-in accounts, and your account shows here.</span></div></SCard>
+        <SCard><div className="sx-empty"><CircleUserRound size={28} /><b>Not signed in to a homeserver</b><span>Sign in from Settings > Homeservers, and your account shows here.</span></div></SCard>
       </SettingsPage>
     );
   }

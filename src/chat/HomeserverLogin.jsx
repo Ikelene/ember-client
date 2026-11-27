@@ -1,5 +1,5 @@
 // Signing in on a homeserver (Ember Protocol v2, homeserver.js): "Continue with nookara.cc" / "Use another homeserver".
-// Plain parts for whatever shows the sign-in (the gate, Settings > Signed-in accounts); the login itself always happens
+// Plain parts for whatever shows the sign-in (the gate, Settings > Homeservers); the login itself always happens
 // on the homeserver's own page, never here.
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { ShieldCheck, Globe, TriangleAlert, ArrowLeft, ArrowRight } from 'lucide-react';

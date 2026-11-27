@@ -1,4 +1,4 @@
-/* Settings > Signed-in accounts and Server hosting (AccountsPages.jsx). Square by default; Modern softens under html.vc-rounded. */
+/* Settings > Accounts (AccountsPages.jsx) and Homeservers. Square by default; Modern softens under html.vc-rounded. */
 .ac-hero { padding: 20px 22px; }
 .ac-hero-in { display: flex; align-items: center; gap: 16px; }
 .ac-hero-blank { flex: none; width: 64px; height: 64px; display: grid; place-items: center; background: var(--surface-3, #1c1c20); color: var(--dim); }
