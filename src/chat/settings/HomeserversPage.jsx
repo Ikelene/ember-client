@@ -171,7 +171,8 @@ function MyHomeservers({ admins, onManage }) {
   const me = useChat(s => s.me);
   const signedIn = useChat(s => s.signedIn);
   const [adding, setAdding] = useState(false);
-  const homeHandle = home?.account?.handle || (signedIn && me ? nookaraHandle(me.username) : null);
+  // (signed in with Nookara, the servers connect as that account even with a homeserver sign-in next to it)
+  const homeHandle = (signedIn && me ? nookaraHandle(me.username) : null) || home?.account?.handle || null;
   const rows = homeserverRows(sessions, instances, servers, { homeHandle, norm: normOrigin });
   async function signOut(r) {
     if (!(await ask({ title: `Sign out of ${r.domain}?`, text: `Ember forgets its sign-in for ${r.handle || r.domain} on this device.${r.servers.length ? ' Your servers there stay in your list, signed out, until you sign in again or forget it.' : ''}`, confirm: 'Sign out', danger: true }))) return;
