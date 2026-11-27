@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Building2, ArrowLeft, Globe, LogOut, AtSign, Users, KeyRound, ShieldCheck, TriangleAlert, RefreshCw, Trash2, Network, Crown, Settings2, Server, UserPlus, Ban, Gauge, Plus, X, RotateCw, ListChecks, Hourglass, Flag, Upload, ArrowLeftRight, Mic, Archive, Info, CircleArrowUp } from 'lucide-react';
 import { ReportsTab } from './HomeserverReports.jsx';
+import { RegistrationQueue, ServerRequestsQueue } from './HomeQueues.jsx';
 import { SettingsPage, SCard, SRow, Switch } from './ui.jsx';
 import { LoginMethods } from './LoginMethods.jsx';
 import { ask, toast, useChat } from '../store.js';
@@ -279,6 +280,8 @@ function AccountsTab({ hs, onDirty }) {
           <Choices name="hsx-reg" value={f.registration} options={REGISTRATION} onPick={v => set({ registration: v })} /></div>
       </SCard>
 
+      <RegistrationQueue hs={hs} mode={cfg.registration} />
+
       <SCard title="Sign-in methods" sub="The ways people can sign in on this homeserver's login page. Each one that isn't a password has a callback address to register with its provider.">
         <LoginMethods methods={f.methods} origin={origin} onChange={methods => set({ methods })} />
         {nobody && <p className="vc-note hsx-warn"><TriangleAlert size={14} /> {adminErrorText('no_login_method')}</p>}
@@ -366,6 +369,7 @@ function ServersTab({ hs, onDirty }) {
         ))}
         {hidden > 0 && servers.list.length > 0 && <small className="vc-hint hsx-foot">{hidden} more {hidden === 1 ? "isn't" : "aren't"} listed and you aren't in {hidden === 1 ? 'it' : 'them'}, so {hidden === 1 ? "it doesn't" : "they don't"} show here.</small>}
       </SCard>
+      {(cur?.mode === 'request' || f.mode === 'request') && <ServerRequestsQueue hs={hs} />}
       <UnsavedBar changed={changed} bar={bar} busy={busy} disabled={limitBad} onReset={() => setF(creationForm(cfg.creation))} onSave={save} />
     </>
   );

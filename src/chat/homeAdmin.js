@@ -5,8 +5,8 @@ import { RATE_FIELDS, FLOOR_MAX, DAYS_MAX, MAX_DENYLISTS, MAX_DENY } from './fed
 export const REGISTRATION = [
   ['open', 'Open', 'Anyone can make an account.'],
   ['closed', 'Closed', 'Nobody new can make an account.'],
-  ['invite', 'Invite only', 'New accounts need an invite. Works like Closed for now.'],
-  ['approval', 'Approval', 'New accounts wait for an admin. Works like Closed for now.'],
+  ['invite', 'Invite only', 'New accounts need an invite code an admin made (below).'],
+  ['approval', 'Approval', 'Anyone can ask; the account waits until an admin approves it (below).'],
 ];
 export const REMOTE_MODES = [
   ['none', 'Nobody', 'Only accounts made here.'],
@@ -17,7 +17,7 @@ export const REMOTE_MODES = [
 export const CREATION_MODES = [
   ['admins', 'Admins only', "Only the homeserver's admins can create servers."],
   ['allowlist', 'Chosen people', 'Admins, and the accounts on the list.'],
-  ['request', 'On request', "People ask, and an admin approves. Requests can't be answered yet, so nobody but admins can create one for now."],
+  ['request', 'On request', 'People ask for a server, and an admin approves it (the queue is below).'],
   ['anyone', 'Anyone', 'Every account here can create servers.'],
 ];
 
@@ -151,6 +151,14 @@ export function adminErrorText(e, methods) {
     case 'not_on_instances': case 'instance_not_connected': return "You aren't connected to this homeserver right now.";
     case 'instance_unreachable': case 'unreachable': return "Couldn't reach the homeserver. Check your connection and try again.";
     case 'signed_out': return 'Your sign-in to this homeserver ended. Sign in again.';
+    case 'invalid_max_uses': return 'Uses can be 1 to 1000, or empty for no limit.';
+    case 'invalid_expires_in_hours': return 'An invite can last 1 to 8760 hours (a year), or empty for no end.';
+    case 'invalid_note': return 'The note can be up to 200 characters.';
+    case 'too_many_invites': return 'This homeserver has as many invites as it can keep. Revoke some first.';
+    case 'invite_not_found': return 'That invite is gone already.';
+    case 'account_not_pending': return "That account isn't waiting any more.";
+    case 'request_not_found': return 'That request was answered or cancelled already.';
+    case 'invalid_reason': return 'The reason can be up to 300 characters.';
     default: return "That didn't work. Try again.";
   }
 }
