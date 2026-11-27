@@ -18,6 +18,7 @@ import { keepInvite, dropInvite } from './addressInvites.js';
 export function AddressInvite({ address, onClose }) {
   const [s, setS] = useState(null);
   const [bad, setBad] = useState('');
+  const [joining, setJoining] = useState(false); // (one join per click: a second one while the first runs only fails)
   const signedIn = useChat(x => x.signedIn || !!x.home);
   const home = useHomeSession();
   const joined = useChat(x => !!s && x.servers.some(v => v.sid === K(s.origin, s.sid)));
@@ -52,11 +53,13 @@ export function AddressInvite({ address, onClose }) {
           {s.description && <p className="vc-dialog-sub">{s.description}</p>}
           {signedIn ? (
             <div className="vc-dialog-btns"><span className="grow" /><button type="button" className="btn btn-surface" onClick={close}>Not now</button>
-              <button type="button" className="btn btn-primary" onClick={() => {
+              <button type="button" className="btn btn-primary" disabled={joining} onClick={() => {
+                if (joining) return;
+                setJoining(true);
                 close();
                 if (joined) go({ kind: 'server', sid: K(s.origin, s.sid) });
                 else joinByAddress({ ...parseAddress(s.address), code: address.code || null });
-              }}><LogIn size={15} /> {joined ? 'Open it' : 'Join server'}</button></div>
+              }}><LogIn size={15} /> {joined ? 'Open it' : joining ? 'Joining...' : 'Join server'}</button></div>
           ) : (
             <>
               <p className="vc-dialog-sub">Sign in with your homeserver account to join. You come back here after.</p>
