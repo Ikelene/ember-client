@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseAddress, addressHash, slugIssue, validSlug, slugFrom, createErrorText, railEntries, railOrigin, railPos, isV2, communityOf, inviteBase, inviteUrl, parseInviteUrl, parseProtocolLink, openRouteLink, serverOfInst } from '../src/chat/addresses.js';
+import { parseAddress, addressHash, slugIssue, validSlug, slugFrom, createErrorText, railEntries, railOrigin, railPos, isV2, communityOf, inviteBase, inviteUrl, parseInviteUrl, parseProtocolLink, openRouteLink, serverOfInst, routeAddress, addressRoute } from '../src/chat/addresses.js';
 import { addressInviteRef, setInviteHomes, isHiddenInviteLine, embedLabel } from '../src/chat/inviteLink.js';
 
 test('addresses: slug@domain, with and without a code', () => {
@@ -155,4 +155,15 @@ test('the server a lookup on a homeserver with several means: on screen, else it
   assert.equal(serverOfInst(servers, H, { viewSid: 'http://other|x', communitySid: 'b' }).sid, `${H}|b`);
   assert.equal(serverOfInst(servers, H).sid, `${H}|a`);
   assert.equal(serverOfInst(servers, 'http://none'), null);
+});
+
+test('server routes by address: #/s/<slug@domain>/<channel>/<message>', () => {
+  assert.equal(routeAddress('garden@nookara.cc'), 'garden@nookara.cc');
+  assert.equal(routeAddress('Garden%40Nookara.cc'), 'garden@nookara.cc');
+  assert.equal(routeAddress('s02f9921428'), null); // (a Nookara-hosted server's id)
+  assert.equal(routeAddress('garden@nookara.cc/abc'), null);
+  assert.equal(routeAddress('%E0%A4%A'), null);
+  assert.equal(addressRoute('garden@nookara.cc', 'c1', '42'), '#/s/garden@nookara.cc/c1/42');
+  assert.equal(addressRoute('garden@nookara.cc'), '#/s/garden@nookara.cc');
+  assert.equal(addressRoute('garden@nookara.cc', null, '42'), '#/s/garden@nookara.cc');
 });

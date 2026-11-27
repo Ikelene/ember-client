@@ -18,11 +18,11 @@ import { applyIdentity, applyNick } from './identity.js';
 import { applyUserUpdate, instancesWithAccount } from './userUpdate.js';
 import { findPending, dropSettled, wireText, settle } from './pending.js';
 import { NOOKARA, K, parseK, instOf, bare, isInst, normOrigin, acctKey } from './ids.js';
-import { parseAddress, addressHash, inviteUrl, inviteBase, parseProtocolLink, openRouteLink, serverOfInst } from './addresses.js';
+import { parseAddress, addressHash, inviteUrl, inviteBase, parseProtocolLink, openRouteLink, serverOfInst, routeAddress, addressRoute, createErrorText } from './addresses.js';
 import { setInviteHomes } from './inviteLink.js';
 import { myIdOn } from './tokens.js';
 import { readChannel as readMsgCache, writeChannel as writeMsgCache, dropChannels as dropMsgCache } from './msgCache.js';
-import { connections, sendTo, startInstances, loadInstanceData, retryInstances, resumeInstances, renewNookaraSession, holdInstances, forgetIfEmpty, wakeInstance, instanceWoke, recheckSleepers, joinByAddress, ensureHost } from './instances.js';
+import { connections, sendTo, startInstances, loadInstanceData, retryInstances, resumeInstances, renewNookaraSession, holdInstances, forgetIfEmpty, wakeInstance, instanceWoke, recheckSleepers, joinByAddress, ensureHost, resolveAddress } from './instances.js';
 import { homeFetch, onSignedOut, currentSession, DEFAULT_HOMESERVER, resolve as resolveHomeserver, homeInfo, remoteToken, isOwnUrl, domainReportsUrl } from './homeserver.js';
 import { reportRoute, reportBody, canReportSealed } from './e2ee/report.js';
 import { social as socialApi, socialBase, socialFetch, createDm, setNookaraSocial, dmHostUrl } from './socialApi.js';
@@ -2360,10 +2360,24 @@ export async function toggleBlock(username, blocked) {
 
 // ── where you are (also in the address: /chat#/s/<sid>/<cid>, #/dm/<name>, #/g/<room>) ──
 // #/s/<sid>/<cid> for Nookara's own servers, #/i/<instance>/s/<sid>/<cid> and #/i/<instance>/invite/<code> for instances
+// a server on a homeserver with many, by its address (slug@domain): its routes use that, not the homeserver's origin
+const addressOfSid = sid => { const a = state.servers.find(x => x.sid === sid)?.address || state.detail[sid]?.server?.address || readServerCache()[sid]?.server?.address; const p = a ? parseAddress(a) : null; return p && !p.code ? p.address : null; };
+// the other way, instantly from what this device knows (the server list, details, the kept copies): -> its sid | null
+function sidOfAddress(address) {
+  const a = String(address || '').toLowerCase(), same = x => String(x || '').toLowerCase() === a;
+  const s = state.servers.find(x => same(x.address));
+  if (s) return s.sid;
+  for (const [sid, d] of Object.entries(state.detail)) if (same(d?.server?.address)) return sid;
+  for (const [sid, c] of Object.entries(readServerCache())) if (same(c?.server?.address)) return sid;
+  return null;
+}
 export function hashFor(v) {
   const at = k => { const p = parseK(k); return p.inst === NOOKARA ? '' : `#/i/${encodeURIComponent(p.inst)}`; };
   const mid = v.kind === 'channel' && v.mid ? `/${v.mid}` : ''; // a message link: #/s/<sid>/<cid>/<message id>
   if (v.kind === 'sdm' || (v.kind === 'channel' && v.dm)) return `#/dm/${encodeURIComponent(v.kind === 'sdm' ? v.id : v.dm)}`; // a DM on a homeserver, by its id
+  // a server with an address: #/s/<slug@domain>/<channel>/<message> (#/i/<origin>/s/... still opens, and becomes this)
+  const addr = (v.kind === 'channel' || v.kind === 'server') && at(v.sid) ? addressOfSid(v.sid) : null;
+  if (addr) return addressRoute(addr, v.kind === 'channel' ? bare(v.cid) : null, v.kind === 'channel' ? v.mid : null);
   if (v.kind === 'channel') return at(v.sid) ? `${at(v.sid)}/s/${bare(v.sid)}/${bare(v.cid)}${mid}` : `#/s/${v.sid}/${v.cid}${mid}`;
   if (v.kind === 'server') return at(v.sid) ? `${at(v.sid)}/s/${bare(v.sid)}` : `#/s/${v.sid}`;
   if (v.kind === 'instance') return `#/i/${encodeURIComponent(v.inst)}`;
@@ -2409,6 +2423,12 @@ export function readHash() {
     return a ? { kind: 'home' } : { kind: 'instance', inst };
   }
   const [, a, b, c, d] = parts;
+  const addr = a === 's' && b ? routeAddress(b) : null;
+  if (addr) { // #/s/<slug@domain>/<channel>/<message>: a server on a homeserver with many, by its address
+    const sid = sidOfAddress(addr), mid = c && /^\d{1,20}$/.test(d || '') ? { mid: d } : {};
+    if (!sid) return { kind: 'server-address', address: addr, cid: c || null, ...mid }; // (not known here yet: open() looks it up)
+    return { kind: c ? 'channel' : 'server', sid, cid: c ? K(instOf(sid), c) : undefined, ...mid };
+  }
   if (a === 's' && b) return { kind: c ? 'channel' : 'server', sid: b, cid: c, ...(c && /^\d{1,20}$/.test(d || '') ? { mid: d } : {}) };
   if (a === 'dm' && b) {
     let who; try { who = decodeURIComponent(b); } catch { return { kind: 'home' }; }
@@ -2486,6 +2506,17 @@ export async function open(v) {
       return;
     }
   }
+  if (v.kind === 'server-address') { // #/s/<slug@domain>/... this device doesn't know yet: find it, then open it (or the way in)
+    const a = parseAddress(v.address);
+    if (!a) { go({ kind: 'home' }, { replace: true }); return; }
+    if (!state.view.kind) set({ view: { kind: 'home' } });
+    resolveAddress(a).then(r => {
+      const sid = K(r.origin, r.sid);
+      if (state.servers.some(x => x.sid === sid)) go(v.cid ? { kind: 'channel', sid, cid: K(r.origin, v.cid), ...(v.mid ? { mid: v.mid } : {}) } : { kind: 'server', sid }, { replace: true });
+      else { history.replaceState(null, '', clientUrl('#/home')); joinByAddress(a); } // (not in it: the usual way in)
+    }, e => { history.replaceState(null, '', clientUrl('#/home')); set({ view: { kind: 'home' } }); toast(createErrorText(e)); });
+    return;
+  }
   if (v.kind === 'address') {
     // stay where you were while the address is looked up; then the usual join (instances.js joinByAddress)
     const back = ['channel', 'dm', 'group'].includes(state.view.kind) ? hashFor(state.view) : '#/home';
@@ -2515,6 +2546,8 @@ export async function open(v) {
   if (isHomeView(v)) lastHome = v;
   set(s => ({ view: v, unread: { ...s.unread, [keyOf(v)]: false }, lastCid: v.kind === 'channel' ? { ...s.lastCid, [v.sid]: v.cid } : s.lastCid }));
   if (v.kind === 'channel') rememberChannel(v.sid, v.cid);
+  // opened by the old #/i/<origin>/s/<sid>/<cid> form: the address bar gets the #/s/<slug@domain>/<channel> one
+  if (v.kind === 'channel' && location.hash.startsWith('#/i/')) { const h = hashFor(v); if (h.startsWith('#/s/') && h !== location.hash) history.replaceState(history.state, '', clientUrl(h)); }
   try { localStorage.setItem('nookara_chat_last', location.hash); } catch { /* fine */ }
   if (v.kind === 'channel') {
     const have = detailOrCached(v.sid);

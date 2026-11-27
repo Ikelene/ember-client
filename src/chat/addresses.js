@@ -185,3 +185,14 @@ export function serverOfInst(servers, origin, { viewSid = null, communitySid = n
   const mine = (servers || []).filter(s => s.inst === origin);
   return (viewSid && mine.find(s => s.sid === viewSid)) || (communitySid != null && mine.find(s => s.sid === `${origin}|${communitySid}`)) || mine[0] || null;
 }
+// ── server routes by address: #/s/<slug@domain>[/<channel>[/<message>]] (a server on a homeserver with many) ──
+// the address in a route segment -> 'slug@domain' (lowercase) | null when the segment is not one (a Nookara-hosted sid)
+export function routeAddress(seg) {
+  let s = String(seg ?? '');
+  try { s = decodeURIComponent(s); } catch { return null; }
+  if (!s.includes('@')) return null;
+  const a = parseAddress(s);
+  return a && !a.code ? a.address : null;
+}
+// the #/ route of a server (or one of its channels / messages) by its address
+export const addressRoute = (address, cid, mid) => `#/s/${address}${cid ? `/${cid}` : ''}${cid && mid ? `/${mid}` : ''}`;

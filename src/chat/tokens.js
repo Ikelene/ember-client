@@ -6,6 +6,7 @@ import { getState } from './store.js';
 import { connections } from './instances.js';
 import { NOOKARA, K, bare, instOf } from './ids.js';
 import { EMBER_HOST } from './hosts.js';
+import { routeAddress } from './addresses.js';
 import { personName, displayNameOf } from './displayNames.js';
 
 export const nameOf = u => personName(u, displayNameOf(u.username)) || u.username;
@@ -91,6 +92,15 @@ export function parseEmberLink(href) {
     rest = rest.slice(2);
   }
   const [a, sid, cid, mid] = rest;
+  // #/s/<slug@domain>/<channel>/<message>: a server by its address - known here when this device has it (else a plain link)
+  const addr = a === 's' && inst === NOOKARA ? routeAddress(sid) : null;
+  if (addr) {
+    const st = getState(), same = x => String(x?.address || '').toLowerCase() === addr;
+    const srv = st.servers.find(same) || Object.values(st.detail).map(d => d?.server).find(same);
+    if (!srv?.sid || !/^c[0-9a-f]{10}$/.test(cid || '') || (mid && !/^\d{1,20}$/.test(mid))) return null;
+    const io = instOf(srv.sid);
+    return { inst: io, sid: srv.sid, cid: K(io, cid), mid: mid || null, hash: u.hash };
+  }
   if (a !== 's' || !/^s[0-9a-f]{10}$/.test(sid || '') || !/^c[0-9a-f]{10}$/.test(cid || '')) return null;
   if (mid && !/^\d{1,20}$/.test(mid)) return null;
   return { inst, sid: K(inst, sid), cid: K(inst, cid), mid: mid || null, hash: u.hash };
