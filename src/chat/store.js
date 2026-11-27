@@ -23,7 +23,8 @@ import { setInviteHomes } from './inviteLink.js';
 import { myIdOn } from './tokens.js';
 import { readChannel as readMsgCache, writeChannel as writeMsgCache, dropChannels as dropMsgCache } from './msgCache.js';
 import { connections, sendTo, startInstances, loadInstanceData, retryInstances, resumeInstances, renewNookaraSession, holdInstances, forgetIfEmpty, wakeInstance, instanceWoke, recheckSleepers, joinByAddress, ensureHost, resolveAddress } from './instances.js';
-import { homeFetch, onSignedOut, currentSession, DEFAULT_HOMESERVER, resolve as resolveHomeserver, homeInfo, remoteToken, isOwnUrl, domainReportsUrl } from './homeserver.js';
+import { movedHome, hostedSlug } from './moved.js';
+import { homeFetch, onSignedOut, currentSession, sessions as homeSessions, DEFAULT_HOMESERVER, resolve as resolveHomeserver, homeInfo, remoteToken, isOwnUrl, domainReportsUrl } from './homeserver.js';
 import { reportRoute, reportBody, canReportSealed } from './e2ee/report.js';
 import { social as socialApi, socialBase, socialFetch, createDm, setNookaraSocial, dmHostUrl } from './socialApi.js';
 import { emptySocial, friendLists, mergeDms, cleanDm, socialReduce, socialRefetch, dmTitle, splitHandle, stableId, cleanHandle, accountName, remoteFriendLists, splitNookaraDms, nookaraDmView, dmHandle, listPresence } from './social.js';
@@ -2418,6 +2419,8 @@ export function readHash() {
     const [, , , a, b, c, d] = parts;
     inst = normOrigin(inst); // only a proper, normalised origin is an instance
     if (!inst || inst.includes('|')) return { kind: 'home' };
+    // a server Nookara used to host (e-<slug>.nookara.cc) that isn't one of mine: it may live on a homeserver now (moved.js)
+    if (hostedSlug(inst) && !state.instances?.some(i => i.origin === inst)) return { kind: 'moved', old: inst, slug: hostedSlug(inst), ...(a === 'invite' && b ? { code: b } : {}) };
     if (a === 's' && b) return { kind: c ? 'channel' : 'server', sid: K(inst, b), cid: c ? K(inst, c) : undefined, ...(c && /^\d{1,20}$/.test(d || '') ? { mid: d } : {}) };
     if (a === 'invite' && b) return { kind: 'invite', code: b, inst };
     return a ? { kind: 'home' } : { kind: 'instance', inst };
@@ -2515,6 +2518,21 @@ export async function open(v) {
       if (state.servers.some(x => x.sid === sid)) go(v.cid ? { kind: 'channel', sid, cid: K(r.origin, v.cid), ...(v.mid ? { mid: v.mid } : {}) } : { kind: 'server', sid }, { replace: true });
       else { history.replaceState(null, '', clientUrl('#/home')); joinByAddress(a); } // (not in it: the usual way in)
     }, e => { history.replaceState(null, '', clientUrl('#/home')); set({ view: { kind: 'home' } }); toast(createErrorText(e)); });
+    return;
+  }
+  if (v.kind === 'moved') {
+    // find the homeserver that lists the old origin, then open the server by its address (the slug and main invite code came along)
+    history.replaceState(null, '', clientUrl('#/home'));
+    if (!state.view.kind) set({ view: { kind: 'home' } });
+    const known = [
+      ...(state.instances || []).map(i => ({ origin: i.origin, domain: i.homeserver?.domain, previousUrls: i.previousUrls })),
+      ...Object.values(homeSessions()).filter(x => x?.origin && !(state.instances || []).some(i => i.origin === x.origin)).map(x => ({ origin: x.origin, domain: x.domain })),
+      ...((state.instances || []).some(i => i.homeserver?.domain === DEFAULT_HOMESERVER) ? [] : [{ origin: `https://${DEFAULT_HOMESERVER}`, domain: DEFAULT_HOMESERVER }]),
+    ];
+    movedHome(v.old, known).then(h => {
+      if (h) open({ kind: 'address', slug: v.slug, domain: h.domain, ...(v.code ? { code: v.code } : {}) });
+      else open(v.code ? { kind: 'invite', code: v.code, inst: v.old } : { kind: 'instance', inst: v.old }); // (the old address itself: Nookara says where it went when it knows)
+    });
     return;
   }
   if (v.kind === 'address') {
