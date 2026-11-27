@@ -146,7 +146,9 @@ const nookaraKey = () => tokenTag(getToken());
 const nookaraAuth = () => ({ key: nookaraKey(), token: async audience => { const d = await apiFetch('/api/v2/auth/remote-token', { method: 'POST', body: JSON.stringify({ audience }) }); if (typeof d?.token !== 'string' || !d.token) throw Object.assign(new Error('request_failed'), { status: 502 }); return d.token; } });
 const openFor = (c, renew = false) => openSession(c.origin, c.info, { legacy: !!getToken(), renew, nookara: getToken() ? nookaraAuth() : null });
 export const homeHere = () => (!getToken() && currentOrigin() ? normOrigin(currentOrigin()) : null);
-const refused = e => Object.assign(new Error(e?.code || e?.message || 'request_failed'), { status: e?.status ?? 0, refused: e?.status >= 400 && e?.status < 500 });
+// (a 429 isn't refused: it is tried again, after retry_after)
+const refused = e => Object.assign(new Error(e?.code || e?.message || 'request_failed'), { status: e?.status ?? 0, refused: e?.status >= 400 && e?.status < 500 && e?.status !== 429, ...(e?.retry_after ? { retry_after: e.retry_after } : {}) });
+const waitOf = e => (e?.retry_after ? e.retry_after * 1000 : 0);
 function adoptHome(c, r) {
   c.session = r.session; c.source = r.source;
   registry.set(c.origin, c);
@@ -225,7 +227,7 @@ hooks.refresh = origin => {
           const err = refused(e);
           if (source === 'nookara' && err.refused) { setStatus(c, 'login', err.message); return false; }
           c.failed = true; setStatus(c, err.refused ? 'error' : 'closed', err.message);
-          if (!err.refused) scheduleRetry(c);
+          if (!err.refused) scheduleRetry(c, waitOf(err));
           return false;
         }
       }
@@ -473,6 +475,12 @@ function onFrame(c, m) {
       sendTo(c.origin, { type: 'chat_hello' });
       instanceRestored(); // (the app's lockout too, once Nookara agrees)
       return;
+    case 'account_payments_update': // the Nookara account linked for payments changed (19.0c): My account's card
+      dispatchEvent(new CustomEvent('ember-payments', { detail: { origin: c.origin, payments: m.payments || null } }));
+      return;
+    case 'chat_tier_update': // a server's tier purchase moved on (19.0a): Server settings > Plan
+      dispatchEvent(new CustomEvent('ember-tier', { detail: { origin: c.origin, ...m } }));
+      break;
     case 'chat_error':
       if (m.error === 'account_restricted') { restrict(c, m.message); return; } // (any chat_ / voice_ frame after the notice: no toast per request)
       if (m.request === 'chat_clients_watch') { onInstClientsFrame(c.origin, m); return; } // (not allowed to see them: no row, no toast)
@@ -591,7 +599,7 @@ export async function connect(origin) {
     if (c.peeking) { sleepInstance(c, 'idle'); return; }
     c.failed = true;
     setStatus(c, e.message === 'insufficient_scope' || e.refused ? 'error' : 'closed', e.message);
-    if (!e.refused) scheduleRetry(c, e.restricted ? RESTRICTED_RETRY : 0);
+    if (!e.refused) scheduleRetry(c, e.restricted ? RESTRICTED_RETRY : waitOf(e));
   } finally { c.busy = false; if (movedTo) moveInstance(origin, movedTo); }
 }
 // A server moved to a new address: the rail entry, its session (same server, same database) and the saved list follow, and the
