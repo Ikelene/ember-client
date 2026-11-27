@@ -9,12 +9,13 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyn
 import { createPortal } from 'react-dom';
 import {
   Share2, Hash, Lock, Plus, Compass, ChevronDown, Settings, UserPlus, LogOut, House, MessageCircle, Home,
-  Pencil, Trash2, Check, X, Circle, Moon, MinusCircle, EyeOff, Smile, UsersRound, Megaphone, FolderPlus, ShieldCheck, Download, Server, UserRound, Volume2, CircleArrowUp, NotebookPen, Unplug } from 'lucide-react';
+  Pencil, Trash2, Check, X, Circle, Moon, MinusCircle, EyeOff, Smile, UsersRound, Megaphone, FolderPlus, ShieldCheck, Download, Server, UserRound, Volume2, CircleArrowUp, NotebookPen, Unplug, Repeat } from 'lucide-react';
 
 import { RetryIn } from './Gate.jsx';
 import { ServerIcon } from './ServerIcon.jsx';
 import { inviteLinkFor, fullHandle, nookaraDomain } from './store.js';
 import { HomeChip, ForeignChip, useServerHome } from './homeLabels.jsx';
+import { deviceAccounts, switchToAccount } from './accountSwitch.js';
 import { nookaraDmRows } from './social.js';
 import { SocialDmRow } from './SocialHome.jsx';
 import { useName, NameText, personName, displayNameOf, useDisplayNamesVersion, wantDisplayNames, serverOwnName } from './displayNames.js';
@@ -868,9 +869,20 @@ function HomeWho({ home, me }) {
   const editable = hasAccountProfile(inst);
   const name = me?.display_name || home.account.display_name || home.account.username;
   const pfp = me?.pfp ?? home.account.avatar_url ?? null;
-  const open = () => (editable ? openProfileEditor(accountTarget(inst.origin)) : dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'chat-settings', page: 'homeaccount' } })));
+  const edit = () => (editable ? openProfileEditor(accountTarget(inst.origin)) : dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'chat-settings', page: 'homeaccount' } })));
+  // a menu: your profile, then every account on this device to switch to, and Add account (accountSwitch.js)
+  const open = e => {
+    const others = deviceAccounts(null, { nookaraDomain: nookaraDomain() }).filter(a => !a.current);
+    openMenu(e, [
+      { label: editable ? 'Edit profile' : 'My account', icon: UserRound, onClick: edit },
+      others.length && 'sep',
+      ...others.map(a => ({ label: a.handle, hint: a.kind === 'nookara' ? 'Nookara account' : a.hsName, icon: Repeat, onClick: () => switchToAccount(a).catch(() => toast(`${a.handle} was signed out - add it again.`)) })),
+      'sep',
+      { label: 'Add account', icon: UserPlus, onClick: () => dispatchEvent(new Event('vc-add-account')) },
+    ]);
+  };
   return (
-    <button type="button" className="vc-me-who" title={editable ? `Edit your profile on ${home.domain}` : home.account.handle} onClick={open}>
+    <button type="button" className="vc-me-who" title={home.account.handle} onClick={open}>
       <Avatar user={{ username: home.account.username, pfp }} size={36} />
       <span className="vc-me-txt"><b>{name}</b><small>{home.account.handle}</small></span>
     </button>

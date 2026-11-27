@@ -53,6 +53,7 @@ import { E2eeHeadLock } from '../chat/E2eeMessage.jsx';
 import { forgetIfEmpty, joinByAddress } from '../chat/instances.js';
 import { CreateOnHomeserver } from '../chat/CreateOnHomeserver.jsx';
 import { AddressInvite, takeInvite } from '../chat/AddressInvite.jsx';
+import { AddAccount } from '../chat/AddAccount.jsx';
 // a left Ember server goes off the list (the server list is updated by the leave's own event, or in a moment)
 const forgetLeft = sid => { const o = instOf(sid); setTimeout(() => forgetIfEmpty(o), 400); };
 
@@ -500,7 +501,9 @@ function ChatPage() {
   useEffect(() => {
     const on = e => setDialog(e.detail?.address ? { kind: 'address-invite', address: e.detail.address } : { kind: 'invite-join', code: e.detail?.code ?? e.detail, inst: e.detail?.inst });
     addEventListener('vc-invite', on);
-    return () => removeEventListener('vc-invite', on);
+    const add = () => setDialog({ kind: 'add-account' }); // (the account switchers' Add account)
+    addEventListener('vc-add-account', add);
+    return () => { removeEventListener('vc-invite', on); removeEventListener('vc-add-account', add); };
   }, []);
   const settings = useChat(s => s.settings);
   const toastOk = useChat(s => s.toastOk);
@@ -739,6 +742,7 @@ function ChatPage() {
       {dialog?.kind === 'invite' && <Invite sid={dialog.sid || view.sid} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'invite-join' && <JoinInvite code={dialog.code} inst={dialog.inst} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'address-invite' && <AddressInvite address={dialog.address} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'add-account' && <AddAccount onClose={() => setDialog(null)} />}
       {dialog?.kind === 'settings' && <ServerSettings key={`${dialog.sid || view.sid}-${dialog.tab || ''}`} sid={dialog.sid || view.sid} tab={dialog.tab} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'channel' && (dialog.channel?.cid
         ? <ChannelSettings key={dialog.channel.cid} sid={dialog.sid || view.sid} channel={dialog.channel} tab={dialog.tab} onClose={() => setDialog(null)} />

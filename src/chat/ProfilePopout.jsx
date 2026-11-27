@@ -14,6 +14,8 @@ import { copy } from './Menu.jsx';
 import { renderBody } from './text.jsx';
 import { Avatar, STATUS_LABEL, ActivityCard, HandleLine } from './Profile.jsx';
 import { ManageFacts } from './ClientVia.jsx';
+import { deviceAccounts, switchToAccount } from './accountSwitch.js';
+import { HomeserverIcon } from './HomeserverLogin.jsx';
 import './ProfilePopout.css';
 import { desktopBridge, SITE_TOKEN, SITE_SAVED, SITE_ME_CACHE, SITE_ACCENT, SITE_ACCENT_AT } from '../compat.js';
 
@@ -274,7 +276,7 @@ export function MePopout({ anchor, onClose, onEditProfile, onCustomStatus }) {
   if (!me) return null;
 
   const status = presence?.status || 'online';
-  const others = sub === 'accounts' ? savedAccounts().filter(a => a.username.toLowerCase() !== username.toLowerCase()) : [];
+  const others = sub === 'accounts' ? (isWebEmber() ? deviceAccounts({ username }, { nookaraDomain: nookaraDomain() }).filter(a => !a.current) : savedAccounts().filter(a => a.username.toLowerCase() !== username.toLowerCase()).map(a => ({ key: `nk:${a.username}`, kind: 'nookara', handle: fullHandle(a.username), pfp: a.pfp, saved: a }))) : [];
   const uid = me.id || p?.id;
   const card = {
     username,
@@ -382,14 +384,14 @@ export function MePopout({ anchor, onClose, onEditProfile, onCustomStatus }) {
                 <div className="bf-pp-fl-head">Saved on this device</div>
                 <div className="bf-pp-fl-acct current"><Avatar user={me} size={26} /><span className="bf-pp-fl-txt"><span>{fullHandle(username)}</span><small>Signed in on {nookaraDomain()}</small></span><Check size={14} /></div>
                 {others.map(a => (
-                  <button type="button" key={a.username} disabled={!!busy} onClick={() => switchTo(a, setBusy)}>
-                    <Avatar user={{ username: a.username, pfp: a.pfp }} size={26} />
-                    <span className="bf-pp-fl-txt"><span>{busy === a.username ? `Switching to ${fullHandle(a.username)}...` : fullHandle(a.username)}</span><small>On {nookaraDomain()}</small></span>
+                  <button type="button" key={a.key} disabled={!!busy} onClick={() => (a.kind === 'nookara' ? switchTo(a.saved, setBusy) : (setBusy(a.key), switchToAccount(a, { kind: 'nookara', handle: fullHandle(username), pfp: me.pfp })))}>
+                    <span className="bf-pp-fl-av"><Avatar user={{ username: a.handle, pfp: a.pfp }} size={26} />{a.kind === 'home' && <HomeserverIcon hs={{ name: a.hsName, domain: a.domain, icon_url: a.icon }} className="sm bf-pp-fl-hs" />}</span>
+                    <span className="bf-pp-fl-txt"><span>{busy === a.key || busy === a.saved?.username ? `Switching to ${a.handle}...` : a.handle}</span><small>{a.kind === 'nookara' ? `Nookara account` : `On ${a.hsName}`}</small></span>
                   </button>
                 ))}
                 {!others.length && <div className="bf-pp-fl-none">No other accounts on this device yet.</div>}
                 <div className="bf-pp-fl-sep" />
-                <a href={isWebEmber() ? '#' : `/login?next=${encodeURIComponent('/chat' + location.hash)}`} onClick={e => { rememberCurrent(username, me.pfp); if (isWebEmber()) { e.preventDefault(); startSignIn(); } }}><UserPlus size={15} /><span className="bf-pp-fl-txt"><span>Add another account</span></span></a>
+                <a href={isWebEmber() ? '#' : `/login?next=${encodeURIComponent('/chat' + location.hash)}`} onClick={e => { rememberCurrent(username, me.pfp); if (isWebEmber()) { e.preventDefault(); onClose?.(); dispatchEvent(new Event('vc-add-account')); } }}><UserPlus size={15} /><span className="bf-pp-fl-txt"><span>Add another account</span></span></a>
                 <button type="button" onClick={() => signOut()}><LogOut size={15} /><span className="bf-pp-fl-txt"><span>Sign out</span></span></button>
               </Flyout>
             )}
