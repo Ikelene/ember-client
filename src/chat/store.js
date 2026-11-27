@@ -2953,7 +2953,7 @@ export function socialEvent(origin, m) {
   if (next === before) return;
   set({ social: next });
   const id = typeof m.dm === 'string' ? m.dm : m.dm?.id || m.id;
-  if (m.type === 'social_dm_remove' && state.view.dm === id) { go({ kind: 'home' }, { replace: true }); toast("You're not in that conversation any more."); }
+  if (m.type === 'social_dm_remove' && state.view.dm === id) { go({ kind: 'home' }, { replace: true }); if (!leavingDms.has(id)) toast("You're not in that conversation any more."); }
   if (m.type === 'social_dm_update' && state.view.dm === id) { const dm = next.dms.find(x => x.id === id); if (dm?.sid && dm.channel && dm.host_origin) seedDm(dm); }
   if (m.type === 'social_dm_activity') {
     if (state.view.dm === id && pageFocused()) readSocialDm(id);
@@ -3110,6 +3110,7 @@ export function messageSomeone(input) {
   return startSocialDm({ handles: [handle] });
 }
 // rename a group, remove someone from it, or leave it: asked of the homeserver the DM is on
+const leavingDms = new Set(); // DMs I'm leaving right now
 export async function socialDmAction(what, id, arg) {
   const dm = state.social.dms.find(x => x.id === id), host = dmHostOf(dm);
   if (!dm || !soc()) return false;
@@ -3117,6 +3118,7 @@ export async function socialDmAction(what, id, arg) {
   try {
     const up = host && (await ensureHost(host));
     if (what === 'leave') {
+      leavingDms.add(id); setTimeout(() => leavingDms.delete(id), 15000); // (its social_dm_remove is my own doing: no "you're not in it" note)
       if (up) await apiFetch(`${at}/leave`, { method: 'POST', inst: host });
       if (!up || !dm.hosted_here) await socialApi.leaveDm(id).catch(() => {}); // (my homeserver's pointer goes now, not when the host gets round to saying so)
       set(st => ({ social: { ...st.social, dms: st.social.dms.filter(x => x.id !== id) } }));
