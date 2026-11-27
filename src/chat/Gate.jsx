@@ -135,7 +135,7 @@ export function InstanceGate({ origin }) {
   if (status !== 'open') { // (also while it retries by itself: the box stays put until a try works)
     return (
       <Box icon={<Server size={34} />} title={inst.error === 'homeserver_rate_limited' ? `${host} is busy` : `Couldn't reach ${host}`}>
-        {inst.error === 'homeserver_rate_limited' && <p>It's getting a lot of sign-ins right now. It's tried again once it says it's ready.</p>}
+        {inst.error === 'homeserver_rate_limited' && <p>It's getting a lot of sign-ins right now. Trying again as soon as it says it's ready.</p>}
         {inst.error && inst.error !== 'instance_unreachable' && inst.error !== 'homeserver_rate_limited' && <p>{errorText(inst.error === 'insufficient_scope' ? 'inst_scope' : inst.error)}</p>}
         <RetryIn at={inst.retryAt} busy={status === 'connecting'} />
         <div className="vc-gate-btns"><button type="button" className="btn btn-primary" onClick={() => reconnect(origin)}><RefreshCw size={15} /> Retry now</button>{statusIdForHost(inst.host) && <StatusLink id={statusIdForHost(inst.host)} className="btn btn-surface" size={15} />}{remove}</div>
