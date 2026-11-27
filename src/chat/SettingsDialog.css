@@ -296,3 +296,14 @@ button.bf-sr-tile:hover { border-color: var(--border-2); }
 .bf-sd-crumbs b { color: var(--text); font-weight: 600; }
 .bf-sd-crumbs svg { color: var(--muted); }
 .bf-ss-dash-top { padding: 0 0 4px; } .bf-ss-dash-top .bf-ss-hero { margin-bottom: 14px; }
+
+/* Server settings > Plan (TierPage.jsx) */
+.bf-tier-now { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; color: var(--text-2, inherit); }
+.bf-tier-now svg { color: var(--accent); flex: none; }
+.bf-tier-pending, .bf-tier-link { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin: 0 0 10px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 12%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.bf-tier-pending > span { flex: 1; }
+.bf-tier-link { align-items: flex-start; flex-wrap: wrap; }
+.bf-tier-link > svg { color: var(--accent); flex: none; margin-top: 2px; }
+.bf-tier-link > div:first-of-type { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 3px; }
+.bf-tier-link span { font-size: 13px; opacity: .85; }
+.bf-tier-link-btns { display: flex; gap: 8px; margin-left: auto; align-self: center; }

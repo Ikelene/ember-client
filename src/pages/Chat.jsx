@@ -75,6 +75,7 @@ import { SUPPORT_URL } from '../chat/gateText.jsx';
 import { finishSignIn, finishHomeLogin, homeLoginText, SIGNIN_TEXT } from '../chat/session.js';
 import { probeDefault, currentSession } from '../chat/homeserver.js';
 import { parseLinkReturn, stripLinkReturn, loginErrorText } from '../chat/homeAdmin.js';
+import { parsePaymentsReturn, stripPaymentsReturn } from '../chat/payments.js';
 import { SetupWizard } from '../chat/Setup.jsx';
 import { MenuHost } from '../chat/Menu.jsx';
 import { openMenu, copy } from '../chat/menus.js';
@@ -442,7 +443,7 @@ function ChatPage() {
   const staff = useChat(s => s.staff); // Nookara staff: Moderator chat button in DMs
   const { openMini, ui: profileUI } = useProfiles();
 
-  const signin = useRef(null), homeSignin = useRef(null), linkBack = useRef(null);
+  const signin = useRef(null), homeSignin = useRef(null), linkBack = useRef(null), payBack = useRef(null);
   useEffect(() => {
     document.title = 'Ember';
     document.documentElement.classList.add('vc-page');
@@ -451,6 +452,9 @@ function ChatPage() {
       // back from linking a login to the account after a full-page trip (?linked= / ?link_error=, the pop-up was blocked)
       linkBack.current = parseLinkReturn(location.search);
       if (linkBack.current) history.replaceState(history.state, '', stripLinkReturn(location.href));
+      // back from Nookara's page for linking a Nookara account for payments (?payments_linked=1 | 0)
+      payBack.current = parsePaymentsReturn(location.search);
+      if (payBack.current) history.replaceState(history.state, '', stripPaymentsReturn(location.href));
       if (web) { probeDefault(); homeSignin.current = await finishHomeLogin(); } // (does nookara.cc speak v2 yet? | back from a homeserver's login page, #/auth/callback)
       signin.current = await finishSignIn(); // back from Nookara's approve-this-app screen (#/signin?code=...)
       if (!getToken()) {
@@ -483,6 +487,11 @@ function ChatPage() {
     if (h) { if (h.ok) toast(`Signed in as ${h.session.account.handle}.`, true); else toast(homeLoginText(h.error, '')); if (h.back?.add) setDialog({ kind: 'add-instance', url: h.back.add }); else if (h.back?.create) setDialog({ kind: 'create-server', tab: 'create' }); }
     const l = linkBack.current;
     if (l) { if (l.linked) toast('That sign-in is linked to your account.', true); else toast(loginErrorText(l.error)); setDialog({ kind: 'chat-settings', page: 'homeaccount' }); }
+    const pb = payBack.current;
+    if (pb) {
+      toast(pb.linked ? 'Your Nookara account is linked for payments.' : 'Linking was cancelled. Nothing was shared.', pb.linked);
+      if (pb.back?.sid) setDialog({ kind: 'settings', sid: pb.back.sid, tab: pb.back.tab || 'plan', keepUntil: Date.now() + 5000 }); else setDialog({ kind: 'chat-settings', page: 'homeaccount' });
+    }
     try { if (sessionStorage.getItem('ember_notice')) { sessionStorage.removeItem('ember_notice'); toast('Your Nookara sign-in ended - sign in again to get your messages back.'); } } catch { /* fine */ }
   }, [ready]);
 
@@ -504,7 +513,7 @@ function ChatPage() {
   useEffect(() => { setDiscover(false); }, [view]); // any navigation (even to where you already are) leaves Discovery
   // a server's (or channel's) settings belong to the server that was open: going somewhere else closes them
   const viewWhere = view.dm || view.sid || view.kind;
-  useEffect(() => { setDialog(d => (d && (d.kind === 'settings' || d.kind === 'channel') ? null : d)); }, [viewWhere]);
+  useEffect(() => { setDialog(d => (d && (d.kind === 'settings' || d.kind === 'channel') && !(d.keepUntil > Date.now()) ? null : d)); }, [viewWhere]); // (keepUntil: opened on start-up, before the first view settles)
   useEffect(() => { setReplyTo(null); setDrawer(!!history.state?.vcDrawer && innerWidth <= 760); }, [view.kind, view.cid, view.username, view.room]);
   // invite links (from messages, the address bar...) open the invite pop-up here
   useEffect(() => {

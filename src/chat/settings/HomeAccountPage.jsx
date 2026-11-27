@@ -18,6 +18,7 @@ import { loginErrorText, KIND_LABEL } from '../homeAdmin.js';
 import './accounts-pages.css';
 import './homeservers.css';
 import { openOutside } from './openOutside.js';
+import { PaymentsCard } from './PaymentsCard.jsx';
 
 const when = t => { const d = new Date(typeof t === 'number' && t < 1e12 ? t * 1000 : t); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); };
 
@@ -130,6 +131,7 @@ export default function HomeAccountPage() {
         })}
         {logins && logins.length > 0 && <small className="vc-hint hsx-foot">Linking opens {s.domain}'s own page and the provider's. Ember never sees those passwords.</small>}
       </SCard>
+      <PaymentsCard key={origin} origin={origin} domain={s.domain} handle={a.handle} />
       {pw && <PasswordDialog origin={origin} domain={s.domain} handle={a.handle} hint={a.username} has={!!logins?.find(x => x.kind === 'password')?.linked} remove={pw === 'remove'} onDone={l => { if (l) setLogins(l); }} onClose={() => setPw(null)} />}
     </SettingsPage>
   );

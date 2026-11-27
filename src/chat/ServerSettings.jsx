@@ -9,9 +9,7 @@ import { cropToFile, keepsAnimation, inMemory } from './cropImage.js';
 import {
   Search, LayoutGrid, Shield, Smile, Volume2, Upload, Users, DoorOpen, Bot, ArrowLeftRight, Gamepad2,
   Globe, TriangleAlert, Trash2, RefreshCw, Check, Ban, UserMinus, Compass, Download, Copy,
-  MessageSquare, Flag, ShieldAlert, ScrollText, ChartLine, Sticker,
-
-
+  MessageSquare, Flag, ShieldAlert, ScrollText, ChartLine, Sticker, Gem,
 } from 'lucide-react';
 import { apiFetch, uploadFetch } from '../api.js';
 import { useChat, go, ask, toast, errorText, refreshServer, loadServersOf, loadMembers, useFace, nookaraDomain } from './store.js';
@@ -39,6 +37,7 @@ import { SettingsShell, Card } from './SettingsShell.jsx';
 import { UnsavedBar } from './unsaved.jsx';
 import { useUnsaved } from './useUnsaved.js';
 import './SettingsDialog.css';
+import { TierPage } from './TierPage.jsx';
 import QRCode from 'qrcode';
 import { linkFor, inviteLinkFor } from './store.js';
 import { OperatorTermsNotice } from './OperatorTerms.jsx';
@@ -75,7 +74,7 @@ function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, 
       canServer && ['bridge', 'Bridge', ArrowLeftRight, ['Discord', 'Fluxer', 'Matrix', 'Linked servers']],
       canServer && ['game', 'Game servers', Gamepad2, ['Minecraft', 'CloudLink', 'Audit log']],
     ]],
-    ['Owner', [danger]],
+    ['Owner', [onInst && owner && ['plan', 'Plan', Gem, ['Tier', 'Buy', 'Credits', 'Payments', 'Upgrade', 'Nookara credits']], danger]],
   ].map(([g, items]) => [g, items.filter(Boolean)]).filter(([, items]) => items.length);
 }
 
@@ -115,6 +114,7 @@ export function ServerSettings({ sid, onClose, tab: startTab }) {
         {page === 'bots' && <BotsManager inst={origin} sid={sid} />}
         {page === 'bridge' && <BridgePage sid={sid} />}
         {page === 'game' && <GameServersSettings sid={sid} />}
+        {page === 'plan' && <TierPage sid={sid} origin={origin} />}
         {page === 'danger' && <DangerZone sid={sid} origin={origin} onClose={onClose} />}
       </PlanCtx.Provider>}
     </SettingsShell>
