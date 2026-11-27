@@ -4,7 +4,8 @@
 // the profile editor.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronLeft, ChevronRight, Search, UserRound, CircleUser, Shield, Bell, MessageSquare, Monitor, Sparkles, SlidersHorizontal, Bot, Info, Bug, LifeBuoy, ExternalLink, Users, ShieldOff, Palette, Type, Mic, LayoutTemplate, SmilePlus, AtSign, Building2 } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Search, UserRound, CircleUser, Shield, Bell, MessageSquare, Monitor, Sparkles, SlidersHorizontal, Bot, Info, Bug, LifeBuoy, ExternalLink, Users, ShieldOff, Palette, Type, Mic, LayoutTemplate, SmilePlus, AtSign, Building2, Lock } from 'lucide-react';
+import { E2eeSettings } from './E2ee.jsx';
 import { PersonalExpressionsPage } from './PersonalPages.jsx';
 import { AccountsPage } from './settings/AccountsPages.jsx';
 import VoicePage from './settings/VoicePage.jsx';
@@ -44,6 +45,7 @@ const PAGES = [
   ]],
   ['Privacy & safety', [
     ['Privacy', 'Privacy', Shield, rowText('Privacy')],
+    ['e2ee', 'Encrypted DMs', Lock, ['Encrypted DMs', 'End-to-end encryption', 'E2EE', 'Recovery code', 'New recovery code', 'Approve a device', 'Passphrase', 'Change passphrase', 'Linked apps', 'Keys'], 'home'],
     ['blocking', 'Blocking', ShieldOff, ['Blocked', 'Block', 'Unblock', 'Blocked users', 'Hide messages']],
     ['Notifications', 'Notifications', Bell, [...rowText('Notifications'), 'Push notifications', 'Windows notifications', 'macOS notifications', 'Browser notifications', 'Server notifications', 'Mute server']],
   ]],
@@ -120,7 +122,7 @@ export default function SettingsDialog({ page: startPage, target, hs, onClose })
   // signed out of Nookara (web Ember): only the pages that don't need an account
   const [design, setDesignState] = useState(() => effectiveDesign());
   useEffect(() => subscribeDesign(() => setDesignState(effectiveDesign())), []);
-  const groups = useMemo(() => PAGES.map(([g, items]) => [g, items.filter(it => (it[4] !== 'desktop' || desktop) && (it[4] !== 'modern' || design === 'rounded') && (it[4] !== 'home' || home) && (it[4] !== 'hs' || anyHome) && (signedIn || ['Account', 'About', 'theme', 'text', 'voice', 'accounts', 'homeaccount', 'homeservers'].includes(it[0]) || (it[0] === 'profile' && serverAccount) || (it[0] === 'Advanced' && canOpenLinks())))
+  const groups = useMemo(() => PAGES.map(([g, items]) => [g, items.filter(it => (it[4] !== 'desktop' || desktop) && (it[4] !== 'modern' || design === 'rounded') && (it[4] !== 'home' || home) && (it[4] !== 'hs' || anyHome) && (signedIn || ['Account', 'About', 'theme', 'text', 'voice', 'accounts', 'homeaccount', 'homeservers', 'e2ee'].includes(it[0]) || (it[0] === 'profile' && serverAccount) || (it[0] === 'Advanced' && canOpenLinks())))
     .map(it => (it[4] === 'desktop' && mac ? [it[0], desktopAppTitle(true), it[2], MAC_APP_WORDS, it[4]] : it))]).filter(([, items]) => items.length), [desktop, signedIn, mac, design, serverAccount, home, anyHome]);
   const shown = useMemo(() => groups.map(([g, items]) => [g, items.filter(([, label, , words]) => matches(q, label, ...words))]).filter(([, items]) => items.length), [groups, q]);
   const help = useMemo(() => HELP.filter(([label, , , words]) => matches(q, label, ...words)), [q]);
@@ -252,6 +254,7 @@ export default function SettingsDialog({ page: startPage, target, hs, onClose })
                     : page === 'theme' ? <ThemePage />
                       : page === 'text' ? <TextLayoutPage />
                         : page === 'blocking' ? <BlockingPage />
+                        : page === 'e2ee' ? <div className="bf-sd-extra"><E2eeSettings /></div>
                           : <>
                             <ChatSettingsTab embedded bare page={page} query={matches(q, current?.[1] || '') ? '' : q} web={isWebEmber()} onLogout={signedIn ? logout : undefined} onLogin={signedIn ? undefined : () => startSignIn()} />
                             {page === 'Notifications' && signedIn && <div className="bf-sd-extra"><NotifLevels /></div>}
