@@ -571,3 +571,16 @@ export async function flushOutbox(onlyFor = null) {
     }
   } finally { flushing = false; }
 }
+
+// ── wrapping again (PROTOCOL §4d.3): a member of a DM got a new key; the messages this device can open get a wrap for it ──
+// the member's keys now: [{ kid, enc_pub }] (their account key and the clients they linked)
+export async function memberKeys(id) {
+  const b = (await docBundle(id, { fresh: true }).catch(() => null))?.b;
+  return b ? [{ kid: b.kid, enc_pub: b.enc_pub }, ...((b.clients?.list || []).filter(c => !c.revoked_at).map(c => ({ kid: c.kid, enc_pub: c.enc_pub })))] : [];
+}
+// items: [{ id, key }] (key: a message's K as openDmMessage gave it) -> { <id>: wrap } for that key
+export async function wrapsFor(items, { kid, enc_pub }) {
+  const out = {};
+  for (const it of items) if (it?.key) out[it.id] = await N.seal(N.unb64(it.key), enc_pub, kid);
+  return out;
+}

@@ -1467,6 +1467,28 @@ function openSdm(msg, dm = sdmOf(msg?.channel)) {
   if (!dm || !msg?.enc) return Promise.resolve(msg);
   return E2EE.openDmMessage(msg, dm).then(sdmMsg).catch(() => ({ ...msg, body: '', sealed: { v: 2, state: 'failed' } }));
 }
+// a member of a homeserver DM got a new key: wrap what this device can open again for it, so they can read it too (PROTOCOL
+// §4d.3). Only messages this device has opened can be wrapped; the host says which ones still lack a wrap.
+export async function rewrapDm(id, member) {
+  const dm = state.social.dms.find(x => x.id === id), host = dmHostOf(dm);
+  if (!dm || !host || !(await ensureHost(host))) { toast("Couldn't reach that conversation's homeserver."); return 0; }
+  const at = `/api/v2/social/dms/${encodeURIComponent(id)}/rewrap`;
+  const open = new Map();
+  for (const [k, b] of Object.entries(state.msgs)) if (k.startsWith('c:') && sdmOf(k.slice(2))?.id === id) for (const m of b?.list || []) if (m.sealed?.key) open.set(bare(m.id), { id: bare(m.id), key: m.sealed.key });
+  let added = 0;
+  try {
+    for (const k of await E2EE.memberKeys(member)) {
+      const need = await apiFetch(`${at}?member=${encodeURIComponent(member)}&kid=${encodeURIComponent(k.kid)}`, { inst: host });
+      const items = (need?.messages || []).map(x => open.get(bare(String(x)))).filter(Boolean).slice(0, 500);
+      if (!items.length) continue;
+      const wraps = await E2EE.wrapsFor(items, k);
+      const r = await apiFetch(at, { method: 'POST', inst: host, body: JSON.stringify({ member, kid: k.kid, wraps }) });
+      added += Number(r?.added) || 0;
+    }
+    toast(added ? `They can read ${added} earlier message${added === 1 ? '' : 's'} again.` : 'Nothing this device has open is missing for them. Scroll up to load older messages and try again.', !!added);
+  } catch (e) { toast(socialErrorText(e)); }
+  return added;
+}
 // social_dm_rewrapped: messages of a DM were wrapped again for my key - what this device has of it is opened again
 export function dmRewrapped(id) {
   const dm = state.social.dms.find(x => x.id === id);

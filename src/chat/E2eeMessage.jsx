@@ -1,7 +1,7 @@
 // Encrypted DMs where they meet the message list and the composer. Separate from Messages.jsx so E2ee.jsx's dialogs stay out of its imports.
 import { useEffect, useRef, useState } from 'react';
 import { Lock, LockOpen, AlertTriangle, Clock, File as FileIcon, Download, Link2, Film, Music, Image as ImageIcon, Play, RefreshCw } from 'lucide-react';
-import { useChat, openE2eeGate, dismissKeyChange, dropFailed, useBotPeer, waitingNames } from './store.js';
+import { useChat, openE2eeGate, dismissKeyChange, dropFailed, useBotPeer, waitingNames, rewrapDm } from './store.js';
 import { nameList, memberName } from './e2ee/homedm.js';
 import { LinkEmbeds } from './LinkEmbeds.jsx';
 import { openSafety, openSafetyId, E2eeLockedPanel } from './E2ee.jsx';
@@ -162,7 +162,7 @@ function SdmComposerNotes({ view }) {
       )}
       {keyChanged.map(m => (
         <div key={m.id} className="e2-keychange"><AlertTriangle size={14} />
-          <span>{memberName(dm, m.id)}'s encryption key changed. They may have started over or lost their old one. <button type="button" onClick={() => openSafetyId(m.id, memberName(dm, m.id))}>Compare keys</button> <button type="button" onClick={() => dismissKeyChange(m.id)}>Dismiss</button></span>
+          <span>{memberName(dm, m.id)}'s encryption key changed. They may have started over or lost their old one. <button type="button" onClick={() => openSafetyId(m.id, memberName(dm, m.id))}>Compare keys</button> <button type="button" title="Wrap the messages this device can open for their new key" onClick={() => rewrapDm(dm.id, m.id)}>Let them read earlier messages</button> <button type="button" onClick={() => dismissKeyChange(m.id)}>Dismiss</button></span>
         </div>
       ))}
     </>
