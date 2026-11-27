@@ -805,7 +805,6 @@ export function VoiceQuotaNote() {
   try { seen = !!localStorage.getItem(quotaKey(origin, level)); } catch { /* fine */ }
   if (seen) return null;
   const dismiss = () => { try { localStorage.setItem(quotaKey(origin, level), '1'); } catch { /* fine */ } redraw(n => n + 1); };
-  const hosted = !!inst.managed;
   const open = tab => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'settings', sid: view.sid, tab } }));
   return (
     <div className={`vc-quota-note ${level}`} role="status">
@@ -813,9 +812,7 @@ export function VoiceQuotaNote() {
       <b><Volume2 size={14} /> {level === 'full' ? 'Voice minutes used up' : 'Voice minutes running low'}</b>
       <span>{Math.min(used, cap).toLocaleString()} of {cap.toLocaleString()} minutes used this month on {inst.name}.{level === 'full' ? ' Voice channels stop working until next month.' : ''}</span>
       <div className="vc-quota-bar"><i style={{ width: `${Math.min(100, (used / cap) * 100)}%` }} /></div>
-      {hosted
-        ? <button type="button" className="btn btn-primary btn-sm" onClick={() => open('hosting')}>See plans</button>
-        : <button type="button" className="btn btn-surface btn-sm" onClick={() => open('voice')}>Use your own voice keys</button>}
+      <button type="button" className="btn btn-surface btn-sm" onClick={() => open('voice')}>Use your own voice keys</button>
     </div>
   );
 }

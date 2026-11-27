@@ -107,7 +107,7 @@ function Directory({ close }) {
     </>
   );
 }
-// (Create a server: Hosting.jsx - Nookara hosts it; Add a server by its address is Instances.jsx)
+// (Create a server: CreateOnHomeserver.jsx; joining one by its address that has to ask for a login is Instances.jsx)
 // creating a server hosted inside Nookara itself is paused (server-creation-policy.json): legacy entry points show why
 export function ServerCreationNotice({ onClose }) {
   return <Dialog title={serverCreationPolicy.title} onClose={onClose}>

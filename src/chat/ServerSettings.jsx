@@ -7,7 +7,7 @@ import ImageCropper from '../components/ImageCropper.jsx';
 import { cropToFile, keepsAnimation, inMemory } from './cropImage.js';
 import {
   Search, LayoutGrid, Shield, Smile, Volume2, Upload, Users, DoorOpen, Bot, ArrowLeftRight, Gamepad2,
-  KeyRound, Mic, Globe, UserCog, TriangleAlert, Trash2, RefreshCw, Check, Ban, UserMinus, Compass, Download, Rocket, Archive, Info, Copy, CircleArrowUp,
+  KeyRound, Mic, Globe, UserCog, TriangleAlert, Trash2, RefreshCw, Check, Ban, UserMinus, Compass, Download, Archive, Info, Copy, CircleArrowUp,
   MessageSquare, Flag, ShieldAlert, ScrollText, ChartLine, Sticker,
 
 
@@ -31,7 +31,6 @@ import { InsightsPage } from './Insights.jsx';
 import { StorageCards, JoiningPage, MessageRulesPage, ReportsPage, AutoModPage, AuditLogPage, UploadRulesPage } from './ServerRules.jsx';
 import { InstanceTab, BridgeBots, restartInstance } from './Instances.jsx';
 import { UpdateServerRow } from './UpdateServer.jsx';
-import { HostingPage, useHostedFor, loadHosted, deleteHostedServer } from './Hosting.jsx';
 import { BackupsPage } from './Backups.jsx';
 import { ServerInfoPage } from './ServerInfo.jsx';
 import { PlanCtx, buildPlanCtx, PlanUsage, PlanGate, usePlan } from './PlanGate.jsx';
@@ -46,7 +45,7 @@ import { pictureAccept } from './accept.js';
 import { INST_REGISTER_NOOKARA, isNookara, nookaraInfo, nookaraRegistration } from '../compat.js';
 
 // [id, label, icon, words the search box answers to]
-function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, owner, legacyDefault, hosted }) {
+function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, owner, legacyDefault }) {
   const uploads = ['uploads', 'Uploads', Upload, ['Files', 'Biggest file', 'MB', 'File types', 'Expire', 'Storage', 'Compression', 'Per minute']];
   const danger = (owner && !legacyDefault) || instAdmin ? ['danger', 'Danger zone', TriangleAlert, ['Delete server', 'Export', 'Restart', 'Update', 'Backup', 'Advanced', 'Unmarked aliases']] : null;
   return [
@@ -75,7 +74,6 @@ function pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, 
       canServer && ['game', 'Game servers', Gamepad2, ['Minecraft', 'CloudLink', 'Audit log']],
     ]],
     ['Instance', instAdmin ? [
-      hosted && ['hosting', 'Hosting', Rocket, ['Plan', 'Starter', 'Plus', 'Billing', 'Credits', 'Upgrade', 'Voice minutes', 'Delete server']],
       ['accounts', 'Accounts', KeyRound, ['Accounts mode', 'Nookara accounts', 'Own accounts', 'Local accounts', 'Registration', 'Public address']],
       uploads,
       ['backups', 'Backups', Archive, ['Backup', 'Restore', 'Download', 'Save to Nookara', 'Export']],
@@ -100,8 +98,7 @@ export function ServerSettings({ sid, onClose, tab: startTab, autoUpdate = false
   const canMod = has(srv?.perms, P.KICK) || has(srv?.perms, P.BAN);
   const canReports = canMod || canServer || has(srv?.perms, P.MANAGE_MESSAGES);
   const owner = srv?.role === 'owner';
-  const hosted = !!inst?.managed && !!inst?.isOwner; // hosted by Nookara: its owner manages the plan here
-  const groups = useMemo(() => pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, owner, legacyDefault: !!srv?.is_default, hosted }), [onInst, canServer, canRoles, canMod, canReports, instAdmin, owner, srv?.is_default, hosted]);
+  const groups = useMemo(() => pagesFor({ onInst, canServer, canRoles, canMod, canReports, instAdmin, owner, legacyDefault: !!srv?.is_default }), [onInst, canServer, canRoles, canMod, canReports, instAdmin, owner, srv?.is_default]);
 
   return (
     <SettingsShell label="Server settings" crumb={srv?.name} groups={groups} startTab={startTab} onClose={onClose} gone={!d}
@@ -127,7 +124,6 @@ export function ServerSettings({ sid, onClose, tab: startTab, autoUpdate = false
         {page === 'bridge' && <BridgePage sid={sid} origin={origin} instAdmin={instAdmin} canServer={canServer} />}
         {page === 'game' && <GameServersSettings sid={sid} />}
         {['accounts', 'voice', 'nookara', 'admins'].includes(page) && <InstanceTab key={page} origin={origin} tab={page} onDirty={onDirty} />}
-        {page === 'hosting' && <HostingPage origin={origin} />}
         {page === 'serverinfo' && <ServerInfoPage origin={origin} autoUpdate={autoUpdate && startTab === 'serverinfo'} />}
         {page === 'backups' && <BackupsPage origin={origin} />}
         {page === 'danger' && <DangerZone sid={sid} origin={origin} instAdmin={instAdmin} onClose={onClose} />}
@@ -342,13 +338,9 @@ function MembersPage({ sid }) {
 function DangerZone({ sid, origin, instAdmin, onClose }) {
   const srv = useChat(s => s.detail[sid]?.server);
   const instName = useChat(s => s.instances.find(i => i.origin === origin)?.name);
-  const hostedRow = useHostedFor(origin); // hosted by Nookara and you own the hosting: deleting goes through Nookara
-  useEffect(() => { if (origin) loadHosted(); }, [origin]);
   if (!srv) return null;
   const owner = srv.role === 'owner' && !srv.is_default;
   const del = async () => {
-    // a hosted server: delete the whole server through Nookara, or it keeps running (empty) and holds the plan slot
-    if (hostedRow) { if (await deleteHostedServer(hostedRow)) onClose(); return; }
     if (!(await ask({ title: `Delete ${srv.name}?`, text: 'This deletes the server, its channels and every message in it, for everyone. It cannot be undone.', match: srv.name, confirm: 'Delete server', danger: true }))) return;
     try { await apiFetch(`/chat/servers/${sid}`, { method: 'DELETE' }); onClose(); go({ kind: 'home' }); loadServersOf(sid); } catch (e) { toast(errorText(e.message)); }
   };
@@ -370,9 +362,9 @@ function DangerZone({ sid, origin, instAdmin, onClose }) {
           <UpdateServerRow origin={origin} name={instName} />
         </Card>
       )}
-      {(owner || hostedRow) && (
+      {owner && (
         <Card title="Delete" icon={Trash2} className="bf-ss-danger">
-          <div className="cs-row"><div className="cs-text"><b>Delete this server</b><span>{hostedRow ? 'Nookara saves a backup to your account, then shuts the server down and deletes it, for everyone. Its plan slot is free right away.' : "Its channels and every message go, for everyone. This can't be undone."}</span></div>
+          <div className="cs-row"><div className="cs-text"><b>Delete this server</b><span>Its channels and every message go, for everyone. This can't be undone.</span></div>
             <button type="button" className="btn btn-danger" onClick={del}><Trash2 size={14} /> Delete server</button></div>
         </Card>
       )}

@@ -45,7 +45,6 @@ import SettingsDialog from '../chat/SettingsDialog.jsx';
 import { useDesktopMac } from '../components/tabs/ChatSettingsTab.jsx';
 import { ServerSettings } from '../chat/ServerSettings.jsx';
 import { ChannelSettings } from '../chat/ChannelSettings.jsx';
-import { CreateServer, HostingNote } from '../chat/Hosting.jsx';
 import { ExportButton } from '../chat/Community.jsx';
 
 import { isInst, instOf } from '../chat/ids.js';
@@ -618,7 +617,6 @@ function ChatPage() {
           </div>
           <VoicePanel />
           <VoiceQuotaNote />
-          <HostingNote />
           <OutdatedNote />
 
           <UserPanel onSettings={() => setDialog({ kind: 'chat-settings' })} onEditProfile={() => setDialog({ kind: 'chat-settings', page: 'profile' })} />
@@ -724,11 +722,10 @@ function ChatPage() {
       {dialog?.kind === 'app-download' && <AppDownload onClose={() => setDialog(null)} />}
       {dialog?.kind === 'test-bot' && <TestBotDialog key={dialog.id} id={dialog.id} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'import' && <ImportServer onClose={() => setDialog(null)} />}
-      {dialog?.kind === 'add-instance' && <AddInstance url={dialog.url} invite={dialog.invite} server={dialog.server} onClose={() => setDialog(null)} onSetup={origin => setDialog({ kind: 'setup', origin })} onCreate={dialog.fromCreate ? () => setDialog({ kind: 'create-server', tab: 'create' }) : undefined} />}
+      {dialog?.kind === 'add-instance' && <AddInstance url={dialog.url} invite={dialog.invite} server={dialog.server} onClose={() => setDialog(null)} onSetup={origin => setDialog({ kind: 'setup', origin })} />}
 
       {dialog?.kind === 'setup' && <SetupWizard origin={dialog.origin} name={dialog.name} onClose={() => setDialog(null)} />}
-      {dialog?.kind === 'create-server' && !dialog.own && <CreateOnHomeserver start={dialog.tab || 'join'} onClose={() => setDialog(null)} onOther={() => setDialog({ kind: 'create-server', own: true })} />}
-      {dialog?.kind === 'create-server' && dialog.own && <CreateServer onClose={() => setDialog(null)} onSetup={(origin, name) => setDialog({ kind: 'setup', origin, name })} onAddByAddress={() => setDialog({ kind: 'add-instance', fromCreate: true })} />}
+      {dialog?.kind === 'create-server' && <CreateOnHomeserver start={dialog.tab || 'join'} onClose={() => setDialog(null)} />}
 
       {dialog?.kind === 'invite' && <Invite sid={dialog.sid || view.sid} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'invite-join' && <JoinInvite code={dialog.code} inst={dialog.inst} onClose={() => setDialog(null)} />}

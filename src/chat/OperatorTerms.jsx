@@ -1,5 +1,5 @@
 // Ember Server Operator Terms (https://nookara.cc/operator-terms, v1.0): whoever sets up or hosts an Ember server accepts them.
-// - the required checkbox in "Create a server" (Hosting.jsx) and in the first-run setup of a self-hosted server (Setup.jsx)
+// - the required checkbox in the first-run setup of a homeserver (Setup.jsx)
 // - a one-time notice on Overview (server settings) of a server that was set up before the terms existed (it never blocks chat)
 import { useEffect, useState } from 'react';
 import { ScrollText, TriangleAlert } from 'lucide-react';

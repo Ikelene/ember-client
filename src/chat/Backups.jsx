@@ -8,13 +8,13 @@ import { apiFetch, uploadFetch, downloadFetch } from '../api.js';
 import { useChat, toast, errorText, ask, go } from './store.js';
 import { hasNookara } from './session.js';
 import { normOrigin } from './ids.js';
-import { HOSTING_TEXT } from './Hosting.jsx';
 import { usePlan, PlanGate, PlanNotice, PlanUsage } from './PlanGate.jsx';
 import { EMBER_API } from '../compat.js';
 
 const when = t => new Date(t).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 const sizeOf = b => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round((b || 0) / 1024))} KB`);
-const fail = e => toast(HOSTING_TEXT[e?.message] || errorText(e?.message));
+const BACKUP_TEXT = { backup_failed: "The backup didn't work - try again in a bit.", backup_not_found: 'That backup is gone.', not_owner: "You aren't the owner.", insufficient_scope: 'Ember needs a new permission for that. Sign out of Ember and sign in again.' };
+const fail = e => toast(BACKUP_TEXT[e?.message] || errorText(e?.message));
 const REASON = { archived: 'Saved when its time ran out', deleted: 'Saved when it was deleted', manual: 'Saved by Nookara hosting', uploaded: 'Saved from the server', 'before restore': 'Before a restore' };
 function save(blob, name) {
   const url = URL.createObjectURL(blob);
@@ -112,7 +112,7 @@ export function BackupsPage({ origin }) {
         <div className="card-body">
           {!signedIn ? <p className="vc-hint">Sign in with Nookara to keep backups in your account, safe even if this server goes away.</p> : mine === null ? <div className="vc-loading"><i /><i /><i /></div> : (
             <>
-              <small className="vc-hint">Up to 10 backups, 500 MB each, kept for 180 days. Nookara hosting also saves one here when a hosted server is deleted or runs out of time.</small>
+              <small className="vc-hint">Up to 10 backups, 500 MB each, kept for 180 days.</small>
               {!here.length && !other.length && <p className="vc-hint">Nothing here yet - use Save to Nookara on a backup above.</p>}
               {here.length > 0 && <div className="vc-rows vc-gap-top">{here.map(nookaraRow)}</div>}
               {owner && other.length > 0 && (<><div className="vc-sec-t vc-gap-top"><Server size={13} className="vc-inline-ico" /> From other servers</div><div className="vc-rows">{other.map(nookaraRow)}</div></>)}
