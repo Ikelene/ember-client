@@ -729,14 +729,14 @@ function ChatPage() {
 
       {dialog?.kind === 'invite' && <Invite sid={dialog.sid || view.sid} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'invite-join' && <JoinInvite code={dialog.code} inst={dialog.inst} onClose={() => setDialog(null)} />}
-      {dialog?.kind === 'settings' && <ServerSettings key={`${dialog.sid || view.sid}-${dialog.tab || ''}`} sid={dialog.sid || view.sid} tab={dialog.tab} autoUpdate={!!dialog.autoUpdate} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'settings' && <ServerSettings key={`${dialog.sid || view.sid}-${dialog.tab || ''}`} sid={dialog.sid || view.sid} tab={dialog.tab} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'channel' && (dialog.channel?.cid
         ? <ChannelSettings key={dialog.channel.cid} sid={dialog.sid || view.sid} channel={dialog.channel} tab={dialog.tab} onClose={() => setDialog(null)} />
         : <ChannelEditor sid={dialog.sid || view.sid} channel={dialog.channel} onClose={() => setDialog(null)} />)}
       {dialog?.kind === 'dm' && <NewDM onClose={() => setDialog(null)} />}
       {dialog?.kind === 'group' && <NewGroup onClose={() => setDialog(null)} />}
       {dialog?.kind === 'quick' && <QuickSwitcher onClose={() => setDialog(null)} />}
-      {dialog?.kind === 'chat-settings' && <SettingsDialog key={`${dialog.page || 'settings'}${dialog.target || ''}`} page={dialog.page} target={dialog.target} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'chat-settings' && <SettingsDialog key={`${dialog.page || 'settings'}${dialog.target || ''}${dialog.hs?.origin || ''}${dialog.hs?.tab || ''}`} page={dialog.page} target={dialog.target} hs={dialog.hs} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'forward' && <ForwardDialog message={dialog.message} from={dialog.from} onClose={() => setDialog(null)} />}
       <AskHost />
       {(signedIn || homeMode) && <E2eeGate />}

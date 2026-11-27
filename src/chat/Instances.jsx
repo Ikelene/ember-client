@@ -15,6 +15,7 @@ import { communityOf, parseAddress } from './addresses.js';
 import { K } from './ids.js';
 import { startSignIn, hasNookara } from './session.js';
 import { useUnsaved, UnsavedBar } from './unsaved.jsx';
+import { hsCall } from './homeApi.js';
 import { PlanGate, planOf } from './PlanGate.jsx';
 import { joinLabel, joinHint } from './Community.jsx';
 import { EMBER_API, INST_REGISTER_NOOKARA, NOOKARA_WIRE, isNookara, accountsMode, nookaraInfo, nookaraUrl, nookaraRegistration, NOOKARA_URL_FIELD, SERVER_ENV } from '../compat.js';
@@ -213,7 +214,8 @@ export function InstanceTab({ origin, tab, onDirty }) {
   const fv = f.voice || {};
   const accChanged = !!cfg && !cfg.managed && ((!cfg.accounts_mode_env && accountsMode(f.accounts_mode) !== accountsMode(cfg.accounts_mode)) || (f.registration || 'closed') !== (cfg.registration || 'closed') || (f.public_url || '') !== (cfg.public_url || '') || (nookaraUrl(f) || '') !== (nookaraUrl(cfg) || ''));
   const voiceChanged = !!cfg && ((fv.cf_app_id || '') !== (cfg.voice?.cf_app_id || '') || (fv.cf_turn_key_id || '') !== (cfg.voice?.cf_turn_key_id || '') || !!secrets.cf_app_secret || !!secrets.cf_turn_token);
-  const changed = tab === 'accounts' ? accChanged : tab === 'voice' ? voiceChanged : false;
+  const addrChanged = !!cfg && !cfg.managed && ((f.public_url || '') !== (cfg.public_url || '') || (nookaraUrl(f) || '') !== (nookaraUrl(cfg) || ''));
+  const changed = tab === 'accounts' ? accChanged : tab === 'voice' ? voiceChanged : tab === 'addresses' ? addrChanged : false;
   const [bar, flashSaved] = useUnsaved(changed, onDirty);
   const reset = () => { setF(cfg); setSecrets({ cf_app_secret: '', cf_turn_token: '' }); };
   useEffect(() => { if (tab === 'admins' && !admins) call('/instance/admins').then(setAdmins).catch(e => toast(errorText(e.message))); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -242,7 +244,7 @@ export function InstanceTab({ origin, tab, onDirty }) {
     setBusy('');
   }
   return (
-    <div className={`vc-settings${tab === 'accounts' || tab === 'voice' ? ' bf-ss-page' : ''}`}>
+    <div className={`vc-settings${tab === 'accounts' || tab === 'voice' || tab === 'addresses' ? ' bf-ss-page' : ''}`}>
       {tab === 'accounts' && managed && (
         <div className="card bf-ss-card"><div className="card-header"><span className="card-title"><KeyRound size={15} /> Who can log in</span></div><div className="card-body">
           <p className="vc-note"><ShieldCheck size={14} /> Hosted by Nookara: people log in with their Nookara account, at <b>{cfg.public_url}</b>. Servers that Nookara hosts can't switch to their own accounts or change their address.</p>
@@ -283,11 +285,14 @@ export function InstanceTab({ origin, tab, onDirty }) {
                 <select className="form-input" value={f.registration || 'closed'} onChange={e => set('registration', e.target.value)}><option value="open">Anyone can make an account</option><option value="closed">Closed - no new accounts</option></select></label>
             )}
           </div></div>
-          <div className="card bf-ss-card"><div className="card-header"><span className="card-title"><Server size={15} /> Addresses</span></div><div className="card-body">
-            <label className="vc-field"><span>Public address</span><input className="form-input" value={f.public_url || ''} onChange={e => set('public_url', e.target.value)} /><small className="vc-hint">The address people reach this server at. Nookara sign-ins are made out to it, so change it with care.</small></label>
-            <label className="vc-field"><span>Nookara address</span><input className="form-input" value={nookaraUrl(f) || ''} onChange={e => set(NOOKARA_URL_FIELD, e.target.value)} /><small className="vc-hint">Which Nookara signs people in, and gives this server its services (both accounts modes).</small></label>
-          </div></div>
+          <AddressesCard f={f} set={set} />
           <UnsavedBar changed={changed} bar={bar} busy={busy === 'save'} disabled={needLocalAdmin} onReset={reset} onSave={() => save({ ...(cfg.accounts_mode_env ? {} : { accounts_mode: f.accounts_mode }), registration: f.registration, public_url: f.public_url, [NOOKARA_URL_FIELD]: nookaraUrl(f) })} />
+        </>
+      )}
+      {tab === 'addresses' && !managed && (
+        <>
+          <AddressesCard f={f} set={set} />
+          <UnsavedBar changed={changed} bar={bar} busy={busy === 'save'} onReset={reset} onSave={() => save({ public_url: f.public_url, [NOOKARA_URL_FIELD]: nookaraUrl(f) })} />
         </>
       )}
       {tab === 'voice' && managed && !managed.limits?.custom_voice_keys && (
@@ -330,6 +335,13 @@ export function InstanceTab({ origin, tab, onDirty }) {
     </div>
   );
 }
+// the homeserver's public address and the Nookara it uses (both accounts modes)
+const AddressesCard = ({ f, set }) => (
+  <div className="card bf-ss-card"><div className="card-header"><span className="card-title"><Server size={15} /> Addresses</span></div><div className="card-body">
+    <label className="vc-field"><span>Public address</span><input className="form-input" value={f.public_url || ''} onChange={e => set('public_url', e.target.value)} /><small className="vc-hint">The address people reach this server at. Nookara sign-ins are made out to it, so change it with care.</small></label>
+    <label className="vc-field"><span>Nookara address</span><input className="form-input" value={nookaraUrl(f) || ''} onChange={e => set(NOOKARA_URL_FIELD, e.target.value)} /><small className="vc-hint">Which Nookara signs people in, and gives this server its services (both accounts modes).</small></label>
+  </div></div>
+);
 // ── Nookara & directory: the relays (registration, voice minutes), the public directory listing, payouts for paid roles ──
 const ago = t => (t ? new Date(t).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
 function NookaraTab({ origin, cfg, setCfg, save, busy }) {
@@ -397,7 +409,7 @@ function NookaraTab({ origin, cfg, setCfg, save, busy }) {
   );
 }
 
-// ── Bridge bots (top of Server settings > Bridge, for the instance's admins): the owner's own Discord / Fluxer bots
+// ── Bridge bots (Settings > Homeservers > Bridges, for the homeserver's admins): its own Discord / Fluxer / Matrix bots
 // (tokens are write-only; only the last 4 characters come back) ──
 const BRIDGE_NAME = { discord: 'Discord', fluxer: 'Fluxer', matrix: 'Matrix' };
 const BRIDGE_STATE = { off: 'Off', connecting: 'Connecting...', ready: 'Connected', waiting: 'Not connected - trying again soon', error: 'Stopped - check the token', stopped: 'Stopped' };
@@ -406,11 +418,11 @@ export function BridgeBots({ origin, onPlan, gated }) {
   const [tok, setTok] = useState({ discord: '', fluxer: '', matrix: '' });
   const [hs, setHs] = useState(''); // the Matrix homeserver address being typed
   const [busy, setBusy] = useState('');
-  const call = (o = {}) => apiFetch('/api/v1/bridge/settings', { inst: origin, ...o });
+  const call = (o = {}) => hsCall(origin, '/api/v1/bridge/settings', o);
   useEffect(() => { if (gated) return undefined; let live = true; const load = () => call().then(x => live && setD(x.bridges)).catch(e => { if (!live) return; const p = planOf(e); if (p) { live = false; onPlan?.({ ...p, what: 'bridges' }); } else toast(errorText(e.message)); }); load(); const t = setInterval(load, 5000); return () => { live = false; clearInterval(t); }; }, [gated]); // eslint-disable-line react-hooks/exhaustive-deps
   async function put(p, token, extra = {}) {
     setBusy(p);
-    try { const x = await call({ method: 'PATCH', body: JSON.stringify({ [p]: { token, ...extra } }) }); setD(x.bridges); setTok(t => ({ ...t, [p]: '' })); if (p === 'matrix') setHs(''); toast(token === null ? 'Removed.' : 'Saved.', true); }
+    try { const x = await call({ method: 'PATCH', body: { [p]: { token, ...extra } } }); setD(x.bridges); setTok(t => ({ ...t, [p]: '' })); if (p === 'matrix') setHs(''); toast(token === null ? 'Removed.' : 'Saved.', true); }
     catch (e) {
       toast(e.message === 'invalid_token' ? `That ${BRIDGE_NAME[p]} token didn't work.${p === 'matrix' ? ' Check that it belongs to an account on that homeserver.' : ''}`
         : e.message === 'invalid_homeserver' ? "That homeserver address can't be used. It has to be a public https address, like https://matrix.org."
@@ -423,7 +435,7 @@ export function BridgeBots({ origin, onPlan, gated }) {
   return (
     <>
       <h3 className="vc-game-sec-title">Bridge bots</h3>
-      <p className="vc-dialog-sub">Bridges carry messages between this server and Discord{dd.matrix ? ', Fluxer or Matrix' : ' or Fluxer'} with <b>your own bot</b>. Make a bot in the platform's developer portal (Discord: turn on the Message Content intent), paste its token here, then link a server below and pick channels in each channel's settings.</p>
+      <p className="vc-dialog-sub">Bridges carry messages between the servers on this homeserver and Discord{dd.matrix ? ', Fluxer or Matrix' : ' or Fluxer'} with <b>your own bot</b>. Make a bot in the platform's developer portal (Discord: turn on the Message Content intent) and paste its token here. Each server then links itself in its own Server settings &gt; Bridge, and picks channels in each channel's settings.</p>
       {['discord', 'fluxer'].map(p => {
         const b = dd[p] || {};
         return (

@@ -1,9 +1,11 @@
 // Settings > Homeservers: every homeserver this device is signed in to or connected to (your account there, whether it's
 // connected, Reconnect / Sign out / Forget, and signing in to another one). The ones you are an admin or the owner of also
-// open their settings in tabs: Accounts & sign-in (PROTOCOL §4a), Servers (who may create them, §5a), Admins, Federation
-// (§4b), and Reports (§4d: reported DM messages, HomeserverReports.jsx).
+// open their settings in tabs: Accounts & sign-in (PROTOCOL §4a), Servers (who may create them, §5a), Admins, Uploads (the
+// biggest file), Bridges (its Discord / Fluxer / Matrix bots), Federation (§4b), Reports (§4d: reported DM messages,
+// HomeserverReports.jsx), and while it is connected as an instance also Voice, Backups, Nookara and Server info (with
+// restart / update). Everything here is the whole homeserver's; one server's own settings are in its Server settings.
 import { useEffect, useRef, useState } from 'react';
-import { Building2, ArrowLeft, Globe, LogOut, AtSign, Users, KeyRound, ShieldCheck, TriangleAlert, RefreshCw, Trash2, Network, Crown, Settings2, Server, UserPlus, Ban, Gauge, Plus, X, RotateCw, ListChecks, Hourglass, Flag } from 'lucide-react';
+import { Building2, ArrowLeft, Globe, LogOut, AtSign, Users, KeyRound, ShieldCheck, TriangleAlert, RefreshCw, Trash2, Network, Crown, Settings2, Server, UserPlus, Ban, Gauge, Plus, X, RotateCw, ListChecks, Hourglass, Flag, Upload, ArrowLeftRight, Mic, Archive, Info, CircleArrowUp } from 'lucide-react';
 import { ReportsTab } from './HomeserverReports.jsx';
 import { SettingsPage, SCard, SRow, Switch } from './ui.jsx';
 import { LoginMethods } from './LoginMethods.jsx';
@@ -15,7 +17,11 @@ import { signOutHome, nookaraHandle } from '../session.js';
 import { forgetHomeserver } from '../homeserver.js';
 import { normOrigin } from '../ids.js';
 import { homeserverRows, forgetText } from '../homeservers.js';
-import { InstanceTab, restartInstance } from '../Instances.jsx';
+import { InstanceTab, BridgeBots, restartInstance } from '../Instances.jsx';
+import { ServerInfoPage } from '../ServerInfo.jsx';
+import { BackupsPage } from '../Backups.jsx';
+import { UpdateServerRow } from '../UpdateServer.jsx';
+import { PlanCtx, PlanGate, buildPlanCtx } from '../PlanGate.jsx';
 import { useUnsaved, UnsavedBar } from '../unsaved.jsx';
 import { hsCall, viaInstance, discoveryDoc, useAdminHomeservers } from '../homeApi.js';
 import { REGISTRATION, REMOTE_MODES, CREATION_MODES, methodsToSend, sameMethods, methodIssues, nameList, adminErrorText } from '../homeAdmin.js';
@@ -24,7 +30,14 @@ import { DEFAULT_DENYLIST, MAX_DENYLISTS, MAX_DENY, RATE_FIELDS, FLOOR_MAX, DENY
 import './accounts-pages.css';
 import './homeservers.css';
 
-const TABS = [['accounts', 'Accounts & sign-in', KeyRound], ['servers', 'Servers', Server], ['admins', 'Admins', ShieldCheck], ['federation', 'Federation', Network], ['reports', 'Reports', Flag]];
+// [id, label, icon, when]: 'inst' = only while it's connected as an instance (those pages talk through that connection),
+// 'v2' = not on an old one-server Ember server (it has none of it)
+const TABS = [
+  ['accounts', 'Accounts & sign-in', KeyRound], ['servers', 'Servers', Server, 'v2'], ['admins', 'Admins', ShieldCheck],
+  ['uploads', 'Uploads', Upload], ['bridges', 'Bridges', ArrowLeftRight], ['voice', 'Voice', Mic, 'inst'], ['backups', 'Backups', Archive, 'inst'],
+  ['nookara', 'Nookara', Globe, 'inst'], ['federation', 'Federation', Network, 'v2'], ['reports', 'Reports', Flag, 'v2'], ['info', 'Server info', Info, 'inst'],
+];
+const tabsFor = inst => TABS.filter(([, , , when]) => (when !== 'inst' || !!inst) && (when !== 'v2' || !inst || inst.v2));
 const Loading = () => <div className="vc-loading"><i /><i /><i /></div>;
 const Choices = ({ name, value, options, onPick, disabled }) => (
   <div className="bf-pe-vis">
@@ -38,10 +51,11 @@ const Choices = ({ name, value, options, onPick, disabled }) => (
 );
 const sameList = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
 
-export default function HomeserversPage({ onDirty }) {
+// start: { origin, tab, autoUpdate } to open one homeserver's tab straight away (openHomeserverSettings in homeservers.js)
+export default function HomeserversPage({ onDirty, start }) {
   const list = useAdminHomeservers();
-  const [origin, setOrigin] = useState(null);
-  const [tab, setTab] = useState('accounts');
+  const [origin, setOrigin] = useState(start?.origin || null);
+  const [tab, setTab] = useState(start?.tab || 'accounts');
   const dirty = useRef({ on: false, nudge: null });
   const note = (on, nudge) => { dirty.current = { on, nudge }; onDirty?.(on, nudge); };
   async function leaveOk() {
@@ -50,9 +64,16 @@ export default function HomeserversPage({ onDirty }) {
     return ask({ title: 'Discard your changes?', text: "Your changes aren't saved yet.", confirm: 'Discard', danger: true });
   }
   const hs = list.find(h => h.origin === origin) || null;
-  useEffect(() => { if (origin && !hs) setOrigin(null); }, [origin, hs]);
+  const inst = useChat(s => (origin ? (s.instances || NONE).find(i => i.origin === origin) : null)) || null;
+  // (the one asked for at the start can take a moment to show up: the v2 sign-ins are asked whether they're admins)
+  const waiting = useRef(!!start?.origin);
+  if (hs) waiting.current = false;
+  useEffect(() => { if (origin && !hs && !waiting.current) setOrigin(null); }, [origin, hs]);
+  const tabs = tabsFor(inst);
+  const shown = tabs.some(([id]) => id === tab) ? tab : 'accounts';
+  const pick = async id => { if (id !== shown && (await leaveOk())) { note(false); setTab(id); } };
 
-  if (!hs) return <MyHomeservers admins={list} onManage={h => { setTab('accounts'); setOrigin(h.origin); }} />;
+  if (!hs) return <MyHomeservers admins={list} onManage={h => { waiting.current = false; setTab('accounts'); setOrigin(h.origin); }} />;
   return (
     <div className="sx-page hsx-page">
       <header className="hsx-head">
@@ -61,13 +82,80 @@ export default function HomeserversPage({ onDirty }) {
         <div className="sx-row-txt"><b>{hs.name}</b><span className="ac-host"><Globe size={12} /> {hs.domain}{hs.isOwner ? ' - owner' : ' - admin'}</span></div>
       </header>
       <div className="sx-seg hsx-tabs" role="tablist" aria-label={`${hs.name} settings`}>
-        {TABS.map(([id, label, I]) => <button type="button" key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'on' : ''} onClick={async () => { if (id !== tab && (await leaveOk())) { note(false); setTab(id); } }}><I size={14} /> {label}</button>)}
+        {tabs.map(([id, label, I]) => <button type="button" key={id} role="tab" aria-selected={shown === id} className={shown === id ? 'on' : ''} onClick={() => pick(id)}><I size={14} /> {label}</button>)}
       </div>
-      {tab === 'accounts' && <AccountsTab key={hs.origin} hs={hs} onDirty={note} />}
-      {tab === 'servers' && <ServersTab key={hs.origin} hs={hs} onDirty={note} />}
-      {tab === 'admins' && (viaInstance(hs.origin) ? <div className="hsx-admins"><InstanceTab key={hs.origin} origin={hs.origin} tab="admins" /></div> : <AdminsTab key={hs.origin} hs={hs} />)}
-      {tab === 'federation' && <FederationTab key={hs.origin} hs={hs} onDirty={note} />}
-      {tab === 'reports' && <ReportsTab key={hs.origin} hs={hs} />}
+      <PlanCtx.Provider value={inst ? buildPlanCtx(inst, pick) : null}>
+        {shown === 'accounts' && (inst && !inst.v2 ? <div className="hsx-inst"><InstanceTab key={`${hs.origin}-accounts`} origin={hs.origin} tab="accounts" onDirty={note} /></div> : <AccountsTab key={hs.origin} hs={hs} onDirty={note} />)}
+        {shown === 'servers' && <ServersTab key={hs.origin} hs={hs} onDirty={note} />}
+        {shown === 'admins' && (viaInstance(hs.origin) ? <div className="hsx-admins"><InstanceTab key={`${hs.origin}-admins`} origin={hs.origin} tab="admins" /></div> : <AdminsTab key={hs.origin} hs={hs} />)}
+        {shown === 'uploads' && <UploadsTab key={hs.origin} hs={hs} onDirty={note} />}
+        {shown === 'bridges' && <BridgesTab key={hs.origin} hs={hs} />}
+        {['voice', 'nookara'].includes(shown) && <div className="hsx-inst"><InstanceTab key={`${hs.origin}-${shown}`} origin={hs.origin} tab={shown} onDirty={note} /></div>}
+        {shown === 'backups' && <div className="hsx-inst"><BackupsPage key={hs.origin} origin={hs.origin} /></div>}
+        {shown === 'federation' && <FederationTab key={hs.origin} hs={hs} onDirty={note} />}
+        {shown === 'reports' && <ReportsTab key={hs.origin} hs={hs} />}
+        {shown === 'info' && <InfoTab key={hs.origin} hs={hs} inst={inst} autoUpdate={!!start?.autoUpdate && start.tab === 'info'} onDirty={note} />}
+      </PlanCtx.Provider>
+    </div>
+  );
+}
+
+// ── Uploads: the biggest file anyone can upload on any server here (each server sets its own, up to this) ──
+function UploadsTab({ hs, onDirty }) {
+  const { origin } = hs;
+  const [cfg, setCfg] = useState(null);
+  const [mb, setMb] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const load = () => { setError(''); hsCall(origin, '/api/v1/instance/settings').then(d => { setCfg(d); setMb(String(d.max_upload_mb ?? 25)); }, e => setError(loadError(e))); };
+  useEffect(load, [origin]); // eslint-disable-line react-hooks/exhaustive-deps
+  const top = Math.min(500, cfg?.managed?.limits?.max_upload_mb || 500);
+  const n = Number(mb);
+  const bad = !!cfg && !(Number.isInteger(n) && n >= 1 && n <= top);
+  const changed = !!cfg && mb !== String(cfg.max_upload_mb ?? 25);
+  const [bar, flashSaved] = useUnsaved(changed, onDirty);
+  if (error) return <Failed error={error} what="upload settings" onRetry={load} />;
+  if (!cfg) return <Loading />;
+  async function save() {
+    setBusy(true);
+    try {
+      const d = await hsCall(origin, '/api/v1/instance/settings', { method: 'PATCH', body: { max_upload_mb: n } });
+      setCfg(d); setMb(String(d.max_upload_mb ?? n)); flashSaved();
+      if (viaInstance(origin)) refreshInstance(origin).catch(() => {});
+    } catch (e) { toast(adminErrorText(e)); }
+    setBusy(false);
+  }
+  return (
+    <>
+      <SCard title="Biggest upload" sub={`The largest file anyone can upload on ${hs.domain}, on any of its servers.`}>
+        <label className="vc-field hsx-block"><span>Size limit (MB)</span>
+          <input className="form-input hsx-num" inputMode="numeric" maxLength={3} value={mb} onChange={e => setMb(e.target.value.replace(/[^\d]/g, ''))} />
+          <small className={bad ? 'hsx-issue' : 'vc-hint'}>{bad ? `A number from 1 to ${top}.` : `1-${top} MB.${cfg.managed ? ' Your plan sets the most it can be.' : ''}`}</small></label>
+        <small className="vc-hint hsx-foot">Each server picks its own limit, file types, upload rate and how long files are kept in its Server settings &gt; Uploads - never more than this.</small>
+      </SCard>
+      <UnsavedBar changed={changed} bar={bar} busy={busy} disabled={bad} onReset={() => setMb(String(cfg.max_upload_mb ?? 25))} onSave={save} />
+    </>
+  );
+}
+
+// ── Bridges: the homeserver's own Discord / Fluxer / Matrix bots; each server links itself in its Server settings > Bridge ──
+function BridgesTab({ hs }) {
+  const [hit, setHit] = useState(null); // the plan has no bridges
+  return <div className="hsx-inst"><PlanGate block={hit}><BridgeBots origin={hs.origin} onPlan={setHit} gated={!!hit} /></PlanGate></div>;
+}
+
+// ── Server info: version, update, uptime, stats; its addresses; restart and update ──
+function InfoTab({ hs, inst, autoUpdate, onDirty }) {
+  return (
+    <div className="hsx-inst">
+      <ServerInfoPage origin={hs.origin} autoUpdate={autoUpdate} />
+      {inst.v2 && !inst.managed && <InstanceTab origin={hs.origin} tab="addresses" onDirty={onDirty} />}
+      <SCard title="Restart" sub="Everyone on every server it hosts is disconnected for a moment. It only comes back by itself under something that restarts it (Docker, systemd).">
+        <button type="button" className="btn btn-surface btn-sm hsx-block" onClick={() => restartInstance(hs.origin, hs.name)}><RefreshCw size={13} /> Restart the homeserver</button>
+      </SCard>
+      <SCard title="Update" sub="Ember can update the homeserver's software itself when its host is set up for it.">
+        <UpdateServerRow origin={hs.origin} name={hs.name} />
+      </SCard>
     </div>
   );
 }

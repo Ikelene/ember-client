@@ -78,3 +78,8 @@ export function forgetText(row) {
 
 // Settings > Homeservers is there for everyone whose device uses a homeserver (not only its admins)
 export const showHomeservers = ({ connections = 0, home = false, admin = false, signedIn = false } = {}) => connections > 0 || !!home || !!admin || !!signedIn;
+
+// open Settings > Homeservers, at one homeserver's tab when it's given (tab: an id from HomeserversPage's TABS)
+export function openHomeserverSettings(origin, tab, extra = {}) {
+  dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'chat-settings', page: 'homeservers', ...(origin ? { hs: { origin, tab: tab || 'accounts', ...extra } } : {}) } }));
+}

@@ -39,7 +39,7 @@ const PAGES = [
     ['expressions', 'Personal Expressions', SmilePlus, ['Emojis', 'Personal emoji', 'Personal emojis', 'My emojis', 'Custom emoji', 'Add emoji', 'Stickers', 'Personal sticker', 'Personal stickers', 'My stickers', 'Add sticker', 'Save sticker', 'Lock my emojis and stickers', 'Clone lock']],
   ]],
   ['Homeservers', [
-    ['homeservers', 'Homeservers', Building2, ['Homeserver', 'Add homeserver', 'Sign in to another homeserver', 'Reconnect', 'Forget', 'Sign out', 'Connected', 'Admin', 'Accounts & sign-in', 'Registration', 'Sign-in methods', 'Login methods', 'OpenID Connect', 'OIDC', 'OAuth', 'Single sign-on', 'SSO', 'Callback address', 'Client secret', 'Who can create servers', 'Admins', 'Federation'], 'hs'],
+    ['homeservers', 'Homeservers', Building2, ['Homeserver', 'Add homeserver', 'Sign in to another homeserver', 'Reconnect', 'Forget', 'Sign out', 'Connected', 'Admin', 'Accounts & sign-in', 'Registration', 'Sign-in methods', 'Login methods', 'OpenID Connect', 'OIDC', 'OAuth', 'Single sign-on', 'SSO', 'Callback address', 'Client secret', 'Who can create servers', 'Admins', 'Federation', 'Reports', 'Uploads', 'Upload limit', 'Biggest file', 'File size', 'Bridges', 'Bridge bot', 'Bridge bots', 'Discord bot', 'Discord token', 'Fluxer bot', 'Fluxer token', 'Matrix bot', 'Matrix token', 'Cloudflare', 'Realtime app', 'TURN', 'Backups', 'Restore a backup', 'Nookara registration', 'Payouts', 'Push relay', 'Directory', 'Server info', 'Server version', 'Server update', 'Update the server', 'Restart', 'Uptime', 'Public address'], 'hs'],
   ]],
   ['Privacy & safety', [
     ['Privacy', 'Privacy', Shield, rowText('Privacy')],
@@ -93,7 +93,7 @@ export function useNarrow() {
   return n;
 }
 
-export default function SettingsDialog({ page: startPage, target, onClose }) {
+export default function SettingsDialog({ page: startPage, target, hs, onClose }) {
   const narrow = useNarrow();
   const [mview, setMview] = useState(startPage ? 'page' : 'list'); // phones: which screen is showing
   const depth = useRef(0); // history entries this dialog added (phones: the dialog, then an opened page)
@@ -236,14 +236,14 @@ export default function SettingsDialog({ page: startPage, target, onClose }) {
           <header className="bf-sd-head">
             <button type="button" className="bf-sd-backbtn" aria-label="Back to settings" onClick={backToList}><ChevronLeft size={22} /></button>
             {['accounts', 'voice', 'theme', 'text', 'blocking', 'design', 'expressions', 'homeaccount', 'homeservers'].includes(page)
-              ? <h2 className="bf-sd-crumbs"><span>Settings</span><ChevronRight size={14} /><span>{groups.find(([, items]) => items.some(it => it[0] === page))?.[0]}</span><ChevronRight size={14} /><b>{current?.[1]}</b></h2>
+              ? <h2 className="bf-sd-crumbs"><span>Settings</span><ChevronRight size={14} />{(g => (g && g !== current?.[1] ? <><span>{g}</span><ChevronRight size={14} /></> : null))(groups.find(([, items]) => items.some(it => it[0] === page))?.[0])}<b>{current?.[1]}</b></h2>
               : <h2>{Icon && <Icon size={19} />} {current?.[1] || 'Settings'}</h2>}
             <button type="button" className="bf-sd-x" aria-label="Close settings" data-tip="Close (Esc)" onClick={() => close()}><X size={18} /></button>
           </header>
           <div className="bf-sd-content" ref={content} key={page}>
             {page === 'profile' ? <ProfileEditor target={target} onDirty={(on, nudge) => { dirty.current = { on, nudge }; }} />
               : page === 'homeaccount' ? <HomeAccountPage />
-              : page === 'homeservers' ? <HomeserversPage onDirty={(on, nudge) => { dirty.current = { on, nudge }; }} />
+              : page === 'homeservers' ? <HomeserversPage start={startPage === 'homeservers' ? hs : null} onDirty={(on, nudge) => { dirty.current = { on, nudge }; }} />
               : page === 'accounts' ? <AccountsPage onHomeservers={anyHome ? () => go('homeservers') : undefined} />
                   : page === 'expressions' ? <PersonalExpressionsPage />
                   : page === 'design' ? <DesignSettings />

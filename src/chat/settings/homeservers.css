@@ -11,13 +11,14 @@
 .hsx-head { display: flex; align-items: center; gap: 12px; }
 .hsx-head .sx-row-txt { flex: 1; min-width: 0; }
 .hsx-head .sx-row-txt b { font-size: 16px; color: #fff; }
-.hsx-tabs { display: flex; align-self: flex-start; max-width: 100%; overflow-x: auto; }
+.hsx-tabs { display: flex; flex-wrap: wrap; align-self: flex-start; max-width: 100%; }
 .hsx-tabs button { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .hsx-block { margin-top: 14px; }
 .hsx-block > .form-textarea { width: 100%; font-family: var(--font-mono, ui-monospace, monospace); font-size: 13px; }
 .hsx-num { width: 120px; }
 .hsx-count { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 13px; }
-.hsx-admins .vc-settings { padding: 0; }
+.hsx-admins .vc-settings, .hsx-inst .vc-settings, .hsx-inst .bf-ss-page { padding: 0; }
+.hsx-inst { display: flex; flex-direction: column; gap: 14px; }
 
 .hsx-methods { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
 .hsx-method.off .sx-row-txt b { color: var(--dim); }
