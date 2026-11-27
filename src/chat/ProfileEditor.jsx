@@ -16,6 +16,7 @@ import { PopoutCard, localTimeFrom } from './ProfilePopout.jsx';
 import ServerProfileEditor, { useProfileTargets, askLeave, ProfileTargetPicker } from './ServerProfileEditor.jsx';
 import { pictureAccept } from './accept.js';
 import AccountProfileEditor from './AccountProfileEditor.jsx';
+import { accountTarget } from './accountProfileCore.js';
 import EmojiPicker from './EmojiPicker.jsx';
 import { bioLength, bioEmojiCount, BIO_EMOJI_MAX } from './bioLength.js';
 
@@ -63,12 +64,13 @@ function cropPreview(file, crop) {
 export default function ProfileEditor({ onDirty, target: open }) {
   const targets = useProfileTargets();
   const signedIn = useChat(s => s.signedIn);
-  const [target, setTarget] = useState(open || (signedIn ? 'global' : targets[0]?.sid || 'global'));
+  const homeTarget = useChat(s => (s.home ? accountTarget(s.home.origin) : null)); // (a homeserver session: its own account's profile first)
+  const [target, setTarget] = useState(open || (signedIn ? 'global' : (targets.some(t => t.sid === homeTarget) ? homeTarget : targets[0]?.sid) || 'global'));
   const dirtyRef = useRef(false);
   const track = (d, nudge) => { dirtyRef.current = !!d; onDirty?.(d, nudge); };
   const choose = async v => { if (v === target) return; if (dirtyRef.current && !(await askLeave())) return; dirtyRef.current = false; onDirty?.(false); setTarget(v); };
-  const cur = targets.find(t => t.sid === target) || (signedIn ? null : targets[0]) || null; // (a server that went away: back to the global one)
-  if (!cur && !signedIn) return <div className="inline-msg">Sign in with Nookara to edit your profile.</div>;
+  const cur = targets.find(t => t.sid === target) || (signedIn ? null : targets.find(t => t.sid === homeTarget) || targets[0]) || null; // (a server that went away: back to the global one)
+  if (!cur && !signedIn) return <div className="inline-msg">{homeTarget ? 'Your homeserver is still connecting, or it has no profiles to edit. Try again in a moment.' : 'Sign in with Nookara to edit your profile.'}</div>;
   return (
     <>
       {targets.length > 0 && (

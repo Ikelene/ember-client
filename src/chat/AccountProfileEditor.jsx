@@ -26,7 +26,8 @@ const skippedText = list => (list?.length ? ` Your ${list.map(k => (k === 'pfp' 
 export default function AccountProfileEditor({ origin, onDirty }) {
   const inst = useChat(s => s.instances.find(i => i.origin === origin));
   const srv = useChat(s => s.servers.find(x => x.inst === origin));
-  const srvName = srv?.name || inst?.name || 'this server';
+  const homeAcct = useChat(s => (s.home?.origin === origin ? s.home : null)); // my homeserver account: the profile people see everywhere
+  const srvName = homeAcct ? homeAcct.domain : srv?.name || inst?.name || 'this server';
   const me = useChat(s => s.me);
   const signedIn = useChat(s => s.signedIn);
   const [nk, setNk] = useState(null); // my Nookara profile (signed in): whose profile a sync follows, and what a copy would bring
@@ -115,8 +116,8 @@ export default function AccountProfileEditor({ origin, onDirty }) {
   return (
     <div className="bf-pe">
       <div className="bf-pe-intro">
-        <h3>Your profile on {srvName}</h3>
-        <p>{srvName} has its own accounts, so this profile is saved on that server ({inst?.host || origin}) and only shows there.</p>
+        <h3>{homeAcct ? `Your profile, ${homeAcct.account?.handle || srvName}` : `Your profile on ${srvName}`}</h3>
+        <p>{homeAcct ? `Your account is on ${srvName}, so your profile is kept there. Everyone sees it: on ${srvName}, on other homeservers, in your DMs and with your friends.` : `${srvName} has its own accounts, so this profile is saved on that server (${inst?.host || origin}) and only shows there.`}</p>
       </div>
       {(signedIn || synced) && (
         <div className="bf-pe-nk">
@@ -182,7 +183,7 @@ export default function AccountProfileEditor({ origin, onDirty }) {
           </div>
         </fieldset>
         <aside className="bf-pe-preview">
-          <div className="bf-pe-preview-label">Preview on {srvName}</div>
+          <div className="bf-pe-preview-label">{homeAcct ? 'Preview' : `Preview on ${srvName}`}</div>
           <PopoutCard preview p={card} status="online" />
         </aside>
       </div>

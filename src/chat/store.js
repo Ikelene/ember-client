@@ -2846,6 +2846,8 @@ async function refreshHomeMe() {
     if (u && state.home) set(st => ({ me: { ...st.me, username: u.username || st.me.username, display_name: u.display_name || st.me.display_name, pfp: absUrl(h.origin, u.pfp) ?? st.me.pfp } }));
   } catch { /* offline: what the sign-in said stays */ }
 }
+// my profile on a server with its own accounts was saved (accountProfile.js): on my homeserver that is the one I go by
+export function accountProfileSaved(origin) { if (state.home?.origin === origin) refreshHomeMe(); }
 // the home homeserver's socket is up (instances.js): what changed while it was down
 export function homeConnected(origin) { if (state.home?.origin === origin) { refreshHomeMe(); loadSocial(); if (state.e2eeStatus === 'loading') E2EE.init().catch(() => {}); else E2EE.flushOutbox(); } }
 // the four lists as state.social keeps them (signed in with Nookara: without the Nookara accounts, which Home lists itself)

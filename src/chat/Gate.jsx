@@ -81,13 +81,13 @@ export function RetryIn({ at, busy }) {
 
 // The login screen: nookara.cc (the default homeserver) or another one. Signed in on a homeserver already (and not with
 // Nookara): that account, and what it can't do yet.
-export function SignInPrompt({ what = 'direct messages, group chats and friends', back }) {
+export function SignInPrompt({ what = 'direct messages, group chats and friends', nookaraOnly = null, back }) {
   const home = useHomeSession();
-  if (home) {
+  if (home) { // (your profile, DMs, group chats and friends are on your homeserver: only what Nookara itself hosts needs Nookara)
     return (
       <Box icon={<ShieldCheck size={34} />} title={`Signed in as ${home.account.handle}`}>
-        <p>Your account is on {home.name}. A Nookara account is still needed for {what}; servers you add work with their own sign-in.</p>
-        <div className="vc-gate-btns"><button type="button" className="btn btn-primary" onClick={() => startSignIn(back)}><ShieldCheck size={15} /> Sign in with Nookara</button></div>
+        <p>Your account, profile, direct messages, group chats and friends are on {home.name}.{nookaraOnly ? ` ${nookaraOnly} need a Nookara account.` : ''}</p>
+        {nookaraOnly && <div className="vc-gate-btns"><button type="button" className="btn btn-primary" onClick={() => startSignIn(back)}><ShieldCheck size={15} /> Sign in with Nookara</button></div>}
         <div className="vc-gate-links"><button type="button" className="vc-gate-link" onClick={() => signOutHome(home.origin)}><LogOut size={12} /> Sign out of {home.account.handle}</button></div>
       </Box>
     );

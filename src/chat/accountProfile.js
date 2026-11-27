@@ -4,13 +4,13 @@
 // of the last copy (so every device knows whether there is anything new to bring over).
 import { apiFetch, uploadFetch, getToken } from '../api.js';
 import { NOOKARA_ORIGIN } from './hosts.js';
-import { getState, lookup, forgetProfile } from './store.js';
+import { getState, lookup, forgetProfile, accountProfileSaved } from './store.js';
 import { setInstanceUser, instanceConn } from './instances.js';
 import { LIMITS, copyFields, stampOf, stampParts, joinStamp, changedParts, follows, pictureSources, hasAccountProfile } from './accountProfileCore.js';
 import { NOOKARA_ID_FIELD } from '../compat.js';
 
 const PATH = '/api/v1/me/profile';
-const took = (origin, r) => { if (r?.user) setInstanceUser(origin, r.user); return r; };
+const took = (origin, r) => { if (r?.user) { setInstanceUser(origin, r.user); accountProfileSaved(origin); } return r; };
 
 export const getAccountProfile = origin => apiFetch(PATH, { inst: origin });
 export const saveAccountProfile = (origin, patch) => apiFetch(PATH, { inst: origin, method: 'PATCH', body: JSON.stringify(patch) }).then(r => took(origin, r));

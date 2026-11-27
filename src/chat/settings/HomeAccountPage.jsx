@@ -1,10 +1,12 @@
 // Settings > My account: the account you signed in to on a homeserver (Ember Protocol v2, homeserver.js). Its handle, the
 // ways it can sign in (link another one, remove one) and a link to the homeserver's own account page.
 import { useEffect, useState } from 'react';
-import { CircleUserRound, ExternalLink, KeyRound, Link2, Unlink, LogOut, Check, RefreshCw, TriangleAlert, Fingerprint } from 'lucide-react';
+import { CircleUserRound, Pencil, ExternalLink, KeyRound, Link2, Unlink, LogOut, Check, RefreshCw, TriangleAlert, Fingerprint } from 'lucide-react';
 import { SettingsPage, SCard } from './ui.jsx';
-import { ask, toast } from '../store.js';
-import { Avatar } from '../Profile.jsx';
+import { ask, toast, useChat } from '../store.js';
+import { Avatar, openProfileEditor } from '../Profile.jsx';
+import { hasAccountProfile, accountTarget } from '../accountProfileCore.js';
+import { normOrigin } from '../ids.js';
 import { HomeserverIcon, useHomeSession, useHomeSessions } from '../HomeserverLogin.jsx';
 import { setCurrent, homeInfo } from '../homeserver.js';
 import { signOutHome } from '../session.js';
@@ -25,6 +27,8 @@ export default function HomeAccountPage() {
   const s = useHomeSession();
   const all = useHomeSessions();
   const origin = s?.origin || null;
+  const profiled = useChat(st => hasAccountProfile(st.instances.find(i => i.origin === normOrigin(origin)))); // (its profile is kept there: 4.1)
+  const me = useChat(st => (st.home ? st.me : null));
   const [logins, setLogins] = useState(null); // null = loading
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
@@ -71,14 +75,15 @@ export default function HomeAccountPage() {
     <SettingsPage icon={CircleUserRound} title="My account" sub={`Your account on ${s.name || s.domain}.`}>
       <SCard className="ac-hero">
         <div className="ac-hero-in">
-          {a.avatar_url ? <Avatar user={{ username: a.username, pfp: a.avatar_url }} size={64} /> : <span className="ac-hero-blank"><CircleUserRound size={30} /></span>}
+          {me?.pfp || a.avatar_url ? <Avatar user={{ username: a.username, pfp: me?.pfp || a.avatar_url }} size={64} /> : <span className="ac-hero-blank"><CircleUserRound size={30} /></span>}
           <div className="ac-hero-txt">
             <small className="ac-kicker">Homeserver account</small>
             <b>{a.handle}</b>
-            <span className="ac-state ok">{a.display_name && a.display_name !== a.username ? `${a.display_name} - signed in` : 'Signed in'}</span>
+            <span className="ac-state ok">{(me?.display_name || a.display_name) && (me?.display_name || a.display_name) !== a.username ? `${me?.display_name || a.display_name} - signed in` : 'Signed in'}</span>
           </div>
           <div className="ac-btns">
-            <button type="button" className="btn btn-primary" onClick={() => openOutside(manage)}><ExternalLink size={14} /> Manage this account on {s.domain}</button>
+            {profiled && <button type="button" className="btn btn-primary" onClick={() => openProfileEditor(accountTarget(normOrigin(origin)))}><Pencil size={14} /> Edit profile</button>}
+            <button type="button" className={`btn ${profiled ? 'btn-surface' : 'btn-primary'}`} onClick={() => openOutside(manage)}><ExternalLink size={14} /> Manage this account on {s.domain}</button>
             <button type="button" className="btn btn-surface" onClick={signOut}><LogOut size={14} /> Sign out</button>
           </div>
         </div>

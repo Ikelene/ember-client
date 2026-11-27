@@ -21,7 +21,7 @@ import { useChat, retryNow, go, keyOf, setStatus, setCustom, isMuted, effectiveN
 import { P, has, ChannelIcon, useNameStyle, colorFrom, NameDecor } from './roles.jsx';
 import { serverMenu, instanceMenu, channelMenu, userMenu, openMenu, copy } from './Menu.jsx';
 import { apiFetch, getToken } from '../api.js';
-import { NOOKARA, instOf, isInst } from './ids.js';
+import { NOOKARA, instOf, isInst, normOrigin } from './ids.js';
 import { loudUnread, needsChannelCount } from './unread.js';
 import { getLook, subscribeLook } from './look.js';
 import { railEntries, railPos, railOrigin } from './addresses.js';
@@ -849,6 +849,22 @@ export function OutdatedNote() {
 
 // ── you, at the bottom left: click = your profile pop-out (status, accounts, Edit profile) ──
 
+// signed in on a homeserver (v2): that account, from the homeserver it is on. Its profile is kept there (ember-server 4.1), so the
+// name opens Settings > Profile on it when the homeserver has account profiles; otherwise My account.
+function HomeWho({ home, me }) {
+  const inst = useChat(s => s.instances.find(i => i.origin === normOrigin(home.origin)));
+  const editable = hasAccountProfile(inst);
+  const name = me?.display_name || home.account.display_name || home.account.username;
+  const pfp = me?.pfp ?? home.account.avatar_url ?? null;
+  const open = () => (editable ? openProfileEditor(accountTarget(inst.origin)) : dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'chat-settings', page: 'homeaccount' } })));
+  return (
+    <button type="button" className="vc-me-who" title={editable ? `Edit your profile on ${home.domain}` : home.account.handle} onClick={open}>
+      <Avatar user={{ username: home.account.username, pfp }} size={36} />
+      <span className="vc-me-txt"><b>{name}</b><small>{home.account.handle}</small></span>
+    </button>
+  );
+}
+
 export function UserPanel({ onSettings, onEditProfile }) {
   const me = useChat(s => s.me);
   const signedIn = useChat(s => s.signedIn);
@@ -870,13 +886,13 @@ export function UserPanel({ onSettings, onEditProfile }) {
     return () => removeEventListener('vc-custom-status', open);
   }, []);
   if (!signedIn || (here?.user && here.user.kind === 'local')) { // signed out of Nookara, or on a server with its own accounts: no Nookara pop-out
-    const u = here?.user;
+    const u = home && here && (here.origin === normOrigin(home.origin) || here.user?.kind !== 'local') ? null : here?.user; // (my homeserver account, wherever it signed me in: shown as itself below)
     const editable = hasAccountProfile(here); // its own accounts keep a profile: the name opens it (Settings > Profile, on this server)
     const who = u && <><Avatar user={u} size={36} /><span className="vc-me-txt"><b>{u.display_name || u.username}</b><small>{here.host}</small></span></>;
     return (
       <div className="vc-me">
         {u ? (editable ? <button type="button" className="vc-me-who" title="Edit your profile on this server" onClick={() => openProfileEditor(accountTarget(here.origin))}>{who}</button> : <div className="vc-me-who">{who}</div>)
-          : home ? <div className="vc-me-who" title={home.account.handle}><Avatar user={{ username: home.account.username, pfp: home.account.avatar_url }} size={36} /><span className="vc-me-txt"><b>{home.account.display_name}</b><small>{home.account.handle}</small></span></div>
+          : home ? <HomeWho home={home} me={me} />
           : <button type="button" className="vc-me-who" onClick={() => startSignIn()} title="Sign in with Nookara"><span className="vc-av vc-sys-av" style={{ width: 36, height: 36 }}><UserRound size={19} /></span><span className="vc-me-txt"><b>Not signed in</b><small>Sign in with Nookara</small></span></button>}
         <QuickVoiceBtns />
         <button type="button" className="vc-ico-btn" onClick={onSettings} title="Settings"><Settings size={17} /></button>

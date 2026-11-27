@@ -191,10 +191,12 @@ export default function ServerProfileEditor({ sid, onDirty }) {
 export function useProfileTargets() {
   const servers = useChat(s => s.servers);
   const instances = useChat(s => s.instances);
+  const home = useChat(s => s.home); // (signed in on a homeserver: that account's profile is the one people see everywhere)
   const accounts = instances.filter(hasAccountProfile).map(i => {
     const srv = servers.find(x => x.inst === i.origin);
+    if (home && i.origin === home.origin) return { sid: accountTarget(i.origin), name: home.account?.handle || i.name, icon: i.homeserver?.icon_url || i.icon || null, account: i.origin, home: true };
     return { sid: accountTarget(i.origin), name: srv?.name || i.name, icon: srv?.icon || i.icon || null, account: i.origin };
-  });
+  }).sort((a, b) => !!b.home - !!a.home);
   const own = new Set(accounts.map(a => a.account));
   return [...accounts, ...servers.filter(x => x.inst && !own.has(x.inst) && instances.find(i => i.origin === x.inst)?.features?.server_profiles).map(x => ({ sid: x.sid, name: x.name, icon: x.icon || null }))];
 }
@@ -206,7 +208,7 @@ export function ProfileTargetPicker({ value, targets, onChange, noGlobal = false
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(0);
   const box = useRef(null);
-  const items = [...(noGlobal ? [] : [{ sid: 'global', name: 'Global profile', hint: 'Your Nookara profile, everywhere' }]), ...targets.map(t => ({ ...t, hint: t.account ? 'Your account on this server' : 'Only on this server' }))];
+  const items = [...(noGlobal ? [] : [{ sid: 'global', name: 'Global profile', hint: 'Your Nookara profile, everywhere' }]), ...targets.map(t => ({ ...t, hint: t.home ? 'Your profile, everywhere' : t.account ? 'Your account on this server' : 'Only on this server' }))];
   const cur = items.find(i => i.sid === value) || items[0];
   useEffect(() => {
     if (!open) return undefined;

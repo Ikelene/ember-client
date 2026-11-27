@@ -186,7 +186,7 @@ export function JoinInvite({ code, inst, onClose }) {
     look.then(d => setS(d.server)).catch(() => setBad(true));
   }, [code, inst, !!conn, signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
   const joined = s && servers.some(x => x.sid === s.sid);
-  if (!inst && !signedIn) return <Dialog title="Sign in to join" onClose={onClose}>{() => <SignInPrompt what="servers hosted by Nookara" back={{}} />}</Dialog>;
+  if (!inst && !signedIn) return <Dialog title="Sign in to join" onClose={onClose}>{() => <SignInPrompt what="servers hosted by Nookara" nookaraOnly="Servers hosted by Nookara" back={{}} />}</Dialog>;
   return (
     <Dialog title={bad ? 'Invite not valid' : "You've been invited to join"} onClose={onClose}>
       {close => (bad ? <p className="vc-dialog-sub">That invite link doesn't work any more - ask for a new one.</p> : !s ? <div className="vc-loading"><i /><i /><i /></div> : (
