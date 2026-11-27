@@ -551,7 +551,6 @@ function ChatPage() {
   const homeMode = useChat(s => !!s.home); // on a v2 homeserver session (SocialHome.jsx)
   const sdm = view.kind === 'channel' && view.dm ? view.dm : null; // a DM on a homeserver: a one-channel server underneath
   const sdmName = useChat(s => (sdm ? s.detail[view.sid]?.server?.name : null));
-  const sdmSealed = useChat(s => (sdm ? !!s.social.dms.find(x => x.id === sdm)?.e2ee : false)); // (end-to-end encrypted: the start says so)
   const locked = useChat(s => s.locked); // staff switched Ember and DMs off for the account (store.js lockAccount)
   const waking = view.kind === 'channel' && !!detail?.cached; // its kept channel list: still connecting
   const wakeStatus = useChat(s => { if (!waking || !isInst(view.sid)) return null; const i = s.instances.find(x => x.origin === instOf(view.sid)); return i && ['insufficient_scope', 'unauthorized', 'invalid_session'].includes(i.error) ? 'error' : i?.status; });
@@ -580,7 +579,7 @@ function ChatPage() {
   }
 
   const title = sdm
-    ? { icon: <AtSign size={34} />, big: sdmName || 'Conversation', sub: sdmSealed ? 'This is the start of the conversation. It is end-to-end encrypted: only the people in it can read it, not the homeservers.' : 'This is the start of the conversation. It is not end-to-end encrypted: the homeserver it is on can read it.' }
+    ? { icon: <AtSign size={34} />, big: sdmName || 'Conversation', sub: 'This is the start of the conversation. It is end-to-end encrypted: only the people in it can read it, not the homeservers.' } // (homeserver DMs always are: the lock in the header says so too)
     : isServer
     ? { icon: <ChIcon size={34} />, big: `Welcome to #${channel?.name || ''}`, sub: channel?.topic || `This is the start of the #${channel?.name} channel.` }
     : modView
