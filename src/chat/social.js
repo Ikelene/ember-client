@@ -128,6 +128,13 @@ export function mergeDms(sources, ctx = {}) {
 // a Nookara account's id: v:<n>@<my domain> (or v:<n>)
 export const isNookaraAccount = (id, myDomain) => { const { name, domain } = splitHandle(id); return /^v:[1-9]\d{0,18}$/.test(name) && (!domain || domain === String(myDomain || '').toLowerCase()); };
 // GET /social/friends -> the four lists with only the people who are not Nookara accounts
+// the presence a friends list carries (friends[].presence.status): { <id>: status }, so they don't show offline until they next change
+const STATUSES = new Set(['online', 'idle', 'dnd', 'offline', 'invisible']);
+export function listPresence(friends) {
+  const out = {};
+  for (const f of Array.isArray(friends) ? friends : []) { const st = f?.presence?.status; if (f?.id != null && STATUSES.has(st)) out[String(f.id)] = st === 'invisible' ? 'offline' : st; }
+  return out;
+}
 export function remoteFriendLists(d, myDomain) {
   const l = friendLists(d, myDomain), far = x => !isNookaraAccount(x.id, myDomain);
   return { friends: l.friends.filter(far), incoming: l.incoming.filter(far), outgoing: l.outgoing.filter(far), blocked: l.blocked.filter(far) };

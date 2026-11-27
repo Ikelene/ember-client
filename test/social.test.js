@@ -279,3 +279,9 @@ test('a Nookara session: one DM list, the conversations Nookara has and the poin
   assert.equal(s.dms[0].preview, 'hello');
   assert.equal(so.dmUnread(s.dms), 6);
 });
+
+test('a friends list seeds presence: friends[].presence.status by id, invisible as offline, junk left out', () => {
+  assert.deepEqual(so.listPresence([{ id: 'l:2@b.example', presence: { status: 'online' } }, { id: 'v:3@nookara.cc', presence: { status: 'invisible' } }, { id: 'x', presence: { status: 'weird' } }, { id: 'y' }, null]),
+    { 'l:2@b.example': 'online', 'v:3@nookara.cc': 'offline' });
+  assert.deepEqual(so.listPresence(null), {});
+});

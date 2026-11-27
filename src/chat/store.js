@@ -26,7 +26,7 @@ import { connections, sendTo, startInstances, loadInstanceData, retryInstances, 
 import { homeFetch, onSignedOut, currentSession, DEFAULT_HOMESERVER, resolve as resolveHomeserver, homeInfo, remoteToken, isOwnUrl, domainReportsUrl } from './homeserver.js';
 import { reportRoute, reportBody, canReportSealed } from './e2ee/report.js';
 import { social as socialApi, socialBase, socialFetch, createDm, setNookaraSocial, dmHostUrl } from './socialApi.js';
-import { emptySocial, friendLists, mergeDms, cleanDm, socialReduce, socialRefetch, dmTitle, splitHandle, stableId, cleanHandle, accountName, remoteFriendLists, splitNookaraDms, nookaraDmView, dmHandle } from './social.js';
+import { emptySocial, friendLists, mergeDms, cleanDm, socialReduce, socialRefetch, dmTitle, splitHandle, stableId, cleanHandle, accountName, remoteFriendLists, splitNookaraDms, nookaraDmView, dmHandle, listPresence } from './social.js';
 import { attachmentRefs } from './signing-payload.js';
 import { spoilerName } from './spoiler.js';
 import { prepareInstanceAttachments } from './attachment-preparation.js';
@@ -2911,7 +2911,8 @@ export function homeConnected(origin) { if (state.home?.origin === origin) { ref
 // the four lists as state.social keeps them (signed in with Nookara: without the Nookara accounts, which Home lists itself)
 function setSocialLists(d, h) {
   const lists = h.nookara ? remoteFriendLists(d, h.domain) : friendLists(d, h.domain);
-  set(st => ({ social: { ...st.social, ...lists, loaded: true }, ...(h.nookara ? {} : { homeRequests: lists.incoming.length }) }));
+  const seen = listPresence(lists.friends); // (seeded from the list; social_presence events keep it current after)
+  set(st => ({ social: { ...st.social, ...lists, presence: { ...st.social.presence, ...seen }, loaded: true }, ...(h.nookara ? {} : { homeRequests: lists.incoming.length }) }));
   if (h.nookara) setHomeRequests({ social: lists.incoming.length });
 }
 export async function loadSocialFriends() {
