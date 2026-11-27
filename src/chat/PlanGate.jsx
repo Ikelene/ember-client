@@ -1,13 +1,11 @@
-// Plan limits on Nookara-hosted ("managed") Ember servers. The server answers 403 `plan_limit` { what, limit, used?, plan? } (a number
+// Plan limits a homeserver sets on its servers (a homeserver may sell tiers; it reports them as "managed"). The server answers 403 `plan_limit` { what, limit, used?, plan? } (a number
 // reached, or limit false / 0 for a feature the plan doesn't have) or `plan_feature` { what, limit: 0|null, plan, message } (a feature the
-// plan doesn't include at all). This file turns those into one clear card over the dimmed page: "Not included in your plan" with Upgrade / Self-host,
+// plan doesn't include at all). This file turns those into one clear card over the dimmed page: "Not included in your plan",
 // and an inline notice for "you've used N of M". Pages use usePlan(what, used): it knows the answer up front (from the plan the server
 // reports) and also catches the error from a request (catchPlan). Everything is read defensively: unknown fields are ignored.
 import { createContext, useContext, useState } from 'react';
-import { Lock, Rocket, Server, TriangleAlert } from 'lucide-react';
+import { Lock, TriangleAlert } from 'lucide-react';
 import { legacyToNew } from '../compat.js';
-
-export const SELF_HOST_URL = 'https://github.com/Nookara-Project/ember-server#readme'; // (no Ember self-hosting guide on /guides yet: the server's own README)
 
 // feature key -> [Name at the start of a sentence, plural noun for "used N of M ___"]
 const NAMES = {
@@ -73,14 +71,9 @@ export function usePlan(what, used) {
   };
 }
 
-function Actions({ ctx }) {
-  return (
-    <div className="bf-pg-actions">
-      {ctx?.canUpgrade && ctx.goTo && <button type="button" className="btn btn-primary" onClick={() => ctx.goTo('hosting')}><Rocket size={14} /> Upgrade plan</button>}
-      <a className="btn btn-surface" href={SELF_HOST_URL} target="_blank" rel="noopener noreferrer"><Server size={14} /> Self-host</a>
-      {ctx?.managed && !ctx.canUpgrade && <small className="vc-hint">Only the server's owner can change the plan.</small>}
-    </div>
-  );
+// (the plan is the homeserver's: Ember has nowhere to change it, so it says who can)
+function Actions() {
+  return <div className="bf-pg-actions"><small className="vc-hint">The homeserver's admins decide what each plan includes.</small></div>;
 }
 
 // A whole feature isn't in the plan: the page's normal content stays rendered (so people can see what it looks like), dimmed and inert
@@ -97,8 +90,8 @@ export function PlanGate({ block, title, children }) {
         <div className="card bf-ss-card bf-pg" role="region" aria-label="Not included in your plan">
           <div className="card-header"><span className="card-title"><Lock size={15} /> Not included in your plan</span></div>
           <div className="card-body">
-            <p className="bf-pg-text"><b>{title || featureName(block.what)}</b> isn't included in this server's plan{plan ? ` (${plan})` : ''}. Upgrade the plan to unlock it, or self-host your own Ember server to get every feature.</p>
-            <Actions ctx={ctx} />
+            <p className="bf-pg-text"><b>{title || featureName(block.what)}</b> isn't included in this server's plan{plan ? ` (${plan})` : ''} on its homeserver.</p>
+            <Actions />
           </div>
         </div>
       </div>
@@ -115,9 +108,9 @@ export function PlanNotice({ block }) {
     <div className="vc-note warn bf-pg-note">
       <TriangleAlert size={14} />
       {canon(block.what) === 'max_upload_mb'
-        ? <span><b>Your plan allows files up to {block.limit} MB</b>{plan ? ` (${plan})` : ''}. Upgrade the plan for bigger files, or self-host your own Ember server for no limit.</span>
-        : <span><b>You've used {block.used ?? block.limit} of {block.limit} {nounOf(block.what)}</b> on your plan{plan ? ` (${plan})` : ''}. Upgrade the plan to add more, or self-host your own Ember server for no limits.</span>}
-      <Actions ctx={ctx} />
+        ? <span><b>Your plan allows files up to {block.limit} MB</b>{plan ? ` (${plan})` : ''}. </span>
+        : <span><b>You've used {block.used ?? block.limit} of {block.limit} {nounOf(block.what)}</b> on this server's plan{plan ? ` (${plan})` : ''}.</span>}
+      <Actions />
     </div>
   );
 }
