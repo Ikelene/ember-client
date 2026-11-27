@@ -1,16 +1,21 @@
-// Settings > Homeservers: the homeservers you are an admin or the owner of, and for each one its settings in tabs:
-// Accounts & sign-in (PROTOCOL §4a), Servers (who may create them, §5a), Admins, Federation (§4b), and Reports (§4d:
-// reported DM messages, HomeserverReports.jsx).
+// Settings > Homeservers: every homeserver this device is signed in to or connected to (your account there, whether it's
+// connected, Reconnect / Sign out / Forget, and signing in to another one). The ones you are an admin or the owner of also
+// open their settings in tabs: Accounts & sign-in (PROTOCOL §4a), Servers (who may create them, §5a), Admins, Federation
+// (§4b), and Reports (§4d: reported DM messages, HomeserverReports.jsx).
 import { useEffect, useRef, useState } from 'react';
-import { Building2, ArrowLeft, Globe, Users, KeyRound, ShieldCheck, TriangleAlert, RefreshCw, Trash2, Network, Crown, Settings2, Server, UserPlus, Ban, Gauge, Plus, X, RotateCw, ListChecks, Hourglass, Flag } from 'lucide-react';
+import { Building2, ArrowLeft, Globe, LogOut, AtSign, Users, KeyRound, ShieldCheck, TriangleAlert, RefreshCw, Trash2, Network, Crown, Settings2, Server, UserPlus, Ban, Gauge, Plus, X, RotateCw, ListChecks, Hourglass, Flag } from 'lucide-react';
 import { ReportsTab } from './HomeserverReports.jsx';
 import { SettingsPage, SCard, SRow, Switch } from './ui.jsx';
 import { LoginMethods } from './LoginMethods.jsx';
-import { ask, toast } from '../store.js';
+import { ask, toast, useChat } from '../store.js';
 import { Avatar } from '../Profile.jsx';
-import { HomeserverIcon } from '../HomeserverLogin.jsx';
+import { HomeserverIcon, HomeserverLogin, useHomeSessions, useHomeSession } from '../HomeserverLogin.jsx';
+import { refreshInstance, reconnect, removeInstance } from '../instances.js';
+import { signOutHome, nookaraHandle } from '../session.js';
+import { forgetHomeserver } from '../homeserver.js';
+import { normOrigin } from '../ids.js';
+import { homeserverRows, forgetText } from '../homeservers.js';
 import { InstanceTab, restartInstance } from '../Instances.jsx';
-import { refreshInstance } from '../instances.js';
 import { useUnsaved, UnsavedBar } from '../unsaved.jsx';
 import { hsCall, viaInstance, discoveryDoc, useAdminHomeservers } from '../homeApi.js';
 import { REGISTRATION, REMOTE_MODES, CREATION_MODES, methodsToSend, sameMethods, methodIssues, nameList, adminErrorText } from '../homeAdmin.js';
@@ -47,21 +52,7 @@ export default function HomeserversPage({ onDirty }) {
   const hs = list.find(h => h.origin === origin) || null;
   useEffect(() => { if (origin && !hs) setOrigin(null); }, [origin, hs]);
 
-  if (!hs) {
-    return (
-      <SettingsPage icon={Building2} title="Homeservers" sub="Homeservers you run: who can sign in, who can create servers, and who helps you run them.">
-        <SCard>
-          {list.length ? list.map(h => (
-            <div className="sx-list-row" key={h.origin}>
-              <HomeserverIcon hs={h} className="ac-ico" />
-              <div className="sx-row-txt"><b>{h.name}</b><span className="ac-host"><Globe size={12} /> {h.domain} - {h.isOwner ? 'you own it' : "you're an admin"}</span></div>
-              <div className="sx-row-ctl"><button type="button" className="btn btn-primary btn-sm" onClick={() => { setTab('accounts'); setOrigin(h.origin); }}><Settings2 size={13} /> Manage</button></div>
-            </div>
-          )) : <div className="sx-empty"><Building2 size={28} /><b>No homeservers to manage</b><span>Homeservers where you're an admin or the owner show here once you're signed in to them.</span></div>}
-        </SCard>
-      </SettingsPage>
-    );
-  }
+  if (!hs) return <MyHomeservers admins={list} onManage={h => { setTab('accounts'); setOrigin(h.origin); }} />;
   return (
     <div className="sx-page hsx-page">
       <header className="hsx-head">
@@ -78,6 +69,64 @@ export default function HomeserversPage({ onDirty }) {
       {tab === 'federation' && <FederationTab key={hs.origin} hs={hs} onDirty={note} />}
       {tab === 'reports' && <ReportsTab key={hs.origin} hs={hs} />}
     </div>
+  );
+}
+
+// ── the list: every homeserver on this device ──
+const NONE = [];
+function MyHomeservers({ admins, onManage }) {
+  const sessions = useHomeSessions();
+  const home = useHomeSession();
+  const instances = useChat(s => s.instances || NONE);
+  const servers = useChat(s => s.servers || NONE);
+  const me = useChat(s => s.me);
+  const signedIn = useChat(s => s.signedIn);
+  const [adding, setAdding] = useState(false);
+  const homeHandle = home?.account?.handle || (signedIn && me ? nookaraHandle(me.username) : null);
+  const rows = homeserverRows(sessions, instances, servers, { homeHandle, norm: normOrigin });
+  async function signOut(r) {
+    if (!(await ask({ title: `Sign out of ${r.domain}?`, text: `Ember forgets its sign-in for ${r.handle || r.domain} on this device.${r.servers.length ? ' Your servers there stay in your list, signed out, until you sign in again or forget it.' : ''}`, confirm: 'Sign out', danger: true }))) return;
+    await signOutHome(r.origin);
+    toast(`Signed out of ${r.domain}.`, true);
+  }
+  async function forget(r) {
+    if (!(await ask({ title: `Forget ${r.domain}?`, text: forgetText(r), confirm: 'Forget', danger: true }))) return;
+    if (r.inst) await removeInstance(r.inst.origin).catch(() => {});
+    if (r.session) await signOutHome(r.origin);
+    forgetHomeserver(r.domain);
+    toast(`Forgot ${r.domain}.`, true);
+  }
+  return (
+    <SettingsPage icon={Building2} title="Homeservers" sub="Every server you're in lives on a homeserver, and your account is kept on one. These are the ones this device uses.">
+      <SCard action={!adding && <button type="button" className="btn btn-surface btn-sm" onClick={() => setAdding(true)}><Plus size={13} /> Add homeserver</button>}>
+        {rows.length ? rows.map(r => {
+          const admin = admins.find(a => a.origin === r.origin);
+          const down = r.inst && (r.inst.sleep || !['open', 'connecting'].includes(r.inst.status));
+          return (
+            <div className="sx-list-row ac-inst" key={r.origin}>
+              <HomeserverIcon hs={r} className="ac-ico" />
+              <div className="sx-row-txt">
+                <b>{r.name}{admin && <i className="hsx-tag">{admin.isOwner ? <><Crown size={11} /> Owner</> : 'Admin'}</i>}</b>
+                <span className="ac-host"><Globe size={12} /> {r.domain}{r.legacy ? ' - one server on its own' : ''}</span>
+                {r.handle && <span className="ac-who"><AtSign size={12} /> {r.handle}</span>}
+                <span className={`ac-state ${r.status[0]}`}>{r.status[1]}{r.servers.length ? ` - ${r.servers.length} ${r.servers.length === 1 ? 'server' : 'servers'}` : ''}</span>
+              </div>
+              <div className="sx-row-ctl ac-acts">
+                {admin && <button type="button" className="btn btn-primary btn-sm" onClick={() => onManage(admin)}><Settings2 size={13} /> Manage</button>}
+                {down && <button type="button" className="btn btn-surface btn-sm" onClick={() => reconnect(r.inst.origin)}><RefreshCw size={13} /> Reconnect</button>}
+                {r.session && <button type="button" className="btn btn-surface btn-sm" onClick={() => signOut(r)}><LogOut size={13} /> Sign out</button>}
+                <button type="button" className="btn btn-surface btn-sm ac-danger" onClick={() => forget(r)}><Trash2 size={13} /> Forget</button>
+              </div>
+            </div>
+          );
+        }) : <div className="sx-empty"><Building2 size={28} /><b>No homeservers yet</b><span>Sign in to a homeserver to see your servers, DMs and friends.</span></div>}
+      </SCard>
+      {(adding || !rows.length) && (
+        <SCard title="Sign in to another homeserver" sub="Your account on it is added next to the ones above." action={rows.length > 0 && <button type="button" className="btn btn-surface btn-sm" onClick={() => setAdding(false)}><X size={13} /> Cancel</button>}>
+          <div className="ac-hs"><HomeserverLogin /></div>
+        </SCard>
+      )}
+    </SettingsPage>
   );
 }
 

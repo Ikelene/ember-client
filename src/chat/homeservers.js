@@ -75,3 +75,6 @@ export function forgetText(row) {
   const list = n ? (n <= 3 ? row.servers.join(', ') : `${row.servers.slice(0, 3).join(', ')} and ${n - 3} more`) : '';
   return `${n ? `${n === 1 ? 'Your server' : `Your ${n} servers`} on it (${list}) ${n === 1 ? 'leaves' : 'leave'} your server list. ` : ''}${row.session ? `Ember signs out of ${row.domain} on this device. ` : ''}Your account and your servers there stay as they are - you can add ${row.domain} again any time.`;
 }
+
+// Settings > Homeservers is there for everyone whose device uses a homeserver (not only its admins)
+export const showHomeservers = ({ connections = 0, home = false, admin = false, signedIn = false } = {}) => connections > 0 || !!home || !!admin || !!signedIn;

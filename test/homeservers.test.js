@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { homeDomainOf, homeLine, statusOf, homeserverRows, forgetText } from '../src/chat/homeservers.js';
+import { homeDomainOf, homeLine, statusOf, homeserverRows, forgetText, showHomeservers } from '../src/chat/homeservers.js';
 
 const inst = o => ({ origin: 'https://chat.b.test', host: 'chat.b.test', v2: true, status: 'open', sleep: null, homeserver: { domain: 'b.test', name: 'B' }, ...o });
 
@@ -47,4 +47,12 @@ test('forget: the confirmation names the servers that leave the rail', () => {
   assert.match(forgetText(row), /signs out of b\.test/);
   assert.match(forgetText({ ...row, servers: ['a', 'b', 'c', 'd', 'e'] }), /\(a, b, c and 2 more\)/);
   assert.doesNotMatch(forgetText({ domain: 'x.test', session: false, servers: [] }), /servers on it|signs out/);
+});
+
+test('settings: the Homeservers page is for anyone using a homeserver, not only its admins', () => {
+  assert.equal(showHomeservers({ connections: 2 }), true);
+  assert.equal(showHomeservers({ home: true }), true);
+  assert.equal(showHomeservers({ signedIn: true }), true);
+  assert.equal(showHomeservers({ admin: true }), true);
+  assert.equal(showHomeservers({}), false);
 });
