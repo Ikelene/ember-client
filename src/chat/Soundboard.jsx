@@ -9,6 +9,7 @@ import { playBoardSound, previewBoardSound, stopBoardSounds } from './voice.js';
 import { Twemoji } from './emoji.jsx';
 import { PlanGate, PlanNotice, PlanUsage } from './PlanGate.jsx';
 import { usePlan } from './plans.js';
+import { useVoiceCan, VOICE_DENIED } from './channelPerms.js';
 
 const SoundIcon = ({ s }) => {
   if (!s.emoji) return <AudioLines size={16} />;
@@ -19,6 +20,8 @@ const SoundIcon = ({ s }) => {
 // the button + floating picker (voice panel / voice channel)
 export function SoundboardButton({ className = 'vc-vbtn', size = 17 }) {
   const [open, setOpen] = useState(null); // rect
+  const may = useVoiceCan('use_soundboard'); // (Use soundboard denied in this voice channel)
+  if (!may) return <button type="button" className={className} title={VOICE_DENIED.use_soundboard} disabled><AudioLines size={size} /></button>;
   return (
     <>
       <button type="button" className={`${className}${open ? ' on' : ''}`} title="Soundboard" onClick={e => {

@@ -363,7 +363,7 @@ export function sendBinary(buf) {
 // voice.js listens here (voice JSON, calls, who's in which voice channel, and the audio frames)
 let voiceHook = null;
 export const onVoiceEvent = fn => { voiceHook = fn; };
-const VOICE_EVENTS = new Set(['voice', 'voice_open', 'voice_closed', 'voice_call_incoming', 'voice_call_ringing', 'voice_call_answered', 'voice_call_accepted', 'voice_call_failed', 'voice_call_ended', 'chat_voice_state', 'chat_call_state', 'voice_sound', 'voice_sound_failed', 'chat_rtc_joined', 'chat_rtc_published', 'chat_rtc_offer', 'chat_rtc_ready', 'chat_rtc_room', 'chat_rtc_resumed', 'chat_rtc_left']);
+const VOICE_EVENTS = new Set(['voice', 'voice_open', 'voice_closed', 'voice_call_incoming', 'voice_call_ringing', 'voice_call_answered', 'voice_call_accepted', 'voice_call_failed', 'voice_call_ended', 'chat_voice_state', 'chat_call_state', 'voice_sound', 'voice_sound_failed', 'chat_rtc_joined', 'chat_rtc_published', 'chat_rtc_offer', 'chat_rtc_ready', 'chat_rtc_room', 'chat_rtc_resumed', 'chat_rtc_left', 'chat_rtc_tracks_closed']);
 // is this a phone (or tablet)? -> the socket says mobile: true and people see the phone mark next to you.
 // 1. the desktop app is never mobile
 // 2. Chromium's Client Hints say so (navigator.userAgentData.mobile) -> mobile
@@ -459,7 +459,7 @@ setInterval(() => send({ type: 'ping' }), 25000);
 
 // one event from the home socket (inst = nookara) or from an instance's (already in Ember's shapes, ids namespaced)
 // an instance may only say what PROTOCOL.md §7 lets it: nothing that is Nookara's own (DMs, kicks, presence, calls...)
-const INSTANCE_EVENTS = new Set(['chat_message', 'chat_message_update', 'chat_message_delete', 'chat_reactions', 'chat_typing', 'chat_pins_update', 'chat_server_update', 'chat_server_removed', 'chat_roles_update', 'chat_perms_changed', 'chat_channels_update', 'chat_member_update', 'chat_presence', 'chat_members_stale', 'chat_emojis_update', 'chat_stickers_update', 'chat_identity_update', 'chat_ack', 'chat_error', 'chat_ephemeral', 'chat_join_request', 'chat_join_result', 'chat_report', 'chat_timeout', 'chat_server_added', 'chat_starboard', 'chat_shop_update', 'chat_commands_update', 'chat_interaction_message', 'chat_interaction_modal', 'game_status', 'game_console', 'game_linked', 'game_unlinked', 'voice_sound', 'voice_sound_failed', 'e2ee_keys_changed', 'e2ee_link_request', 'e2ee_link_done']);
+const INSTANCE_EVENTS = new Set(['chat_message', 'chat_message_pinned', 'chat_message_update', 'chat_message_delete', 'chat_reactions', 'chat_typing', 'chat_pins_update', 'chat_server_update', 'chat_server_removed', 'chat_roles_update', 'chat_perms_changed', 'chat_channels_update', 'chat_member_update', 'chat_presence', 'chat_members_stale', 'chat_emojis_update', 'chat_stickers_update', 'chat_identity_update', 'chat_ack', 'chat_error', 'chat_ephemeral', 'chat_join_request', 'chat_join_result', 'chat_report', 'chat_timeout', 'chat_server_added', 'chat_starboard', 'chat_shop_update', 'chat_commands_update', 'chat_interaction_message', 'chat_interaction_modal', 'game_status', 'game_console', 'game_linked', 'game_unlinked', 'voice_sound', 'voice_sound_failed', 'e2ee_keys_changed', 'e2ee_link_request', 'e2ee_link_done']);
 const INSTANCE_VOICE = /^(chat_rtc_|chat_voice_state$)/;
 const LOCKED_EVENTS = new Set(['auth_success', 'auth_error', 'restrictions', 'error', 'kicked', 'ember_update', OLD_EMBER_UPDATE, 'web_build']); // (what still matters while locked)
 // "who posted recently" (channel list, Modern): people who posted in a channel lately, newest first. The server's list comes
@@ -676,6 +676,7 @@ function onEvent(m, inst = NOOKARA) {
     case 'chat_typing': typingFrom(`c:${m.channel}`, m.bridged?.name ? noteBridgedTyper(m.bridged) : m.username, m.typing, inst); break;
     case 'dm_typing': typingFrom(`d:${String(m.from).toLowerCase()}`, m.from, m.typing); break;
     case 'chat_channels_update':
+      import('./channelPerms.js').then(p => p.refreshMyChannelPerms(m.server)).catch(() => {});
       set(s => ({ detail: upd(s.detail, m.server, d => d && { ...d, categories: m.categories ?? d.categories, channels: m.channels.map(c => ({ ...(d.channels.find(x => x.cid === c.cid) || {}), ...c })) }) }));
       refreshServer(m.server);
       break;
@@ -725,7 +726,8 @@ function onEvent(m, inst = NOOKARA) {
     case 'chat_roles_update':
       set(s => ({ detail: upd(s.detail, m.server, d => d && { ...d, roles: m.roles }) }));
       break;
-    case 'chat_perms_changed': // someone changed my roles there
+    case 'chat_perms_changed': // someone changed my roles there (or a channel's permissions)
+      import('./channelPerms.js').then(p => p.refreshMyChannelPerms(m.server)).catch(() => {});
       if (state.commands[m.server]) loadCommands(m.server);
       refreshServer(m.server); if (inst === NOOKARA) { loadServers(); loadMembers(m.server); } else loadInstanceData(inst); // (Manage users changes what the member list shows)
       break;
@@ -842,6 +844,10 @@ function onEvent(m, inst = NOOKARA) {
       break;
     case 'group_update': case 'group_removed': loadGroups(); break;
     case 'chat_pins_update': bumpPins(m.channel); break;
+    case 'chat_message_pinned': // (no Read message history: only the pin state, no message)
+      set(s => ({ msgs: upd(s.msgs, `c:${m.channel}`, b => b && { ...b, list: b.list.map(x => (String(x.id) === String(m.id) ? { ...x, pinned: !!m.pinned } : x)) }) }));
+      bumpPins(m.channel);
+      break;
     case 'friend_request': case 'friend_request_accepted': loadFriends(); loadHomeRequests(); break;
     case 'blocks_changed': loadBlocks(); break;
     case 'chat_settings_changed': if (m.settings && typeof m.settings === 'object') set(s => ({ settings: { ...s.settings, ...m.settings } })); break; // (pinned DM categories from another device)

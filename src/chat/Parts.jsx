@@ -25,7 +25,7 @@ import { ChannelIcon, NameDecor } from './roles.jsx';
 import { P, has, useNameStyle, colorFrom } from './perms.js';
 import { serverMenu, instanceMenu, channelMenu, userMenu, openMenu, copy } from './menus.js';
 import { apiFetch, getToken } from '../api.js';
-import { NOOKARA, instOf, isInst, normOrigin } from './ids.js';
+import { NOOKARA, instOf, isInst, normOrigin, bare } from './ids.js';
 import { loudUnread, needsChannelCount } from './unread.js';
 import { getLook, subscribeLook } from './look.js';
 import { railEntries, railPos, railOrigin } from './addresses.js';
@@ -402,6 +402,11 @@ export function ServerSidebar({ sid, onInvite, onSettings, onChannel, onLeave, o
     const name = await ask({ title: `Rename ${old}`, input: { placeholder: 'Category name', value: old }, confirm: 'Rename' });
     if (!name || !name.trim() || name.trim() === old) return;
     const nn = name.trim().slice(0, 40);
+    if (isInst(sid)) { // an Ember server renames it in place: its permissions stay, and its channels keep following them
+      try { await apiFetch(`/api/v1/servers/${encodeURIComponent(bare(sid))}/categories/${encodeURIComponent(old)}`, { inst: instOf(sid), method: 'PUT', body: JSON.stringify({ name: nn }) }); await refreshServer(sid); }
+      catch (e) { toast(e.message === 'category_taken' ? 'There is already a category with that name.' : errorText(e.message)); }
+      return;
+    }
     const order = groups.flatMap(g => g.list).map(c => ((c.category || '') === old ? { ...c, category: nn } : c));
     saveLayout(cats.map(c => (c === old ? nn : c)), order);
   }

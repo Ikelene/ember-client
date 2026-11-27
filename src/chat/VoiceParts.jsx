@@ -14,6 +14,7 @@ import { PlatformIcon } from './platforms.jsx';
 import { PLATFORM_NAMES } from './platformNames.js';
 import { desktopBridge } from '../compat.js';
 import { micMenu, outputMenu, cameraMenu } from './voiceMenus.js';
+import { useVoiceCan, useCanIn, VOICE_DENIED } from './channelPerms.js';
 
 const roomOf = cid => `bf_${cid}`;
 // your own picture comes from `me` (nothing puts you in `people` until a message of yours is seen, e.g. right after a reload);
@@ -34,13 +35,13 @@ const ExtName = ({ ext, size = 12 }) => <span className="vc-ext-name" title={`In
 const coarse = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 const moreHint = what => `${coarse() ? 'Hold' : 'Right-click'} for ${what}`;
 // a voice control button: left-click as before, right-click (or a long press on touch) opens its menu
-function VBtn({ className, tip, menu, onClick, children }) {
+function VBtn({ className, tip, menu, onClick, children, disabled = false }) {
   const h = useRef({ t: 0, x: 0, y: 0, fired: 0 }).current;
   const cancel = () => { clearTimeout(h.t); h.t = 0; };
   const recent = () => Date.now() - h.fired < 800;
   return (
-    <button type="button" className={className} data-tip={tip} aria-label={tip}
-      onClick={e => { if (recent()) { e.preventDefault(); return; } onClick(e); }}
+    <button type="button" className={className} data-tip={tip} aria-label={tip} disabled={disabled}
+      onClick={e => { if (recent() || disabled) { e.preventDefault(); return; } onClick(e); }}
       onContextMenu={e => {
         if (recent()) { e.preventDefault(); e.stopPropagation(); return; }
         const touch = !!h.t; // the browser's own long-press beat our timer
@@ -62,6 +63,8 @@ function VBtn({ className, tip, menu, onClick, children }) {
 }
 function MicBtn({ v, big, bar }) {
   const s = big ? 20 : 17;
+  const may = useVoiceCan('speak'); // (Speak denied in this voice channel: the mic stays off)
+  if (!may && v.info) return <VBtn className={`${bar ? 'vc-ico-btn' : big ? 'vc-vbig' : 'vc-vbtn'} off`} tip={VOICE_DENIED.speak} menu={micMenu} disabled onClick={() => {}}><MicOff size={s} /></VBtn>;
   return <VBtn className={`${bar ? 'vc-ico-btn' : big ? 'vc-vbig' : 'vc-vbtn'}${v.muted ? ' off' : ''}`} tip={`${v.muted ? 'Unmute' : 'Mute'} (${moreHint('mic settings')})`} menu={micMenu} onClick={() => setMute(!v.muted)}>{v.muted ? <MicOff size={s} /> : <Mic size={s} />}</VBtn>;
 }
 function DeafenBtn({ v, big, bar }) {
@@ -70,6 +73,8 @@ function DeafenBtn({ v, big, bar }) {
 }
 function CameraBtn({ v, big }) {
   const s = big ? 20 : 17;
+  const may = useVoiceCan('video');
+  if (!may && !v.camera) return <VBtn className={big ? 'vc-vbig' : 'vc-vbtn'} tip={VOICE_DENIED.video} menu={cameraMenu} disabled onClick={() => {}}><VideoOff size={s} /></VBtn>;
   return <VBtn className={`${big ? 'vc-vbig' : 'vc-vbtn'}${v.camera ? ' on' : ''}`} tip={`${v.camera ? 'Turn camera off' : 'Turn camera on'} (${moreHint('camera settings')})`} menu={cameraMenu} onClick={() => toggleCamera().catch(() => {})}>{v.camera ? <Video size={s} /> : <VideoOff size={s} />}</VBtn>;
 }
 
@@ -109,6 +114,7 @@ export function QuickVoiceBtns() {
 // bottom left, above your name: where you're connected + mute / deafen / hang up
 export function VoicePanel() {
   const v = useChat(s => s.voice);
+  const mayStream = useVoiceCan('stream');
   const [callIn, setCallIn] = useState(false);
   const [shareSources, setShareSources] = useState(null);
   const startShare = async () => { if (v.screen) return toggleScreen().catch(() => {}); if (!desktopBridge()?.isDesktop) return toggleScreen().catch(() => {}); try { setShareSources(await desktopScreenSources()); } catch { setShareSources([]); } };
@@ -131,7 +137,7 @@ export function VoicePanel() {
       )}
       <div className="vc-vpanel-btns">
         <CameraBtn v={v} />
-        <button type="button" className={`vc-vbtn${v.screen ? ' on' : ''}`} title={v.screen ? 'Stop sharing screen' : 'Share screen'} onClick={startShare}>{v.screen ? <MonitorUp size={17} /> : <MonitorOff size={17} />}</button>
+        <button type="button" className={`vc-vbtn${v.screen ? ' on' : ''}`} title={v.screen ? 'Stop sharing screen' : mayStream ? 'Share screen' : VOICE_DENIED.stream} disabled={!v.screen && !mayStream} onClick={startShare}>{v.screen ? <MonitorUp size={17} /> : <MonitorOff size={17} />}</button>
         {v.info.kind === 'channel' && v.info.allowCallIn && <button type="button" className="vc-vbtn" title="Call someone in" onClick={() => setCallIn(true)}><UserPlus size={17} /></button>}
         <SoundboardButton />
       </div>
@@ -338,6 +344,8 @@ function CallStage({ v, tiles, compact, sid }) {
 export function VoiceView({ channel, sid }) {
   const room = roomOf(channel.cid);
   const v = useChat(s => (s.voice?.room === room ? s.voice : null));
+  const mayConnect = useCanIn(sid, channel.cid, 'connect'); // (Connect denied here: the Join button says so)
+  const mayStream = useVoiceCan('stream');
   const others = useChat(s => s.voiceStates[channel.cid]);
   const [startShare, picker] = useScreenShare(v);
   const flags = name => (others || []).find(o => String(o.username).toLowerCase() === String(name).toLowerCase());
@@ -355,11 +363,11 @@ export function VoiceView({ channel, sid }) {
             <MicBtn v={v} big />
             <DeafenBtn v={v} big />
             <CameraBtn v={v} big />
-            <button type="button" className={`vc-vbig${v.screen ? ' on' : ''}`} title={v.screen ? 'Stop sharing screen' : 'Share screen'} onClick={startShare}>{v.screen ? <MonitorUp size={20} /> : <MonitorOff size={20} />}</button>
+            <button type="button" className={`vc-vbig${v.screen ? ' on' : ''}`} title={v.screen ? 'Stop sharing screen' : mayStream ? 'Share screen' : VOICE_DENIED.stream} disabled={!v.screen && !mayStream} onClick={startShare}>{v.screen ? <MonitorUp size={20} /> : <MonitorOff size={20} />}</button>
             <button type="button" className="vc-vbig hang" title="Disconnect" onClick={() => leaveVoice()}><PhoneOff size={20} /></button>
           </>
         ) : (
-          <button type="button" className="btn btn-primary vc-vjoin" onClick={() => joinVoice(room, { kind: 'channel', sid, cid: channel.cid })}><Volume2 size={16} /> Join voice</button>
+          <button type="button" className="btn btn-primary vc-vjoin" disabled={!mayConnect} title={mayConnect ? undefined : VOICE_DENIED.connect} onClick={() => joinVoice(room, { kind: 'channel', sid, cid: channel.cid })}><Volume2 size={16} /> {mayConnect ? 'Join voice' : "Can't join"}</button>
         )}
       </div>
       {picker}

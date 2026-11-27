@@ -1,7 +1,8 @@
 // Channel permission overwrites (ember-server PROTOCOL §6.5): the channel permissions by name, grouped for the editor
 // (ChannelPerms.jsx), the words for the server's refusals, and what I may do in a channel worked out the server's way from the
 // channel view's permission_overwrites, so the composer and the buttons hide what the server would refuse anyway.
-import { useChat, getState } from './store.js';
+import { useChat, getState, patchState } from './store.js';
+import { apiFetch } from '../api.js';
 import { isInst, instOf, bare } from './ids.js';
 import { CH, bitsOf, resolveBits } from './channelPermsCore.js';
 
@@ -67,6 +68,8 @@ export function channelBits(st, sid, cid) {
   if (!d || d.server?.perms == null) return null; // (not known yet)
   const server = Number(d.server.perms) || 0;
   if (d.server?.role === 'owner' || (server & 512)) return 0x7fffffff;
+  const known = st.myChPerms?.[cid]; // (what the server said I may do there: member overwrites aren't shown to me)
+  if (known != null) return known;
   const ch = d.channels?.find(c => c.cid === cid);
   const ows = ch?.permission_overwrites;
   if (!isInst(sid) || !Array.isArray(ows)) return server;
@@ -80,6 +83,31 @@ export function channelBits(st, sid, cid) {
 export const canIn = (st, sid, cid, name) => { const b = channelBits(st, sid, cid); return b == null || (b & CH[name]) === CH[name]; };
 export const useCanIn = (sid, cid, name) => useChat(s => (sid && cid ? canIn(s, sid, cid, name) : true));
 export const canInNow = (sid, cid, name) => canIn(getState(), sid, cid, name);
+// in the voice channel I'm in (or about to join): may I use the mic / camera / screen / soundboard there? (calls: always)
+export const useVoiceCan = name => useChat(s => { const i = s.voice?.info; return i?.kind === 'channel' && i.sid && i.cid ? canIn(s, i.sid, i.cid, name) : true; });
+export const VOICE_DENIED = { connect: "You don't have permission to join this voice channel.", speak: "You don't have permission to speak in this channel.", video: "You don't have permission to use your camera in this channel.", stream: "You don't have permission to share your screen in this channel.", use_soundboard: "You don't have permission to use the soundboard in this channel." };
+
+// ask the server what I may do in a channel (GET …/permissions/<me>): kept in state.myChPerms[cid] for channelBits
+export async function loadMyChannelPerms(sid, cid) {
+  if (!sid || !cid || !isInst(sid)) return;
+  const me = getState().instances.find(i => i.origin === instOf(sid))?.user;
+  if (me?.id == null) return;
+  let bits = null;
+  try {
+    const r = await apiFetch(effectivePath(sid, cid, String(me.id)), { inst: instOf(sid) });
+    bits = r.owner || r.administrator ? 0x7fffffff : bitsOf(Array.isArray(r.names) ? r.names : []);
+  } catch (e) { if (e.message === 'channel_not_found' || e.status === 404) bits = 0; else return; }
+  patchState(s => ({ myChPerms: { ...(s.myChPerms || {}), [cid]: bits } }));
+}
+// a server's permissions changed: what I knew about its channels is stale; the open one is asked again
+export function refreshMyChannelPerms(sid) {
+  const st = getState();
+  const drop = Object.keys(st.myChPerms || {}).filter(cid => isInst(cid) && instOf(cid) === instOf(sid) && st.detail[sid]?.channels?.some(c => c.cid === cid) !== false);
+  if (drop.length) patchState(s => { const m = { ...(s.myChPerms || {}) }; for (const k of drop) delete m[k]; return { myChPerms: m }; });
+  const v = st.view, vc = st.voice?.info;
+  if (v?.sid === sid && v.cid) loadMyChannelPerms(sid, v.cid);
+  if (vc?.kind === 'channel' && vc.sid === sid && vc.cid && vc.cid !== v?.cid) loadMyChannelPerms(sid, vc.cid);
+}
 
 // the routes, by the app's ids
 export const owPath = (sid, cid) => `/api/v1/servers/${encodeURIComponent(bare(sid))}/channels/${encodeURIComponent(bare(cid))}/overwrites`;

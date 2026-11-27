@@ -556,7 +556,9 @@ function Message({ m, head, ctx, canMod, onReply, onUser: openUser, editing, set
         <div className="vc-reply-to" onClick={() => document.querySelector(`.vc-msg[data-id="${m.reply.id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
           <span className="vc-reply-line" />
           {replyAuthor ? <Avatar user={replyBlocked ? blockedFace(replyAuthor) : aliasFace(replyAlias, replyAuthor)} size={16} /> : null}
-          {replyBlocked
+          {m.reply.earlier
+            ? <span className="vc-reply-text vc-reply-earlier">Replying to an earlier message</span>
+            : replyBlocked
             ? <><b className="vc-blocked-name">{BLOCKED_NAME}<BlockedMark size={11} /></b><span className="vc-reply-text vc-blocked-quote">Message from someone you blocked</span></>
             : <><b style={replyAuthor?.color ? { color: replyAuthor.color } : undefined}>{replyAlias ? replyAlias.name : <NameText u={replyAuthor} fallback="Nookara" />}</b>
               {replyAlias && <AliasMark alias={replyAlias} by={replyAuthor} size={12} />}

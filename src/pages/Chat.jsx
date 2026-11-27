@@ -52,7 +52,7 @@ import { useDesktopMac } from '../components/tabs/chatSettings.js';
 import { ServerSettings } from '../chat/ServerSettings.jsx';
 import { ChannelSettings } from '../chat/ChannelSettings.jsx';
 import { OverwritesEditor } from '../chat/OverwritesEditor.jsx';
-import { channelBits } from '../chat/channelPerms.js';
+import { channelBits, loadMyChannelPerms } from '../chat/channelPerms.js';
 import { ExportButton } from '../chat/Community.jsx';
 
 import { isInst, instOf } from '../chat/ids.js';
@@ -523,7 +523,9 @@ function ChatPage() {
   useEffect(() => { setDiscover(false); }, [view]); // any navigation (even to where you already are) leaves Discovery
   // a server's (or channel's) settings belong to the server that was open: going somewhere else closes them
   const viewWhere = view.dm || view.sid || view.kind;
-  useEffect(() => { setDialog(d => (d && (d.kind === 'settings' || d.kind === 'channel') && !(d.keepUntil > Date.now()) ? null : d)); }, [viewWhere]); // (keepUntil: opened on start-up, before the first view settles)
+  useEffect(() => { setDialog(d => (d && (d.kind === 'settings' || d.kind === 'channel') && !(d.keepUntil > Date.now()) ? null : d)); }, [viewWhere]);
+  // what I may do in the channel I open, as its server says (member overwrites aren't shown to members: channelPerms.js)
+  useEffect(() => { if (view.kind === 'channel' && view.sid && view.cid) loadMyChannelPerms(view.sid, view.cid); }, [view.sid, view.cid]); // eslint-disable-line react-hooks/exhaustive-deps // (keepUntil: opened on start-up, before the first view settles)
   useEffect(() => { setReplyTo(null); setDrawer(!!history.state?.vcDrawer && innerWidth <= 760); }, [view.kind, view.cid, view.username, view.room]);
   // invite links (from messages, the address bar...) open the invite pop-up here
   useEffect(() => {
