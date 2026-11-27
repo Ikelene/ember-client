@@ -362,7 +362,7 @@ export function sendBinary(buf) {
 // voice.js listens here (voice JSON, calls, who's in which voice channel, and the audio frames)
 let voiceHook = null;
 export const onVoiceEvent = fn => { voiceHook = fn; };
-const VOICE_EVENTS = new Set(['voice', 'voice_open', 'voice_closed', 'voice_call_incoming', 'voice_call_ringing', 'voice_call_answered', 'voice_call_accepted', 'voice_call_failed', 'voice_call_ended', 'chat_voice_state', 'chat_call_state', 'voice_sound', 'voice_sound_failed', 'chat_rtc_joined', 'chat_rtc_published', 'chat_rtc_offer', 'chat_rtc_ready', 'chat_rtc_room', 'chat_rtc_resumed']);
+const VOICE_EVENTS = new Set(['voice', 'voice_open', 'voice_closed', 'voice_call_incoming', 'voice_call_ringing', 'voice_call_answered', 'voice_call_accepted', 'voice_call_failed', 'voice_call_ended', 'chat_voice_state', 'chat_call_state', 'voice_sound', 'voice_sound_failed', 'chat_rtc_joined', 'chat_rtc_published', 'chat_rtc_offer', 'chat_rtc_ready', 'chat_rtc_room', 'chat_rtc_resumed', 'chat_rtc_left']);
 // is this a phone (or tablet)? -> the socket says mobile: true and people see the phone mark next to you.
 // 1. the desktop app is never mobile
 // 2. Chromium's Client Hints say so (navigator.userAgentData.mobile) -> mobile
@@ -1466,6 +1466,13 @@ const sdmMsg = o => (o?.sealed ? { ...o, attachments: sealedAtts(o) } : o);
 function openSdm(msg, dm = sdmOf(msg?.channel)) {
   if (!dm || !msg?.enc) return Promise.resolve(msg);
   return E2EE.openDmMessage(msg, dm).then(sdmMsg).catch(() => ({ ...msg, body: '', sealed: { v: 2, state: 'failed' } }));
+}
+// social_dm_rewrapped: messages of a DM were wrapped again for my key - what this device has of it is opened again
+export function dmRewrapped(id) {
+  const dm = state.social.dms.find(x => x.id === id);
+  if (!dm) return;
+  set(s => ({ msgs: Object.fromEntries(Object.entries(s.msgs).filter(([k]) => !(k.startsWith('c:') && sdmOf(k.slice(2))?.id === id))) }));
+  if (state.view.dm === id) loadMessages(state.view);
 }
 // messages of a channel fetched elsewhere (pins, search): a homeserver DM's opened on this device, others as they are
 export const openChannelMessages = list => Promise.all((list || []).map(m => openSdm(m)));
@@ -3024,10 +3031,10 @@ const SOCIAL_TEXT = {
   cannot_friend_yourself: "That's you!", user_not_found: "Couldn't find anyone with that name.", wrong_homeserver: "Couldn't find anyone with that name.", blocked: "You can't send them a request.", user_blocked: 'You blocked them - unblock them first.',
   too_many_friends: 'Your friends list is full.', rate_limited: "You're doing that a lot - try again in a bit.", homeserver_rate_limited: 'Their homeserver is busy - try again in a bit.', no_request: 'That request is gone.', not_friends: "You're not friends any more.",
   remote_accounts_off: "Your homeserver doesn't talk to other homeservers.", homeserver_denied: "Your homeserver doesn't talk to that homeserver.", homeserver_not_allowed: "Your homeserver doesn't talk to that homeserver.", homeserver_unreachable: "Couldn't reach their homeserver.",
-  dm_not_allowed: "They don't take messages from you.", invalid_members: "That won't work - pick up to 9 other people.", too_many_dms: 'They have too many conversations.', not_a_group: 'Only group chats can do that.', owner_only: 'Only the group owner can do that.',
+  dm_not_allowed: "They don't take messages from you.", already_member: "They're in the group already.", group_full: 'A group can have up to 10 people.', not_hosted_here: "That group's homeserver has to do that - try again in a moment.", invalid_members: "That won't work - pick up to 9 other people.", too_many_dms: 'They have too many conversations.', not_a_group: 'Only group chats can do that.', owner_only: 'Only the group owner can do that.',
   dm_not_found: "That conversation isn't there any more.", local_accounts_only: 'Friends and DMs need an account on this homeserver.', unreachable: "Couldn't reach your homeserver.", signed_out: 'Your sign-in ended - sign in again.',
 };
-export const socialErrorText = e => SOCIAL_TEXT[e?.error || e?.message] || "That didn't work - try again in a bit.";
+export const socialErrorText = e => `${e?.member ? `${e.member}: ` : ''}${SOCIAL_TEXT[e?.error || e?.message] || "That didn't work - try again in a bit."}`; // (member: which person it was about)
 export async function addSocialFriend(input, message) {
   const h = soc(), handle = cleanHandle(input, h?.domain);
   if (!h) return false;
@@ -3092,7 +3099,9 @@ export async function socialDmAction(what, id, arg) {
       return true;
     }
     if (!up) throw Object.assign(new Error('unreachable'), { error: 'unreachable' });
-    const d = what === 'rename' ? await apiFetch(at, { method: 'PATCH', inst: host, body: JSON.stringify({ name: arg }) }) : await apiFetch(`${at}/members/${encodeURIComponent(arg)}`, { method: 'DELETE', inst: host });
+    const d = what === 'rename' ? await apiFetch(at, { method: 'PATCH', inst: host, body: JSON.stringify({ name: arg }) })
+      : what === 'add' ? await apiFetch(`${at}/members`, { method: 'POST', inst: host, body: JSON.stringify({ members: arg }) }) // (arg: [handle])
+      : await apiFetch(`${at}/members/${encodeURIComponent(arg)}`, { method: 'DELETE', inst: host });
     if (d?.dm) socialEvent(host, { type: 'social_dm_update', dm: d.dm });
     return true;
   } catch (e) { toast(socialErrorText(e)); return false; }

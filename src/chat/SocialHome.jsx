@@ -10,7 +10,7 @@ import { useChat, go, toast, ask, getState, addSocialFriend, socialFriendAction,
 import { Avatar } from './Profile.jsx';
 import { Dialog } from './Dialogs.jsx';
 import { openMenu } from './Menu.jsx';
-import { accountName, shownHandle, dmHandle, dmTitle, dmUnread, sameAccount } from './social.js';
+import { accountName, shownHandle, dmHandle, dmTitle, dmUnread, sameAccount, cleanHandle } from './social.js';
 import './dashboard.css';
 import './home.css';
 
@@ -81,6 +81,11 @@ const dmMenu = (e, dm, domain) => {
   openMenu(e, [
     { label: 'Open', onClick: () => go({ kind: 'sdm', id: dm.id }) },
     dm.group && { label: 'Rename group', icon: Pencil, onClick: async () => { const name = window.prompt('Group name', dm.name || ''); if (name != null && name.trim()) socialDmAction('rename', dm.id, name.trim().slice(0, 60)); } },
+    dm.group && sameAccount(dm.owner, me, domain) && dm.members.length < 10 && { label: 'Add people', icon: UserPlus, onClick: async () => {
+      const typed = window.prompt('Add who? Names like alice or bob@example.org, separated by commas.', '');
+      const handles = String(typed || '').split(/[\s,]+/).map(h => cleanHandle(h, domain)).filter(Boolean);
+      if (handles.length && await socialDmAction('add', dm.id, handles)) toast(`Added ${handles.join(', ')}.`, true);
+    } },
     dm.group && sameAccount(dm.owner, me, domain) && dm.others.length > 0 && { label: 'Remove someone', icon: UserMinus, sub: dm.others.map(m => ({ label: accountName(m, domain), onClick: async () => { if (await ask({ title: `Remove ${accountName(m, domain)} from ${title}?`, confirm: 'Remove', danger: true })) socialDmAction('remove', dm.id, m.id); } })) },
     dm.group && { label: 'Leave group', icon: LogOut, danger: true, onClick: async () => { if (await ask({ title: `Leave ${title}?`, text: 'Someone in the group will have to add you back.', confirm: 'Leave group', danger: true })) socialDmAction('leave', dm.id); } },
   ]);
