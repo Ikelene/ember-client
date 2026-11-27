@@ -1,6 +1,7 @@
 // Typing @ in the composer: pick a member, a role (that you're allowed to ping) or @everyone / @here.
 import { useEffect, useMemo, useState } from 'react';
-import { useChat, getState, botPresenceOf } from './store.js';
+import { useChat, getState, botPresenceOf, fullHandle } from './store.js';
+import { instOf } from './ids.js';
 import { userToken, channelToken } from './tokens.js';
 import { Avatar } from './Profile.jsx';
 import { P, has, nameColor, ChannelIcon } from './roles.jsx';
@@ -92,7 +93,8 @@ export function useMentionItems(view, q) {
     users.filter(u => u.username && rank(u) < 9)
       .sort((a, b) => (rank(a) - rank(b)) || (online(b) - online(a)) || dn(a).localeCompare(dn(b)))
       .slice(0, 8)
-      .forEach(u => { const name = dn(u), you = u.username === st.me?.username; out.push({ kind: 'user', key: `u${u.username}`, label: name, insert: `@${u.username} `, token: u.id != null ? userToken(u.id) : undefined, user: u, hint: [name !== u.username ? `@${u.username}` : '', you ? 'you' : ''].filter(Boolean).join(' - ') }); });
+      // every entry: Display name (username@home.server), so two people of one username on different homeservers are told apart
+      .forEach(u => { const name = dn(u), you = u.username === st.me?.username, handle = fullHandle(u.username, sid ? instOf(sid) : undefined); out.push({ kind: 'user', key: `u${u.id ?? u.username}`, label: name, insert: `@${u.username} `, token: u.id != null ? userToken(u.id) : undefined, user: u, hint: [`(${handle})`, you ? 'you' : ''].filter(Boolean).join(' - ') }); });
     if (detail) {
       const big = has(detail.server.perms, P.MENTION_EVERYONE);
       if (big) {

@@ -2858,3 +2858,4 @@ html.vc-light .vc-ch-tabs button.on { color: var(--text, #111); }
   .vc-notify-banner { top: auto; bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
   body:has(.vc-sign-banner) .vc-notify-banner { top: auto; }
 }
+.vc-pick-handle { color: var(--muted); font-size: 12px; font-weight: 400; }

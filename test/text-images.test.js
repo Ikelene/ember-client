@@ -12,7 +12,7 @@ const stub = {
   name: 'stub',
   setup(b) {
     b.onResolve({ filter: /\/(store|emoji|EmojiPicker|instances|api)\.jsx?$/ }, a => ({ path: a.path, namespace: 'stub' }));
-    b.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({ contents: 'export const ask=()=>{},customEmoji=()=>null,loadEmojis=()=>{},useChat=()=>({}),UNI_EMOJI=/\\u0000\\u0000/g,Twemoji=()=>null,nameOfChar=()=>"",emojiDataSync=()=>null,getState=()=>({members:{},msgs:{},people:{},detail:{},servers:[]}),connections=new Map(),apiFetch=async()=>({});', loader: 'js' }));
+    b.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({ contents: 'export const ask=()=>{},customEmoji=()=>null,loadEmojis=()=>{},useChat=()=>({}),UNI_EMOJI=/\\u0000\\u0000/g,Twemoji=()=>null,nameOfChar=()=>"",emojiDataSync=()=>null,getState=()=>({members:{},msgs:{},people:{},detail:{},servers:[]}),connections=new Map(),apiFetch=async()=>({}),hashFor=()=>"#/home",fullHandle=n=>n;', loader: 'js' }));
   },
 };
 const dir = mkdtempSync(join(tmpdir(), 'ember-text-'));

@@ -8,7 +8,7 @@ import { ServerIcon } from './ServerIcon.jsx';
 import { userById, channelById, parseEmberLink } from './tokens.js';
 import { stickerOfBody } from './stickerLink.js';
 import { onEmberHost } from './hosts.js';
-import { ask, customEmoji, loadEmojis, useChat } from './store.js';
+import { ask, customEmoji, loadEmojis, useChat, hashFor, fullHandle } from './store.js';
 import { NameText } from './displayNames.js';
 import { UNI_EMOJI, Twemoji, nameOfChar } from './emoji.jsx';
 import { emojiDataSync } from './EmojiPicker.jsx';
@@ -113,10 +113,7 @@ function CustomEmojiImg({ eid, animated, name, inst }) {
     data-eid={eid} data-name={name} data-animated={animated ? '1' : '0'} onClick={e => emojiInfo(e, { eid, name, animated: !!animated, inst })} />;
 }
 const ctxInst = ctx => ctx?.inst || (ctx?.sid ? instOf(ctx.sid) : NOOKARA);
-const hashOfChannel = (sid, cid) => {
-  const inst = instOf(sid), b = x => String(x).split('|').pop();
-  return inst === NOOKARA ? `/s/${sid}/${cid}` : `/i/${encodeURIComponent(inst)}/s/${b(sid)}/${b(cid)}`;
-};
+const hashOfChannel = (sid, cid) => hashFor({ kind: 'channel', sid, cid }).slice(1); // (by address for a server on a homeserver)
 // <@id> -> @Name (the server's member first, then anyone Ember has seen with that id)
 function UserMention({ id, ctx }) {
   const inst = ctxInst(ctx);
@@ -126,7 +123,7 @@ function UserMention({ id, ctx }) {
   const me = ctx?.me && String(u.username).toLowerCase() === String(ctx.me).toLowerCase();
   const blocked = !me && !!ctx?.isBlocked?.(u.username);
   return (
-    <button type="button" className={`vc-mention${me ? ' me' : ''}${blocked ? ' blocked' : ''}`} onClick={e => ctx?.onUser?.(u.username, e.currentTarget)} title={blocked ? undefined : `@${ctx?.handleOf?.(u.username) || u.username}`}>
+    <button type="button" className={`vc-mention${me ? ' me' : ''}${blocked ? ' blocked' : ''}`} onClick={e => ctx?.onUser?.(u.username, e.currentTarget)} title={blocked ? undefined : `@${ctx?.handleOf?.(u.username) || fullHandle(u.username, inst)}`}>
       @{blocked ? 'Blocked User' : <NameText u={ctx?.personOf?.(u.username) || u} fallback={u.username} />}
     </button>
   );
