@@ -64,6 +64,7 @@ export function setHome(h) {
   home = h ? { ...NOOKARA_HOME, nookara: false, ...h } : NOOKARA_HOME;
   me = null; keys = null; info = null;
   forgetAllBundles();
+  dropFiles();
   changed();
 }
 export async function init() {
@@ -73,6 +74,7 @@ export async function init() {
   const local = await KS.getKeys(me.id).catch(() => null);
   // the account has moved on to a new key since this device was unlocked: this one can't read new messages, so it unlocks again
   keys = local && info?.has && local.kid === info.kid ? local : null;
+  if (!keys) dropFiles();
   if (keys) shareOnce();
   changed();
   return status();
@@ -81,7 +83,7 @@ async function shareOnce() {
   if (!notifBridge()) return;
   shareWithNative((await privateKeys()).enc_priv);
 }
-export const signOut = async () => { if (me) await KS.dropKeys(me.id).catch(() => {}); keys = null; try { notifBridge()?.postMessage(JSON.stringify({ type: 'dm_key', kid: '', jwk: null })); } catch { /* */ } changed(); };
+export const signOut = async () => { if (me) await KS.dropKeys(me.id).catch(() => {}); keys = null; dropFiles(); try { notifBridge()?.postMessage(JSON.stringify({ type: 'dm_key', kid: '', jwk: null })); } catch { /* */ } changed(); };
 
 // ── keeping keys on this device ──
 async function holdKeys(secret) {
@@ -510,13 +512,18 @@ export async function sealFile(file) {
 }
 export const fileLink = N.fileLink;
 export const parseFileLink = N.parseFileLink;
-const blobs = new Map(); // link -> promise of an object URL
+// link -> promise of an object URL: the last BLOB_MAX files opened (most recent last). A file that drops out, and all of them on
+// lock / sign-out / another account, has its URL revoked so the decrypted bytes don't stay in memory.
+const blobs = new Map();
+const BLOB_MAX = 50;
+const revoke = p => p.then(u => URL.revokeObjectURL(u), () => {});
+function dropFiles() { for (const p of blobs.values()) revoke(p); blobs.clear(); }
 const myHost = u => { try { const x = new URL(u); return /^\/(t|uploads)\//.test(x.pathname) && /(^|\.)nookara\.cc$|ikelene\.net$|^127\.0\.0\.1$|^localhost$/.test(x.hostname) && x.hostname !== 'cdn.nookara.cc' ? location.origin + x.pathname : u; } catch { return u; } };
 // a file link -> an object URL of the opened file. Rejects 'gone' when the file isn't there any more.
 // max: opening by itself (bytes): a bigger file stops before downloading and rejects with too_big (err.size = its size)
 export function openFile(link, { max = 0 } = {}) {
   let p = blobs.get(link);
-  if (p) return p;
+  if (p) { blobs.delete(link); blobs.set(link, p); return p; }
   const f = N.parseFileLink(link);
   if (!f) return Promise.reject(new Error('bad_link'));
   const ctl = new AbortController();
@@ -530,7 +537,8 @@ export function openFile(link, { max = 0 } = {}) {
     return URL.createObjectURL(new Blob([plain], { type: mimeOf(f.mime, f.name) }));
   })();
   blobs.set(link, p);
-  p.catch(() => blobs.delete(link));
+  p.catch(() => { if (blobs.get(link) === p) blobs.delete(link); });
+  while (blobs.size > BLOB_MAX) { const [k, old] = blobs.entries().next().value; blobs.delete(k); revoke(old); }
   return p;
 }
 
