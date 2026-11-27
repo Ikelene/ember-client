@@ -9,7 +9,7 @@ import { Copy, Pencil, ChevronRight, Check, Circle, Moon, MinusCircle, EyeOff, S
 import { NOOKARA_ORIGIN } from './hosts.js';
 import { isWebEmber, getToken, apiFetch } from '../api.js';
 import { signOutNookara, startSignIn, savedEmberAccounts, rememberAccount, switchEmberAccount } from './session.js';
-import { useChat, lookup, wantPresence, setStatus, setCustom, toast, getState, onUserUpdate } from './store.js';
+import { useChat, lookup, wantPresence, setStatus, setCustom, toast, getState, onUserUpdate, fullHandle, nookaraDomain } from './store.js';
 import { copy } from './Menu.jsx';
 import { renderBody } from './text.jsx';
 import { Avatar, STATUS_LABEL, ActivityCard, HandleLine } from './Profile.jsx';
@@ -380,11 +380,11 @@ export function MePopout({ anchor, onClose, onEditProfile, onCustomStatus }) {
               <Flyout from={acctRow.current}>
                 {back}
                 <div className="bf-pp-fl-head">Saved on this device</div>
-                <div className="bf-pp-fl-acct current"><Avatar user={me} size={26} /><span className="bf-pp-fl-txt"><span>{username}</span><small>Signed in</small></span><Check size={14} /></div>
+                <div className="bf-pp-fl-acct current"><Avatar user={me} size={26} /><span className="bf-pp-fl-txt"><span>{fullHandle(username)}</span><small>Signed in on {nookaraDomain()}</small></span><Check size={14} /></div>
                 {others.map(a => (
                   <button type="button" key={a.username} disabled={!!busy} onClick={() => switchTo(a, setBusy)}>
                     <Avatar user={{ username: a.username, pfp: a.pfp }} size={26} />
-                    <span className="bf-pp-fl-txt"><span>{busy === a.username ? `Switching to ${a.username}...` : a.username}</span></span>
+                    <span className="bf-pp-fl-txt"><span>{busy === a.username ? `Switching to ${fullHandle(a.username)}...` : fullHandle(a.username)}</span><small>On {nookaraDomain()}</small></span>
                   </button>
                 ))}
                 {!others.length && <div className="bf-pp-fl-none">No other accounts on this device yet.</div>}

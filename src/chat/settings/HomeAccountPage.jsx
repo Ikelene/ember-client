@@ -72,7 +72,7 @@ export default function HomeAccountPage() {
   const manage = accountUrl || `${origin}/account`;
 
   return (
-    <SettingsPage icon={CircleUserRound} title="My account" sub={`Your account on ${s.name || s.domain}.`}>
+    <SettingsPage icon={CircleUserRound} title="My account" sub={`Your account lives on ${s.domain}${s.name && s.name !== s.domain ? ` (${s.name})` : ''}. Everyone sees you as ${a.handle}.`}>
       <SCard className="ac-hero">
         <div className="ac-hero-in">
           {me?.pfp || a.avatar_url ? <Avatar user={{ username: a.username, pfp: me?.pfp || a.avatar_url }} size={64} /> : <span className="ac-hero-blank"><CircleUserRound size={30} /></span>}

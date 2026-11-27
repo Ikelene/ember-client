@@ -10,7 +10,8 @@ import { applyAccentColor } from '../theme.js';
 import ImageCropper from '../components/ImageCropper.jsx';
 import { inMemory } from './cropImage.js';
 import { COUNTRIES, TIMEZONES } from '../profile-locales.js';
-import { useChat, useScopeStatus, loginAgain, ask, patchState, getState, remember, forgetProfile } from './store.js';
+import { useChat, useScopeStatus, loginAgain, ask, patchState, getState, remember, forgetProfile, fullHandle, nookaraDomain } from './store.js';
+import { HomeChip } from './homeLabels.jsx';
 import { imgHint, warnImage } from './imgHints.js';
 import { PopoutCard, localTimeFrom } from './ProfilePopout.jsx';
 import ServerProfileEditor, { useProfileTargets, askLeave, ProfileTargetPicker } from './ServerProfileEditor.jsx';
@@ -70,9 +71,12 @@ export default function ProfileEditor({ onDirty, target: open }) {
   const track = (d, nudge) => { dirtyRef.current = !!d; onDirty?.(d, nudge); };
   const choose = async v => { if (v === target) return; if (dirtyRef.current && !(await askLeave())) return; dirtyRef.current = false; onDirty?.(false); setTarget(v); };
   const cur = targets.find(t => t.sid === target) || (signedIn ? null : targets.find(t => t.sid === homeTarget) || targets[0]) || null; // (a server that went away: back to the global one)
+  // where the account lives (Matrix-style: the homeserver is part of who you are)
+  const lives = useChat(s => (s.home ? { domain: s.home.domain, handle: s.home.account?.handle } : s.signedIn && s.me ? { domain: nookaraDomain(), handle: fullHandle(s.me.username) } : null));
   if (!cur && !signedIn) return <div className="inline-msg">{homeTarget ? 'Your homeserver is still connecting, or it has no profiles to edit. Try again in a moment.' : 'Sign in with Nookara to edit your profile.'}</div>;
   return (
     <>
+      {lives && <p className="vc-hint bf-pe-home"><HomeChip domain={lives.domain} /> Your account lives on {lives.domain}. Everyone sees you as {lives.handle}.</p>}
       {targets.length > 0 && (
         <div className="bf-pe-target">
           <span className="bf-pe-target-label">Editing</span>
