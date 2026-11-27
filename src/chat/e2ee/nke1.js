@@ -7,6 +7,8 @@
 //   commit         HMAC-SHA256(K, "nke1 commit"): a report hands over K, and Nookara checks it's the K the sender used
 //   wraps          K sealed once per kid (recipient, me, linked clients): a fresh ECDH key each time, HKDF-SHA256, AES-256-GCM
 //   sig            ECDSA over "nke1 sig|from|to|edit_of|iv|ct|commit", so Nookara can't write a message as someone else
+// v: 2 is the same message in a DM a homeserver hosts (two people or a group): what it is bound to is the DM and its sender,
+//   "nke1|2|<dm id>|<from stable id>" and "nke1 sig|2|<dm id>|<from stable id>|edit_of|iv|ct|commit", K wrapped for every member's keys
 const subtle = globalThis.crypto.subtle;
 const te = new TextEncoder(), td = new TextDecoder();
 export const VERSION = 1;
@@ -58,23 +60,31 @@ export async function unseal(wrap, encPriv, kid) {
 }
 
 // ── messages ──
-const aad = (from, to) => te.encode(`nke1|${from}|${to}`);
-const sigInput = (from, to, editOf, iv, ct, commit) => te.encode(`nke1 sig|${from}|${to}|${editOf || 0}|${iv}|${ct}|${commit}`);
+// what a message is bound to: { from, to } (v: 1, a Nookara DM, user ids) or { dm, from } (v: 2, a homeserver DM: its id and the sender's stable id)
+export const MAX_WRAPS = 256; // v: 2 (a group of 10 with linked clients; hosts refuse more)
+const isV2 = c => c?.v === 2 || (c?.v !== 1 && c?.dm != null);
+export const aadText = c => (isV2(c) ? `nke1|2|${c.dm}|${c.from}` : `nke1|${c.from}|${c.to}`);
+export const sigText = (c, editOf, iv, ct, commit) => (isV2(c) ? `nke1 sig|2|${c.dm}|${c.from}|${editOf || 0}|${iv}|${ct}|${commit}` : `nke1 sig|${c.from}|${c.to}|${editOf || 0}|${iv}|${ct}|${commit}`);
+const aad = c => te.encode(aadText(c));
+const sigInput = (c, editOf, iv, ct, commit) => te.encode(sigText(c, editOf, iv, ct, commit));
 export async function commitOf(k) {
   const key = await subtle.importKey('raw', k, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   return b64(await subtle.sign('HMAC', key, te.encode('nke1 commit')));
 }
 // payload: { t: text, r?: { from, s } the quoted reply, n: random }. recipients: [{ kid, enc_pub }]. signer: { kid, sigPriv: CryptoKey }
-export async function encryptMessage(payload, { from, to, recipients, signer, editOf = 0 }) {
+// v: 2 = pass dm (and from = the sender's stable id) instead of to; its payload also carries ts, the sender's clock
+export async function encryptMessage(payload, { v, dm, from, to, recipients, signer, editOf = 0 }) {
+  const c = { v, dm, from, to }, two = isV2(c);
+  if (two && new Set(recipients.map(r => r.kid)).size > MAX_WRAPS) throw new Error('too_many_wraps');
   const k = random(32), iv = random(12);
   const key = await subtle.importKey('raw', k, 'AES-GCM', false, ['encrypt']);
-  const body = te.encode(JSON.stringify({ ...payload, n: b64(random(8)) }));
-  const ct = b64(await subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad(from, to) }, key, body));
+  const body = te.encode(JSON.stringify({ ...payload, n: b64(random(8)), ...(two ? { ts: Date.now() } : {}) }));
+  const ct = b64(await subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad(c) }, key, body));
   const ivS = b64(iv), commit = await commitOf(k);
   const wraps = {};
-  for (const r of recipients) wraps[r.kid] = await seal(k, r.enc_pub, r.kid);
-  const sig = b64(await subtle.sign(SIGN, signer.sigPriv, sigInput(from, to, editOf, ivS, ct, commit)));
-  return { v: VERSION, ct, iv: ivS, commit, sig, signer: signer.kid, wraps };
+  for (const r of recipients) if (!wraps[r.kid]) wraps[r.kid] = await seal(k, r.enc_pub, r.kid);
+  const sig = b64(await subtle.sign(SIGN, signer.sigPriv, sigInput(c, editOf, ivS, ct, commit)));
+  return { v: two ? 2 : VERSION, ct, iv: ivS, commit, sig, signer: signer.kid, wraps };
 }
 // the message's K with my key, checked against the commit (null when it isn't for this key or it doesn't match)
 export async function messageKey(enc, kid, encPriv) {
@@ -85,14 +95,14 @@ export async function messageKey(enc, kid, encPriv) {
     return (await commitOf(k)) === enc.commit ? k : null;
   } catch { return null; }
 }
-export async function openWithKey(enc, k, { from, to }) {
+export async function openWithKey(enc, k, ctx) {
   const key = await subtle.importKey('raw', k, 'AES-GCM', false, ['decrypt']);
-  const plain = await subtle.decrypt({ name: 'AES-GCM', iv: unb64(enc.iv), additionalData: aad(from, to) }, key, unb64(enc.ct));
+  const plain = await subtle.decrypt({ name: 'AES-GCM', iv: unb64(enc.iv), additionalData: aad(ctx) }, key, unb64(enc.ct));
   return JSON.parse(td.decode(plain));
 }
-export async function verifyMessage(enc, sigPub, { from, to, editOf = 0 }) {
+export async function verifyMessage(enc, sigPub, ctx) {
   if (!enc?.sig) return false;
-  try { return await subtle.verify(SIGN, await importSigPub(sigPub), unb64(enc.sig), sigInput(from, to, editOf, enc.iv, enc.ct, enc.commit)); }
+  try { return await subtle.verify(SIGN, await importSigPub(sigPub), unb64(enc.sig), sigInput(ctx, ctx.editOf || 0, enc.iv, enc.ct, enc.commit)); }
   catch { return false; }
 }
 
@@ -122,8 +132,11 @@ export const signProof = async (what, sigPriv) => b64(await subtle.sign(SIGN, si
 // ── comparing keys with someone ──
 export const fingerprint = async (encPub, sigPub) => b64(await sha256(new Uint8Array([...unb64(encPub), ...unb64(sigPub)])));
 // 12 groups of 5 digits, the same on both sides: compare it with the other person outside Nookara
+// uid: a Nookara user id (two of those go lower number first, as ever) or a stable id (those go in string order)
 export async function safetyCode(a, b) {
-  const [x, y] = [a, b].sort((p, q) => (p.uid < q.uid ? -1 : 1));
+  const num = v => typeof v === 'number' || /^\d+$/.test(String(v));
+  const both = num(a.uid) && num(b.uid);
+  const [x, y] = [a, b].sort((p, q) => ((both ? Number(p.uid) < Number(q.uid) : String(p.uid) < String(q.uid)) ? -1 : 1));
   const h = await sha256(te.encode(`nke1 safety|${x.uid}|${x.fp}|${y.uid}|${y.fp}`));
   const h2 = await sha256(h);
   const all = [...h, ...h2];
