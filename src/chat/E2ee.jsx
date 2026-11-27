@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Lock, KeyRound, ShieldCheck, Smartphone, AppWindow, Trash2, Copy, Check, AlertTriangle } from 'lucide-react';
 import { Dialog } from './Dialogs.jsx';
-import { toast, errorText, ask, useChat, openE2eeGate, closeE2eeGate } from './store.js';
+import { toast, errorText, ask, useChat, openE2eeGate, closeE2eeGate, patchState } from './store.js';
 import * as S from './e2ee/session.js';
 import './E2ee.css';
 
@@ -58,7 +58,7 @@ function RecoveryCode({ code, onDone }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="e2-fields">
-      <p>This is your recovery code. <b>Save it somewhere safe, it's only shown now.</b> If you forget your PIN or password and don't have another device, it's the only way back to your DMs. Nookara can't recover them for you.</p>
+      <p>This is your recovery code. <b>Save it somewhere safe, it's only shown now.</b> If you forget your {S.secretHome().nookara ? 'PIN or password' : 'passphrase'} and don't have another device, it's the only way back to your DMs. {S.secretHome().nookara ? 'Nookara' : S.secretHome().name || 'Your homeserver'} can't recover them for you.</p>
       <div className="e2-code">{code}</div>
       <button type="button" className="btn btn-surface" onClick={() => navigator.clipboard?.writeText(code).then(() => setCopied(true))}>{copied ? <Check size={15} /> : <Copy size={15} />} {copied ? 'Copied' : 'Copy'}</button>
       <label className="e2-check"><input type="checkbox" checked={saved} onChange={e => setSaved(e.target.checked)} /> I saved my recovery code</label>
@@ -73,12 +73,14 @@ function Setup({ replace, onDone, onCancel }) {
   const [b, setB] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const kept = useChat(s => s.e2eeRecovery); // (kept in the store: the code still shows if this dialog is drawn again meanwhile)
   const [code, setCode] = useState(null);
-  if (code) return <RecoveryCode code={code} onDone={onDone} />;
+  const shown = code || kept;
+  if (shown) return <RecoveryCode code={shown} onDone={() => { patchState({ e2eeRecovery: null }); onDone(); }} />;
   const ok = S.validPasscode(type, a) && a === b;
   const go = async () => {
     setBusy(true); setErr('');
-    try { setCode(await S.setup(type, a, { replace })); }
+    try { const c = await S.setup(type, a, { replace }); patchState({ e2eeRecovery: c }); setCode(c); }
     catch (e) { setErr(say(e)); setBusy(false); }
   };
   return (
@@ -188,6 +190,9 @@ function NewPasscode({ onDone, intro }) {
 export function E2eeGate() {
   const open = useChat(s => s.e2eeGate);
   const status = useChat(s => s.e2eeStatus);
+  const recovery = useChat(s => s.e2eeRecovery);
+  // new keys were just made: their recovery code stays on screen until Done, whatever else happens meanwhile
+  if (recovery) return <Dialog title="Your recovery code" onClose={() => {}}><RecoveryCode code={recovery} onDone={() => { patchState({ e2eeRecovery: null }); closeE2eeGate(); }} /></Dialog>;
   if (!open) return null;
   if (status === 'loading') return open === 'auto' ? null : <KeysLoading />; // (asked for by a click: say so while the key home answers)
   return <GateDialog first={status === 'none'} />;
