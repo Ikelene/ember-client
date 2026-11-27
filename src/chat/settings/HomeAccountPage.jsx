@@ -8,9 +8,10 @@ import { Avatar, openProfileEditor } from '../Profile.jsx';
 import { hasAccountProfile, accountTarget } from '../accountProfileCore.js';
 import { normOrigin } from '../ids.js';
 import { HomeserverIcon, useHomeSession, useHomeSessions } from '../HomeserverLogin.jsx';
-import { setCurrent, homeInfo } from '../homeserver.js';
-import { signOutHome } from '../session.js';
-import { loadLogins, unlinkLogin, linkLogin } from '../homeApi.js';
+import { setCurrent, homeInfo, resolve as resolveHomeserver } from '../homeserver.js';
+import { signOutHome, signInOn } from '../session.js';
+import { loadLogins, unlinkLogin, linkLogin, homeJson } from '../homeApi.js';
+import { Dialog } from '../Dialogs.jsx';
 import { loginErrorText, KIND_LABEL } from '../homeAdmin.js';
 import { desktopBridge } from '../../compat.js';
 import './accounts-pages.css';
@@ -32,6 +33,7 @@ export default function HomeAccountPage() {
   const [logins, setLogins] = useState(null); // null = loading
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
+  const [pw, setPw] = useState(null); // the password dialog: 'set' | 'remove'
   // "Manage this account": the account page the homeserver names in its discovery (login.account_url), /account until it answers
   const [accountUrl, setAccountUrl] = useState(null);
   useEffect(() => { let gone = false; setAccountUrl(null); if (origin) homeInfo(origin).then(i => !gone && setAccountUrl(i.account_url)).catch(() => {}); return () => { gone = true; }; }, [origin]);
@@ -121,7 +123,8 @@ export default function HomeAccountPage() {
                 </span>
               </div>
               <div className="sx-row-ctl">
-                {password ? <button type="button" className="btn btn-surface btn-sm" onClick={() => openOutside(manage)}><ExternalLink size={13} /> {m.linked ? 'Change' : 'Set one'}</button>
+                {password ? <>{m.linked && logins.some(x => x.linked && x.kind !== 'password' && x.enabled !== false) && <button type="button" className="btn btn-surface btn-sm ac-danger" onClick={() => setPw('remove')}><Unlink size={13} /> Remove</button>}
+                  <button type="button" className="btn btn-surface btn-sm" disabled={m.enabled === false} onClick={() => setPw('set')}><KeyRound size={13} /> {m.linked ? 'Change' : 'Set one'}</button></>
                   : m.linked ? <button type="button" className="btn btn-surface btn-sm ac-danger" disabled={!!busy} onClick={() => unlink(m)}><Unlink size={13} /> {busy === m.id ? 'Removing...' : 'Remove'}</button>
                     : <button type="button" className="btn btn-primary btn-sm" disabled={!!busy || m.enabled === false} onClick={() => link(m)}><Link2 size={13} /> {busy === m.id ? 'Waiting...' : 'Link'}</button>}
               </div>
@@ -130,6 +133,59 @@ export default function HomeAccountPage() {
         })}
         {logins && logins.length > 0 && <small className="vc-hint hsx-foot">Linking opens {s.domain}'s own page and the provider's. Ember never sees those passwords.</small>}
       </SCard>
+      {pw && <PasswordDialog origin={origin} domain={s.domain} handle={a.handle} hint={a.username} has={!!logins?.find(x => x.kind === 'password')?.linked} remove={pw === 'remove'} onDone={l => { if (l) setLogins(l); }} onClose={() => setPw(null)} />}
     </SettingsPage>
+  );
+}
+
+// setting, changing or removing your password on the homeserver (POST / DELETE /api/v2/account/password): with the one you
+// have, or, without one, a sign-in in the last 10 minutes (fresh_sign_in_required: sign in again, then it works)
+const PW_TEXT = {
+  invalid_password: 'A password is 8 to 200 characters.', invalid_credentials: "That isn't your current password.",
+  password_login_disabled: "This homeserver doesn't use passwords.", last_login_method: "It's your only way to sign in - link another one first.",
+  no_password: "You don't have a password to remove.", rate_limited: 'Too many tries. Wait a moment and try again.',
+};
+function PasswordDialog({ origin, domain, handle, hint, has, remove, onDone, onClose }) {
+  const [cur, setCur] = useState('');
+  const [next, setNext] = useState('');
+  const [again, setAgain] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [fresh, setFresh] = useState(false);
+  const ok = remove ? (!has || cur) : next.length >= 8 && next === again && (!has || cur);
+  async function save(e, close) {
+    e.preventDefault();
+    setBusy(true); setErr(''); setFresh(false);
+    try {
+      const body = remove ? (cur ? { current_password: cur } : {}) : { new_password: next, ...(cur ? { current_password: cur } : {}) };
+      const d = await homeJson('/api/v2/account/password', { origin, method: remove ? 'DELETE' : 'POST', body });
+      onDone(Array.isArray(d?.logins) ? d.logins : null);
+      toast(remove ? 'Password removed.' : has ? 'Password changed. Your other sessions were signed out.' : 'Password set.', true);
+      close();
+    } catch (x) {
+      if (x.error === 'fresh_sign_in_required') setFresh(true);
+      else setErr(PW_TEXT[x.error] || loginErrorText(x.error));
+    }
+    setBusy(false);
+  }
+  async function signInAgain() {
+    try { const hs = await resolveHomeserver(domain); await signInOn(hs, { hint }); setFresh(false); setErr(''); } catch { setErr(`Couldn't open ${domain}'s sign-in.`); }
+  }
+  return (
+    <Dialog title={remove ? 'Remove your password' : has ? 'Change your password' : 'Set a password'} sub={remove ? `You won't be able to sign in to ${handle} with a password any more.` : `For signing in to ${handle} on ${domain}'s page.`} onClose={onClose}>
+      {close => (
+        <form onSubmit={e => save(e, close)} className="e2-fields">
+          {has && <label className="vc-field"><span>Current password</span><input className="form-input" type="password" autoComplete="current-password" value={cur} onChange={x => setCur(x.target.value)} /></label>}
+          {!remove && <>
+            <label className="vc-field"><span>New password (8 characters or more)</span><input className="form-input" type="password" autoComplete="new-password" value={next} onChange={x => setNext(x.target.value)} /></label>
+            <label className="vc-field"><span>Type it again</span><input className="form-input" type="password" autoComplete="new-password" value={again} onChange={x => setAgain(x.target.value)} /></label>
+          </>}
+          {fresh && <p className="vc-note"><TriangleAlert size={14} /> For your safety, sign in to {domain} again first, then try within 10 minutes. <button type="button" className="btn btn-surface btn-sm" onClick={signInAgain}>Sign in again</button></p>}
+          {err && <p className="vc-err"><TriangleAlert size={14} /> {err}</p>}
+          <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" onClick={close}>Cancel</button><span className="grow" />
+            <button type="submit" className={`btn ${remove ? 'btn-danger' : 'btn-primary'}`} disabled={!ok || busy}>{busy ? 'Saving...' : remove ? 'Remove password' : 'Save'}</button></div>
+        </form>
+      )}
+    </Dialog>
   );
 }
