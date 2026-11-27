@@ -652,7 +652,7 @@ function ChatPage() {
                 <>
                   <button type="button" className="vc-head-user" onClick={e => openMini(view.username, e.currentTarget)}>
                     <Avatar user={{ username: view.username, pfp: getState().people[view.username]?.pfp }} size={26} status={dmPresence?.status || 'offline'} />
-                    <b className="vc-head-name">{view.username}</b>
+                    <b className="vc-head-name">{fullHandle(view.username)}</b>
                     {dmIsBot && <BotTag small />}
                   </button>
                   <E2eeHeadLock view={view} />
