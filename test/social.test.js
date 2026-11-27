@@ -84,6 +84,18 @@ test('friend lists: four lists, sorted by name, junk dropped', () => {
   assert.deepEqual(l.blocked, []);
 });
 
+test('in DMs: always username@domain, my own homeserver people too', () => {
+  assert.equal(so.dmHandle({ handle: 'alice@a.example' }, 'a.example'), 'alice@a.example');
+  assert.equal(so.dmHandle({ handle: 'alice@B.example' }, 'a.example'), 'alice@b.example');
+  assert.equal(so.dmHandle({ handle: null, username: 'bob', domain: 'b.example' }), 'bob@b.example');
+  assert.equal(so.dmHandle('alice', 'nookara.cc'), 'alice@nookara.cc'); // (a Nookara name: on Nookara's domain)
+  assert.equal(so.dmHandle('@alice@b.example', 'nookara.cc'), 'alice@b.example');
+  assert.equal(so.dmHandle('alice'), 'alice'); // no domain known: the name alone
+  assert.equal(so.dmHandle({ handle: null, id: 'l:9@b.example' }, 'a.example'), '');
+  assert.equal(so.dmHandle(null, 'a.example'), '');
+  assert.equal(so.dmTitle({ others: [{ id: 'l:6@a.example', handle: 'bob@a.example', display_name: '' }] }, 'a.example'), 'bob@a.example');
+});
+
 const ctx = { home: HOME, me: 'l:5', domain: 'a.example' };
 const member = (id, name) => ({ id, handle: `${name}@${id.split('@')[1]}`, display_name: name, avatar_url: null });
 const ME = member('l:5@a.example', 'alice');

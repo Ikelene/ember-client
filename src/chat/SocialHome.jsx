@@ -10,7 +10,7 @@ import { useChat, go, toast, ask, getState, addSocialFriend, socialFriendAction,
 import { Avatar } from './Profile.jsx';
 import { Dialog } from './Dialogs.jsx';
 import { openMenu } from './Menu.jsx';
-import { accountName, shownHandle, dmTitle, dmUnread, sameAccount } from './social.js';
+import { accountName, shownHandle, dmHandle, dmTitle, dmUnread, sameAccount } from './social.js';
 import './dashboard.css';
 import './home.css';
 
@@ -20,7 +20,7 @@ export const face = a => ({ username: a.display_name || a.handle || a.id, pfp: a
 export const useDomain = () => useChat(s => socialAccount(s)?.domain || '');
 
 // someone's card: what their homeserver says about them (GET /social/profile/:id), and what I can do
-export function PersonCard({ person, onClose }) {
+export function PersonCard({ person, dm = false, onClose }) {
   const domain = useDomain();
   const social = useChat(s => s.social);
   const [p, setP] = useState(null);
@@ -28,8 +28,9 @@ export function PersonCard({ person, onClose }) {
   const who = { ...person, ...(p || {}) };
   const isFriend = social.friends.some(f => f.id === person.id), blocked = social.blocked.some(f => f.id === person.id);
   const status = p?.presence?.status || social.presence[person.id] || 'offline';
+  const handle = dm ? dmHandle(who, domain) : shownHandle(who, domain); // (in a DM: always username@domain)
   return (
-    <Dialog title={accountName(who, domain)} sub={shownHandle(who, domain) ? `@${shownHandle(who, domain)}` : undefined} onClose={onClose}>
+    <Dialog title={accountName(who, domain)} sub={handle ? `@${handle}` : undefined} onClose={onClose}>
       {close => (
         <div className="sh-card">
           <div className="sh-card-top"><Avatar user={face(who)} size={64} status={status} /><div><b>{STATUS[status]}{p?.presence?.activity ? ` - ${p.presence.activity}` : ''}</b>{who.pronouns && <small>{who.pronouns}</small>}{p?.stale && <small>Their homeserver can't be reached right now.</small>}</div></div>
@@ -62,7 +63,7 @@ function NewDm({ onClose }) {
       {close => (
         <form onSubmit={async e => { e.preventDefault(); if (!n || busy) return; setBusy(true); const dm = await startSocialDm({ ids: [...picked], handles, name: n > 1 ? name.trim() : '', group: n > 1 }); setBusy(false); if (dm) close(); }}>
           {friends.length > 0 && <div className="sh-pick">{friends.map(f => (
-            <label key={f.id} className="sh-pick-row"><input type="checkbox" checked={picked.has(f.id)} onChange={() => toggle(f.id)} /><Avatar user={face(f)} size={26} /><span>{accountName(f, domain)}</span><small>{shownHandle(f, domain)}</small></label>
+            <label key={f.id} className="sh-pick-row"><input type="checkbox" checked={picked.has(f.id)} onChange={() => toggle(f.id)} /><Avatar user={face(f)} size={26} /><span>{accountName(f, domain)}</span><small>{dmHandle(f, domain)}</small></label>
           ))}</div>}
           <label className="vc-field"><span>{friends.length ? 'Anyone else' : 'Who'}</span><input value={typed} onChange={e => setTyped(e.target.value)} placeholder="alice, bob@example.org" autoFocus={!friends.length} /></label>
           {n > 1 && <label className="vc-field"><span>Group name (optional)</span><input value={name} maxLength={60} onChange={e => setName(e.target.value)} /></label>}
@@ -139,7 +140,7 @@ export function SocialDmHead({ id }) {
       </button>
       <SdmHeadLock dm={dm} />
       {!dm.hosted_here && dm.host && <span className="vc-head-topic">on {dm.host}</span>}
-      {card && <PersonCard person={card} onClose={() => setCard(null)} />}
+      {card && <PersonCard person={card} dm onClose={() => setCard(null)} />}
     </>
   );
 }

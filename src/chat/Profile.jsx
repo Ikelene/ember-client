@@ -7,8 +7,8 @@ import { createPortal } from 'react-dom';
 import { MessageCircle, Maximize2, X, UserPlus, Check, Clock, ExternalLink, Globe, Gamepad2, Music, Tv, Trophy, Radio, MoreHorizontal, Pencil, CalendarDays, LogIn, ShieldCheck, Crown, UserMinus, Ban, Link as LinkIcon, Plus } from 'lucide-react';
 import { apiFetch, getToken } from '../api.js';
 import { BotTag, AddBotButton, TrustedIn } from './Bots.jsx';
-import { useChat, lookup, go, wantPresence, toast, errorText, getState, setCustom, ask, loadFriends, toggleBlock, memberRef, faceOf, botPresenceOf, loadMembers, onUserUpdate, markBotPeer, cleanServerProfile, socialProfileOf, shownUser } from './store.js';
-import { isInst } from './ids.js';
+import { useChat, lookup, go, wantPresence, toast, errorText, getState, setCustom, ask, loadFriends, toggleBlock, memberRef, faceOf, botPresenceOf, loadMembers, onUserUpdate, markBotPeer, cleanServerProfile, socialProfileOf, shownUser, fullHandle } from './store.js';
+import { isInst, NOOKARA } from './ids.js';
 import { hasAccountProfile, accountTarget } from './accountProfileCore.js';
 import { ServerIcon } from './ServerIcon.jsx';
 // your own profile's "Edit profile": Ember's settings, Profile page (Chat.jsx listens for vc-dialog)
@@ -295,7 +295,7 @@ export function HandleLine({ name, handle, pronouns, cls = 'vc-pronouns' }) {
   if (!at && !pronouns) return null;
   return <div className={`${cls} vc-handle-line`}>{at && <span className="vc-handle" title="Username">@{handle}</span>}{pronouns && <span title="Pronouns">{pronouns}</span>}</div>;
 }
-export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: outerRef }) {
+export function ProfileCard({ username, sid, who, dm = false, onExpand, onClose, cardRef: outerRef }) {
   const [p, extra, vname] = useProfile(username, who, sid);
   const plain = plainOn(who); // an instance's own account / bot: name, roles, joined - nothing from Nookara
   const [, tick] = useState(0);
@@ -324,7 +324,9 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
   const act = async what => { setMenu(false); if (await moderate(sid, username, what, member)) onClose?.(); };
   const canMod = canKick || canBan;
   // display name big, @username small beside the pronouns (displayNames.js). An Ember server's own name for them wins there.
-  const handle = plain ? shownUser(p?.handle || username) : p?.username || vname;
+  // (in a DM: always username@domain, my own homeserver's people too)
+  const handle = dm ? fullHandle(plain ? who?.handle || p?.handle || username : p?.username || vname, plain ? who.inst : NOOKARA)
+    : plain ? shownUser(p?.handle || username) : p?.username || vname;
   const serverName = who?.inst && who?.display_name && who.display_name !== who.username ? who.display_name : '';
   const bigName = (plain ? who?.display_name : serverName || p?.display_name) || handle;
 
@@ -414,7 +416,7 @@ export function ProfileCard({ username, sid, who, onExpand, onClose, cardRef: ou
 }
 
 // the mini profile as a pop-up next to whatever was clicked
-export function MiniProfile({ username, anchor, side = 'right', sid, who, onClose, onExpand }) {
+export function MiniProfile({ username, anchor, side = 'right', sid, who, dm, onClose, onExpand }) {
   const box = useRef(null);
   const [pos, setPos] = useState(null);
   const [closing, setClosing] = useState(false);
@@ -445,14 +447,14 @@ export function MiniProfile({ username, anchor, side = 'right', sid, who, onClos
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return createPortal(
     <div ref={box} className={`vc-pop${closing ? ' out' : ''}`} style={pos ? { left: pos.x, top: pos.y } : { left: -9999, top: 0 }}>
-      <ProfileCard username={username} sid={sid} who={who} onClose={close} onExpand={rect => { onExpand?.(username, rect); onClose(); }} />
+      <ProfileCard username={username} sid={sid} who={who} dm={dm} onClose={close} onExpand={rect => { onExpand?.(username, rect); onClose(); }} />
     </div>,
     document.body,
   );
 }
 
 // the large profile: grows out of the mini card it was opened from
-export function ProfileModal({ username: shown, from, sid, who, onClose }) {
+export function ProfileModal({ username: shown, from, sid, who, dm = false, onClose }) {
   const [p, extra, username] = useProfile(shown, who, sid); // (username: their Nookara name - on an instance it can differ from the one it shows)
   const bigName = (who?.inst && who?.display_name && who.display_name !== who.username ? who.display_name : p?.display_name) || p?.username || username; // (display names: see ProfileCard)
   const me = useChat(s => s.me);
@@ -538,7 +540,7 @@ export function ProfileModal({ username: shown, from, sid, who, onClose }) {
         </div>
         <div className="vc-big-id">
           <h2 style={color ? { color } : undefined}>{bigName}{extra?.bot && <BotTag verified={!!extra.bot.bot?.verified} />}</h2>
-          <HandleLine name={bigName} handle={p?.username || username} pronouns={!p?.private ? p?.pronouns : ''} />
+          <HandleLine name={bigName} handle={dm ? fullHandle(p?.username || username, plainOn(who) ? who.inst : NOOKARA) : p?.username || username} pronouns={!p?.private ? p?.pronouns : ''} />
           {extra?.bot?.bot?.owner && <div className="vc-card-sub">Bot made by @{extra.bot.bot.owner}</div>}
           {extra?.bot?.bot && <TrustedIn n={extra.bot.bot.trusted_in} verified={!!extra.bot.bot.verified} />}
           {sub && <div className="vc-card-sub">{sub}</div>}
@@ -615,15 +617,16 @@ export function useProfiles() {
   const [big, setBig] = useState(null);
   const view = useChat(s => s.view);
   const sid = view.kind === 'channel' ? view.sid : null;
+  const dm = view.kind === 'dm' || view.kind === 'group' || view.kind === 'sdm' || (view.kind === 'channel' && !!view.dm); // (full handles there)
   // who: the author / member object when it's someone on an instance server (decides Nookara profile vs plain card)
-  const openMini = (username, el, side = 'right', who) => setMini({ username, anchor: el?.getBoundingClientRect?.() || el, side, sid, who, k: Date.now() + Math.random() });
+  const openMini = (username, el, side = 'right', who) => setMini({ username, anchor: el?.getBoundingClientRect?.() || el, side, sid, who, dm, k: Date.now() + Math.random() });
   const ui = (
     <>
-      {mini && <MiniProfile key={mini.k} {...mini} onClose={() => setMini(m => (m?.k === mini.k ? null : m))} onExpand={(u, rect) => setBig({ username: u, from: rect, sid: mini.sid, who: mini.who })} />}
+      {mini && <MiniProfile key={mini.k} {...mini} onClose={() => setMini(m => (m?.k === mini.k ? null : m))} onExpand={(u, rect) => setBig({ username: u, from: rect, sid: mini.sid, who: mini.who, dm: mini.dm })} />}
       {big && <ProfileModal {...big} onClose={() => setBig(null)} />}
     </>
   );
-  return { openMini, openBig: (username, from) => setBig({ username, from, sid }), ui };
+  return { openMini, openBig: (username, from, inDm = dm) => setBig({ username, from, sid, dm: inDm }), ui };
 }
 export const meName = () => getState().me?.username;
 

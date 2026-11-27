@@ -25,7 +25,7 @@ import { connections, sendTo, startInstances, loadInstanceData, retryInstances, 
 import { homeFetch, onSignedOut, currentSession, DEFAULT_HOMESERVER, resolve as resolveHomeserver, homeInfo, remoteToken, isOwnUrl } from './homeserver.js';
 import { reportRoute, reportBody, canReportSealed } from './e2ee/report.js';
 import { social as socialApi, socialBase, socialFetch, createDm, setNookaraSocial, dmHostUrl } from './socialApi.js';
-import { emptySocial, friendLists, mergeDms, cleanDm, socialReduce, socialRefetch, dmTitle, splitHandle, stableId, cleanHandle, accountName, remoteFriendLists, splitNookaraDms, nookaraDmView } from './social.js';
+import { emptySocial, friendLists, mergeDms, cleanDm, socialReduce, socialRefetch, dmTitle, splitHandle, stableId, cleanHandle, accountName, remoteFriendLists, splitNookaraDms, nookaraDmView, dmHandle } from './social.js';
 import { attachmentRefs } from './signing-payload.js';
 import { spoilerName } from './spoiler.js';
 import { prepareInstanceAttachments } from './attachment-preparation.js';
@@ -2981,6 +2981,14 @@ export function socialProfileOf(who) {
 }
 // a name as shown: username@domain, the domain left out for people on my own homeserver
 export const shownUser = name => (state.home && String(name || '').includes('@') ? shownHandleOf(name, state.home.domain) : name);
+// in DMs a name is always username@domain, my own homeserver's too: a Nookara name is on Nookara's domain (as its lookup
+// says), a homeserver's own accounts on that homeserver's. inst: where the name is from
+export const nookaraDomain = () => state.nkHome?.domain || DEFAULT_HOMESERVER;
+export function fullHandle(name, inst = NOOKARA) {
+  if (!inst || inst === NOOKARA) return dmHandle(name, nookaraDomain());
+  let host = ''; try { host = new URL(inst).host; } catch { /* odd */ }
+  return dmHandle(name, state.instances.find(i => i.origin === inst)?.homeserver?.domain || host);
+}
 const shownHandleOf = (name, domain) => { const { name: n, domain: d } = splitHandle(name); return !d || d === String(domain).toLowerCase() ? n : `${n}@${d}`; };
 
 const SOCIAL_TEXT = {

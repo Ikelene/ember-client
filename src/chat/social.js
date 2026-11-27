@@ -46,6 +46,13 @@ export function shownHandle(account, myDomain) {
   if (!name) return '';
   return !domain || domain === String(myDomain || '').toLowerCase() ? name : `${name}@${domain}`;
 }
+// in DMs everyone is username@domain, the domain kept even for my own homeserver. who: a handle, a bare name (then it's
+// on `domain`) or an account { handle, id, username?, domain? }
+export function dmHandle(who, domain = '') {
+  const s = shownHandle(typeof who === 'string' ? { handle: who } : who, '');
+  const d = String(domain || '').toLowerCase();
+  return !s || s.includes('@') || !d ? s : `${s}@${d}`;
+}
 export const accountName = (account, myDomain) => String(account?.display_name || '').trim() || shownHandle(account, myDomain) || String(account?.id || '');
 // what was typed into "add a friend": 'alice', '@alice', 'alice@b.example' -> the handle to send, or '' when it can't be one
 export function cleanHandle(input, myDomain) {
@@ -85,7 +92,7 @@ export function cleanDm(dm, { from = null, home = null, me = null, domain = '' }
     ...(typeof dm.preview === 'string' ? { preview: dm.preview } : {}),
   };
 }
-export const dmTitle = (dm, myDomain) => dm?.name || (dm?.others?.length ? dm.others.map(m => accountName(m, myDomain)).join(', ') : dm?.group ? 'Group chat' : 'Just you');
+export const dmTitle = (dm, myDomain) => dm?.name || (dm?.others?.length ? dm.others.map(m => String(m?.display_name || '').trim() || dmHandle(m, myDomain) || String(m?.id || '')).join(', ') : dm?.group ? 'Group chat' : 'Just you');
 const newest = (a, b) => (b.updated_at - a.updated_at) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 export const sortDms = list => [...list].sort(newest);
 // Lists from one or more homeservers -> one list, newest activity first. sources: [{ origin, dms }], home's own list first or

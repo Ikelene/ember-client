@@ -754,7 +754,7 @@ function BigFromEvent() {
   const ref = useRef(openBig);
   ref.current = openBig;
   useEffect(() => {
-    const on = e => ref.current(e.detail.username, e.detail.rect);
+    const on = e => ref.current(e.detail.username, e.detail.rect, !!e.detail.dm);
     addEventListener('vc-open-big', on);
     return () => removeEventListener('vc-open-big', on);
   }, []);

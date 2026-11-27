@@ -126,7 +126,7 @@ function UserMention({ id, ctx }) {
   const me = ctx?.me && String(u.username).toLowerCase() === String(ctx.me).toLowerCase();
   const blocked = !me && !!ctx?.isBlocked?.(u.username);
   return (
-    <button type="button" className={`vc-mention${me ? ' me' : ''}${blocked ? ' blocked' : ''}`} onClick={e => ctx?.onUser?.(u.username, e.currentTarget)} title={blocked ? undefined : `@${u.username}`}>
+    <button type="button" className={`vc-mention${me ? ' me' : ''}${blocked ? ' blocked' : ''}`} onClick={e => ctx?.onUser?.(u.username, e.currentTarget)} title={blocked ? undefined : `@${ctx?.handleOf?.(u.username) || u.username}`}>
       @{blocked ? 'Blocked User' : <NameText u={ctx?.personOf?.(u.username) || u} fallback={u.username} />}
     </button>
   );
@@ -216,7 +216,7 @@ const RULES = [
     if (!ctx?.legacy) return m[0];
     const me = ctx?.me && m[1].toLowerCase() === ctx.me.toLowerCase();
     const blocked = !me && !!ctx?.isBlocked?.(m[1]); // somebody I blocked, in a server: no name
-    return <button type="button" key={k} className={`vc-mention${me ? ' me' : ''}${blocked ? ' blocked' : ''}`} onClick={e => ctx?.onUser?.(m[1], e.currentTarget)} title={blocked ? undefined : `@${m[1]}`}>@{blocked ? 'Blocked User' : <NameText u={ctx?.personOf?.(m[1]) || { username: m[1], kind: 'local', inst: true }} fallback={m[1]} />}</button>;
+    return <button type="button" key={k} className={`vc-mention${me ? ' me' : ''}${blocked ? ' blocked' : ''}`} onClick={e => ctx?.onUser?.(m[1], e.currentTarget)} title={blocked ? undefined : `@${ctx?.handleOf?.(m[1]) || m[1]}`}>@{blocked ? 'Blocked User' : <NameText u={ctx?.personOf?.(m[1]) || { username: m[1], kind: 'local', inst: true }} fallback={m[1]} />}</button>;
   }],
   [/(?:^|(?<=[\s(]))#([a-z0-9_-]{1,40})/, (m, ctx, k) => {
     if (!ctx?.legacy) return m[0];

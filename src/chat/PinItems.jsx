@@ -83,7 +83,7 @@ export function itemMenu(e, k, it, { tile = false } = {}) {
       i >= 0 && i < list.length - 1 && { label: 'Move right', icon: ChevronRight, onClick: () => setShortcuts(moveShortcut(getShortcuts(), k, 1)) }] : []),
   ].filter(Boolean);
   if (it.kind === 'dm' && !it.gone && it.username !== 'System') {
-    userMenu(e, it.username, { onProfile: () => dispatchEvent(new CustomEvent('vc-open-big', { detail: { username: it.username } })), extra: ['sep', ...more] });
+    userMenu(e, it.username, { onProfile: () => dispatchEvent(new CustomEvent('vc-open-big', { detail: { username: it.username, dm: true } })), extra: ['sep', ...more] });
     return;
   }
   openMenu(e, [{ label: 'Open', icon: MessageCircle, onClick: it.open }, 'sep', ...more]);

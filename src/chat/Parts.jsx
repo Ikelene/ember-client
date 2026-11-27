@@ -600,7 +600,7 @@ export function HomeSidebar({ onNewDM, onNewGroup, onQuick }) {
     return (
       <button type="button" key={c.username} ref={el => { const key = c.username.toLowerCase(); if (el) dmNodes.current.set(key, el); else dmNodes.current.delete(key); }} className={`vc-dm${on ? ' on' : ''}${!on && (c.unread || unread[k]) ? ' unread' : ''}${dropCls}${dragCls}`}
         {...dp}
-        onContextMenu={e => (sys ? openMenu(e, [{ label: 'Open', onClick: () => go({ kind: 'dm', username: c.username }) }, 'sep', ...pinMenuItems(k)]) : userMenu(e, c.username, { onProfile: () => dispatchEvent(new CustomEvent('vc-open-big', { detail: { username: c.username } })), extra: ['sep', ...pinMenuItems(k)] }))}
+        onContextMenu={e => (sys ? openMenu(e, [{ label: 'Open', onClick: () => go({ kind: 'dm', username: c.username }) }, 'sep', ...pinMenuItems(k)]) : userMenu(e, c.username, { onProfile: () => dispatchEvent(new CustomEvent('vc-open-big', { detail: { username: c.username, dm: true } })), extra: ['sep', ...pinMenuItems(k)] }))}
         onClick={() => go({ kind: 'dm', username: c.username })}>
         {sys ? <span className="vc-av vc-sys-av" style={{ width: 32, height: 32 }}><Logo size={18} /></span> : <Avatar user={{ username: c.username, pfp: c.pfp || people[c.username]?.pfp }} size={32} status={p?.status || 'offline'} />}
         <span className="vc-dm-txt"><b>{sys ? 'Nookara' : <NameText u={{ username: c.username }} />}{c.bot && <BotTag small />}</b>{!sys && subtitle(p) && <small>{subtitle(p)}</small>}</span>
