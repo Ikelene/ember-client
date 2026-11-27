@@ -864,22 +864,34 @@ export async function quickJoin(input, code, sid) {
   const com = communityOf(info, sid);
   const viaHome = canHomeConnect(d.origin, info); // (a v2 session: my homeserver's own token, or one it signs for that homeserver)
   if (!(viaHome || (getToken() && nookaraSignsIn(info))) || info.claimed === false || !(sid != null ? isV2(info) || com : info.community)) return null;
-  if (!code && com && com.join_policy !== 'open') return null; // (a server it doesn't list: only asking tells)
-  let c = connections.get(d.origin);
-  if (!c?.session && viaHome) c = await homeConnect(d.origin, info);
-  else if (!c?.session) c = await addInstance(d.origin, info, await nookaraSession(d.origin));
-  else if (c.status !== 'open') await connect(d.origin);
-  // in it already (with several servers there, an invite or an address is for one of them: being in another doesn't count)
-  const already = getState().servers.find(x => x.inst === d.origin && (sid != null ? x.sid === K(d.origin, sid) : !(isV2(info) && code)));
-  if (already) return { sid: already.sid };
-  const r = await joinCommunity(d.origin, code, undefined, sid);
-  return r.pending ? { pending: true, name: com?.name } : r;
+  // one server of a homeserver with many, with my homeserver account: it says itself whether I'm in, asked to wait, or why not
+  // (no Add a server dialog: that is for servers with their own logins). Only a join password needs the dialog.
+  const direct = viaHome && isV2(info) && sid != null && (code || com?.join_policy !== 'password');
+  if (!code && com && com.join_policy !== 'open' && !direct) return null; // (a server it doesn't list: only asking tells)
+  try {
+    let c = connections.get(d.origin);
+    if (!c?.session && viaHome) c = await homeConnect(d.origin, info);
+    else if (!c?.session) c = await addInstance(d.origin, info, await nookaraSession(d.origin));
+    else if (c.status !== 'open') await connect(d.origin);
+    // in it already (with several servers there, an invite or an address is for one of them: being in another doesn't count)
+    const already = getState().servers.find(x => x.inst === d.origin && (sid != null ? x.sid === K(d.origin, sid) : !(isV2(info) && code)));
+    if (already) return { sid: already.sid };
+    const r = await joinCommunity(d.origin, code, undefined, sid);
+    return r.pending ? { pending: true, name: com?.name } : r;
+  } catch (e) {
+    if (direct && e && typeof e === 'object') e.direct = true; // (joinAndOpen says why, in plain words)
+    throw e;
+  }
 }
 // Join buttons (invite embeds, the invite pop-up, Discover): straight in when it can, the Add a server dialog when it can't
 export async function joinAndOpen(origin, code, sid) {
   const dialog = () => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'add-instance', url: origin, ...(code ? { invite: code } : {}), ...(sid != null ? { server: String(sid) } : {}) } }));
   let r = null;
-  try { r = await quickJoin(origin, code, sid); } catch { r = null; } // (anything odd: the dialog shows what went wrong)
+  try { r = await quickJoin(origin, code, sid); }
+  catch (e) {
+    if (e?.direct) { toast(createErrorText(e)); return false; } // (a homeserver's server turned my account away: say why, no login dialog)
+    r = null; // (anything odd: the dialog shows what went wrong)
+  }
   if (!r) { dialog(); return false; }
   if (r.pending) { toast(`Asked to join ${r.name || 'the server'}.`, true); return true; }
   go({ kind: 'server', sid: r.sid });
@@ -912,6 +924,8 @@ export async function resolveAddress({ slug, domain, origin: at }) {
 export async function joinByAddress(input) {
   const a = typeof input === 'string' ? parseAddress(input) || parseInviteUrl(input) : input;
   if (!a?.slug || !(a.domain || a.origin)) return false;
+  // signed out: what server it is, with the homeserver sign-in (AddressInvite.jsx), never a server's own login
+  if (!getToken() && !homeHere()) { dispatchEvent(new CustomEvent('vc-invite', { detail: { address: { slug: a.slug, domain: a.domain, origin: a.origin, code: a.code || null } } })); return true; }
   let at;
   try { at = await resolveAddress(a); } catch (e) { toast(createErrorText(e)); return false; }
   const mine = connections.get(at.origin) && getState().servers.find(x => x.sid === K(at.origin, at.sid));

@@ -131,6 +131,15 @@ export function createErrorText(e) {
     case 'not_found': return "This homeserver can't do that yet - it needs an update.";
     case 'instance_unreachable': case 'unreachable': return "Couldn't reach that homeserver.";
     case 'not_an_instance': case 'not_found_domain': return "There's no Ember homeserver at that address.";
+    case 'homeserver_too_new': {
+      const days = Number(e?.days_left);
+      return `This server doesn't let in accounts from new homeservers yet${Number.isFinite(days) && days > 0 ? ` - try again in ${days} day${days === 1 ? '' : 's'}` : ''}. An invite from one of its moderators gets you in now.`;
+    }
+    case 'remote_not_allowed': case 'remote_accounts_off': return "This server doesn't let in accounts from your homeserver.";
+    case 'homeserver_rate_limited': return 'That homeserver is getting a lot of joins from yours - try again in a bit.';
+    case 'banned': return "You're banned from that server.";
+    case 'invite_only': return 'That server only lets people in with an invite.';
+    case 'invalid_invite': return "That invite doesn't work any more - ask for a new one.";
     default: return "That didn't work - try again in a bit.";
   }
 }

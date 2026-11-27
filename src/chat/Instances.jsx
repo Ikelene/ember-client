@@ -33,7 +33,7 @@ function InstanceCard({ origin, info }) {
     <div className="vc-invite-srv vc-inst-card">
       <span className="vc-srv-ico lg">{(c?.icon_url || info.icon_url) ? <img src={c?.icon_url || info.icon_url} alt="" /> : initials(c?.name || info.name)}</span>
       <div><b>{c?.name || info.name}</b><small>{hostOf(origin)}{c && c.member_count != null ? <> - <Users size={13} /> {c.member_count} member{c.member_count === 1 ? '' : 's'}</> : ''}</small>
-        <small>{nookaraSignsIn(info) ? <><ShieldCheck size={13} /> Signs you in with your Nookara account</> : <><KeyRound size={13} /> Has its own accounts</>}</small></div>
+        <small>{!hasNookara() && canHomeConnect(origin, info) ? <><ShieldCheck size={13} /> Signs you in with your homeserver account</> : nookaraSignsIn(info) ? <><ShieldCheck size={13} /> Signs you in with your Nookara account</> : <><KeyRound size={13} /> Has its own accounts</>}</small></div>
     </div>
   );
 }
@@ -116,7 +116,7 @@ export function AddInstance({ url, invite, server, onClose, onSetup }) {
       const r = await joinCommunity(found.origin, withCode, withCode ? undefined : joinPass, server ?? undefined);
       if (r.pending) { setAsked(true); toast(`Asked to join ${info.community?.name || 'the server'}.`, true); }
       else { onClose(); setTimeout(() => go({ kind: 'server', sid: r.sid }), 200); }
-    } catch (e) { toast(errorText(e.message)); }
+    } catch (e) { setAsked(false); toast(errorText(e.message)); } // (nothing was asked: no "Request sent")
     setBusy(false);
   }
   const closedSignup = found && info.accounts_mode === 'local' && info.registration !== 'open' && info.claimed !== false;

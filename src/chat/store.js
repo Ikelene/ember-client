@@ -2455,7 +2455,9 @@ export async function open(v) {
     const back = ['channel', 'dm', 'group'].includes(state.view.kind) ? hashFor(state.view) : '#/home';
     history.replaceState(null, '', clientUrl(back));
     if (!state.view.kind || state.view.kind === 'home') set(s => ({ view: s.view }));
-    joinByAddress(v);
+    // an invite (with its code): what server it is first, with a Join button (AddressInvite.jsx); just an address: straight in
+    if (v.code) dispatchEvent(new CustomEvent('vc-invite', { detail: { address: { slug: v.slug, domain: v.domain, code: v.code } } }));
+    else joinByAddress(v);
     return;
   }
   if (v.kind === 'invite') {

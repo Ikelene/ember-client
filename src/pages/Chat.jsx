@@ -49,8 +49,9 @@ import { ExportButton } from '../chat/Community.jsx';
 
 import { isInst, instOf } from '../chat/ids.js';
 import { E2eeHeadLock } from '../chat/E2eeMessage.jsx';
-import { forgetIfEmpty } from '../chat/instances.js';
+import { forgetIfEmpty, joinByAddress } from '../chat/instances.js';
 import { CreateOnHomeserver } from '../chat/CreateOnHomeserver.jsx';
+import { AddressInvite, takeInvite } from '../chat/AddressInvite.jsx';
 // a left Ember server goes off the list (the server list is updated by the leave's own event, or in a moment)
 const forgetLeft = sid => { const o = instOf(sid); setTimeout(() => forgetIfEmpty(o), 400); };
 
@@ -479,6 +480,9 @@ function ChatPage() {
     if (!ready) return;
     const tb = /^#\/test-bot\/(\d{1,20})\/?$/.exec(location.hash); // admin: /chat#/test-bot/<bot id> opens the test-install dialog
     if (tb) { setDialog({ kind: 'test-bot', id: tb[1] }); history.replaceState(null, '', clientUrl('#/home')); open({ kind: 'home' }); return; }
+    // an invite kept across a sign-in (AddressInvite.jsx): signed in now, so join it
+    const kept = takeInvite();
+    if (kept && (getState().signedIn || getState().home)) { history.replaceState(null, '', clientUrl('#/home')); open({ kind: 'home' }); joinByAddress(kept); return; }
     let v = readHash();
     if (v.kind === 'invite') { setDialog({ kind: 'invite-join', code: v.code, inst: v.inst }); history.replaceState(null, '', clientUrl('#/home')); open({ kind: 'home' }); return; }
     if (v.kind === 'home' && !location.hash) {
@@ -487,10 +491,13 @@ function ChatPage() {
     open(v);
   }, [ready]);
   useEffect(() => { setDiscover(false); }, [view]); // any navigation (even to where you already are) leaves Discovery
+  // a server's (or channel's) settings belong to the server that was open: going somewhere else closes them
+  const viewWhere = view.dm || view.sid || view.kind;
+  useEffect(() => { setDialog(d => (d && (d.kind === 'settings' || d.kind === 'channel') ? null : d)); }, [viewWhere]);
   useEffect(() => { setReplyTo(null); setDrawer(!!history.state?.vcDrawer && innerWidth <= 760); }, [view.kind, view.cid, view.username, view.room]);
   // invite links (from messages, the address bar...) open the invite pop-up here
   useEffect(() => {
-    const on = e => setDialog({ kind: 'invite-join', code: e.detail?.code ?? e.detail, inst: e.detail?.inst });
+    const on = e => setDialog(e.detail?.address ? { kind: 'address-invite', address: e.detail.address } : { kind: 'invite-join', code: e.detail?.code ?? e.detail, inst: e.detail?.inst });
     addEventListener('vc-invite', on);
     return () => removeEventListener('vc-invite', on);
   }, []);
@@ -544,6 +551,7 @@ function ChatPage() {
   const homeMode = useChat(s => !!s.home); // on a v2 homeserver session (SocialHome.jsx)
   const sdm = view.kind === 'channel' && view.dm ? view.dm : null; // a DM on a homeserver: a one-channel server underneath
   const sdmName = useChat(s => (sdm ? s.detail[view.sid]?.server?.name : null));
+  const sdmSealed = useChat(s => (sdm ? !!s.social.dms.find(x => x.id === sdm)?.e2ee : false)); // (end-to-end encrypted: the start says so)
   const locked = useChat(s => s.locked); // staff switched Ember and DMs off for the account (store.js lockAccount)
   const waking = view.kind === 'channel' && !!detail?.cached; // its kept channel list: still connecting
   const wakeStatus = useChat(s => { if (!waking || !isInst(view.sid)) return null; const i = s.instances.find(x => x.origin === instOf(view.sid)); return i && ['insufficient_scope', 'unauthorized', 'invalid_session'].includes(i.error) ? 'error' : i?.status; });
@@ -572,7 +580,7 @@ function ChatPage() {
   }
 
   const title = sdm
-    ? { icon: <AtSign size={34} />, big: sdmName || 'Conversation', sub: 'This is the start of the conversation. It is not end-to-end encrypted: the homeserver it is on can read it.' }
+    ? { icon: <AtSign size={34} />, big: sdmName || 'Conversation', sub: sdmSealed ? 'This is the start of the conversation. It is end-to-end encrypted: only the people in it can read it, not the homeservers.' : 'This is the start of the conversation. It is not end-to-end encrypted: the homeserver it is on can read it.' }
     : isServer
     ? { icon: <ChIcon size={34} />, big: `Welcome to #${channel?.name || ''}`, sub: channel?.topic || `This is the start of the #${channel?.name} channel.` }
     : modView
@@ -729,6 +737,7 @@ function ChatPage() {
 
       {dialog?.kind === 'invite' && <Invite sid={dialog.sid || view.sid} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'invite-join' && <JoinInvite code={dialog.code} inst={dialog.inst} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'address-invite' && <AddressInvite address={dialog.address} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'settings' && <ServerSettings key={`${dialog.sid || view.sid}-${dialog.tab || ''}`} sid={dialog.sid || view.sid} tab={dialog.tab} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'channel' && (dialog.channel?.cid
         ? <ChannelSettings key={dialog.channel.cid} sid={dialog.sid || view.sid} channel={dialog.channel} tab={dialog.tab} onClose={() => setDialog(null)} />
