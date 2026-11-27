@@ -38,7 +38,7 @@ export function CreateOnHomeserver({ onClose, start = 'join' }) {
   const [host, setHost] = useState(null);
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
-  const [touched, setTouched] = useState(false); // typed an address of their own (it stops following the name)
+  const [touched, setTouched] = useState(false); // typed an address of their own (it stops following the name; until then focusing it selects it all, so typing replaces it)
   const [policy, setPolicy] = useState('open');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -102,6 +102,7 @@ export function CreateOnHomeserver({ onClose, start = 'join' }) {
               <label className="vc-field"><span>Name</span><input className="form-input" autoFocus maxLength={60} value={name} onChange={e => { setName(e.target.value); setErr(''); }} /></label>
               <label className="vc-field"><span>Address (optional)</span>
                 <div className="vc-row"><input className="form-input" maxLength={32} autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="picked for you" aria-invalid={!!issue} value={slug}
+                  onFocus={e => { if (!touched) e.target.select(); }} onMouseUp={e => { if (!touched) e.preventDefault(); }}
                   onChange={e => { setTouched(true); setSlug(e.target.value.toLowerCase().replace(/\s+/g, '-')); setErr(''); }} /><span className="bf-ss-addr-at">@{host.domain}</span></div>
                 {issue ? <small className="vc-hint bf-ss-addr-bad">{issue}</small> : <small className="vc-hint"><Globe size={12} className="vc-inline-ico" /> {slug ? `People will find it as ${slug}@${host.domain}.` : '3-32 lowercase letters, numbers and dashes. Leave it empty and the homeserver picks one.'}</small>}
               </label>
