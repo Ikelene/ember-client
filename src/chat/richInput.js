@@ -9,9 +9,9 @@ import { NOOKARA, instOf } from './ids.js';
 
 const EMOJI_TOKEN = /^<(a?):([A-Za-z0-9_]{1,32}):(e[0-9a-f]{10})>$/;
 const ROLE_TOKEN = /^<@&(r[0-9a-f]{10})>$/;
-const USER_TOKEN = /^<@!?((?:[vlb]:)?\d{1,20})>$/;
+const USER_TOKEN = /^<@!?((?:[vlb]:)?\d{1,20}(?:@[a-z0-9.-]{1,253})?|[A-Za-z0-9][A-Za-z0-9._:-]{0,63}@[a-z0-9.-]{1,253})>$/; // (someone from another homeserver: v:2@nookara.cc)
 const CHAN_TOKEN = /^<#(c[0-9a-f]{10})>$/;
-const SPLIT_RE = /(<a?:[A-Za-z0-9_]{1,32}:e[0-9a-f]{10}>|<@&r[0-9a-f]{10}>|<@!?(?:[vlb]:)?\d{1,20}>|<#c[0-9a-f]{10}>)/;
+const SPLIT_RE = /(<a?:[A-Za-z0-9_]{1,32}:e[0-9a-f]{10}>|<@&r[0-9a-f]{10}>|<@!?(?:(?:[vlb]:)?\d{1,20}(?:@[a-z0-9.-]{1,253})?|[A-Za-z0-9][A-Za-z0-9._:-]{0,63}@[a-z0-9.-]{1,253})>|<#c[0-9a-f]{10}>)/;
 const instOfSid = sid => (sid ? instOf(sid) : NOOKARA);
 
 // the element for one token (or null if it isn't one we style)

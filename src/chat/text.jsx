@@ -189,7 +189,7 @@ const RULES = [
   }],
   [/(?:^|(?<=\s))@(everyone|here)\b/, (m, ctx, k) => <span key={k} className="vc-mention all">@{m[1]}</span>],
   // <@id>: a person (Nookara ids are numbers, an Ember server's are v:/l:/b: principals)
-  [/<@!?((?:[vlb]:)?\d{1,20})>/, (m, ctx, k) => <UserMention key={k} id={m[1]} ctx={ctx} />],
+  [/<@!?((?:[vlb]:)?\d{1,20}(?:@[a-z0-9.-]{1,253})?|[A-Za-z0-9][A-Za-z0-9._:-]{0,63}@[a-z0-9.-]{1,253})>/, (m, ctx, k) => <UserMention key={k} id={m[1]} ctx={ctx} />],
   // <#cid>: a channel (any server of mine on the same backend; otherwise "#unknown", like Discord)
   [/<#(c[0-9a-f]{10})>/, (m, ctx, k) => {
     const found = channelById(m[1], ctxInst(ctx));

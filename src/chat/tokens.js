@@ -11,7 +11,8 @@ import { personName, displayNameOf } from './displayNames.js';
 
 export const nameOf = u => personName(u, displayNameOf(u.username)) || u.username;
 
-export const USER_TOKEN = /<@!?((?:[vlb]:)?\d{1,20})>/;
+// a person: <@id>, the id as the server has it - 'l:5', 'v:2', or someone from another homeserver 'v:2@nookara.cc' (PROTOCOL)
+export const USER_TOKEN = /<@!?((?:[vlb]:)?\d{1,20}(?:@[a-z0-9.-]{1,253})?|[A-Za-z0-9][A-Za-z0-9._:-]{0,63}@[a-z0-9.-]{1,253})>/;
 export const CHANNEL_TOKEN = /<#(c[0-9a-f]{10})>/;
 export const userToken = id => `<@${id}>`;
 export const channelToken = cid => `<#${bare(cid)}>`;
@@ -71,7 +72,7 @@ export function channelById(cid, inst = NOOKARA) {
 // message text -> plain text for one-line previews (notifications, inbox rows, the overlay)
 export function plainText(body, inst = NOOKARA, sid = null) {
   return String(body || '')
-    .replace(/<@!?((?:[vlb]:)?\d{1,20})>/g, (_, id) => { const u = userById(id, inst, sid); return `@${u ? nameOf(u) : 'unknown-user'}`; })
+    .replace(/<@!?((?:[vlb]:)?\d{1,20}(?:@[a-z0-9.-]{1,253})?|[A-Za-z0-9][A-Za-z0-9._:-]{0,63}@[a-z0-9.-]{1,253})>/g, (_, id) => { const u = userById(id, inst, sid); return `@${u ? nameOf(u) : 'unknown-user'}`; })
     .replace(/<#(c[0-9a-f]{10})>/g, (_, cid) => `#${channelById(cid, inst)?.channel.name || 'unknown'}`);
 }
 
