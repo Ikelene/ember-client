@@ -2854,3 +2854,8 @@ html.vc-light .vc-ch-tabs button.on { color: var(--text, #111); }
 .bf-ss-home .vc-hs-chip { font-size: 12.5px; padding: 4px 9px; }
 .vc-disc-card .vc-hs-chip.on-banner { position: absolute; top: 8px; right: 8px; z-index: 1; background: rgba(0, 0, 0, .5); color: #fff; backdrop-filter: blur(4px); }
 .bf-pe-home { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+/* phones: the notifications banner floats above the composer, not over the header (and the menu button) */
+@media (max-width: 760px) {
+  .vc-notify-banner { top: auto; bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
+  body:has(.vc-sign-banner) .vc-notify-banner { top: auto; }
+}
