@@ -12,6 +12,7 @@ import { signOut, savedAccounts, switchTo } from './ProfilePopout.jsx';
 import { siteHref } from './hosts.js';
 import { StatusLink } from './StatusLink.jsx';
 import { statusIdForHost } from './status.js';
+import { homeDomainOf } from './homeservers.js';
 
 export const SUPPORT_URL = 'https://nookara.cc/support';
 // where the birthday is set (Nookara account settings; a website session, the Ember token can't set it)
@@ -94,7 +95,7 @@ export function SignInPrompt({ what = 'direct messages, group chats and friends'
   }
   return (
     <Box icon={<ShieldCheck size={34} />} title="Sign in to Ember">
-      <p>Your account lives on a homeserver and is needed for {what}. Servers with their own accounts work without it.</p>
+      <p>Your account lives on a homeserver and is needed for {what}.</p>
       <HomeserverLogin back={back} />
     </Box>
   );
@@ -119,7 +120,8 @@ export function InstanceGate({ origin }) {
   const [code, setCode] = useState('');
   const [pass, setPass] = useState('');
   if (!inst) return null;
-  const { host, status, community } = inst;
+  const { status, community } = inst;
+  const host = inst.v2 ? homeDomainOf(inst, srv) : inst.host; // (a server on a homeserver: the homeserver's domain, not where it runs)
   const name = community?.name || inst.name;
   const retry = <button type="button" className="btn btn-surface" onClick={() => reconnect(origin)}><RefreshCw size={15} /> Retry</button>;
   const remove = <button type="button" className="btn btn-surface" onClick={async () => { if (await ask({ title: `Remove ${name}?`, text: `${host} leaves your server list. Your account there stays as it is - you can add it again any time.`, confirm: 'Remove from list', danger: true })) removeInstance(origin); }}><Trash2 size={15} /> Remove from list</button>;
@@ -139,7 +141,7 @@ export function InstanceGate({ origin }) {
         <p>{inst.needsNookara ? 'This server signs you in with your Nookara account.' : 'Log in to open this server.'}</p>
         <div className="vc-gate-btns">
           {inst.needsNookara ? <button type="button" className="btn btn-primary" onClick={() => startSignIn()}><ShieldCheck size={15} /> Sign in with Nookara</button>
-            : <button type="button" className="btn btn-primary" onClick={() => dialog('add-instance', { url: origin })}><LogIn size={15} /> Log in</button>}
+            : <button type="button" className="btn btn-primary" onClick={() => (inst.v2 && inst.source ? dialog('chat-settings', { page: 'homeservers' }) : dialog('add-instance', { url: origin }))}><LogIn size={15} /> {inst.v2 ? `Sign in to ${host}` : 'Log in'}</button>}
           {retry}
         </div>
       </Box>
@@ -161,7 +163,7 @@ export function InstanceGate({ origin }) {
       <Box icon={<Server size={34} />} title={`Couldn't reach ${host}`}>
         {inst.error && inst.error !== 'instance_unreachable' && <p>{errorText(inst.error === 'insufficient_scope' ? 'inst_scope' : inst.error)}</p>}
         <RetryIn at={inst.retryAt} busy={status === 'connecting'} />
-        <div className="vc-gate-btns"><button type="button" className="btn btn-primary" onClick={() => reconnect(origin)}><RefreshCw size={15} /> Retry now</button>{statusIdForHost(host) && <StatusLink id={statusIdForHost(host)} className="btn btn-surface" size={15} />}{remove}</div>
+        <div className="vc-gate-btns"><button type="button" className="btn btn-primary" onClick={() => reconnect(origin)}><RefreshCw size={15} /> Retry now</button>{statusIdForHost(inst.host) && <StatusLink id={statusIdForHost(inst.host)} className="btn btn-surface" size={15} />}{remove}</div>
       </Box>
     );
   }
