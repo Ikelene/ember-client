@@ -469,6 +469,14 @@ function ChatPage() {
       if (web && cached?.account?.username) try { localStorage.setItem('ember_user', cached.account.username); } catch { /* fine */ } // (the per-account storage keys follow it)
       if (cached) { applyAccentColor(cached.profile?.color); init(meFrom(cached)); setReady(true); }
       api.getMe().then(d => {
+        // signed in as someone else on Nookara's own sign-in page (same site): the per-account storage keys follow the new name,
+        // and a page already running on the old one's (its servers' sessions) starts over
+        const name = d?.account?.username;
+        if (web && name && localStorage.getItem('ember_user') !== name) {
+          const was = localStorage.getItem('ember_user');
+          try { localStorage.setItem('ember_user', name); } catch { /* fine */ }
+          if (was && getState().me) { location.reload(); return; }
+        }
         applyAccentColor(d.profile?.color);
         if (!getState().me) { init(meFrom(d)); setReady(true); }
       }).catch(e => {
