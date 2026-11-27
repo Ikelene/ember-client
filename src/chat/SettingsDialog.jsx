@@ -17,6 +17,7 @@ import { ThemePage, TextLayoutPage, BlockingPage, NotifLevels } from './settings
 import { effectiveDesign, subscribeDesign } from './design.js';
 import ChatSettingsTab, { GROUPS, matches, useDesktopMac, desktopAppTitle, DesignSettings } from '../components/tabs/ChatSettingsTab.jsx';
 import ProfileEditor from './ProfileEditor.jsx';
+import { OpenLinksCard, canOpenLinks } from './settings/OpenLinksCard.jsx';
 import { useChat, ask, getState } from './store.js';
 import { NameText } from './displayNames.js';
 import { isWebEmber } from '../api.js';
@@ -58,7 +59,7 @@ const PAGES = [
   ['App settings', [
     ['Windows app', 'Windows app', Monitor, ['Desktop app', 'Start with Windows', 'Start minimized', 'Minimize to tray', 'Discord game status', 'RPC', 'Detect games I play'], 'desktop'],
     ['Extras', 'Extras', Sparkles, [...rowText('Extras'), 'Radio', 'Stream address', 'Volume']],
-    ['Advanced', 'Advanced', SlidersHorizontal, rowText('Advanced')],
+    ['Advanced', 'Advanced', SlidersHorizontal, [...rowText('Advanced'), 'Invite links', 'Open invite links', 'web+ember', 'Open links in this app']],
     ['About', 'About', Info, ['Ember', 'Ikelene', 'Creator', 'Author', 'Version', 'Build', 'Copyright', 'License']],
   ]],
   ['Developer', [
@@ -119,7 +120,7 @@ export default function SettingsDialog({ page: startPage, target, hs, onClose })
   // signed out of Nookara (web Ember): only the pages that don't need an account
   const [design, setDesignState] = useState(() => effectiveDesign());
   useEffect(() => subscribeDesign(() => setDesignState(effectiveDesign())), []);
-  const groups = useMemo(() => PAGES.map(([g, items]) => [g, items.filter(it => (it[4] !== 'desktop' || desktop) && (it[4] !== 'modern' || design === 'rounded') && (it[4] !== 'home' || home) && (it[4] !== 'hs' || anyHome) && (signedIn || ['Account', 'About', 'theme', 'text', 'voice', 'accounts', 'homeaccount', 'homeservers'].includes(it[0]) || (it[0] === 'profile' && serverAccount)))
+  const groups = useMemo(() => PAGES.map(([g, items]) => [g, items.filter(it => (it[4] !== 'desktop' || desktop) && (it[4] !== 'modern' || design === 'rounded') && (it[4] !== 'home' || home) && (it[4] !== 'hs' || anyHome) && (signedIn || ['Account', 'About', 'theme', 'text', 'voice', 'accounts', 'homeaccount', 'homeservers'].includes(it[0]) || (it[0] === 'profile' && serverAccount) || (it[0] === 'Advanced' && canOpenLinks())))
     .map(it => (it[4] === 'desktop' && mac ? [it[0], desktopAppTitle(true), it[2], MAC_APP_WORDS, it[4]] : it))]).filter(([, items]) => items.length), [desktop, signedIn, mac, design, serverAccount, home, anyHome]);
   const shown = useMemo(() => groups.map(([g, items]) => [g, items.filter(([, label, , words]) => matches(q, label, ...words))]).filter(([, items]) => items.length), [groups, q]);
   const help = useMemo(() => HELP.filter(([label, , , words]) => matches(q, label, ...words)), [q]);
@@ -254,6 +255,7 @@ export default function SettingsDialog({ page: startPage, target, hs, onClose })
                           : <>
                             <ChatSettingsTab embedded bare page={page} query={matches(q, current?.[1] || '') ? '' : q} web={isWebEmber()} onLogout={signedIn ? logout : undefined} onLogin={signedIn ? undefined : () => startSignIn()} />
                             {page === 'Notifications' && signedIn && <div className="bf-sd-extra"><NotifLevels /></div>}
+                            {page === 'Advanced' && <div className="bf-sd-extra"><OpenLinksCard /></div>}
                           </>}
           </div>
         </div>
