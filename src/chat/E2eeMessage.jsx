@@ -152,7 +152,13 @@ function SdmComposerNotes({ view }) {
   if (!dm) return null;
   const c = status === 'ready' ? E2EE.membersOf(dm) : { added: [], removed: [] };
   // (someone no longer in the list has only an id left, like v:3: say "someone" rather than that)
-  const who = ids => nameList(ids.map(id => memberName(dm, id)).map(n => (/^[a-z]:\w+(@\S+)?$/i.test(n) ? 'someone' : n))).replace(/^someone/, 'Someone');
+  // (several of those: "2 people" / "alice and 2 others", never "someone and someone")
+  const who = ids => {
+    const names = ids.map(id => memberName(dm, id)), anon = n => /^[a-z]:\w+(@\S+)?$/i.test(n);
+    const known = names.filter(n => !anon(n)), rest = names.length - known.length;
+    const tail = !rest ? [] : known.length ? [rest === 1 ? 'someone else' : `${rest} others`] : [rest === 1 ? 'someone' : `${rest} people`];
+    return nameList([...known, ...tail]).replace(/^someone/, 'Someone');
+  };
   const keyChanged = dm.members.filter(m => changedKeys[String(m.id).toLowerCase()]);
   return (
     <>
