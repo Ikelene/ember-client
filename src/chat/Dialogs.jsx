@@ -6,7 +6,7 @@ import serverCreationPolicy from '../server-creation-policy.json';
 import { Users, Copy, Check, Upload, Trash2, Hash, Search, Globe, ShieldCheck, Bot } from 'lucide-react';
 import { joinAndOpen } from './instances.js';
 import { BotGallery } from './BotGallery.jsx';
-import { apiFetch } from '../api.js';
+import { apiFetch, uploadFetch } from '../api.js';
 import { getState, useChat, go, messageSomeone, loadServersOf, refreshServer, loadGroups, toast, errorText, ask, answerAsk, loadFriends, sendMessage, inviteLinkFor } from './store.js';
 import { NameText, displayNameOf } from './displayNames.js';
 import { NOOKARA, instOf, isInst, fromInstance, normOrigin } from './ids.js';
@@ -255,7 +255,7 @@ export function ChannelEditor({ sid, channel, onClose }) {
               {editing && (
                 <label className={`vc-icon-up${/^https?:\/\//.test(icon) ? ' on' : ''}`} title="Upload a picture">
                   {/^https?:\/\//.test(icon) ? <img src={icon} alt="" /> : <Upload size={15} />}
-                  <input type="file" hidden accept={pictureAccept('image/*')} onChange={async e => { const f = e.target.files[0]; if (!f) return; warnImage(f, 'channelIcon', isInst(channel.cid)); try { const res = await uploadTo(`/chat/channels/${channel.cid}/icon`, f); setIcon(res.channel.icon); } catch (er) { toast(errorText(er.message)); } }} />
+                  <input type="file" hidden accept={pictureAccept('image/*')} onChange={async e => { const f = e.target.files[0]; if (!f) return; warnImage(f, 'channelIcon', isInst(channel.cid)); try { const fd = new FormData(); fd.append('file', f); const res = await uploadFetch(`/chat/channels/${channel.cid}/icon`, fd); setIcon(res.channel.icon); } catch (er) { toast(errorText(er.message)); } }} />
                 </label>
               )}
             </div></div>
