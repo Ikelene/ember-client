@@ -106,7 +106,7 @@ export function SignedOutSidebar() {
   return (
     <div className="vc-side">
       <div className="vc-side-head" />
-      <div className="vc-side-list"><div className="vc-side-empty">Sign in with Nookara to use direct messages, group chats and friends.</div></div>
+      <div className="vc-side-list"><div className="vc-side-empty">Your direct messages, group chats and friends show here once you're signed in.</div></div>
     </div>
   );
 }
