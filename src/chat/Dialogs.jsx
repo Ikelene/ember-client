@@ -7,7 +7,7 @@ import { Users, Copy, Check, Upload, Trash2, Hash, Search, Globe, ShieldCheck, B
 import { joinAndOpen } from './instances.js';
 import { BotGallery } from './BotGallery.jsx';
 import { apiFetch, uploadFetch } from '../api.js';
-import { getState, useChat, go, messageSomeone, loadServersOf, refreshServer, loadGroups, toast, errorText, ask, answerAsk, loadFriends, sendMessage, inviteLinkFor } from './store.js';
+import { getState, useChat, go, messageSomeone, loadServersOf, refreshServer, loadGroups, toast, errorText, ask, answerAsk, loadFriends, sendMessage, inviteLinkFor, startSocialDm, fullHandle } from './store.js';
 import { NameText, displayNameOf } from './displayNames.js';
 import { NOOKARA, instOf, isInst, fromInstance, normOrigin } from './ids.js';
 import { parseAddress } from './addresses.js';
@@ -328,14 +328,19 @@ export function NewDM({ onClose }) {
 }
 export function NewGroup({ onClose }) {
   const [name, setName] = useState('');
+  const [far, setFar] = useState(''); // people on other homeservers (name@their.homeserver): then it is a homeserver group
+  const farList = far.split(/[\s,]+/).map(x => x.trim().replace(/^@/, '')).filter(x => x.includes('@'));
   return (
     <Dialog title="New group chat" sub="A private chat for a few people (up to 50)." onClose={onClose}>
       {close => (
         <>
           <label className="vc-field"><span>Group name</span><input className="form-input" maxLength={50} value={name} onChange={e => setName(e.target.value)} placeholder="The squad" /></label>
+          <label className="vc-field"><span>People on other homeservers (optional)</span><input className="form-input" value={far} onChange={e => setFar(e.target.value)} placeholder="carol@b.example, dave@example.org" autoCapitalize="none" spellCheck={false} />
+            <small className="vc-hint">With anyone from another homeserver it is an end-to-end encrypted homeserver group (up to 10 people).</small></label>
           <PeoplePicker multi onDone={() => {}} button={picked => (
             <div className="vc-dialog-btns"><span className="grow" /><button type="button" className="btn btn-surface" onClick={close}>Cancel</button>
               <button type="button" className="btn btn-primary" disabled={!name.trim()} onClick={async () => {
+                if (farList.length) { const dm = await startSocialDm({ handles: [...picked.map(u => fullHandle(u)), ...farList], name: name.trim(), group: true }); if (dm) close(); return; }
                 try { const d = await apiFetch('/groups', { method: 'POST', body: JSON.stringify({ name, members: picked }) }); await loadGroups(); close(); go({ kind: 'group', room: d.group.room }); }
                 catch (e) { toast(errorText(e.message)); }
               }}>Create group{picked.length ? ` (${picked.length + 1})` : ''}</button></div>
