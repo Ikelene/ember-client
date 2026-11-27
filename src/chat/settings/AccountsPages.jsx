@@ -36,7 +36,7 @@ export function AccountsPage({ onClose }) {
   const me = useChat(s => s.me);
   const signedIn = useChat(s => s.signedIn);
   const instances = useChat(s => s.instances || NONE);
-  const localInstances = instances.filter(i => !isNookara(i.mode) && !i.needsNookara); // (Nookara-linked ones are left out, see Server accounts)
+  const localInstances = instances.filter(i => !isNookara(i.mode) && !i.viaNookara && !i.needsNookara); // (Nookara-linked ones are left out, see Server accounts)
   const [busy, setBusy] = useState('');
   const homes = useHomeSessions(); // homeserver (v2) sign-ins
   const others = signedIn ? savedAccounts().filter(a => a.username.toLowerCase() !== String(me?.username || '').toLowerCase()) : [];
@@ -51,7 +51,7 @@ export function AccountsPage({ onClose }) {
     toast(`Signed out of ${s.account.handle}.`, true);
   }
   async function signOutAll() {
-    const own = instances.filter(i => !isNookara(i.mode));
+    const own = instances.filter(i => !isNookara(i.mode) && !i.viaNookara);
     const text = `You'll be signed out of Nookara${own.length ? `, and ${own.length === 1 ? 'the server with its own account is' : `the ${own.length} servers with their own accounts are`} removed from your server list${getToken() ? ' on every device' : ''}. You can add ${own.length === 1 ? 'it' : 'them'} back any time` : ''}.`;
     if (!(await ask({ title: 'Sign out of everything?', text, confirm: 'Sign out of everything', danger: true }))) return;
     setBusy('all');
@@ -145,7 +145,7 @@ function InstanceRow({ inst, onClose }) {
   const name = s?.name || inst.community?.name || inst.name;
   const icon = s?.icon || inst.community?.icon_url || inst.icon;
   const u = inst.user;
-  const viaNookara = isNookara(inst.mode);
+  const viaNookara = isNookara(inst.mode) || !!inst.viaNookara;
   const st = STATUS[inst.status] || ['', inst.status || 'Not connected'];
   const open = () => { go(s && inst.status === 'open' ? { kind: 'server', sid: s.sid } : { kind: 'instance', inst: inst.origin }); onClose?.(); };
   const remove = async () => {

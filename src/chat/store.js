@@ -2696,7 +2696,7 @@ export function socialEvent(origin, m) {
   if (m.type === 'social_dm_update' && state.view.dm === id) { const dm = next.dms.find(x => x.id === id); if (dm?.sid && dm.channel && dm.host_origin) seedDm(dm); }
   if (m.type === 'social_dm_activity') {
     if (state.view.dm === id && pageFocused()) readSocialDm(id);
-    else if (state.settings.sounds && state.presence[state.me?.username]?.status !== 'dnd') { try { playSound('message'); } catch { /* no sound */ } }
+    else if (state.settings?.sounds && state.presence[state.me?.username]?.status !== 'dnd') { try { playSound('message'); } catch { /* no sound */ } }
   }
 }
 const dmHostOf = dm => normOrigin(dm?.host_origin);

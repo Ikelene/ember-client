@@ -46,8 +46,8 @@ export const instView = c => ({
   community: c.info?.community || null, mode: c.info?.accounts_mode || null, status: c.peeking && c.status !== 'open' ? 'asleep' : c.status, claimed: c.info?.claimed !== false, features: c.info?.features || {},
   registration: c.info?.registration || 'closed', isAdmin: !!c.isAdmin, isOwner: !!c.isOwner, user: c.user || null, error: c.error || null, restricted: c.restricted || null,
   needsNookara: isNookara(c.info?.accounts_mode) && !getToken() && srcOf(c) === 'legacy', pending: !!c.pending, failed: !!c.failed,
-  viaNookara: nookaraSignsIn(c.info) && srcOf(c) === 'legacy', // the Nookara instance token signs me in there
-  source: c.source || null, // 'home' (my homeserver, on its own session) | 'remote' (signed in from my homeserver) | null (as before)
+  viaNookara: srcOf(c) === 'nookara' || (nookaraSignsIn(c.info) && srcOf(c) === 'legacy'), // my Nookara account signs me in there (its instance token, or a token it signs for that homeserver)
+  source: c.source || null, // 'home' (my homeserver, on its own session) | 'remote' (signed in from my homeserver) | 'nookara' (signed in from Nookara) | null (as before)
   quiet: !!(c.dmHost || c.source === 'home'), // only there for my account or a DM: no rail entry until I'm in a server on it
   loaded: !!c.loaded, // this account's communities on it have been fetched (so "not in it" is known)
   prefs: c.prefs || null, // Nookara's push consent for it ({ muted, push }), signed in only
@@ -154,6 +154,7 @@ function adoptHome(c, r) {
 let homeWas = null; // the home homeserver the sessions below were made with
 async function ensureHome(c, source) {
   homeWas = homeHere();
+  if (c.session && !c.source && source === 'nookara' && loadSessionTags()[c.origin] === tagFor(c.origin, c.info, true, nookaraKey())) c.source = source; // (kept from before a reload: used until it says 401)
   if (c.session && c.source !== source) { c.session = null; registry.delete(c.origin); }
   if (c.session && source !== 'home' && loadSessionTags()[c.origin] !== tagFor(c.origin, c.info, !!getToken(), nookaraKey())) { c.session = null; registry.delete(c.origin); saveSession(c.origin, null); } // another account's
   if (source === 'home' || !c.session) {
