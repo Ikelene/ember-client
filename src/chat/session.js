@@ -4,7 +4,7 @@
 import { clientPath, clientUrl, onEmberHost, AUTH_POPUP_URL, AUTH_ORIGINS } from './hosts.js';
 import { getToken, isWebEmber } from '../api.js';
 import { dropNookaraSessions } from './instances.js';
-import { toast, stopKeepingMessages } from './store.js';
+import { toast, stopKeepingMessages, getState } from './store.js';
 import { forgetAccount as forgetKeptMessages } from './msgCache.js';
 import { acctKey } from './ids.js';
 import { EMBER_API, notifBridge } from '../compat.js';
@@ -64,11 +64,23 @@ export async function homeLogin(hs, { hint, back } = {}) {
   try {
     const s = await startLogin(hs, { hint, back });
     toast(`Signed in as ${s.account.handle}.`, true);
+    adoptHomeSession(s, back);
     return s;
   } catch (e) {
     if (e?.code !== 'cancelled') toast(homeLoginText(e?.code, hs?.domain));
     return null;
   }
+}
+// Signed in through the pop-up (the gate, Add homeserver, Add account): when the app isn't running as a Nookara account and
+// isn't already running as this one, start over as it, where the sign-in was asked from (the full-page trip does the same on its
+// way back, Chat.jsx). Signed in with Nookara, the new session just joins the others (Settings > Homeservers, the switchers).
+function adoptHomeSession(s, back) {
+  if (getToken() || !s?.account) return;
+  const running = getState().home;
+  if (running && String(running.origin).toLowerCase() === String(s.origin).toLowerCase() && running.account?.handle === s.account.handle) return;
+  const hash = back?.hash && !isCallbackHash(back.hash) && !back.hash.startsWith('#/signin') ? back.hash : '#/home';
+  history.replaceState(null, '', clientUrl(hash));
+  location.reload();
 }
 export const homeLoginText = (code, domain) => (code === 'declined' ? 'Sign-in was cancelled.' : code === 'state' ? SIGNIN_TEXT.state : code === 'unreachable' ? `Couldn't reach ${domain || 'the homeserver'} - try again.` : `Couldn't sign in${domain ? ` to ${domain}` : ''} - try again.`);
 // page load: back from a homeserver's login page after a full-page trip (#/auth/callback, the pop-up was blocked)
