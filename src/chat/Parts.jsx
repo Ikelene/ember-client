@@ -21,7 +21,7 @@ import { deviceAccounts, switchToAccount } from './accountSwitch.js';
 import { nookaraDmRows } from './social.js';
 import { SocialDmRow } from './SocialHome.jsx';
 import { useName, NameText, personName, displayNameOf, useDisplayNamesVersion, wantDisplayNames, serverOwnName } from './displayNames.js';
-import { useChat, retryNow, go, keyOf, setStatus, setCustom, isMuted, effectiveNotify, ask, refreshServer, toast, errorText, setDetailLayout, patchState, saveSettings, getState, statusOf, presenceFor, useFace, isBlockedPerson, isBlockedName, blockedFace, BLOCKED_NAME, loadMoreMembers, lastHomeView, bridgedTyper } from './store.js';
+import { useChat, retryNow, go, keyOf, setStatus, setCustom, isMuted, effectiveNotify, ask, refreshServer, toast, errorText, setDetailLayout, patchState, saveSettings, saveRailOrder, getState, statusOf, presenceFor, useFace, isBlockedPerson, isBlockedName, blockedFace, BLOCKED_NAME, loadMoreMembers, lastHomeView, bridgedTyper } from './store.js';
 import { ChannelIcon, NameDecor } from './roles.jsx';
 import { P, has, useNameStyle, colorFrom } from './perms.js';
 import { serverMenu, instanceMenu, channelMenu, userMenu, openMenu, copy } from './menus.js';
@@ -29,7 +29,8 @@ import { apiFetch, getToken } from '../api.js';
 import { NOOKARA, instOf, isInst, normOrigin, bare } from './ids.js';
 import { loudUnread, needsChannelCount } from './unread.js';
 import { getLook, subscribeLook } from './look.js';
-import { railEntries, railPos, railOrigin } from './addresses.js';
+import { railEntries, railPos, railOrigin, railWire, railMerge, railMigrate } from './addresses.js';
+import { hostedSlug } from './moved.js';
 import { homeDomainOf, openHomeserverSettings } from './homeservers.js';
 import { removeInstance, reorderInstances, reconnect as reconnectInstance, disconnectInstance } from './instances.js';
 import { startSignIn } from './session.js';
@@ -116,10 +117,11 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
   const group = id => (id.startsWith('i:') ? 'i' : 'v');
   // one order for the whole rail, Nookara-hosted and Ember servers mixed (chat setting rail_order; local until it's saved)
   const savedOrder = useChat(s => s.settings?.rail_order);
-  const railOrder = savedOrder?.length ? savedOrder : localRailOrder();
   // an instance is one entry, or (a homeserver I'm in several servers on) one per server: addresses.js railEntries
   const hidden = useHiddenServers(); // ("Hide from list": the rail entry goes, the server and its homeserver stay)
   const entries = railEntries(instances, servers).filter(e => !(e.server && hidden.has(e.server.sid))).map(e => ({ rail: e.id, inst: e.inst, server: e.server }));
+  // (Nookara keeps one place per homeserver for now: this device's full order wins while it agrees; old places of moved servers follow them)
+  const railOrder = railMigrate(railMerge(savedOrder, localRailOrder()), entries, hostedSlug);
   // servers on 2+ homeservers: each icon carries a small badge of its homeserver (Matrix-style "which server is this on")
   const homes = new Set([...(legacy.length ? [nookaraDomain()] : []), ...entries.map(e => homeDomainOf(e.inst, e.server))]);
   const hsBadge = homes.size > 1 ? (domain, icon) => ({ domain, icon }) : () => null;
@@ -137,7 +139,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
     const at = list.indexOf(id);
     if (at < 0) return;
     list.splice(at + (after ? 1 : 0), 0, from);
-    if (getToken()) saveSettings({ rail_order: list }).catch(() => toast("Couldn't save the server order."));
+    if (getToken()) saveRailOrder(list, railWire(list)).catch(() => toast("Couldn't save the server order."));
     else patchState({ settings: { ...getState().settings, rail_order: list } });
     try { localStorage.setItem('bf_rail_order', JSON.stringify(list)); } catch { /* fine */ }
     // (each list's own order follows too, for older apps)

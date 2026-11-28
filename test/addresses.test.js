@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseAddress, addressHash, slugIssue, validSlug, slugFrom, createErrorText, railEntries, railOrigin, railPos, isV2, communityOf, inviteBase, inviteUrl, parseInviteUrl, parseProtocolLink, openRouteLink, serverOfInst, routeAddress, addressRoute } from '../src/chat/addresses.js';
+import { parseAddress, addressHash, slugIssue, validSlug, slugFrom, createErrorText, railEntries, railOrigin, railPos, railWire, railMerge, railMigrate, isV2, communityOf, inviteBase, inviteUrl, parseInviteUrl, parseProtocolLink, openRouteLink, serverOfInst, routeAddress, addressRoute } from '../src/chat/addresses.js';
 import { addressInviteRef, setInviteHomes, isHiddenInviteLine, embedLabel } from '../src/chat/inviteLink.js';
 
 test('addresses: slug@domain, with and without a code', () => {
@@ -166,4 +166,29 @@ test('server routes by address: #/s/<slug@domain>/<channel>/<message>', () => {
   assert.equal(addressRoute('garden@nookara.cc', 'c1', '42'), '#/s/garden@nookara.cc/c1/42');
   assert.equal(addressRoute('garden@nookara.cc'), '#/s/garden@nookara.cc');
   assert.equal(addressRoute('garden@nookara.cc', null, '42'), '#/s/garden@nookara.cc');
+});
+test('rail: several servers on one homeserver keep their own places', () => {
+  const H = 'https://chat.nookara.cc';
+  const full = [`i:${H}|s0000000003`, 'v:s0123456789', `i:${H}|s0000000001`, `i:${H}|s0000000002`];
+  // what Nookara can hold today: one place per homeserver (the first server's), per-server ids folded
+  assert.deepEqual(railWire(full), [`i:${H}`, 'v:s0123456789']);
+  assert.deepEqual(railWire(['v:bad id', 'i:https://a.b/x']), []);
+  // the device's full order wins while it agrees with the saved one; a different saved order (another device) wins
+  assert.deepEqual(railMerge(railWire(full), full), full);
+  assert.deepEqual(railMerge(['v:s0123456789', `i:${H}`], full), ['v:s0123456789', `i:${H}`]);
+  assert.deepEqual(railMerge([], full), full);
+  assert.deepEqual(railMerge(full, []), full);
+  assert.deepEqual(railMerge(full, ['v:s0123456789']), full); // (saved per-server: as it is)
+  // so official, dragged to the top, stays there
+  assert.equal(railPos(railMerge(railWire(full), full), `i:${H}|s0000000003`), 0);
+});
+test('rail: places of servers that moved to a homeserver follow them', () => {
+  const H = 'https://chat.nookara.cc', old1 = 'https://e-official.nookara.cc', old2 = 'https://e-dementia.nookara.cc';
+  const inst = { origin: H, previousUrls: [old1, old2, 'https://e-gone.nookara.cc'] };
+  const entries = [{ rail: `i:${H}|s1`, inst, server: { slug: 'dementia' } }, { rail: `i:${H}|s2`, inst, server: { slug: 'official' } }, { rail: 'i:https://x.test', inst: { origin: 'https://x.test' }, server: null }];
+  const slugOf = o => /^https:\/\/e-([a-z0-9-]+)\.nookara\.cc$/.exec(o)?.[1] || null;
+  assert.deepEqual(railMigrate([`i:${old1}`, 'v:s1', `i:${old2}`, 'i:https://e-gone.nookara.cc', 'i:https://x.test'], entries, slugOf),
+    [`i:${H}|s2`, 'v:s1', `i:${H}|s1`, `i:${H}`, 'i:https://x.test']);
+  const same = ['v:s1', 'i:https://x.test'];
+  assert.equal(railMigrate(same, entries, slugOf), same);
 });

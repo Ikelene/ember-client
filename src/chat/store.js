@@ -2716,6 +2716,17 @@ export async function saveSettings(patch) {
   set({ settings: d.settings });
   return d.settings;
 }
+// the rail's order: the full list (per-server ids for a homeserver's servers) when Nookara keeps it, else what it can hold
+// (wire: addresses.js railWire). Shown at once; never flips back while the save is on its way.
+export async function saveRailOrder(list, wire) {
+  set(s => ({ settings: { ...s.settings, rail_order: list } }));
+  const put = v => apiFetch('/chat/settings', { method: 'PATCH', body: JSON.stringify({ rail_order: v }) });
+  const same = (a, b) => Array.isArray(a) && a.length === b.length && a.every((x, i) => x === b[i]);
+  let d = await put(list);
+  if (!same(d?.settings?.rail_order, list) && wire && !same(wire, list)) d = await put(wire);
+  set({ settings: d.settings });
+  return d.settings;
+}
 // "Remove tracking from links": asked the first time a link with tracking junk is pasted / sent. Resolves true / false
 // (the answer is saved as chat setting strip_tracking, so it is only ever asked once); closing the box counts as No.
 let stripAsking = null;

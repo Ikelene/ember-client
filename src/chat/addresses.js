@@ -179,6 +179,40 @@ export function railPos(order, id) {
   if (!origin) return -1;
   return list.findIndex(x => railOrigin(x) === origin);
 }
+// rail_order as Nookara's chat settings can hold it today: v:<sid> and i:<origin> only (its check drops the whole list when an
+// entry is i:<origin>|<sid>, so a homeserver's servers are one place there: the first one's). The full order stays on the device.
+const WIRE_OK = x => typeof x === 'string' && x.length <= 260 && (/^v:s[0-9a-f]{10}$/.test(x) || /^i:https?:\/\/[a-z0-9.-]+(:\d{1,5})?$/.test(x));
+export function railWire(order) {
+  const out = [];
+  for (const id of order || []) { const k = String(id).startsWith('i:') ? `i:${railOrigin(id)}` : String(id); if (WIRE_OK(k) && !out.includes(k)) out.push(k); }
+  return out;
+}
+// the order to show: the device's full one while it agrees with the saved one (same places, Nookara keeping only one per homeserver),
+// else the saved one (changed on another device); saved with per-server ids (a Nookara that holds them) wins as it is
+export function railMerge(saved, local) {
+  const s = saved || [], l = local || [];
+  if (!s.length) return l;
+  if (!l.length || s.some(x => String(x).includes('|'))) return s;
+  return railWire(l).join('\n') === railWire(s).join('\n') ? l : s;
+}
+// old places of servers that moved to a homeserver: i:<old origin> (an e-<slug>.nookara.cc server, say) becomes that server's
+// entry on the homeserver whose previous_urls list it (the server with that slug, else the homeserver's place)
+// entries: [{ rail, inst: { origin, previousUrls }, server: { slug } | null }]
+export function railMigrate(order, entries, slugOf = () => null) {
+  const list = order || [], live = new Set((entries || []).map(e => e.inst?.origin));
+  if (!list.some(id => { const o = railOrigin(id); return o && !live.has(o); })) return list;
+  const out = [];
+  for (const id of list) {
+    const o = railOrigin(id);
+    let to = id;
+    if (o && !live.has(o)) {
+      const at = (entries || []).filter(e => (e.inst?.previousUrls || []).includes(o));
+      if (at.length) { const slug = slugOf(o); to = (slug && at.find(e => e.server?.slug === slug)?.rail) || `i:${at[0].inst.origin}`; }
+    }
+    if (!out.includes(to)) out.push(to);
+  }
+  return out;
+}
 // the server of an instance a lookup means, on a homeserver with several: the one on screen when it is there, else the
 // homeserver's default one, else the first I'm in (servers: [{ sid: 'origin|id', inst }]) -> a server | null
 export function serverOfInst(servers, origin, { viewSid = null, communitySid = null } = {}) {
