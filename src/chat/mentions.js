@@ -95,7 +95,7 @@ export function useMentionItems(view, q) {
       .sort((a, b) => (rank(a) - rank(b)) || (online(b) - online(a)) || dn(a).localeCompare(dn(b)))
       .slice(0, 8)
       // every entry: Display name (username@home.server), so two people of one username on different homeservers are told apart
-      .forEach(u => { const name = dn(u), you = u.username === st.me?.username, handle = fullHandle(u.username, sid ? instOf(sid) : undefined); out.push({ kind: 'user', key: `u${u.id ?? u.username}`, label: name, insert: `@${u.username} `, token: u.id != null ? userToken(u.id) : undefined, user: u, hint: [`(${handle})`, you ? 'you' : ''].filter(Boolean).join(' - ') }); });
+      .forEach(u => { const name = dn(u), you = u.username === st.me?.username, handle = fullHandle(u.username, sid ? instOf(sid) : undefined); out.push({ kind: 'user', key: `u${u.id ?? u.username}`, label: name, insert: `@${u.username} `, token: u.id != null ? userToken(u.id) : undefined, user: u, handle, you, hint: [`(${handle})`, you ? 'you' : ''].filter(Boolean).join(' - ') }); });
     if (detail) {
       const big = has(detail.server.perms, P.MENTION_EVERYONE);
       if (big) {

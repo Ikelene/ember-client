@@ -1,5 +1,6 @@
 // Typing @ in the composer: pick a member, a role (that you're allowed to ping) or @everyone / @here.
 import { useEffect } from 'react';
+import { Handle } from './Handle.jsx';
 import { getState, botPresenceOf } from './store.js';
 import { Avatar } from './Profile.jsx';
 import { ChannelIcon } from './roles.jsx';
@@ -23,7 +24,7 @@ export function MentionPicker({ items, sel, setSel, onPick, sid }) {
               {it.kind === 'emoji' && (it.img ? <img className="vc-sug-emoji" src={it.img} alt="" /> : <Twemoji char={it.char} className="vc-sug-emoji" />)}
               {it.kind === 'channel' && <span className="vc-sug-ch"><ChannelIcon c={it.channel} size={16} /></span>}
               <b style={it.kind === 'role' ? { color: it.role.color || undefined } : it.kind === 'user' ? { color: nameColor(sid, it.user) || undefined } : undefined}>{it.label}</b>
-              {it.hint && <small>{it.hint}</small>}
+              {it.kind === 'user' && it.handle ? <small>(<Handle handle={it.handle} />){it.you ? ' - you' : ''}</small> : it.hint && <small>{it.hint}</small>}
             </button>
           </div>
         );

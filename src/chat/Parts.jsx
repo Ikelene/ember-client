@@ -1,5 +1,6 @@
 // The frame around the conversation: server rail, channel / DM sidebar, member list, your panel.
 import { BotTag } from './Bots.jsx';
+import { Handle } from './Handle.jsx';
 import { StatusLink } from './StatusLink.jsx';
 import { isDesktopApp } from './emberLogo.js';
 import { VoiceChannelUsers, QuickVoiceBtns } from './VoiceParts.jsx';
@@ -879,7 +880,7 @@ function HomeWho({ home, me }) {
   return (
     <button type="button" className="vc-me-who" title={home.account.handle} onClick={open}>
       <Avatar user={{ username: home.account.username, pfp }} size={36} />
-      <span className="vc-me-txt"><b>{name}</b><small>{home.account.handle}</small></span>
+      <span className="vc-me-txt"><b>{name}</b><small><Handle handle={home.account.handle} /></small></span>
     </button>
   );
 }
@@ -926,7 +927,7 @@ export function UserPanel({ onSettings, onEditProfile }) {
         <Avatar user={me} size={36} status={showConn ? 'offline' : status} />
         <span className="vc-me-txt">
           <b><NameText u={{ username: me.username }} fallback={me.username} /></b>
-          <small title={subtitle(p) || STATUS_LABEL[status]}>{showConn ? (conn === 'closed' ? 'Reconnecting...' : 'Connecting...') : fullHandle(me.username)}</small>
+          <small title={subtitle(p) || STATUS_LABEL[status]}>{showConn ? (conn === 'closed' ? 'Reconnecting...' : 'Connecting...') : <Handle handle={fullHandle(me.username)} />}</small>
         </span>
       </button>
       <QuickVoiceBtns />

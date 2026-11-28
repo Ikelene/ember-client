@@ -1,6 +1,7 @@
 // Settings > My account: the account you signed in to on a homeserver (Ember Protocol v2, homeserver.js). Its handle, the
 // ways it can sign in (link another one, remove one) and a link to the homeserver's own account page.
 import { useEffect, useState } from 'react';
+import { Handle } from '../Handle.jsx';
 import { CircleUserRound, Pencil, ExternalLink, KeyRound, Link2, Unlink, LogOut, Check, RefreshCw, TriangleAlert, Fingerprint } from 'lucide-react';
 import { SettingsPage, SCard } from './ui.jsx';
 import { ask, toast, useChat } from '../store.js';
@@ -79,7 +80,7 @@ export default function HomeAccountPage() {
           {me?.pfp || a.avatar_url ? <Avatar user={{ username: a.username, pfp: me?.pfp || a.avatar_url }} size={64} /> : <span className="ac-hero-blank"><CircleUserRound size={30} /></span>}
           <div className="ac-hero-txt">
             <small className="ac-kicker">Homeserver account</small>
-            <b>{a.handle}</b>
+            <b><Handle handle={a.handle} /></b>
             <span className="ac-state ok">{(me?.display_name || a.display_name) && (me?.display_name || a.display_name) !== a.username ? `${me?.display_name || a.display_name} - signed in` : 'Signed in'}</span>
           </div>
           <div className="ac-btns">
@@ -95,7 +96,7 @@ export default function HomeAccountPage() {
           {everyone.filter(x => x.key !== s.key).map(x => (
             <div className="sx-list-row" key={x.key}>
               <HomeserverIcon hs={x} className="ac-ico" />
-              <div className="sx-row-txt"><b>{x.account.handle}</b><span>{x.name}</span></div>
+              <div className="sx-row-txt"><b><Handle handle={x.account.handle} /></b><span>{x.name}</span></div>
               <div className="sx-row-ctl"><button type="button" className="btn btn-surface btn-sm" onClick={() => switchToAccount({ kind: 'home', origin: x.origin, hsKey: x.key })}>Switch to it</button></div>
             </div>
           ))}

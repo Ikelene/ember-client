@@ -4,6 +4,7 @@
 // Signed in with Nookara, Home.jsx and the sidebar in Parts.jsx stay as they are and borrow the pieces exported here for the
 // people and DMs on other homeservers (PersonCard, SocialDmRow, DmFace, SocialDmHead).
 import { useEffect, useMemo, useState } from 'react';
+import { Handle } from './Handle.jsx';
 import { MessageCircle, UserPlus, Check, X, House, Users, Inbox, ShieldOff, UsersRound, Search, Plus, Pencil, LogOut, UserMinus, Ban, Lock } from 'lucide-react';
 import { SdmHeadLock } from './E2eeMessage.jsx';
 import { useChat, go, toast, ask, getState, addSocialFriend, socialFriendAction, startSocialDm, socialDmAction, socialProfileById, socialAccount } from './store.js';
@@ -187,7 +188,7 @@ export default function SocialHome() {
               {me && <Avatar user={{ username: me.username, pfp: me.pfp }} size={46} status="online" />}
               <div>
                 <h2>{hourWord(new Date().getHours())}{me ? `, ${me.display_name || me.username}` : ''}</h2>
-                <p>{home?.account?.handle} - {online.length} {online.length === 1 ? 'friend' : 'friends'} online{unreadN ? ` - ${unreadN} unread ${unreadN === 1 ? 'message' : 'messages'}` : ''}</p>
+                <p><Handle handle={home?.account?.handle} /> - {online.length} {online.length === 1 ? 'friend' : 'friends'} online{unreadN ? ` - ${unreadN} unread ${unreadN === 1 ? 'message' : 'messages'}` : ''}</p>
               </div>
             </header>
             {!servers.length && (

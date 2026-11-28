@@ -1,4 +1,5 @@
 import { siteHref } from './hosts.js';
+import { Handle } from './Handle.jsx';
 // Settings > Profile in Ember: the Nookara profile editor (same fields + endpoints as /me#profile,
 // components/tabs/ProfileTab.jsx) laid out like Fluxer: fields on the left, live "Profile preview" on the
 // right (the same card as your bottom-left pop-out). Saving goes through the unsaved-changes bar.
@@ -80,7 +81,7 @@ export default function ProfileEditor({ onDirty, target: open }) {
   if (!cur && !signedIn) return <div className="inline-msg">{homeTarget ? 'Your homeserver is still connecting, or it has no profiles to edit. Try again in a moment.' : 'Sign in with Nookara to edit your profile.'}</div>;
   return (
     <>
-      {lives && <p className="vc-hint bf-pe-home"><HomeChip domain={lives.domain} /> Your account lives on {lives.domain}. Everyone sees you as {lives.handle}.</p>}
+      {lives && <p className="vc-hint bf-pe-home"><HomeChip domain={lives.domain} /> Your account lives on {lives.domain}. Everyone sees you as <Handle handle={lives.handle} />.</p>}
       {targets.length > 0 && (
         <div className="bf-pe-target">
           <span className="bf-pe-target-label">Editing</span>

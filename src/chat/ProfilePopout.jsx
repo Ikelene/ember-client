@@ -4,6 +4,7 @@
 // copy user ID, and a full-width "Edit profile" button that opens Settings > Profile.
 // PopoutCard is also the live preview in Settings > Profile (chat/ProfileEditor.jsx).
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Handle } from './Handle.jsx';
 import { createPortal } from 'react-dom';
 import { Copy, Pencil, ChevronRight, Check, Circle, Moon, MinusCircle, EyeOff, Smile, X, Users, IdCard, UserPlus, Crown, Globe, LogOut, Plus, Coins, ExternalLink } from 'lucide-react';
 import { NOOKARA_ORIGIN } from './hosts.js';
@@ -64,7 +65,7 @@ export function PopoutCard({ p, status = 'online', custom, activities, bubble, c
       </div>
       <div className="bf-pp-body">
         <div className="bf-pp-name-row">
-          <b className="bf-pp-name" style={color ? { color } : undefined}>{shown || ' '}</b>
+          <b className="bf-pp-name" style={color ? { color } : undefined}>{shown && shown === name ? <Handle handle={shown} /> : shown || ' '}</b>
           {name && <button type="button" className="bf-pp-copy" data-tip="Copy username" aria-label="Copy username" onClick={() => copy(name, 'Username copied')}><Copy size={13} /></button>}
         </div>
         <HandleLine name={shown} handle={name} pronouns={p?.pronouns || ''} cls="bf-pp-pronouns" />
@@ -338,11 +339,11 @@ export function MePopout({ anchor, onClose, onEditProfile, onCustomStatus }) {
               <Flyout from={acctRow.current}>
                 {back}
                 <div className="bf-pp-fl-head">Saved on this device</div>
-                <div className="bf-pp-fl-acct current"><Avatar user={me} size={26} /><span className="bf-pp-fl-txt"><span>{fullHandle(username)}</span><small>Signed in on {nookaraDomain()}</small></span><Check size={14} /></div>
+                <div className="bf-pp-fl-acct current"><Avatar user={me} size={26} /><span className="bf-pp-fl-txt"><span><Handle handle={fullHandle(username)} /></span><small>Signed in on {nookaraDomain()}</small></span><Check size={14} /></div>
                 {others.map(a => (
                   <button type="button" key={a.key} disabled={!!busy} onClick={() => (a.kind === 'nookara' ? switchTo(a.saved, setBusy) : (setBusy(a.key), switchToAccount(a, { kind: 'nookara', handle: fullHandle(username), pfp: me.pfp })))}>
                     <span className="bf-pp-fl-av"><Avatar user={{ username: a.handle, pfp: a.pfp }} size={26} />{a.kind === 'home' && <HomeserverIcon hs={{ name: a.hsName, domain: a.domain, icon_url: a.icon }} className="sm bf-pp-fl-hs" />}</span>
-                    <span className="bf-pp-fl-txt"><span>{busy === a.key || busy === a.saved?.username ? `Switching to ${a.handle}...` : a.handle}</span><small>{a.kind === 'nookara' ? `Nookara account` : `On ${a.hsName}`}</small></span>
+                    <span className="bf-pp-fl-txt"><span>{busy === a.key || busy === a.saved?.username ? `Switching to ${a.handle}...` : <Handle handle={a.handle} />}</span><small>{a.kind === 'nookara' ? `Nookara account` : `On ${a.hsName}`}</small></span>
                   </button>
                 ))}
                 {!others.length && <div className="bf-pp-fl-none">No other accounts on this device yet.</div>}

@@ -5,6 +5,7 @@
 // HomeserverReports.jsx), and while it is connected as an instance also Voice, Backups, Nookara and Server info (with
 // restart / update). Everything here is the whole homeserver's; one server's own settings are in its Server settings.
 import { useEffect, useRef, useState } from 'react';
+import { Handle } from '../Handle.jsx';
 import { Building2, ArrowLeft, Globe, LogOut, AtSign, Users, KeyRound, ShieldCheck, TriangleAlert, RefreshCw, Trash2, Network, Crown, Settings2, Server, UserPlus, Ban, Gauge, Plus, X, RotateCw, ListChecks, Hourglass, Flag, Upload, ArrowLeftRight, Mic, Archive, Info, CircleArrowUp, Palette, Eye, EyeOff } from 'lucide-react';
 import { ReportsTab } from './HomeserverReports.jsx';
 import { BrandingTab } from './BrandingTab.jsx';
@@ -210,8 +211,8 @@ function MyHomeservers({ admins, onManage }) {
                 <b>{r.name}{admin && <i className="hsx-tag">{admin.isOwner ? <><Crown size={11} /> Owner</> : 'Admin'}</i>}</b>
                 <span className="ac-host"><Globe size={12} /> {r.domain}{r.legacy ? ' - one server on its own' : ''}</span>
                 {r.accounts.length > 1 ? r.accounts.map(a => (
-                  <span className="ac-who" key={a.key}><AtSign size={12} /> {a.handle}{a.active ? ' (in use)' : ''} <button type="button" className="btn btn-surface btn-sm" onClick={() => signOut(r, a)}><LogOut size={12} /> Sign out</button></span>
-                )) : r.handle && <span className="ac-who"><AtSign size={12} /> {r.handle}</span>}
+                  <span className="ac-who" key={a.key}><AtSign size={12} /> <Handle handle={a.handle} />{a.active ? ' (in use)' : ''} <button type="button" className="btn btn-surface btn-sm" onClick={() => signOut(r, a)}><LogOut size={12} /> Sign out</button></span>
+                )) : r.handle && <span className="ac-who"><AtSign size={12} /> <Handle handle={r.handle} /></span>}
                 <span className={`ac-state ${r.status[0]}`}>{r.status[1]}{r.servers.length ? ` - ${r.servers.length} ${r.servers.length === 1 ? 'server' : 'servers'}` : ''}</span>
                 {(() => {
                   const hid = (servers || []).filter(x => x.inst === r.origin && hidden.has(x.sid));

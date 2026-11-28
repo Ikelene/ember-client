@@ -1,5 +1,6 @@
 // Pop-up dialogs: make / find / join servers, invites, server + channel settings, new DM / group.
 import { TypePicker, TypeSettings } from './ChannelTypes.jsx';
+import { Handle } from './Handle.jsx';
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import serverCreationPolicy from '../server-creation-policy.json';
@@ -312,7 +313,7 @@ function PeoplePicker({ multi, onDone, button }) {
         {hits.map(u => (
           <button type="button" key={u.username} className={`vc-pick${picked.includes(u.username) ? ' on' : ''}`} onClick={() => pick(u.username)}>
             <span className="vc-av" style={{ width: 30, height: 30 }}>{u.pfp_url ? <img src={u.pfp_url} alt="" /> : <span className="vc-av-l">{u.username[0].toUpperCase()}</span>}</span>
-            <span><NameText u={u} fallback={u.username} /> <small className="vc-pick-handle">({fullHandle(u.username)})</small></span>{picked.includes(u.username) && <Check size={14} />}
+            <span><NameText u={u} fallback={u.username} /> <small className="vc-pick-handle">(<Handle handle={fullHandle(u.username)} />)</small></span>{picked.includes(u.username) && <Check size={14} />}
           </button>
         ))}
         {!hits.length && q.trim() && !multi && <button type="button" className="vc-pick" onClick={() => onDone([q.trim()])}>Message "{q.trim()}"</button>}

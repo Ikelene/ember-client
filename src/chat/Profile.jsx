@@ -1,4 +1,5 @@
 import { siteHref } from './hosts.js';
+import { Handle } from './Handle.jsx';
 import { viaProxy } from './mediaProxy.js';
 // People: square avatars with a status square, the mini profile (the same card as the
 // profile editor's preview) and the large profile it expands into.
@@ -273,7 +274,7 @@ function localTimeOf(p) {
 export function HandleLine({ name, handle, pronouns, cls = 'vc-pronouns' }) {
   const at = !!handle && !!name && name !== handle;
   if (!at && !pronouns) return null;
-  return <div className={`${cls} vc-handle-line`}>{at && <span className="vc-handle" title="Username">@{handle}</span>}{pronouns && <span title="Pronouns">{pronouns}</span>}</div>;
+  return <div className={`${cls} vc-handle-line`}>{at && <span className="vc-handle" title="Username"><Handle handle={handle} at /></span>}{pronouns && <span title="Pronouns">{pronouns}</span>}</div>;
 }
 export function ProfileCard({ username, sid, who, dm = false, onExpand, onClose, cardRef: outerRef }) {
   const [p, extra, vname] = useProfile(username, who, sid);
@@ -351,7 +352,7 @@ export function ProfileCard({ username, sid, who, dm = false, onExpand, onClose,
           )}
           </div>
         </div>
-        <div className="pe-name" data-vpb-protect="" style={color ? { color } : undefined}>{bigName}{(extra?.bot || (plain && who?.bot)) && <BotTag verified={!!(extra?.bot?.bot?.verified || (plain && who?.verified))} />}</div>
+        <div className="pe-name" data-vpb-protect="" style={color ? { color } : undefined}>{bigName === handle ? <Handle handle={handle} /> : bigName}{(extra?.bot || (plain && who?.bot)) && <BotTag verified={!!(extra?.bot?.bot?.verified || (plain && who?.verified))} />}</div>
         <HandleLine name={bigName} handle={handle} pronouns={(!plain || p?.server_profile) && !p?.private ? p?.pronouns : ''} />
         {!plain && vname !== username && <div className="vc-card-sub">{username} on this server</div>}
         {who?.alias_name && <div className="vc-card-sub vc-card-alias"><MaskIcon size={13} /> Posting as alias: <b>{who.alias_name}</b></div>}
@@ -519,7 +520,7 @@ export function ProfileModal({ username: shown, from, sid, who, dm = false, onCl
           </div>
         </div>
         <div className="vc-big-id">
-          <h2 style={color ? { color } : undefined}>{bigName}{extra?.bot && <BotTag verified={!!extra.bot.bot?.verified} />}</h2>
+          <h2 style={color ? { color } : undefined}>{bigName === (p?.username || username) ? <Handle handle={bigName} /> : bigName}{extra?.bot && <BotTag verified={!!extra.bot.bot?.verified} />}</h2>
           <HandleLine name={bigName} handle={fullHandle(p?.username || username, plainOn(who) ? who.inst : NOOKARA)} pronouns={!p?.private ? p?.pronouns : ''} />
           {extra?.bot?.bot?.owner && <div className="vc-card-sub">Bot made by @{extra.bot.bot.owner}</div>}
           {extra?.bot?.bot && <TrustedIn n={extra.bot.bot.trusted_in} verified={!!extra.bot.bot.verified} />}
