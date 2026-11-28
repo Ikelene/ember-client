@@ -848,7 +848,7 @@ export function OutdatedNote() {
     <div className="vc-quota-note near" role="status">
       <button type="button" className="vc-quota-x" aria-label="Dismiss" onClick={dismiss}><X size={14} /></button>
       <b><CircleArrowUp size={14} /> Server update available</b>
-      <span>This server is running an old version ({mine}). Latest is {latest}{u.latest?.message ? `: ${u.latest.message}` : ''}. {inst.managed ? 'Nookara updates it automatically within about 10 minutes.' : oneClick ? 'Update it now? Everyone is disconnected for a minute or two.' : 'Update the server software to get the latest.'}</span>
+      <span>This server is running an old version ({mine}). Latest is {latest}{u.latest?.message ? `: ${u.latest.message}` : ''}. {inst.managed ? 'Nookara updates it automatically within about 10 minutes.' : oneClick ? 'Update it now? Everyone is disconnected for a minute or two.' : 'Server info shows how to update it.'}</span>
       {oneClick && <button type="button" className="btn btn-primary btn-sm" onClick={() => open(true)}><CircleArrowUp size={14} /> Update now</button>}
       <button type="button" className="btn btn-surface btn-sm" onClick={() => open(false)}>Server info</button>
     </div>
