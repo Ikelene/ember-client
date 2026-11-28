@@ -2,6 +2,7 @@ import { siteHref } from './hosts.js';
 // The conversation: messages (grouped by person, with day dividers), the composer and who's typing.
 import { SAVEABLE } from './uploadLinks.js';
 import { canAttachInChannel } from './attachment-permissions.js';
+import { signedOnHost } from './signing-payload.js';
 import { canIn } from './channelPerms.js';
 import { apiFetch } from '../api.js';
 import { instOpt, isInst, instOf, NOOKARA } from './ids.js';
@@ -41,7 +42,7 @@ import { loadMyClips, liveClips } from './glintApi.js';
 import EmojiPicker from './EmojiPicker.jsx';
 import { loadEmojiData } from './emojiData.js';
 import { useDocked, watchKeyboard, dockHeight, closeKeyboard, withoutKeyboard, useBackCloses } from './pickerDock.js';
-import { TriangleAlert, Shield, Clock, HardDrive } from 'lucide-react';
+import { TriangleAlert, Shield, ShieldCheck, Clock, HardDrive } from 'lucide-react';
 import { expiryAt, expiryLabel } from './temp-expiry.js';
 import { TempAttPopover } from './TempAttPopover.jsx';
 import { shortDays, daysText } from './temp-pick.js';
@@ -361,6 +362,7 @@ function useDistrust(m) {
 function SigBadge({ m, inStack }) {
   const v = useChat(s => (m.signature ? s.sigs[sigId(m)] : null));
   if (v === 'bad') return <span className="vc-sig bad" data-tip-title="Signature doesn't match" data-tip-kind="danger" data-tip={`This message says it's from ${m.author?.username || 'someone'}, but its signature doesn't check out. It may have been changed or faked.`}><TriangleAlert size={14} /></span>;
+  if (v === 'ok' && signedOnHost(m)) return <span className="vc-sig moved" data-tip-title="Signed" data-tip={`Signed on ${signedOnHost(m)} before this server moved. The signature still checks out with ${m.author?.username || 'their'} Nookara key.`}><ShieldCheck size={13} /></span>;
   if (!inStack && isUnsigned(m)) return <span className="vc-sig unsigned" data-tip-title="Not signed" data-tip-kind="warn" data-tip={`This message came without a signature, so Nookara can't confirm it really came from ${m.author.username}.`}><Shield size={14} /></span>;
   return null;
 }

@@ -1751,7 +1751,7 @@ export const askSendUnsigned = (edit = false) => ask({
 export function signingInfo(sid) {
   const inst = instOf(sid || '');
   const c = inst === NOOKARA ? null : connections.get(inst);
-  const allow = isNookara(c?.info?.accounts_mode);
+  const allow = isNookara(c?.info?.accounts_mode) || c?.info?.features?.signing === true;
   return { allow, can: allow && canSign() && !!nookaraId(c.user) };
 }
 // a conversation's pin list changed: an open panel loads it again (a channel by its cid, a DM by d:<name>, a group by g:<room>)

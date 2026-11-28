@@ -31,6 +31,23 @@ export function receivedPayload(m, iss) {
     reply_to: m.reply_to ?? m.reply?.id ?? null, edit_of: m.edited_at ? m.id : null, sticker: m.sticker?.tid ?? null });
 }
 
+// a message of a server that moved here (imported): its signature covers what was sent on the old server, which the view hands
+// back as signature.signed (instance, community, channel, author, ts, nonce, body, attachments, reply_to, edit_of, sticker,
+// iss). -> that payload, or null for an ordinary message
+export function signedPayload(m, iss) {
+  const s = m?.signature?.signed;
+  if (!s || typeof s !== 'object') return null;
+  return payloadOf({ iss: s.iss || iss, instance: s.instance, community: s.community, channel: s.channel, author: s.author,
+    ts: s.ts ?? m.signature.ts, nonce: s.nonce ?? m.signature.nonce, body: s.body ?? '', attachments: Array.isArray(s.attachments) ? s.attachments : [],
+    reply_to: s.reply_to ?? null, edit_of: s.edit_of ?? null, sticker: s.sticker ?? null });
+}
+const hostOfUrl = u => { try { return new URL(u).host; } catch { return null; } };
+// where a moved message was signed ("e-dementia.nookara.cc"), for its tooltip; null for an ordinary one
+export const signedOnHost = m => (m?.signature?.signed ? hostOfUrl(m.signature.moved_from || m.signature.signed.instance) : null);
+const normO = u => { try { return new URL(u).origin.toLowerCase(); } catch { return String(u || '').toLowerCase(); } };
+// may a moved message's signed instance stand for this server? its current address, or one of the addresses it had before
+export const movedInstanceOk = (signedInstance, inst, previous = []) => [inst, ...previous].map(normO).includes(normO(signedInstance));
+
 // the "iss" to sign with for an instance, from its discovery info (/.well-known/bonfire): the first of nookara.signing_issuers
 // (https://nookara.cc on Nookara); an instance older than that list checks against its own nookara_url (nookara.issuer); with
 // neither, Nookara's original https://velora.ikelene.net

@@ -11,7 +11,7 @@ const b64u = buf => { let s = ''; for (const b of new Uint8Array(buf)) s += Stri
 const unb64u = s => Uint8Array.from(atob(String(s).replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 
 export { canonical } from './signing-payload.js';
-import { canonical, payloadOf, receivedPayload, issuerFor } from './signing-payload.js';
+import { canonical, payloadOf, receivedPayload, issuerFor, signedPayload, movedInstanceOk } from './signing-payload.js';
 import { EMBER_API, nookaraId, SIGN_PREFIX, OLD_ORIGIN } from '../compat.js';
 const bytesOf = payload => enc.encode(`${SIGN_PREFIX}\n${canonical(payload)}`);
 
@@ -104,6 +104,15 @@ export async function checkMessage(m) {
     if (!vid || String(key.user_id) !== String(vid)) return 'bad';
     if (key.revoked_at != null && Number(key.revoked_at) < Number(sig.ts)) return 'bad';
     const pub = await importKey(key.public_key);
+    // a message from before its server moved here: checked as it was signed there (signature.signed), on an address the server had
+    if (sig.signed) {
+      const s = sig.signed, prev = getState().instances?.find(i => i.origin === m.inst)?.previousUrls || [];
+      if (String(s.author) !== String(vid) || !movedInstanceOk(s.instance, m.inst, prev)) return 'bad';
+      for (const iss of s.iss ? [s.iss] : SIG_ISS_ALL) {
+        if (await crypto.subtle.verify({ name: 'Ed25519' }, pub, unb64u(sig.sig), bytesOf(signedPayload(m, iss)))) return 'ok';
+      }
+      return 'bad';
+    }
     // the signature names the account issuer (pinned, see SIG_ISS) and the server's address when it was sent: try the
     // current address, then the ones it had before a move
     const insts = [m.inst, ...(getState().instances?.find(i => i.origin === m.inst)?.previousUrls || [])];
