@@ -10,7 +10,7 @@ import { useChat, go, toast, ask, getState, addSocialFriend, socialFriendAction,
 import { Avatar } from './Profile.jsx';
 import { Dialog } from './Dialogs.jsx';
 import { openMenu } from './menus.js';
-import { accountName, shownHandle, dmHandle, dmTitle, dmUnread, sameAccount, cleanHandle } from './social.js';
+import { accountName, shownHandle, dmHandle, dmHandles, dmTitle, dmUnread, sameAccount, cleanHandle } from './social.js';
 import './dashboard.css';
 import './home.css';
 import { useDomain, face } from './socialHome.js';
@@ -136,17 +136,14 @@ export function SocialDmHead({ id }) {
   const [card, setCard] = useState(null);
   if (!dm) return <b className="vc-head-name">Conversation</b>;
   const one = !dm.group && dm.others[0];
-  const nick = one && String(one.display_name || '').trim();
-  const shownNick = nick && nick.toLowerCase() !== dmHandle(one, domain).split('@')[0].toLowerCase() ? nick : '';
   return (
     <>
       <button type="button" className="vc-head-user" onClick={e => (one ? setCard(one) : dmMenu(e, dm, domain))}>
         <DmFace dm={dm} size={26} presence={presence} />
-        <b className="vc-head-name">{dmTitle(dm, domain)}</b>
+        <b className="vc-head-name" title={dmHandles(dm, domain) || undefined}>{dmTitle(dm, domain)}</b>
       </button>
       <SdmHeadLock dm={dm} />
-      {/* (a DM with one person: they are username@their homeserver in the name, not where the DM is kept) */}
-      {one ? shownNick && <span className="vc-head-topic">{nick}</span> : !dm.hosted_here && dm.host && <span className="vc-head-topic">on {dm.host}</span>}
+      {!one && !dm.hosted_here && dm.host && <span className="vc-head-topic">on {dm.host}</span>}
       {card && <PersonCard person={card} dm onClose={() => setCard(null)} />}
     </>
   );

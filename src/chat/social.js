@@ -92,8 +92,14 @@ export function cleanDm(dm, { from = null, home = null, me = null, domain = '' }
     ...(typeof dm.preview === 'string' ? { preview: dm.preview } : {}),
   };
 }
-// a DM's name: the group's own name, else the people in it as username@domain (display names can be anything, so not those)
-export const dmTitle = (dm, myDomain) => dm?.name || (dm?.others?.length ? dm.others.map(m => dmHandle(m, myDomain) || String(m?.display_name || '').trim() || String(m?.id || '')).join(', ') : dm?.group ? 'Group chat' : 'Just you');
+// a DM's name: the group's own name, else the people in it by display name (else username). Their full username@domain is in
+// their profile card and the tooltips
+export const dmTitle = (dm, myDomain) => dm?.name || (dm?.others?.length ? dm.others.map(m => knownNames.get(String(m?.id || '').toLowerCase()) || String(m?.display_name || '').trim() || dmHandle(m, myDomain).split('@')[0] || String(m?.id || '')).join(', ') : dm?.group ? 'Group chat' : 'Just you');
+// display names seen in friend lists (newer than what a DM pointer kept, which may be none or an old one)
+const knownNames = new Map();
+export function rememberNames(people) { for (const p of people || []) { const n = String(p?.display_name || '').trim(); if (p?.id && n) knownNames.set(String(p.id).toLowerCase(), n); } }
+// what a tooltip on a DM's name says: everyone in it as username@domain
+export const dmHandles = (dm, myDomain) => (dm?.others || []).map(m => dmHandle(m, myDomain)).filter(Boolean).join(', ');
 const newest = (a, b) => (b.updated_at - a.updated_at) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 export const sortDms = list => [...list].sort(newest);
 // Lists from one or more homeservers -> one list, newest activity first. sources: [{ origin, dms }], home's own list first or

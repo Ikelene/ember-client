@@ -27,7 +27,7 @@ import { movedHome, hostedSlug } from './moved.js';
 import { homeFetch, onSignedOut, currentSession, sessions as homeSessions, DEFAULT_HOMESERVER, resolve as resolveHomeserver, homeInfo, remoteToken, isOwnUrl, domainReportsUrl } from './homeserver.js';
 import { reportRoute, reportBody, canReportSealed } from './e2ee/report.js';
 import { social as socialApi, socialBase, socialFetch, createDm, setNookaraSocial, dmHostUrl } from './socialApi.js';
-import { emptySocial, friendLists, mergeDms, cleanDm, socialReduce, socialRefetch, dmTitle, splitHandle, stableId, cleanHandle, accountName, remoteFriendLists, splitNookaraDms, nookaraDmView, dmHandle, listPresence } from './social.js';
+import { emptySocial, friendLists, mergeDms, cleanDm, socialReduce, socialRefetch, dmTitle, splitHandle, stableId, cleanHandle, accountName, remoteFriendLists, splitNookaraDms, nookaraDmView, dmHandle, listPresence, rememberNames } from './social.js';
 import { attachmentRefs } from './signing-payload.js';
 import { spoilerName } from './spoiler.js';
 import { prepareInstanceAttachments } from './attachment-preparation.js';
@@ -2975,6 +2975,7 @@ export function homeConnected(origin) { if (state.home?.origin === origin) { ref
 function setSocialLists(d, h) {
   const lists = h.nookara ? remoteFriendLists(d, h.domain) : friendLists(d, h.domain);
   const seen = listPresence(lists.friends); // (seeded from the list; social_presence events keep it current after)
+  rememberNames([...(lists.friends || []), ...(lists.incoming || []), ...(lists.outgoing || [])]); // (DM titles: display names)
   set(st => ({ social: { ...st.social, ...lists, presence: { ...st.social.presence, ...seen }, loaded: true }, ...(h.nookara ? {} : { homeRequests: lists.incoming.length }) }));
   if (h.nookara) setHomeRequests({ social: lists.incoming.length });
 }

@@ -93,7 +93,8 @@ test('in DMs: always username@domain, my own homeserver people too', () => {
   assert.equal(so.dmHandle('alice'), 'alice'); // no domain known: the name alone
   assert.equal(so.dmHandle({ handle: null, id: 'l:9@b.example' }, 'a.example'), '');
   assert.equal(so.dmHandle(null, 'a.example'), '');
-  assert.equal(so.dmTitle({ others: [{ id: 'l:6@a.example', handle: 'bob@a.example', display_name: '' }] }, 'a.example'), 'bob@a.example');
+  assert.equal(so.dmTitle({ others: [{ id: 'l:6@a.example', handle: 'bob@a.example', display_name: '' }] }, 'a.example'), 'bob'); // (no display name: the username)
+  assert.equal(so.dmHandles({ others: [{ id: 'l:6@a.example', handle: 'bob@a.example', display_name: 'Bobby' }] }, 'a.example'), 'bob@a.example'); // (the tooltip)
 });
 
 const ctx = { home: HOME, me: 'l:5', domain: 'a.example' };
@@ -108,7 +109,7 @@ test('the DM list: hosted here and pointers together, newest activity first, unr
   assert.deepEqual(list.map(d => d.hosted_here), [false, true, true]);
   assert.equal(list[0].host_origin, B);
   assert.deepEqual(list[0].others.map(m => m.id), ['l:2@b.example']); // (me left out, by my id with or without the domain)
-  assert.equal(so.dmTitle(list[0], 'a.example'), 'carol@b.example'); // (a DM: the full handle, not the display name)
+  assert.equal(so.dmTitle(list[0], 'a.example'), 'carol'); // (a DM: the display name; the handle is in the profile card)
   assert.equal(so.dmTitle(list[1], 'a.example'), 'Camp');
   assert.equal(so.dmUnread(list), 7);
   assert.equal(so.dmMentions(list), 1);
@@ -254,7 +255,7 @@ test('a Nookara session: the DM list keeps the DMs Nookara has where they are an
   const list = so.mergeDms([{ origin: NK, dms: pointers }], { home: NK, me: 'v:5@nookara.cc', domain: 'nookara.cc' });
   assert.deepEqual(list.map(d => [d.id, d.host_origin, d.hosted_here, d.unread]), [['7@b.example', B, false, 1], ['3@nookara.cc', CHAT, false, 1]]);
   assert.deepEqual(list[0].others.map(m => m.id), ['l:2@b.example']);
-  assert.equal(so.dmTitle(list[0], 'nookara.cc'), 'carol@b.example');
+  assert.equal(so.dmTitle(list[0], 'nookara.cc'), 'Carol'); // (her display name)
   assert.equal(so.dmTitle(list[1], 'nookara.cc'), 'Mixed');
 });
 

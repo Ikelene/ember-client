@@ -53,6 +53,7 @@ import { ServerSettings } from '../chat/ServerSettings.jsx';
 import { ChannelSettings } from '../chat/ChannelSettings.jsx';
 import { OverwritesEditor } from '../chat/OverwritesEditor.jsx';
 import { channelBits, loadMyChannelPerms } from '../chat/channelPerms.js';
+import { NameText, displayNameOf } from '../chat/displayNames.js';
 import { ExportButton } from '../chat/Community.jsx';
 
 import { isInst, instOf } from '../chat/ids.js';
@@ -146,7 +147,7 @@ function DesktopTitle() {
   const pfp = useChat(s => (view.kind === 'dm' && view.username !== 'System' ? s.people[view.username]?.pfp || s.dms.find(c => c.username === view.username)?.pfp : null));
   const group = useChat(s => (view.kind === 'group' ? s.groups.find(g => g.room === view.room)?.name : null));
   const text = view.kind === 'channel' || view.kind === 'server' ? server || ''
-    : view.kind === 'dm' ? (view.username === 'System' ? 'Nookara' : `@${fullHandle(view.username)}`)
+    : view.kind === 'dm' ? (view.username === 'System' ? 'Nookara' : displayNameOf(view.username) || view.username)
       : view.kind === 'group' ? group || 'Group chat'
         : view.kind === 'modmail' ? 'Nookara Moderator Chat'
           : view.kind === 'notes' ? 'Personal Notes'
@@ -585,7 +586,7 @@ function ChatPage() {
   const sdm = view.kind === 'channel' && view.dm ? view.dm : null; // a DM on a homeserver: a one-channel server underneath
   // a homeserver DM's name: who it is with (username@domain), from the DM list; the host's own name for it until that's there
   const sdmName = useChat(s => { if (!sdm) return null; const d = s.social.dms.find(x => x.id === sdm); return (d && dmTitle(d, socialAccount(s)?.domain || '')) || s.detail[view.sid]?.server?.name || null; });
-  useEffect(() => { document.title = `${unreadCount ? `(${unreadCount > 999 ? '999+' : unreadCount}) ` : ''}${sdm ? sdmName || 'Conversation' : channel ? `#${channel.name} - ${detail.server.name}` : view.kind === 'instance' ? gateName || 'Server' : view.kind === 'dm' ? `@${fullHandle(view.username)}` : view.kind === 'notes' ? 'Personal Notes' : group ? group.name : 'Home'} | Ember`; }, [unreadCount, channel, detail, view, group, gateName, sdmName]);
+  useEffect(() => { document.title = `${unreadCount ? `(${unreadCount > 999 ? '999+' : unreadCount}) ` : ''}${sdm ? sdmName || 'Conversation' : channel ? `#${channel.name} - ${detail.server.name}` : view.kind === 'instance' ? gateName || 'Server' : view.kind === 'dm' ? displayNameOf(view.username) || view.username : view.kind === 'notes' ? 'Personal Notes' : group ? group.name : 'Home'} | Ember`; }, [unreadCount, channel, detail, view, group, gateName, sdmName]);
   const locked = useChat(s => s.locked); // staff switched Ember and DMs off for the account (store.js lockAccount)
   const waking = view.kind === 'channel' && !!detail?.cached; // its kept channel list: still connecting
   const wakeStatus = useChat(s => { if (!waking || !isInst(view.sid)) return null; const i = s.instances.find(x => x.origin === instOf(view.sid)); return i && ['insufficient_scope', 'unauthorized', 'invalid_session'].includes(i.error) ? 'error' : i?.status; });
@@ -696,7 +697,7 @@ function ChatPage() {
                 <>
                   <button type="button" className="vc-head-user" onClick={e => openMini(view.username, e.currentTarget)}>
                     <Avatar user={{ username: view.username, pfp: getState().people[view.username]?.pfp }} size={26} status={dmPresence?.status || 'offline'} />
-                    <b className="vc-head-name">{fullHandle(view.username)}</b>
+                    <b className="vc-head-name" title={fullHandle(view.username)}><NameText u={{ username: view.username }} fallback={view.username} /></b>
                     {dmIsBot && <BotTag small />}
                   </button>
                   <E2eeHeadLock view={view} />

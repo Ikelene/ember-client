@@ -191,7 +191,7 @@ export default function Home({ onUser }) {
                       ) : (
                         <button type="button" key={c.username} className="hm-tile vl-rise" onClick={() => go({ kind: 'dm', username: c.username })}>
                           <Avatar user={{ username: c.username, pfp: c.pfp || people[c.username]?.pfp }} size={44} status={presence[c.username]?.status || 'offline'} />
-                          <b>{fullHandle(c.username)}</b>
+                          <b title={fullHandle(c.username)}><NameText u={{ username: c.username }} fallback={c.username} /></b>
                           {c.unread > 0 && <i>{c.unread > 99 ? '99+' : c.unread}</i>}
                         </button>
                       )))}
