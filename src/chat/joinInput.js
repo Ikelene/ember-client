@@ -1,16 +1,21 @@
-// What someone typed or pasted into Join (the "+" dialog, CreateOnHomeserver.jsx): a server's address, an invite (Nookara's or an
-// instance's), or the address of an instance. Pure: the node tests load it.
-import { parseAddress, parseInviteUrl } from './addresses.js';
+// What someone typed or pasted into Join (the "+" dialog, CreateOnHomeserver.jsx): an invite link (<url_base><code>, or an older
+// form), a bare invite code (for a homeserver picked beside it), or the address of an instance. Servers have no addresses people
+// see any more: a bare name@domain is turned away. Pure: the node tests load it.
+import { parseAddress, parseInviteUrl, parseInviteLink } from './addresses.js';
 import { inviteRef } from './inviteLink.js';
 
 const CODE = /^[A-Za-z0-9]{4,32}$/;
 const OWN_HASH = /^#?\/?invite\/([A-Za-z0-9]{4,32})\/?$/;
-// -> { kind: 'address', address } (address: { slug, domain, code } or, from a link, { slug, code, origin }) | { kind: 'invite', code, inst } (inst: an instance origin, null = Nookara) | { kind: 'instance', url } | null
+// -> { kind: 'link', invite } (invite: { code, origin, link, slug }) | { kind: 'address', address } (an older invite: { slug, domain, code }
+// or, from a link, { slug, code, origin }) | { kind: 'no-address' } (name@domain, no code) | { kind: 'invite', code, inst } (an old
+// Nookara / instance invite link) | { kind: 'code', code } | { kind: 'instance', url } | null
 export function joinTarget(input) {
   const s = String(input ?? '').trim();
   if (!s || /\s/.test(s)) return null;
+  const invite = parseInviteLink(s);
+  if (invite) return { kind: 'link', invite };
   const address = parseAddress(s);
-  if (address) return { kind: 'address', address };
+  if (address) return address.code ? { kind: 'address', address } : { kind: 'no-address' };
   const link = parseInviteUrl(s); // an invite link whose host isn't the domain (its homeserver says which one it is)
   if (link) return { kind: 'address', address: link };
   if (/^https?:\/\//i.test(s)) {
@@ -19,6 +24,6 @@ export function joinTarget(input) {
   }
   const own = OWN_HASH.exec(s); // (#/invite/<code>, as copied from the address bar)
   if (own) return { kind: 'invite', code: own[1], inst: null };
-  if (CODE.test(s) && !/^\d+$/.test(s)) return { kind: 'invite', code: s, inst: null }; // a bare invite code (an instance address has a dot or a port)
+  if (CODE.test(s) && !/^\d+$/.test(s)) return { kind: 'code', code: s }; // a bare invite code (an instance address has a dot or a port): for the homeserver picked
   return { kind: 'instance', url: s };
 }

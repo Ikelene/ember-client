@@ -2,8 +2,9 @@
 // the search, then Servers / Bots. Servers come in sections, one per homeserver (nookara.cc first, then the biggest).
 // The directory listings are untrusted text (shown as text; a card only opens Add a server).
 import { useEffect, useState } from 'react';
+import { HsVerified } from './verifiedHomes.jsx';
 import { HomeChip } from './homeLabels.jsx';
-import { ArrowLeft, AtSign, Bot, Compass, Globe, Search, ShieldCheck, Users, X } from 'lucide-react';
+import { ArrowLeft, Bot, Compass, Globe, Search, ShieldCheck, Users, X } from 'lucide-react';
 import { loadDirectory, mergeGroups, filterGroups } from './directory.js';
 import { joinLabel } from './community.js';
 import { useChat } from './store.js';
@@ -40,7 +41,7 @@ export default function DiscoverPage({ onClose, tab: tabIn = 'servers', onTab })
           <h1>Discovery</h1>
           <p>{tab === 'servers' ? 'Find communities to join, grouped by the homeserver they live on. Every server here lists itself in the directory.' : 'Bots approved by Nookara staff. Verified bots were looked at before they were listed.'}</p>
           {tab === 'servers' && (
-            <label className="vc-disc-search"><Search size={18} /><input autoFocus placeholder="Search servers by name, address, description or tag" value={q} onChange={e => setQ(e.target.value)} />{q && <button type="button" onClick={() => setQ('')} aria-label="Clear"><X size={16} /></button>}</label>
+            <label className="vc-disc-search"><Search size={18} /><input autoFocus placeholder="Search servers by name, description or tag" value={q} onChange={e => setQ(e.target.value)} />{q && <button type="button" onClick={() => setQ('')} aria-label="Clear"><X size={16} /></button>}</label>
           )}
           <div className="vc-disc-tabs" role="tablist">
             <button type="button" role="tab" aria-selected={tab === 'servers'} className={tab === 'servers' ? 'on' : ''} onClick={() => setTab('servers')}><Globe size={15} /> Servers</button>
@@ -84,7 +85,7 @@ function ServerResults({ q, onClose }) {
         <section key={g.domain} className="vc-disc-hs">
           <header className="vc-disc-hs-head">
             <span className="vc-srv-ico">{safeImg(g.icon_url) ? <img src={g.icon_url} alt="" /> : initials(g.name)}</span>
-            <div><b>{g.name}</b>{g.name !== g.domain && <small><Globe size={11} /> {g.domain}</small>}</div>
+            <div><b>{g.name}<HsVerified domain={g.domain} on={g.verified} /></b>{g.name !== g.domain && <small><Globe size={11} /> {g.domain}</small>}</div>
             <span className="vc-disc-hs-n">{g.communities.length} server{g.communities.length === 1 ? '' : 's'}</span>
           </header>
           <div className="vc-disc-grid">
@@ -97,7 +98,7 @@ function ServerResults({ q, onClose }) {
                   <span className="vc-srv-ico lg">{safeImg(r.icon_url) ? <img src={r.icon_url} alt="" /> : initials(r.name)}</span>
                   <div className="vc-disc-body">
                     <b>{r.name}{r.trusted && <ShieldCheck size={14} className="vc-inline-ico vc-disc-trusted" title="Trusted by Nookara" />}</b>
-                    <small className="vc-disc-host" title="Server address">{r.address ? <AtSign size={11} /> : <Globe size={11} />} {r.address || r.url.replace(/^https?:\/\//, '')}</small>
+                    <small className="vc-disc-host" title="Its homeserver"><Globe size={11} /> {r.address ? r.address.split('@')[1] : r.url ? r.url.replace(/^https?:\/\//, '') : g.domain}</small>
                     <p>{r.description || 'No description.'}</p>
                     {r.tags.length > 0 && <div className="vc-disc-tags">{r.tags.slice(0, 6).map(t => <span key={t} className="vc-chip">{t}</span>)}</div>}
                     <div className="vc-disc-foot">

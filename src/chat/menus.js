@@ -1,7 +1,7 @@
 // The right-click menus' items (servers, channels, messages, people) and openMenu, which shows one; Menu.jsx draws them.
-import { getState, setMenu, toast, markServerRead, markChannelRead, linkFor, saveToMedia, sdmReportRoute, go, toggleBlock, notifyOf, setNotify } from './store.js';
+import { getState, setMenu, toast, markServerRead, markChannelRead, linkFor, inviteLinkFor, saveToMedia, sdmReportRoute, go, toggleBlock, notifyOf, setNotify } from './store.js';
 import { has, P, canNick, changeNick, nickMenuItems, profileMenuItems, roleMenuItems, modMenuItems } from './perms.js';
-import { CheckCheck, UserPlus, Settings, LogOut, Code2, LogIn, RefreshCw, Pencil, AtSign, Trash2, BellRing, Link2, Plug, Unplug, ShieldCheck, Copy, Image as ImageIcon, Pin, ExternalLink, BookmarkPlus, Info, Flag, Download, Reply, Forward, SmilePlus, Users, BookmarkCheck, Bookmark, Languages, Ellipsis, User, MessageCircle, Ban, Bell, BellOff, EyeOff } from 'lucide-react';
+import { CheckCheck, UserPlus, Settings, LogOut, Code2, LogIn, RefreshCw, Pencil, Trash2, BellRing, Link2, Plug, Unplug, ShieldCheck, Copy, Image as ImageIcon, Pin, ExternalLink, BookmarkPlus, Info, Flag, Download, Reply, Forward, SmilePlus, Users, BookmarkCheck, Bookmark, Languages, Ellipsis, User, MessageCircle, Ban, Bell, BellOff, EyeOff } from 'lucide-react';
 import { bare, instOf, isInst } from './ids.js';
 import { homeDomainOf, homeLine } from './homeservers.js';
 import { setInstancePrefs } from './instances.js';
@@ -84,7 +84,7 @@ export function homeServerMenu(e, inst, srv, { onInvite, onSettings, onLeave, on
   const admin = here && (has(srv.perms, P.MANAGE_SERVER) || has(srv.perms, P.MANAGE_ROLES) || inst.isAdmin);
   const line = homeLine(inst);
   openMenu(e, [
-    { type: 'head', label: `${name} · ${srv?.address || domain}` },
+    { type: 'head', label: `${name} · ${domain}` },
     line && (line.action === 'signin'
       ? { label: `Sign in to ${domain}`, icon: LogIn, hint: line.hint, onClick: onLogin }
       : { label: `Reconnect to ${domain}`, icon: RefreshCw, hint: line.hint, onClick: onReconnect }),
@@ -96,7 +96,7 @@ export function homeServerMenu(e, inst, srv, { onInvite, onSettings, onLeave, on
     here && { label: 'Invite people', icon: UserPlus, onClick: onInvite },
     here && inst.user && canNick(srv.sid, true) && { label: 'Change nickname', icon: Pencil, onClick: () => changeNick(srv.sid, getState().members[srv.sid]?.find(x => x.id === inst.user.id) || { ...inst.user, nick: null }, true) },
     admin && { label: 'Server settings', icon: Settings, onClick: onSettings },
-    srv?.address && { label: 'Copy address', icon: AtSign, onClick: () => copy(srv.address, 'Server address copied') },
+    here && srv.invite && { label: 'Copy invite link', icon: Link2, onClick: () => copy(inviteLinkFor(srv.sid, srv.invite), 'Invite link copied') },
     'sep',
     srv && onHide && { label: 'Hide from list', icon: EyeOff, hint: 'You stay in it', onClick: onHide },
     here && srv.role !== 'owner' && { label: 'Leave server', icon: LogOut, danger: true, onClick: onLeave },
@@ -127,7 +127,7 @@ export function instanceMenu(e, inst, srv, opts) {
     here && { label: 'Invite people', icon: UserPlus, onClick: onInvite },
     here && inst.user && canNick(srv.sid, true) && { label: 'Change nickname', icon: Pencil, onClick: () => changeNick(srv.sid, getState().members[srv.sid]?.find(x => x.id === inst.user.id) || { ...inst.user, nick: null }, true) },
     admin && { label: 'Server settings', icon: Settings, onClick: onSettings },
-    srv?.address && { label: 'Copy address', icon: AtSign, onClick: () => copy(srv.address, 'Server address copied') },
+    here && srv.invite && { label: 'Copy invite link', icon: Link2, onClick: () => copy(inviteLinkFor(srv.sid, srv.invite), 'Invite link copied') },
     { label: 'Copy URL', icon: Link2, onClick: () => copy(inst.origin, 'Server URL copied') },
     inst.sleep ? { label: 'Connect', icon: Plug, hint: inst.sleep === 'manual' ? 'You disconnected it' : 'Asleep (sleep mode)', onClick: onReconnect }
       : inst.status !== 'connecting' && { label: 'Reconnect', icon: RefreshCw, onClick: onReconnect },

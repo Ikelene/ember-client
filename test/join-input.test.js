@@ -4,8 +4,13 @@ import assert from 'node:assert/strict';
 import { joinTarget } from '../src/chat/joinInput.js';
 import { initials } from '../src/chat/initials.js';
 
-test('join: addresses, with and without a code, and their links', () => {
-  assert.deepEqual(joinTarget('garden@nookara.cc'), { kind: 'address', address: { slug: 'garden', domain: 'nookara.cc', address: 'garden@nookara.cc', code: null } });
+test('join: invite links, the new form (<url_base><code>)', () => {
+  assert.deepEqual(joinTarget('https://nookara.cc/i/Ab3dE7Kq'), { kind: 'link', invite: { code: 'Ab3dE7Kq', origin: 'https://nookara.cc', link: 'https://nookara.cc/i/Ab3dE7Kq', slug: null } });
+  assert.equal(joinTarget('http://localhost:4102/i/garden').invite.slug, 'garden'); // (maybe an older link to a listed server)
+  // no joining by an address any more
+  assert.deepEqual(joinTarget('garden@nookara.cc'), { kind: 'no-address' });
+});
+test('join: older invites by address, and their links', () => {
   assert.equal(joinTarget(' cabin@b.test/Ab12Cd ').address.code, 'Ab12Cd');
   assert.equal(joinTarget('https://b.test/i/cabin/Ab12Cd').address.address, 'cabin@b.test');
   // a link whose host isn't the domain: the homeserver there says which domain it is
@@ -14,7 +19,7 @@ test('join: addresses, with and without a code, and their links', () => {
 test('join: old invite links and codes', () => {
   assert.deepEqual(joinTarget('https://ember.nookara.cc/#/invite/Xy12Ab'), { kind: 'invite', code: 'Xy12Ab', inst: null });
   assert.deepEqual(joinTarget('https://chat.example.org/invite/Xy12Ab'), { kind: 'invite', code: 'Xy12Ab', inst: 'https://chat.example.org' });
-  assert.deepEqual(joinTarget('Xy12Ab'), { kind: 'invite', code: 'Xy12Ab', inst: null });
+  assert.deepEqual(joinTarget('Xy12Ab'), { kind: 'code', code: 'Xy12Ab' });
   assert.deepEqual(joinTarget('#/invite/Xy12Ab'), { kind: 'invite', code: 'Xy12Ab', inst: null });
 });
 test('join: anything else is an instance address; nothing is nothing', () => {

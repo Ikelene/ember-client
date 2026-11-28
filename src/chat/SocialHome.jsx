@@ -194,7 +194,7 @@ export default function SocialHome() {
             {!servers.length && (
               <section className="hm-tip vl-rise" style={{ '--i': 1 }}>
                 <span className="hm-tip-ico"><Search size={20} /></span>
-                <div><b>Find your people</b><span>You're not in any servers yet. Look around Discovery, or join one by its address.</span></div>
+                <div><b>Find your people</b><span>You're not in any servers yet. Look around Discovery, or join one with an invite link.</span></div>
                 <button type="button" className="btn btn-surface" onClick={() => dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'discover' } }))}>Explore servers</button>
               </section>
             )}

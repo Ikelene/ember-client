@@ -41,7 +41,6 @@ import { TierPage } from './TierPage.jsx';
 import QRCode from 'qrcode';
 import { linkFor, inviteLinkFor } from './store.js';
 import { OperatorTermsNotice } from './OperatorTerms.jsx';
-import { slugIssue, createErrorText } from './addresses.js';
 import { pictureAccept } from './accept.js';
 import { INST_REGISTER_NOOKARA, isNookara, nookaraInfo, nookaraRegistration } from '../compat.js';
 
@@ -95,7 +94,7 @@ export function ServerSettings({ sid, onClose, tab: startTab }) {
     <SettingsShell label="Server settings" crumb={srv?.name} groups={groups} startTab={startTab} onClose={onClose} gone={!d}
       head={srv && <>
         <span className="vc-srv-ico">{srv.icon ? <img src={srv.icon} alt="" /> : initials(srv.name)}</span>
-        <span><b>{srv.name}</b><small>{onInst ? <><Globe size={11} /> {srv.address || inst?.homeserver?.domain || inst?.host || origin}</> : `Hosted by Nookara (${nookaraDomain()})`}</small></span>
+        <span><b>{srv.name}</b><small>{onInst ? <><Globe size={11} /> {inst?.homeserver?.domain || inst?.host || origin}</> : `Hosted by Nookara (${nookaraDomain()})`}</small></span>
       </>}>
       {(page, { onDirty, goTo }) => <PlanCtx.Provider value={buildPlanCtx(inst, goTo)}>
         {page === 'overview' && <Overview sid={sid} origin={origin} instAdmin={instAdmin} onDirty={onDirty} goTo={goTo} />}
@@ -220,7 +219,7 @@ function Overview({ sid, origin, instAdmin, onDirty, goTo }) {
       )}
       <OperatorTermsNotice sid={sid} />
       <ServerCard sid={sid} srv={srv} origin={origin} goTo={goTo} />
-      {(srv.address || srv.slug) && <AddressCard sid={sid} srv={srv} />}
+      {isInst(sid) && <HomeCard sid={sid} />}
       <Card title="Server profile" icon={LayoutGrid}>
         <div className="vc-settings-imgs">
           <div className="vc-field"><span>Icon</span>
@@ -240,7 +239,7 @@ function Overview({ sid, origin, instAdmin, onDirty, goTo }) {
           {!cfg ? <div className="vc-loading"><i /><i /><i /></div> : (
             <>
               <div className="cs-row">
-                <div className="cs-text"><b>Show in Discover</b><span>{cfg.listed ? 'On: anyone can find this server in Discover and add it.' : 'Off: people need its address or an invite.'}</span></div>
+                <div className="cs-text"><b>Show in Discover</b><span>{cfg.listed ? 'On: anyone can find this server in Discover and add it.' : 'Off: people need an invite.'}</span></div>
                 <button type="button" role="switch" aria-label="Show in Discover" aria-checked={!!cfg.listed} className={`cs-switch${cfg.listed ? ' on' : ''}`} disabled={off || busy === 'listed'} onClick={() => setListed(!cfg.listed)}><i /></button>
               </div>
               <div className={`bf-ss-reg${off || !v.registered ? ' warn' : ' ok'}`}>
@@ -397,53 +396,23 @@ function AdvancedCard({ sid }) {
   );
 }
 
-// Overview > Address: a server on a homeserver with many servers is name@homeserver. Anyone here can copy it; the owner can
-// change the name part (PATCH /servers/:sid { slug }), checked as it's typed and again by the homeserver.
-function AddressCard({ sid, srv }) {
-  const owner = useChat(s => (s.servers.find(x => x.sid === sid)?.role || srv.role) === 'owner');
-  const domain = String(srv.address || '').split('@')[1] || '';
-  const hsName = useChat(s => s.instances.find(i => i.origin === instOf(sid))?.homeserver?.name || '');
-  const [slug, setSlug] = useState(srv.slug || '');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  useEffect(() => { setSlug(srv.slug || ''); }, [srv.slug]);
-  const address = srv.address || srv.slug;
-  const changed = slug !== (srv.slug || '');
-  const issue = changed ? slugIssue(slug) : null;
-  const copy = () => navigator.clipboard?.writeText(address).then(() => toast('Address copied.', true), () => toast("Couldn't copy that."));
-  async function save(e) {
-    e.preventDefault();
-    if (!changed || issue || busy) return;
-    setBusy(true); setErr('');
-    try { await apiFetch(`/chat/servers/${sid}`, { method: 'PATCH', body: JSON.stringify({ slug }) }); await refreshServer(sid); await loadServersOf(sid); toast('Address changed.', true); }
-    catch (er) { setErr(createErrorText(er)); }
-    setBusy(false);
-  }
+// Overview > Homeserver: where this server lives (servers have no addresses people see: invite links are the way in)
+function HomeCard({ sid }) {
+  const inst = useChat(s => s.instances.find(i => i.origin === instOf(sid)));
+  const domain = inst?.homeserver?.domain || (inst?.v2 ? inst?.host : '') || '';
+  const hsName = inst?.homeserver?.name || '';
+  if (!domain) return null;
   return (
-    <Card title="Address" icon={Globe} className="bf-ss-address">
-      <div className="vc-field"><span>Server address</span>
-        <div className="vc-row"><input className="form-input vc-info-mono" readOnly value={address} aria-label="Server address" onFocus={e => e.target.select()} />
-          <button type="button" className="btn btn-surface" onClick={copy}><Copy size={14} /> Copy</button></div>
-        <small className="vc-hint">People can join with this address, or with an invite made from it.</small></div>
-      {domain && <div className="vc-field"><span>Homeserver</span>
+    <Card title="Homeserver" icon={Globe} className="bf-ss-address">
+      <div className="vc-field">
         <div className="bf-ss-home"><HomeChip domain={domain} />{hsName && hsName !== domain && <b>{hsName}</b>}</div>
-        <small className="vc-hint">This server lives on {domain}. People from other homeservers join it with their own homeserver account, and show with their homeserver next to their name.</small></div>}
-      {owner && (
-        <form className="vc-field" onSubmit={save}><span>Change the name</span>
-          <div className="vc-row"><input className="form-input" value={slug} maxLength={32} autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-invalid={!!issue} aria-label="Address name"
-            onChange={e => { setSlug(e.target.value.toLowerCase().replace(/\s+/g, '-')); setErr(''); }} />
-            {domain && <span className="bf-ss-addr-at">@{domain}</span>}
-            <button type="submit" className="btn btn-primary" disabled={!changed || !!issue || busy}>{busy ? 'Saving...' : 'Change'}</button></div>
-          {issue ? <small className="vc-hint bf-ss-addr-bad">{issue}</small> : <small className="vc-hint">3-32 lowercase letters, numbers and dashes. The old address stops working.</small>}
-          {err && <p className="vc-err"><TriangleAlert size={14} /> {err}</p>}
-        </form>
-      )}
+        <small className="vc-hint">This server lives on {domain}. People from other homeservers join it with their own homeserver account, and show with their homeserver next to their name.</small></div>
     </Card>
   );
 }
 
 // Overview (Modern): the server as people see it - banner, icon and name - with its invite link, a QR code of it, and the
-// server's address. Classic keeps just the editing cards below (CSS hides this card there).
+// homeserver. Classic keeps just the editing cards below (CSS hides this card there).
 function ServerCard({ sid, srv, origin, goTo }) {
   const [qr, setQr] = useState('');
   // the invite link, or (no invite, e.g. an Ember server reached by its address) a link straight to the server
@@ -451,7 +420,6 @@ function ServerCard({ sid, srv, origin, goTo }) {
   useEffect(() => { if (!link) return; QRCode.toString(link, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#111111', light: '#ffffff' } }).then(setQr).catch(() => setQr('')); }, [link]);
   if (!srv) return null;
   const copy = (t, what) => navigator.clipboard?.writeText(t).then(() => toast(`${what} copied.`, true), () => toast("Couldn't copy that."));
-  const address = srv.address || (origin ? origin.replace(/^https?:\/\//, '') : null); // name@homeserver where the homeserver has many servers
   return (
     <section className="bf-ss-hero">
       <div className="bf-ss-hero-banner">{srv.banner && <img src={srv.banner} alt="" />}</div>
@@ -469,7 +437,6 @@ function ServerCard({ sid, srv, origin, goTo }) {
           </div>
         </div>
       )}
-      {address && <div className="bf-ss-hero-addr">Server address: <code>{address}</code><button type="button" className="vc-ico-btn" data-tip="Copy the address" onClick={() => copy(address, 'Address')}><Copy size={14} /></button></div>}
     </section>
   );
 }

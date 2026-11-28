@@ -98,6 +98,36 @@ export function parseInviteUrl(input) {
   if (!validSlug(slug) || !CODE.test(code)) return null;
   return { slug, code, origin: u.origin };
 }
+// ── invite links without an address (servers no longer have addresses people see): <invites.url_base><code> ──
+// https://nookara.cc/i/Ab3dE7Kq -> { code, origin, link } (origin: where to ask /.well-known/ember which homeserver it is).
+// One segment after /i/: an older https://<domain>/i/<slug> link to a listed server has that shape too, so `slug` says
+// what to try when no invite has that code. null for anything else
+export function parseInviteLink(input) {
+  const s = String(input ?? '').trim();
+  if (!/^https?:\/\//i.test(s)) return null;
+  let u;
+  try { u = new URL(s); } catch { return null; }
+  if (u.username || u.password || u.search || u.hash) return null;
+  const m = /^(?:\/[^/]+)*\/i\/([^/]+)\/?$/.exec(u.pathname);
+  if (!m || !CODE.test(m[1])) return null;
+  const lower = m[1].toLowerCase();
+  return { code: m[1], origin: u.origin, link: `${u.origin}${u.pathname.replace(/\/$/, '')}`, slug: m[1] === lower && validSlug(lower) ? lower : null };
+}
+// the link to share for an invite: what the homeserver said it is (an invite's `url`), else <invites.url_base><code>
+export function newInviteUrl(code, invites, domain, url) {
+  if (typeof url === 'string' && /^https:\/\/[^\s]+$/i.test(url)) return url;
+  return `${inviteBase(domain, invites)}${encodeURIComponent(code)}`;
+}
+// #/invite?u=<invite link> (the homeserver's invite page sends people here): the link, or null
+export function inviteRouteLink(hash) {
+  const m = /^#\/invite\?(.*)$/.exec(String(hash ?? ''));
+  return m ? new URLSearchParams(m[1]).get('u') : null;
+}
+// the #/ route for an invite link (kept across a sign-in like the old #/i/<slug@domain>/<code>)
+export const inviteRoute = link => `#/invite?${new URLSearchParams({ u: link })}`;
+// what a pasted invite is, any form: { code, origin, link, slug? } (new) or { slug, domain | origin, code } (old) | null
+export const anyInvite = input => parseInviteLink(input) || (() => { const a = parseAddress(input); return a?.code ? a : null; })() || parseInviteUrl(input);
+
 // web+ember:invite?address=slug@domain&code=X, as the browser hands it over (the protocol handler opens #/open?u=<it>)
 // -> { slug, domain, address, code | null } or null
 export function parseProtocolLink(input) {
@@ -105,6 +135,8 @@ export function parseProtocolLink(input) {
   const m = /^web\+ember:(?:\/\/)?([a-z]+)\/?(?:\?(.*))?$/i.exec(s);
   if (!m || m[1].toLowerCase() !== 'invite') return null;
   const q = new URLSearchParams(m[2] || '');
+  const viaUrl = q.get('url') ? parseInviteLink(q.get('url')) || parseInviteUrl(q.get('url')) : null; // (web+ember:invite?url=<invite link>: preferred)
+  if (viaUrl) return viaUrl;
   const a = parseAddress(q.get('address') || '');
   if (!a) return null;
   const code = q.get('code') || a.code;

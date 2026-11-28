@@ -71,7 +71,7 @@ function TypingMark({ names, people, sid }) {
 
 // ── the server rail ─────────────────────────────────────────────────────────
 // Every server is one plain icon: Nookara-hosted ones (only while signed in with Nookara) first, then the servers on instances in
-// the order of the instance list. Each group is dragged within itself. An instance icon's tooltip names the server and its address.
+// the order of the instance list. Each group is dragged within itself. An instance icon's tooltip names the server and its homeserver.
 const localRailOrder = () => { try { const v = JSON.parse(localStorage.getItem('bf_rail_order') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
 export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }) {
 
@@ -258,7 +258,7 @@ export function Rail({ onDiscover, onAddInstance, onCreate, discoverOn = false }
     const muted = s && isMuted(s.sid);
     const ask_ = async () => { if (await ask({ title: `Remove ${split ? homeDomainOf(inst, s) : name}?`, text: `${inst.v2 ? homeDomainOf(inst, s) : inst.host} leaves your server list${split ? ', with every server you are in on it,' : ''}${getToken() ? ' on every device' : ''}. Your account there stays as it is - you can add it again any time.`, confirm: 'Remove from list', danger: true })) removeInstance(inst.origin); };
     return (
-      <RailItem key={rail} dnd={dnd(rail)} hs={hsBadge(homeDomainOf(inst, s), inst.homeserver?.icon_url || null)} active={active} unread={!active && !!s && loudUnreadOf(s)} title={`${name} · ${s?.address || (inst.v2 ? homeDomainOf(inst, s) : inst.host)}`} server={s?.sid} style={{ '--i': legacy.length + i }}
+      <RailItem key={rail} dnd={dnd(rail)} hs={hsBadge(homeDomainOf(inst, s), inst.homeserver?.icon_url || null)} active={active} unread={!active && !!s && loudUnreadOf(s)} title={`${name} · ${inst.v2 ? homeDomainOf(inst, s) : inst.host}`} server={s?.sid} style={{ '--i': legacy.length + i }}
         status={inst.status !== 'open' ? inst.status : null} sleep={inst.sleep} badge={s && !muted ? (s.mentions || 0) + (srvMentions[s.sid] || 0) : 0}
         onClick={() => go(s && inst.status === 'open' ? { kind: 'server', sid: s.sid } : { kind: 'instance', inst: inst.origin, ...(split ? { then: { kind: 'server', sid: s.sid } } : {}) })}
         onContextMenu={e => instanceMenu(e, inst, s, {
@@ -437,7 +437,7 @@ export function ServerSidebar({ sid, onInvite, onSettings, onChannel, onLeave, o
       <div className={`vc-side-head${d.server.banner ? ' banner' : ''}`} ref={menuRef} onContextMenu={e => serverMenu(e, d.server, { onInvite, onSettings, onLeave, admin: canSettings })}>
         {d.server.banner && <img className="vc-side-banner" src={d.server.banner} alt="" />}
         <button type="button" className="vc-side-title" onClick={() => setMenu(m => !m)}>
-          <span className="vc-side-tname"><span>{d.server.name}</span><HomeChip domain={home} title={`${d.server.address || d.server.name} lives on the homeserver ${home}`} /></span><ChevronDown size={16} className={menu ? 'flip' : ''} />
+          <span className="vc-side-tname"><span>{d.server.name}</span><HomeChip domain={home} title={`${d.server.name} lives on the homeserver ${home}`} /></span><ChevronDown size={16} className={menu ? 'flip' : ''} />
         </button>
         {/* Modern: quick actions on the banner (Classic keeps just the menu) */}
         <span className="vc-side-acts">

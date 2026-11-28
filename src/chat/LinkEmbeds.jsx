@@ -367,8 +367,9 @@ function InviteEmbed({ e }) {
 // already uses that homeserver; for any other, nothing is fetched until Join, and the card says just the address.
 const addrCards = new Map(); // origin|code -> promise of { server } | { invalid: true } | null
 function AddressInviteEmbed({ r }) {
-  const origin = useChat(s => r.origin || (s.instances || []).find(i => i.v2 && (i.homeserver?.domain || i.host) === r.domain)?.origin || null);
+  const origin = useChat(s => r.hsOrigin || r.origin || (s.instances || []).find(i => i.v2 && (i.homeserver?.domain || i.host) === r.domain)?.origin || null);
   const known = !!origin && r.sure;
+  const homeDomain = useChat(st => (st.instances || []).find(i => i.origin === origin)?.homeserver?.domain || null);
   const [e, setE] = useState(undefined);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -377,7 +378,7 @@ function AddressInviteEmbed({ r }) {
     const k = `${origin}|${r.code}`;
     if (!addrCards.has(k)) {
       addrCards.set(k, fetch(`${origin}/api/v1/invite/${encodeURIComponent(r.code)}`, { credentials: 'omit', headers: { Accept: 'application/json' } })
-        .then(res => (res.ok ? res.json() : res.status === 404 ? { invalid: true } : null)).catch(() => null));
+        .then(res => (res.ok ? res.json() : res.status === 404 && !(r.link && r.slug) ? { invalid: true } : null)).catch(() => null)); // (a lowercase one may be an older /i/<slug> link)
     }
     addrCards.get(k).then(d => { if (live) setE(d || null); });
     return () => { live = false; };
@@ -385,7 +386,7 @@ function AddressInviteEmbed({ r }) {
   const s = e?.server;
   const mine = useChat(st => (s && origin ? st.servers.some(x => x.sid === K(origin, s.sid)) : false));
   if (e?.invalid) return <div className="vc-invite-card bad vl-rise"><b>Invalid invite</b><span>This invite link doesn't work any more.</span></div>;
-  const address = s?.address || r.address || (r.domain ? `${r.slug}@${r.domain}` : r.slug);
+  const domain = r.domain || (() => { try { return new URL(origin).host; } catch { return ''; } })();
   const abs = u => { try { return u ? new URL(u, origin).href : null; } catch { return null; } };
   const icon = abs(s?.icon), banner = abs(s?.banner);
   return (
@@ -393,10 +394,10 @@ function AddressInviteEmbed({ r }) {
       {banner && <div className="vc-invite-banner" style={{ backgroundImage: `url(${banner})` }} />}
       <small className="vc-invite-kicker">You've been invited to join a server</small>
       <div className="vc-invite-main">
-        <span className="vc-srv-ico lg">{icon ? <img src={icon} alt="" /> : (s?.name || r.slug).slice(0, 2)}</span>
+        <span className="vc-srv-ico lg">{icon ? <img src={icon} alt="" /> : (s?.name || r.slug || '?').slice(0, 2)}</span>
         <div className="vc-invite-info">
-          <b>{s?.name || address} <HomeChip domain={String(address).split('@')[1] || ''} /></b>
-          <span>{s && <><i className="dot" /> {s.member_count} member{s.member_count === 1 ? '' : 's'} </>}<small className="vc-invite-host">{address}</small></span>
+          <b>{s?.name || 'A server'} <HomeChip domain={homeDomain || domain} /></b>
+          <span>{s && <><i className="dot" /> {s.member_count} member{s.member_count === 1 ? '' : 's'} </>}</span>
         </div>
         <button type="button" className="btn btn-primary" disabled={busy} onClick={async () => { setBusy(true); await joinByAddress(r); setBusy(false); }}>{busy ? 'Joining...' : mine ? 'Open' : 'Join'}</button>
       </div>

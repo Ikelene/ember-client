@@ -159,19 +159,19 @@ export function InstanceGate({ origin }) {
     } catch (e) { toast(errorText(e.message)); }
     setBusy(false);
   }
-  // a homeserver with several servers: the ones it lists, each with its own Join (an invite or an address finds the others)
+  // a homeserver with several servers: the ones it lists, each with its own Join (an invite link finds the others)
   const listed = inst.v2 ? (inst.communities || []).filter(c => c && c.sid != null) : [];
   if (listed.length > 1) {
     return (
       <Box icon={<Server size={34} />} title={`Servers on ${host}`}>
-        <p>Pick one to join with your account. Servers it doesn't list can be joined with an invite or their address.</p>
+        <p>Pick one to join with your account. Servers it doesn't list can be joined with an invite link.</p>
         <div className="vc-rows vc-gate-list">
           {listed.map(c => {
             const mine = srv && srv.sid === K(origin, c.sid);
             return (
               <div key={c.sid} className="vc-list-row vc-ch-row">
                 <span className="vc-ch-ico">{c.icon_url ? <img src={c.icon_url} alt="" /> : initials(c.name)}</span>
-                <span className="vc-list-txt"><b>{c.name}</b><small>{c.address || host} - <Users size={11} /> {c.member_count}</small></span>
+                <span className="vc-list-txt"><b>{c.name}</b><small>{host} - <Users size={11} /> {c.member_count}</small></span>
                 {mine ? <button type="button" className="btn btn-surface btn-sm" onClick={() => go({ kind: 'server', sid: srv.sid })}>Open</button>
                   : c.join_policy !== 'invite' && c.join_policy !== 'password' && <button type="button" className="btn btn-primary btn-sm" disabled={!!busy} onClick={() => join(undefined, String(c.sid))}>{busy === String(c.sid) ? 'Joining...' : joinLabel(c.join_policy, 'Join')}</button>}
               </div>

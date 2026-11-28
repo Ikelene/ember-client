@@ -9,7 +9,7 @@ import { K, acctKey, registry, hooks, normOrigin, instOf, loadSessions, loadSess
 import { onInstClientsFrame, rewatchInstClients } from './instClients.js';
 import { SHORT } from '../version.js';
 import { getState, patchState, toast, handleEvent, socialEvent, homeConnected, RESTRICTED_TEXT, instanceVoiceClosed, voiceSocketReady, loadEmojis, go, catchUp, resumeInstanceView, backoff, instanceRestricted, instanceRestored, forgetServerCache, dmRewrapped } from './store.js';
-import { isV2, communityOf, parseAddress, parseInviteUrl, createErrorText } from './addresses.js';
+import { isV2, communityOf, parseAddress, parseInviteUrl, parseInviteLink, anyInvite, createErrorText } from './addresses.js';
 import { locate, currentOrigin, onSignedOut } from './homeserver.js';
 import { sourceFor, tagFor, openSession } from './homeAuth.js';
 import { SOCIAL_EVENTS, isTradedTag } from './social.js';
@@ -950,10 +950,55 @@ export async function resolveAddress({ slug, domain, origin: at }) {
   if (r?.sid == null) throw new Error('server_not_found');
   return { origin, sid: String(r.sid), slug: r.slug || slug, address: r.address || `${slug}@${domain}` };
 }
+// ── invite links: <invites.url_base><code> (servers have no addresses people see any more) ──
+// the homeserver behind the link (the link's host says, /.well-known/ember), then the invite there (GET /api/v1/invite/<code>,
+// public). A one-segment link that is no invite but an older https://<domain>/i/<slug> link to a listed server: that server.
+// inv: { code, origin, slug? } -> { origin, sid, code, server } (server: the invite's server view, null for a listed one)
+export async function resolveInvite(inv) {
+  const link = inv.link || `${normOrigin(inv.origin)}/i/${encodeURIComponent(inv.code)}`;
+  let r = null;
+  try { r = await fetch(link, { credentials: 'omit', redirect: 'follow', headers: { Accept: 'application/json' } }); } catch { r = null; } // (a host that doesn't let other sites read it: asked the other way below)
+  const d = r?.ok ? await r.json().catch(() => null) : null;
+  if (d?.server?.sid != null) {
+    let origin = null;
+    try { origin = normOrigin(new URL(r.url || link).origin); } catch { /* no */ }
+    if (origin) return { origin, domain: (String(d.server.address || '').split('@')[1]) || hostOf(origin), sid: String(d.server.sid), code: d.code || null, url: d.url || null, server: { ...d.server, icon: d.server.icon_url || d.server.icon || null } };
+  }
+  let hs;
+  try { hs = await locate({ origin: normOrigin(inv.origin), domain: hostOf(inv.origin) }); }
+  catch (e) { throw new Error(e?.code === 'unreachable' ? 'instance_unreachable' : 'not_an_instance'); }
+  const origin = normOrigin(hs.origin);
+  if (!origin) throw new Error('not_an_instance');
+  const domain = (hs.doc?.homeserver && typeof hs.doc.homeserver === 'object' && hs.doc.homeserver.domain) || hs.domain;
+  let res = null;
+  try { res = await fetch(`${origin}/api/v1/invite/${encodeURIComponent(inv.code)}`, { credentials: 'omit', headers: { Accept: 'application/json' } }); }
+  catch { throw new Error('instance_unreachable'); }
+  if (res.ok) {
+    const server = fromInstance(origin, await res.json().catch(() => ({})), '/invite').server || null;
+    if (server?.sid == null) throw new Error('invalid_invite');
+    return { origin, domain, sid: String(server.sid).split('|').pop(), code: inv.code, server };
+  }
+  if (res.status === 404 && inv.slug) {
+    const at = await resolveAddress({ slug: inv.slug, origin: inv.origin }).catch(() => null);
+    if (at) return { origin: at.origin, domain, sid: at.sid, code: null, server: null };
+  }
+  throw new Error(res.status === 404 ? 'invalid_invite' : 'instance_unreachable');
+}
+// a pasted or opened invite link: signed out, what server it is first (AddressInvite.jsx); else in (or the way in)
+export async function joinByInvite(inv) {
+  if (!getToken() && !homeHere()) { dispatchEvent(new CustomEvent('vc-invite', { detail: { address: { code: inv.code, origin: inv.origin, link: inv.link || null, slug: inv.slug || null } } })); return true; }
+  let at;
+  try { at = await resolveInvite(inv); } catch (e) { toast(createErrorText(e)); return false; }
+  const mine = connections.get(at.origin) && getState().servers.find(x => x.sid === K(at.origin, at.sid));
+  if (mine) { go({ kind: 'server', sid: mine.sid }); return true; }
+  return joinAndOpen(at.origin, at.code || undefined, at.sid);
+}
 // typed, pasted or opened (#/i/slug@domain/code): find the server, then the usual join (straight in when it can, the Add a
 // server dialog when it has to ask). -> true when it went somewhere, false when it isn't an address or didn't work (a toast says why)
 export async function joinByAddress(input) {
-  const a = typeof input === 'string' ? parseAddress(input) || parseInviteUrl(input) : input;
+  const a = typeof input === 'string' ? anyInvite(input) || parseAddress(input) : input;
+  if (a?.code && !a.slug && a.origin) return joinByInvite(a);
+  if (a?.link && a.origin) return joinByInvite(a); // (a one-segment /i/ link: a code, or an older listed server's slug)
   if (!a?.slug || !(a.domain || a.origin)) return false;
   // signed out: what server it is, with the homeserver sign-in (AddressInvite.jsx), never a server's own login
   if (!getToken() && !homeHere()) { dispatchEvent(new CustomEvent('vc-invite', { detail: { address: { slug: a.slug, domain: a.domain, origin: a.origin, code: a.code || null } } })); return true; }

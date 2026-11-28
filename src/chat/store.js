@@ -18,7 +18,7 @@ import { applyIdentity, applyNick } from './identity.js';
 import { applyUserUpdate, instancesWithAccount } from './userUpdate.js';
 import { findPending, dropSettled, wireText, settle } from './pending.js';
 import { NOOKARA, K, parseK, instOf, bare, isInst, normOrigin, acctKey } from './ids.js';
-import { parseAddress, addressHash, inviteUrl, inviteBase, parseProtocolLink, openRouteLink, serverOfInst, routeAddress, addressRoute, createErrorText } from './addresses.js';
+import { parseAddress, addressHash, inviteUrl, inviteBase, parseProtocolLink, openRouteLink, serverOfInst, routeAddress, createErrorText, newInviteUrl, inviteRouteLink, inviteRoute, anyInvite } from './addresses.js';
 import { setInviteHomes } from './inviteLink.js';
 import { myIdOn } from './tokens.js';
 import { readChannel as readMsgCache, writeChannel as writeMsgCache, dropChannels as dropMsgCache } from './msgCache.js';
@@ -131,7 +131,7 @@ let homesOf = null;
 subs.add(() => {
   if (state.instances === homesOf) return;
   homesOf = state.instances;
-  setInviteHomes((homesOf || []).filter(i => i.v2).map(i => { const domain = i.homeserver?.domain || i.host; return { domain, bases: [inviteBase(domain, i.invites), `${i.origin}/i/`] }; }));
+  setInviteHomes((homesOf || []).filter(i => i.v2).map(i => { const domain = i.homeserver?.domain || i.host; return { domain, origin: i.origin, bases: [inviteBase(domain, i.invites), `${i.origin}/i/`] }; }));
 });
 export const getState = () => state;
 // a custom emoji's picture: an instance's own (from its emoji list), else Nookara's
@@ -2369,7 +2369,6 @@ export async function toggleBlock(username, blocked) {
 // ── where you are (also in the address: /chat#/s/<sid>/<cid>, #/dm/<name>, #/g/<room>) ──
 // #/s/<sid>/<cid> for Nookara's own servers, #/i/<instance>/s/<sid>/<cid> and #/i/<instance>/invite/<code> for instances
 // a server on a homeserver with many, by its address (slug@domain): its routes use that, not the homeserver's origin
-const addressOfSid = sid => { const a = state.servers.find(x => x.sid === sid)?.address || state.detail[sid]?.server?.address || readServerCache()[sid]?.server?.address; const p = a ? parseAddress(a) : null; return p && !p.code ? p.address : null; };
 // the other way, instantly from what this device knows (the server list, details, the kept copies): -> its sid | null
 function sidOfAddress(address) {
   const a = String(address || '').toLowerCase(), same = x => String(x || '').toLowerCase() === a;
@@ -2383,13 +2382,11 @@ export function hashFor(v) {
   const at = k => { const p = parseK(k); return p.inst === NOOKARA ? '' : `#/i/${encodeURIComponent(p.inst)}`; };
   const mid = v.kind === 'channel' && v.mid ? `/${v.mid}` : ''; // a message link: #/s/<sid>/<cid>/<message id>
   if (v.kind === 'sdm' || (v.kind === 'channel' && v.dm)) return `#/dm/${encodeURIComponent(v.kind === 'sdm' ? v.id : v.dm)}`; // a DM on a homeserver, by its id
-  // a server with an address: #/s/<slug@domain>/<channel>/<message> (#/i/<origin>/s/... still opens, and becomes this)
-  const addr = (v.kind === 'channel' || v.kind === 'server') && at(v.sid) ? addressOfSid(v.sid) : null;
-  if (addr) return addressRoute(addr, v.kind === 'channel' ? bare(v.cid) : null, v.kind === 'channel' ? v.mid : null);
+  // (servers on a homeserver are #/i/<origin>/s/<id>: an older #/s/<slug@domain>/... link still opens, readHash)
   if (v.kind === 'channel') return at(v.sid) ? `${at(v.sid)}/s/${bare(v.sid)}/${bare(v.cid)}${mid}` : `#/s/${v.sid}/${v.cid}${mid}`;
   if (v.kind === 'server') return at(v.sid) ? `${at(v.sid)}/s/${bare(v.sid)}` : `#/s/${v.sid}`;
   if (v.kind === 'instance') return `#/i/${encodeURIComponent(v.inst)}`;
-  if (v.kind === 'address') return addressHash(v);
+  if (v.kind === 'address') return v.link ? inviteRoute(v.link) : addressHash(v);
   if (v.kind === 'invite') return v.inst && v.inst !== NOOKARA ? `#/i/${encodeURIComponent(v.inst)}/invite/${v.code}` : `#/invite/${v.code}`;
   if (v.kind === 'dm') return `#/dm/${encodeURIComponent(v.username)}`;
   if (v.kind === 'group') return `#/g/${v.room}`;
@@ -2401,10 +2398,14 @@ export function hashFor(v) {
 export const linkFor = v => { const long = shareLink(hashFor(v)); return (long.startsWith(EMBER_ORIGIN + '/') && shortLinkFor(v)) || long; };
 // the link to share for an invite to a server: one with an address (slug@domain) gets its homeserver's invite link, which any
 // app can open (https://<domain>/i/<slug>/<code>, or where its discovery doc says they start); others the Ember link as before
-export function inviteLinkFor(sid, code) {
+// A homeserver with many servers: <invites.url_base><code> (servers have no addresses people see; url: the invite's own link
+// when the homeserver gave one)
+export function inviteLinkFor(sid, code, url) {
   if (!code) return '';
   const io = instOf(sid);
   const srv = state.servers.find(x => x.sid === sid);
+  const hs = io && io !== NOOKARA ? state.instances.find(i => i.origin === io) : null;
+  if (hs?.v2) return newInviteUrl(code, hs.invites, hs.homeserver?.domain || hs.host, url || (code === (srv?.invite || state.detail[sid]?.server?.invite) ? srv?.invite_url || state.detail[sid]?.server?.invite_url : null));
   const a = io && io !== NOOKARA ? parseAddress(srv?.address || state.detail[sid]?.server?.address || '') : null;
   if (!a) return linkFor({ kind: 'invite', code, inst: io });
   return inviteUrl({ ...a, code }, state.instances.find(i => i.origin === io)?.invites);
@@ -2415,8 +2416,14 @@ export function go(v, { replace = false } = {}) {
   open(v);
 }
 export function readHash() {
+  // #/invite?u=<invite link>: the homeserver's invite page sends people here
+  if (location.hash.startsWith('#/invite?')) {
+    const l = inviteRouteLink(location.hash), a = l ? anyInvite(l) : null;
+    if (!a) return { kind: 'home' };
+    return a.link ? { kind: 'address', code: a.code, origin: a.origin, link: a.link, slug: a.slug } : { kind: 'address', slug: a.slug, domain: a.domain, origin: a.origin, code: a.code };
+  }
   // #/open?u=web+ember:invite?address=slug@domain&code=X: a link the browser handed over (Settings > Advanced registers Ember for them)
-  if (location.hash.startsWith('#/open?')) { const a = parseProtocolLink(openRouteLink(location.hash)); return a ? { kind: 'address', slug: a.slug, domain: a.domain, code: a.code } : { kind: 'home' }; }
+  if (location.hash.startsWith('#/open?')) { const a = parseProtocolLink(openRouteLink(location.hash)); return !a ? { kind: 'home' } : a.link ? { kind: 'address', code: a.code, origin: a.origin, link: a.link, slug: a.slug } : { kind: 'address', slug: a.slug, domain: a.domain, origin: a.origin, code: a.code }; }
   const parts = location.hash.split('/');
   if (parts[1] === 'i' && parts[2]) {
     let inst = null;
@@ -2548,7 +2555,7 @@ export async function open(v) {
     history.replaceState(null, '', clientUrl(back));
     if (!state.view.kind || state.view.kind === 'home') set(s => ({ view: s.view }));
     // an invite (with its code): what server it is first, with a Join button (AddressInvite.jsx); just an address: straight in
-    if (v.code) dispatchEvent(new CustomEvent('vc-invite', { detail: { address: { slug: v.slug, domain: v.domain, code: v.code } } }));
+    if (v.code) dispatchEvent(new CustomEvent('vc-invite', { detail: { address: v.link ? { code: v.code, origin: v.origin, link: v.link, slug: v.slug || null } : { slug: v.slug, domain: v.domain, origin: v.origin, code: v.code } } }));
     else joinByAddress(v);
     return;
   }

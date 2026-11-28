@@ -4,6 +4,7 @@
 // copy user ID, and a full-width "Edit profile" button that opens Settings > Profile.
 // PopoutCard is also the live preview in Settings > Profile (chat/ProfileEditor.jsx).
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { HsVerified } from './verifiedHomes.jsx';
 import { Handle } from './Handle.jsx';
 import { createPortal } from 'react-dom';
 import { Copy, Pencil, ChevronRight, Check, Circle, Moon, MinusCircle, EyeOff, Smile, X, Users, IdCard, UserPlus, Crown, Globe, LogOut, Plus, Coins, ExternalLink } from 'lucide-react';
@@ -343,7 +344,7 @@ export function MePopout({ anchor, onClose, onEditProfile, onCustomStatus }) {
                 {others.map(a => (
                   <button type="button" key={a.key} disabled={!!busy} onClick={() => (a.kind === 'nookara' ? switchTo(a.saved, setBusy) : (setBusy(a.key), switchToAccount(a, { kind: 'nookara', handle: fullHandle(username), pfp: me.pfp })))}>
                     <span className="bf-pp-fl-av"><Avatar user={{ username: a.handle, pfp: a.pfp }} size={26} />{a.kind === 'home' && <HomeserverIcon hs={{ name: a.hsName, domain: a.domain, icon_url: a.icon }} className="sm bf-pp-fl-hs" />}</span>
-                    <span className="bf-pp-fl-txt"><span>{busy === a.key || busy === a.saved?.username ? `Switching to ${a.handle}...` : <Handle handle={a.handle} />}</span><small>{a.kind === 'nookara' ? `Nookara account` : `On ${a.hsName}`}</small></span>
+                    <span className="bf-pp-fl-txt"><span>{busy === a.key || busy === a.saved?.username ? `Switching to ${a.handle}...` : <Handle handle={a.handle} />}</span><small>{a.kind === 'nookara' ? `Nookara account` : <>On {a.hsName}<HsVerified domain={a.domain} size={11} /></>}</small></span>
                   </button>
                 ))}
                 {!others.length && <div className="bf-pp-fl-none">No other accounts on this device yet.</div>}

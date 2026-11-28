@@ -43,7 +43,7 @@ export function JoinInvites({ sid, requestsOnly }) {
       setMax(''); loadInvites();
     } catch (e) { fail(e); }
   };
-  const copy = (code) => { navigator.clipboard?.writeText(inviteLinkFor(sid, code)); setCopied(code); setTimeout(() => setCopied(''), 1500); };
+  const copy = (code, url) => { navigator.clipboard?.writeText(inviteLinkFor(sid, code, url)); setCopied(code); setTimeout(() => setCopied(''), 1500); };
   return (
     <div className="vc-settings">
       {!requestsOnly && <PlanUsage what="member_cap" used={people ? people.filter(m => !m.bot).length : undefined} label="People" />}
@@ -76,7 +76,7 @@ export function JoinInvites({ sid, requestsOnly }) {
             <div key={i.code} className="vc-list-row">
               <span className="vc-list-txt"><b className="vc-mono">{i.code}</b><small>{i.uses}{i.max_uses ? ` / ${i.max_uses}` : ''} use{i.uses === 1 ? '' : 's'} - {i.expires_at ? `expires ${stampOf(i.expires_at)}` : 'never expires'}</small></span>
               <span className="grow" />
-              <button type="button" className="btn btn-surface btn-sm" onClick={() => copy(i.code)}>{copied === i.code ? <Check size={13} /> : <Copy size={13} />} Copy link</button>
+              <button type="button" className="btn btn-surface btn-sm" onClick={() => copy(i.code, i.url)}>{copied === i.code ? <Check size={13} /> : <Copy size={13} />} Copy link</button>
               <button type="button" className="vc-ico-btn danger" title="Delete invite" onClick={async () => { try { await apiFetch(`/chat/invites/${i.code}`, { method: 'DELETE', inst: instOf(sid) }); loadInvites(); } catch (e) { fail(e); } }}><Trash2 size={15} /></button>
             </div>
           ))}

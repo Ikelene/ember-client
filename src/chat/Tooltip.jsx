@@ -126,7 +126,7 @@ function ServerTip({ sid }) {
   return (
     <div className="vc-tip-server">
       <b>{s.name}</b>
-      {s.inst && s.inst !== NOOKARA && <em className="vc-tip-host"><Globe size={11} />{s.address || s.inst.replace(/^https?:\/\//, '')}</em>}
+      {s.inst && s.inst !== NOOKARA && <em className="vc-tip-host"><Globe size={11} />{st.instances?.find(i => i.origin === s.inst)?.homeserver?.domain || s.inst.replace(/^https?:\/\//, '')}</em>}
       <span>
         {online != null && <><i className="dot on" />{online} online</>}
         <i className="dot" />{s.member_count} member{s.member_count === 1 ? '' : 's'}

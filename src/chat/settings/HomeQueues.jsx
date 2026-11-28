@@ -112,7 +112,7 @@ export function ServerRequestsQueue({ hs }) {
           {list.map(r => (
             <div key={r.id} className="hsx-list-row">
               <Server size={16} />
-              <span className="sx-row-txt"><b>{r.name}{r.slug ? ` (${r.slug}@${hs.domain})` : ''}</b><small>{r.account?.username || ''} - {when(r.created_at)}{r.note ? ` - "${r.note}"` : ''}{r.reason ? ` - ${r.reason}` : ''}</small>{r.description && <small>{r.description}</small>}</span>
+              <span className="sx-row-txt"><b>{r.name}</b><small>{r.account?.username || ''} - {when(r.created_at)}{r.note ? ` - "${r.note}"` : ''}{r.reason ? ` - ${r.reason}` : ''}</small>{r.description && <small>{r.description}</small>}</span>
               {r.status === 'pending' && <>
                 <button type="button" className="btn btn-primary btn-sm" disabled={!!busy} onClick={act(r, 'approve')}><Check size={13} /> Approve</button>
                 <button type="button" className="btn btn-surface btn-sm" disabled={!!busy} onClick={act(r, 'reject')}><X size={13} /> Decline</button>

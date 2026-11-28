@@ -3,7 +3,7 @@
 // one you signed in on. Whether you may create one isn't in a homeserver's discovery: its answer to the request says.
 // The "+" dialog: Join (first) takes anything joining takes, and suggests a few servers from Discovery; Create is the above.
 import { useEffect, useState } from 'react';
-import { ChevronRight, Globe, Plus, Server, TriangleAlert, LogIn, AtSign, Users } from 'lucide-react';
+import { ChevronRight, Plus, Server, TriangleAlert, LogIn, Link2, Users } from 'lucide-react';
 import { apiFetch } from '../api.js';
 import { EMBER_API } from '../compat.js';
 import { loadDirectory } from './directory.js';
@@ -14,10 +14,10 @@ import { Dialog } from './Dialogs.jsx';
 import { initials } from './initials.js';
 import { useChat, go, toast } from './store.js';
 import { K } from './ids.js';
-import { discover, addInstance, nookaraSession, instanceConn, loadInstanceData, hostOf, canHomeConnect, homeConnect, nookaraSignsIn, joinByAddress } from './instances.js';
+import { discover, addInstance, nookaraSession, instanceConn, loadInstanceData, hostOf, canHomeConnect, homeConnect, nookaraSignsIn, joinByAddress, joinByInvite, joinAndOpen } from './instances.js';
 import { hasNookara } from './session.js';
 import { discoveryDoc } from './homeApi.js';
-import { isV2, slugIssue, slugFrom, createErrorText } from './addresses.js';
+import { isV2, createErrorText } from './addresses.js';
 import { useCreateHosts } from './createHosts.js';
 
 const POLICIES = [['open', 'Anyone can join'], ['request', 'People ask to join'], ['invite', 'Only with an invite']];
@@ -27,8 +27,6 @@ export function CreateOnHomeserver({ onClose, start = 'join' }) {
   const [tab, setTab] = useState(start); // join | create
   const [host, setHost] = useState(null);
   const [name, setName] = useState('');
-  const [slug, setSlug] = useState('');
-  const [touched, setTouched] = useState(false); // typed an address of their own (it stops following the name; until then focusing it selects it all, so typing replaces it)
   const [policy, setPolicy] = useState('open');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -48,8 +46,6 @@ export function CreateOnHomeserver({ onClose, start = 'join' }) {
   const loadMine = () => apiFetch('/api/v2/server-requests', { inst: host.origin }).then(d => setMine(Array.isArray(d?.requests) ? d.requests : []), () => setMine([]));
   useEffect(() => { if (asking && host && instanceConn(host.origin)?.session) loadMine(); }, [asking, host?.origin]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const f = e => { if (host && e.detail?.origin === host.origin) loadMine(); }; addEventListener('ember-server-request', f); return () => removeEventListener('ember-server-request', f); }, [host?.origin]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (!touched) setSlug(slugFrom(name)); }, [name]); // eslint-disable-line react-hooks/exhaustive-deps
-  const issue = slug ? slugIssue(slug) : null;
 
   // a homeserver that isn't connected yet (the one you signed in on): connect with your account first
   async function ready(h) {
@@ -64,18 +60,18 @@ export function CreateOnHomeserver({ onClose, start = 'join' }) {
   }
   async function create(e) {
     e.preventDefault();
-    if (!name.trim() || issue || busy) return;
+    if (!name.trim() || busy) return;
     setBusy(true); setErr('');
     try {
       if (!(await ready(host))) return;
       if (asking) {
-        await apiFetch('/api/v2/server-requests', { inst: host.origin, method: 'POST', body: JSON.stringify({ name: name.trim(), ...(slug ? { slug } : {}), ...(desc.trim() ? { description: desc.trim() } : {}), ...(note.trim() ? { note: note.trim() } : {}) }) });
+        await apiFetch('/api/v2/server-requests', { inst: host.origin, method: 'POST', body: JSON.stringify({ name: name.trim(), ...(desc.trim() ? { description: desc.trim() } : {}), ...(note.trim() ? { note: note.trim() } : {}) }) });
         toast(`Asked for ${name.trim()}. You'll hear when an admin answers.`, true);
-        setName(''); setNote(''); setDesc(''); setTouched(false);
+        setName(''); setNote(''); setDesc('');
         loadMine();
         return;
       }
-      const d = await apiFetch('/api/v1/servers', { inst: host.origin, method: 'POST', body: JSON.stringify({ name: name.trim(), ...(slug ? { slug } : {}), join_policy: policy }) });
+      const d = await apiFetch('/api/v1/servers', { inst: host.origin, method: 'POST', body: JSON.stringify({ name: name.trim(), join_policy: policy }) }); // (no address: the homeserver picks its slug itself)
       const sid = d?.server?.sid ?? d?.sid; // (already origin|sid: apiFetch namespaces what an instance answers)
       await loadInstanceData(host.origin);
       onClose();
@@ -89,7 +85,7 @@ export function CreateOnHomeserver({ onClose, start = 'join' }) {
 
   const picking = tab === 'join' || !host;
   return (
-    <Dialog title={tab === 'join' ? 'Join a server' : 'Create a server'} sub={tab === 'join' ? "Paste an invite, or type a server's address." : host ? `It will live on ${host.domain}. You can change all of this later.` : 'Pick the homeserver it will live on.'} onClose={onClose} wide className="vc-create-hs">
+    <Dialog title={tab === 'join' ? 'Join a server' : 'Create a server'} sub={tab === 'join' ? 'Paste an invite link.' : host ? `It will live on ${host.domain}. You can change all of this later.` : 'Pick the homeserver it will live on.'} onClose={onClose} wide className="vc-create-hs">
       {close => (
         <>
           {picking && (
@@ -116,12 +112,6 @@ export function CreateOnHomeserver({ onClose, start = 'join' }) {
           ) : (
             <form onSubmit={create}>
               <label className="vc-field"><span>Name</span><input className="form-input" autoFocus maxLength={60} value={name} onChange={e => { setName(e.target.value); setErr(''); }} /></label>
-              <label className="vc-field"><span>Address (optional)</span>
-                <div className="vc-row"><input className="form-input" maxLength={32} autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="picked for you" aria-invalid={!!issue} value={slug}
-                  onFocus={e => { if (!touched) e.target.select(); }} onMouseUp={e => { if (!touched) e.preventDefault(); }}
-                  onChange={e => { setTouched(true); setSlug(e.target.value.toLowerCase().replace(/\s+/g, '-')); setErr(''); }} /><span className="bf-ss-addr-at">@{host.domain}</span></div>
-                {issue ? <small className="vc-hint bf-ss-addr-bad">{issue}</small> : <small className="vc-hint"><Globe size={12} className="vc-inline-ico" /> {slug ? `People will find it as ${slug}@${host.domain}.` : '3-32 lowercase letters, numbers and dashes. Leave it empty and the homeserver picks one.'}</small>}
-              </label>
               {asking ? <>
                 <label className="vc-field"><span>What it's for (optional)</span><input className="form-input" maxLength={300} value={desc} onChange={e => setDesc(e.target.value)} /></label>
                 <label className="vc-field"><span>Note to the admins (optional)</span><textarea className="form-textarea" rows={2} maxLength={500} value={note} onChange={e => setNote(e.target.value)} /></label>
@@ -130,7 +120,7 @@ export function CreateOnHomeserver({ onClose, start = 'join' }) {
                 <select className="form-input" value={policy} onChange={e => setPolicy(e.target.value)}>{POLICIES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>}
               {err && <p className="vc-err"><TriangleAlert size={14} /> {err}</p>}
               <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" onClick={() => { setHost(null); setErr(''); }}>Back</button><span className="grow" />
-                <button type="submit" className="btn btn-primary" disabled={!name.trim() || !!issue || busy}><Plus size={15} /> {busy ? (asking ? 'Asking...' : 'Creating...') : asking ? 'Request server' : 'Create server'}</button></div>
+                <button type="submit" className="btn btn-primary" disabled={!name.trim() || busy}><Plus size={15} /> {busy ? (asking ? 'Asking...' : 'Creating...') : asking ? 'Request server' : 'Create server'}</button></div>
               {asking && mine && mine.length > 0 && (
                 <div className="vc-rows vc-gap-top">
                   <div className="vc-ch-sugg-head">Your requests</div>
@@ -150,8 +140,8 @@ export function CreateOnHomeserver({ onClose, start = 'join' }) {
   );
 }
 
-// Join: one field for everything joining takes (slug@domain, slug@domain/code, https://domain/i/slug/code, an old invite link or
-// code, a homeserver's address), and a few listed servers from Discovery I'm not in yet
+// Join: one field for everything joining takes (an invite link, any form; a bare code with the homeserver it is for; a homeserver's
+// address), and a few listed servers from Discovery I'm not in yet. Servers have no addresses people see: no joining by name@domain.
 const getJson = url => fetch(url).then(r => (r.ok ? r.json() : Promise.reject(Object.assign(new Error('request_failed'), { status: r.status }))));
 function JoinPane({ close }) {
   const [text, setText] = useState('');
@@ -160,6 +150,11 @@ function JoinPane({ close }) {
   const [busy, setBusy] = useState('');
   const servers = useChat(s => s.servers);
   const mine = useChat(s => s.instances);
+  const hosts = useCreateHosts();
+  const [hostAt, setHostAt] = useState('');
+  const t = joinTarget(text);
+  const bare = t?.kind === 'code';
+  const codeHost = hosts.find(h => h.origin === hostAt) || hosts[0] || null;
   useEffect(() => {
     let live = true;
     loadDirectory(getJson, EMBER_API, {}).then(d => { if (live) setListed(d.groups.flatMap(g => g.communities)); }).catch(() => { if (live) setListed([]); });
@@ -168,11 +163,14 @@ function JoinPane({ close }) {
   const suggested = (listed || []).filter(r => (r.url || r.address) && !isListedAdded(r, servers, mine)).slice(0, 5);
   function submit(e) {
     e.preventDefault();
-    const t = joinTarget(text);
-    if (!t) { setErr("Paste an invite link, or type a server's address like name@example.com."); return; }
+    if (!t) { setErr('Paste an invite link.'); return; }
+    if (t.kind === 'no-address') { setErr("Servers don't have addresses any more. Ask someone in it for an invite link."); return; }
+    if (bare && !codeHost) { setErr('Paste the whole invite link: a code alone needs a homeserver to ask.'); return; }
     close();
     setTimeout(() => {
-      if (t.kind === 'address') joinByAddress(t.address);
+      if (t.kind === 'link') joinByInvite(t.invite);
+      else if (t.kind === 'code') joinAndOpen(codeHost.origin, t.code);
+      else if (t.kind === 'address') joinByAddress(t.address);
       else if (t.kind === 'invite') dispatchEvent(new CustomEvent('vc-invite', { detail: { code: t.code, inst: t.inst } }));
       else dispatchEvent(new CustomEvent('vc-dialog', { detail: { kind: 'add-instance', url: t.url } }));
     }, 200);
@@ -185,10 +183,16 @@ function JoinPane({ close }) {
   }
   return (
     <form onSubmit={submit}>
-      <label className="vc-field"><span>Invite or address</span>
-        <input className="form-input" autoFocus autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="name@example.com, or an invite link" value={text} onChange={e => { setText(e.target.value); setErr(''); }} />
-        <small className="vc-hint"><AtSign size={12} className="vc-inline-ico" /> A server's address (name@example.com), or an invite link or code.</small>
+      <label className="vc-field"><span>Invite link</span>
+        <input className="form-input" autoFocus autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="https://nookara.cc/i/..." value={text} onChange={e => { setText(e.target.value); setErr(''); }} />
+        <small className="vc-hint"><Link2 size={12} className="vc-inline-ico" /> An invite link, or an invite code and the homeserver it is for.</small>
       </label>
+      {bare && hosts.length > 0 && (
+        <label className="vc-field"><span>Homeserver</span>
+          <select className="form-input" value={codeHost?.origin || ''} onChange={e => setHostAt(e.target.value)}>{hosts.map(h => <option key={h.origin} value={h.origin}>{h.name && h.name !== h.domain ? `${h.name} (${h.domain})` : h.domain}</option>)}</select>
+          <small className="vc-hint">The homeserver the server with this code is on.</small>
+        </label>
+      )}
       {err && <p className="vc-err"><TriangleAlert size={14} /> {err}</p>}
       <div className="vc-dialog-btns"><button type="button" className="btn btn-surface" onClick={close}>Cancel</button><span className="grow" />
         <button type="submit" className="btn btn-primary" disabled={!text.trim()}><LogIn size={15} /> Join</button></div>
@@ -198,7 +202,7 @@ function JoinPane({ close }) {
         {suggested.map(r => (
           <button type="button" key={r.key} className="vc-list-row bf-backup-pick vc-ch-row" disabled={!!busy} onClick={() => pick(r)}>
             <span className="vc-ch-ico">{/^https:\/\//i.test(r.icon_url || '') ? <img src={r.icon_url} alt="" /> : initials(r.name)}</span>
-            <span className="vc-list-txt"><b>{r.name} <HomeChip domain={r.address ? r.address.split('@')[1] : hostOf(r.url)} /></b><small>{r.address || hostOf(r.url)} - <Users size={11} /> {r.member_count}</small></span>
+            <span className="vc-list-txt"><b>{r.name} <HomeChip domain={r.address ? r.address.split('@')[1] : hostOf(r.url)} /></b><small><Users size={11} /> {r.member_count}</small></span>
             {busy === r.key ? <i className="vc-gate-spin" /> : <ChevronRight size={16} className="vc-ch-chev" />}
           </button>
         ))}

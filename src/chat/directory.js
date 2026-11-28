@@ -19,10 +19,11 @@ function card(c, hs) {
     name: str(c.name, 100) || address || hs.domain, description: str(c.description, 500),
     icon_url: str(c.icon_url, 2000), banner_url: str(c.banner_url, 2000), invite_url: str(c.invite_url, 2000),
     tags: (Array.isArray(c.tags) ? c.tags : []).filter(t => typeof t === 'string' && t.trim()).map(t => t.trim().slice(0, 24)).slice(0, 8),
-    member_count: Math.max(0, Number(c.member_count) || 0), join_policy: str(c.join_policy, 20) || null, trusted: !!c.trusted,
+    member_count: Math.max(0, Number(c.member_count) || 0), join_policy: str(c.join_policy, 20) || null, trusted: !!c.trusted, verified: c.verified === true,
   };
 }
-const section = (hs, communities) => ({ domain: hs.domain, name: hs.name || hs.domain, url: hs.url, icon_url: hs.icon_url || '', communities });
+// verified: Nookara's staff list (the group's / entry's top-level `verified`; homeserver.verified means only that its delegation checked out)
+const section = (hs, communities) => ({ domain: hs.domain, name: hs.name || hs.domain, url: hs.url, icon_url: hs.icon_url || '', verified: !!hs.verified, communities });
 
 // is this the grouped answer? (an array, or { groups: [...] }, of { homeserver, communities })
 const groupsIn = d => (Array.isArray(d) ? d : Array.isArray(d?.groups) ? d.groups : null);
@@ -35,7 +36,7 @@ export function fromGrouped(d) {
     const url = originOf(g.homeserver.url || g.homeserver.domain);
     const domain = str(g.homeserver.domain, 253).toLowerCase() || hostOf(url);
     if (!domain) continue;
-    const hs = { domain, name: str(g.homeserver.name, 100), url: url || originOf(domain), icon_url: str(g.homeserver.icon_url, 2000) };
+    const hs = { domain, name: str(g.homeserver.name, 100), url: url || originOf(domain), icon_url: str(g.homeserver.icon_url, 2000), verified: g.verified === true };
     out.push(section(hs, g.communities.filter(c => c && typeof c === 'object').map(c => card(c, hs))));
   }
   return out;

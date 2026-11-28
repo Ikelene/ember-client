@@ -11,7 +11,7 @@ import { useChat, go, toast, errorText } from './store.js';
 import { Toggle } from './roles.jsx';
 import { PlatformIcon } from './platforms.jsx';
 import { discover, nookaraSession, localSession, addInstance, loginInstance, instanceConn, refreshInstance, joinCommunity, joinByAddress, hostOf, canHomeConnect, homeConnect, nookaraSignsIn } from './instances.js';
-import { communityOf, parseAddress, parseInviteUrl } from './addresses.js';
+import { communityOf, parseAddress, anyInvite } from './addresses.js';
 import { K } from './ids.js';
 import { startSignIn, hasNookara } from './session.js';
 import { UnsavedBar } from './unsaved.jsx';
@@ -69,8 +69,9 @@ export function AddInstance({ url, invite, server, onClose, onSetup }) {
   const member = found && mine.find(m => m.inst === found.origin && (server == null || m.sid === K(found.origin, server)));
 
   async function look(value = text) {
-    const at = parseAddress(value) || parseInviteUrl(value); // name@example.com (with or without an invite code): found by its address instead
+    const at = anyInvite(value); // an invite link (any form): the homeserver behind it says which server
     if (at) { onClose(); joinByAddress(at); return; }
+    if (parseAddress(value)) { setErr("Servers don't have addresses any more. Ask someone in it for an invite link."); return; }
     setBusy(true); setErr('');
     try {
       const d = await discover(value);
@@ -119,7 +120,7 @@ export function AddInstance({ url, invite, server, onClose, onSetup }) {
     setBusy(false);
   }
   async function join(withCode) {
-    const at = withCode && (parseAddress(withCode) || parseInviteUrl(withCode)); // an invite to a server by its address, maybe on another homeserver
+    const at = withCode && anyInvite(withCode); // an invite link, maybe to a server on another homeserver
     if (at) { onClose(); joinByAddress(at); return; }
     setBusy(true);
     try {
@@ -134,13 +135,13 @@ export function AddInstance({ url, invite, server, onClose, onSetup }) {
   const back = () => { setStep('url'); setFound(null); setErr(''); };
 
   return (
-    <Dialog title="Join a server" sub="Enter a server's address (name@example.com) or its homeserver's address to find it, sign in and join - it then shows up in the list on the left." onClose={onClose} wide className="vc-inst-dialog">
+    <Dialog title="Join a server" sub="Paste an invite link, or type a homeserver's address to find it, sign in and join - it then shows up in the list on the left." onClose={onClose} wide className="vc-inst-dialog">
       {close => (
         <>
           {(step === 'url' || step === 'look') && (
             <form onSubmit={e => { e.preventDefault(); look(); }}>
-              <label className="vc-field"><span>Server address</span>
-                <div className="vc-row"><input className="form-input" autoFocus placeholder="chat.example.com or name@example.com" value={text} onChange={e => setText(e.target.value)} />
+              <label className="vc-field"><span>Invite link or homeserver</span>
+                <div className="vc-row"><input className="form-input" autoFocus placeholder="https://nookara.cc/i/... or chat.example.com" value={text} onChange={e => setText(e.target.value)} />
                   <button className="btn btn-primary" type="submit" disabled={!text.trim() || busy}>{busy ? 'Looking...' : 'Continue'}</button></div></label>
               {err && <p className="vc-err"><TriangleAlert size={14} /> {err}</p>}
               <div className="vc-dialog-btns"><span className="grow" /><button type="button" className="btn btn-surface" onClick={close}>Cancel</button></div>

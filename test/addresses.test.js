@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseAddress, addressHash, slugIssue, validSlug, slugFrom, createErrorText, railEntries, railOrigin, railPos, railWire, railMerge, railMigrate, isV2, communityOf, inviteBase, inviteUrl, parseInviteUrl, parseProtocolLink, openRouteLink, serverOfInst, routeAddress, addressRoute } from '../src/chat/addresses.js';
+import { parseAddress, addressHash, slugIssue, validSlug, slugFrom, createErrorText, railEntries, railOrigin, railPos, railWire, railMerge, railMigrate, parseInviteLink, newInviteUrl, inviteRoute, inviteRouteLink, anyInvite, isV2, communityOf, inviteBase, inviteUrl, parseInviteUrl, parseProtocolLink, openRouteLink, serverOfInst, routeAddress, addressRoute } from '../src/chat/addresses.js';
 import { addressInviteRef, setInviteHomes, isHiddenInviteLine, embedLabel } from '../src/chat/inviteLink.js';
 
 test('addresses: slug@domain, with and without a code', () => {
@@ -146,7 +146,29 @@ test('invite links: cards in messages, hidden only for homeservers this device u
   assert.deepEqual(addressInviteRef('http://localhost:4102/i/cabin/Ab12'), { slug: 'cabin', code: 'Ab12', origin: 'http://localhost:4102', sure: true });
   assert.equal(isHiddenInviteLine('http://localhost:4102/i/cabin/Ab12'), true);
   assert.equal(embedLabel('https://b.test/i/cabin/Ab12'), 'Server Invite');
+  // the new form, <url_base><code>, on another host than the homeserver: a card about the homeserver behind it
+  setInviteHomes([{ domain: 'nookara.cc', origin: 'https://chat.nookara.cc', bases: ['https://nookara.cc/i/', 'https://chat.nookara.cc/i/'] }]);
+  assert.deepEqual(addressInviteRef('https://nookara.cc/i/Ab3dE7Kq'), { code: 'Ab3dE7Kq', origin: 'https://nookara.cc', link: 'https://nookara.cc/i/Ab3dE7Kq', slug: null, hsOrigin: 'https://chat.nookara.cc', sure: true });
+  assert.equal(isHiddenInviteLine('https://nookara.cc/i/Ab3dE7Kq'), true);
+  assert.equal(addressInviteRef('https://other.example/i/Ab3dE7Kq'), null); // (an unknown host's /i/ path: just a link)
   setInviteHomes([]);
+});
+test('invite links: new form, routes and what to share', () => {
+  assert.deepEqual(parseInviteLink('https://nookara.cc/i/Ab3dE7Kq/'), { code: 'Ab3dE7Kq', origin: 'https://nookara.cc', link: 'https://nookara.cc/i/Ab3dE7Kq', slug: null });
+  assert.equal(parseInviteLink('https://nookara.cc/i/cabin/Ab12'), null); // (the older two-part form: parseInviteUrl)
+  assert.equal(parseInviteLink('https://nookara.cc/x/Ab3dE7Kq'), null);
+  assert.equal(parseInviteLink('https://nookara.cc/i/Ab3dE7Kq?x=1'), null);
+  assert.equal(newInviteUrl('Ab3dE7Kq', { url_base: 'https://nookara.cc/i/' }, 'nookara.cc'), 'https://nookara.cc/i/Ab3dE7Kq');
+  assert.equal(newInviteUrl('Ab3dE7Kq', null, 'b.test'), 'https://b.test/i/Ab3dE7Kq');
+  assert.equal(newInviteUrl('Ab3dE7Kq', null, 'b.test', 'https://nookara.cc/i/Ab3dE7Kq'), 'https://nookara.cc/i/Ab3dE7Kq');
+  const route = inviteRoute('https://nookara.cc/i/Ab3dE7Kq');
+  assert.equal(inviteRouteLink(route), 'https://nookara.cc/i/Ab3dE7Kq');
+  assert.equal(anyInvite(inviteRouteLink(route)).code, 'Ab3dE7Kq');
+  assert.equal(anyInvite('https://b.test/i/cabin/Ab12').slug, 'cabin'); // (older forms still work)
+  assert.equal(anyInvite('cabin@b.test/Ab12').code, 'Ab12');
+  assert.equal(anyInvite('cabin@b.test'), null); // (an address alone is no invite)
+  // web+ember:invite?url=<invite link> (preferred over address + code)
+  assert.equal(parseProtocolLink(`web+ember:invite?url=${encodeURIComponent('https://nookara.cc/i/Ab3dE7Kq')}&address=x@y.z&code=Q`).code, 'Ab3dE7Kq');
 });
 
 test('the server a lookup on a homeserver with several means: on screen, else its default, else the first', () => {

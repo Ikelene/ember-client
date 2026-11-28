@@ -4,7 +4,7 @@
 //   https://<instance>/invite/<code>                                  (the instance's own invite page)
 // The server (unfurl.js) makes the card data - the instance is asked from Nookara, never from the browser.
 import { shortLinkHash } from './shortLinks.js';
-import { parseAddress, parseInviteUrl } from './addresses.js';
+import { parseAddress, parseInviteUrl, parseInviteLink } from './addresses.js';
 const NOOKARA_HOST =/^(www\.)?((?:ember\.)?nookara\.cc|velora\.ikelene\.net)$/i;
 const CODE = '[A-Za-z0-9]{4,32}';
 const HASH_OWN = new RegExp(`^#/invite/(${CODE})/?$`);
@@ -114,8 +114,9 @@ export function siteRef(href) {
 // site, so an unknown domain's https://<domain>/i/... gets the card but keeps its link in the text.
 let inviteHomes = { domains: new Set(), bases: [] };
 // homes: [{ domain, bases: [url prefixes its invite links start with] }] (store.js keeps it in step with the connected homeservers)
+// (origin: the homeserver itself, which a link on another host - url_base https://nookara.cc/i/ - is about)
 export function setInviteHomes(homes) {
-  inviteHomes = { domains: new Set(homes.map(h => h.domain).filter(Boolean)), bases: homes.flatMap(h => h.bases || []).filter(Boolean) };
+  inviteHomes = { domains: new Set(homes.map(h => h.domain).filter(Boolean)), bases: homes.flatMap(h => h.bases || []).filter(Boolean), homeOf: homes.flatMap(h => (h.bases || []).filter(Boolean).map(b => [b, h.origin || null])) };
 }
 // -> { slug, domain?, origin?, code, sure } or null
 export function addressInviteRef(href) {
@@ -123,8 +124,12 @@ export function addressInviteRef(href) {
   if (!/^https?:\/\/\S+$/i.test(s)) return null;
   const a = parseAddress(s);
   if (a?.code) return { slug: a.slug, domain: a.domain, address: a.address, code: a.code, sure: /#\/i\//.test(s) || inviteHomes.domains.has(a.domain) };
+  const base = (inviteHomes.homeOf || []).find(([b]) => s.startsWith(b));
+  const n = parseInviteLink(s); // <url_base><code>, the form invites have now
+  const hs = base?.[1] ? { hsOrigin: base[1] } : {};
+  if (n && base) return { ...n, ...hs, sure: true };
   const l = parseInviteUrl(s);
-  return l && inviteHomes.bases.some(b => s.startsWith(b)) ? { ...l, sure: true } : null;
+  return l && base ? { ...l, ...hs, sure: true } : null;
 }
 // what a link to a card is called where the card itself isn't shown (a reply preview)
 export function embedLabel(href) {

@@ -2,6 +2,7 @@
 // each homeserver (and reconnecting / signing out of one) are under Settings > Homeservers (HomeserversPage.jsx).
 import { useState } from 'react';
 import { Handle } from '../Handle.jsx';
+import { HsVerified } from '../verifiedHomes.jsx';
 import { CircleUserRound, ExternalLink, LogOut, ArrowRight, Repeat } from 'lucide-react';
 import { SettingsPage, SCard } from './ui.jsx';
 import { useChat, ask } from '../store.js';
@@ -88,7 +89,7 @@ export function AccountsPage({ onHomeservers }) {
           {homes.map(s => (
             <div className="sx-list-row" key={s.key}>
               {s.account.avatar_url ? <Avatar user={{ username: s.account.username, pfp: s.account.avatar_url }} size={36} /> : <HomeserverIcon hs={s} className="ac-ico" />}
-              <div className="sx-row-txt"><b><Handle handle={s.account.handle} /></b><span>{s.account.display_name !== s.account.username ? `${s.account.display_name} - ` : ''}{s.name}{!signedIn && s.origin === currentOrigin() && s.active ? ' - in use' : ''}</span></div>
+              <div className="sx-row-txt"><b><Handle handle={s.account.handle} /><HsVerified domain={s.domain} /></b><span>{s.account.display_name !== s.account.username ? `${s.account.display_name} - ` : ''}{s.name}{!signedIn && s.origin === currentOrigin() && s.active ? ' - in use' : ''}</span></div>
               {(signedIn || s.origin !== currentOrigin() || !s.active) && <div className="sx-row-ctl">
                 <button type="button" className="btn btn-surface btn-sm" disabled={!!busy} onClick={() => { setBusy(s.key); switchToAccount({ kind: 'home', origin: s.origin, hsKey: s.key }, signedIn && me ? { kind: 'nookara', handle: nookaraHandle(me.username), pfp: me.pfp } : null); }}><Repeat size={13} /> {busy === s.key ? 'Switching...' : 'Switch'}</button>
               </div>}

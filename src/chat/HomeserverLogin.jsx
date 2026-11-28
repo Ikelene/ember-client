@@ -2,6 +2,7 @@
 // Plain parts for whatever shows the sign-in (the gate, Settings > Homeservers); the login itself always happens
 // on the homeserver's own page, never here.
 import { useEffect, useState } from 'react';
+import { HsVerified } from './verifiedHomes.jsx';
 import { ShieldCheck, Globe, TriangleAlert, ArrowLeft, ArrowRight } from 'lucide-react';
 import { DEFAULT_HOMESERVER, parseHomeserver, resolve, probeDefault, recentHomeservers } from './homeserver.js';
 import { startSignIn, signInOn } from './session.js';
@@ -66,14 +67,14 @@ function OtherHomeserver({ back, onBack }) {
       {ok && (
         <div className="vc-invite-srv vc-inst-card vc-hs-found">
           <HomeserverIcon hs={look.hs} />
-          <div><b>{look.hs.name}</b><small><Globe size={13} /> {look.hs.domain}</small>{look.hs.nookara_identity ? <small><ShieldCheck size={13} /> Signs you in with Nookara</small> : look.hint && <small>Signing in as {look.hint}@{look.hs.domain}</small>}</div>
+          <div><b>{look.hs.name}<HsVerified domain={look.hs.domain} /></b><small><Globe size={13} /> {look.hs.domain}</small>{look.hs.nookara_identity ? <small><ShieldCheck size={13} /> Signs you in with Nookara</small> : look.hint && <small>Signing in as {look.hint}@{look.hs.domain}</small>}</div>
         </div>
       )}
       {look.status === 'error' && <p className="vc-err" role="alert"><TriangleAlert size={14} /> {RESOLVE_TEXT(look.error, look.domain)}</p>}
       {look.status === 'idle' && recent.length > 0 && (
         <div className="vc-hs-recent">
           <small>Recently used</small>
-          <div className="vc-gate-links">{recent.map(r => <button key={r.domain} type="button" className="vc-gate-link" onClick={() => type(r.domain)}><Globe size={12} /> {r.domain}</button>)}</div>
+          <div className="vc-gate-links">{recent.map(r => <button key={r.domain} type="button" className="vc-gate-link" onClick={() => type(r.domain)}><Globe size={12} /> {r.domain}<HsVerified domain={r.domain} size={11} /></button>)}</div>
         </div>
       )}
       <div className="vc-gate-btns">

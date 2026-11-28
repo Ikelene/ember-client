@@ -5,6 +5,7 @@
 // HomeserverReports.jsx), and while it is connected as an instance also Voice, Backups, Nookara and Server info (with
 // restart / update). Everything here is the whole homeserver's; one server's own settings are in its Server settings.
 import { useEffect, useRef, useState } from 'react';
+import { HsVerified } from '../verifiedHomes.jsx';
 import { Handle } from '../Handle.jsx';
 import { Building2, ArrowLeft, Globe, LogOut, AtSign, Users, KeyRound, ShieldCheck, TriangleAlert, RefreshCw, Trash2, Network, Crown, Settings2, Server, UserPlus, Ban, Gauge, Plus, X, RotateCw, ListChecks, Hourglass, Flag, Upload, ArrowLeftRight, Mic, Archive, Info, CircleArrowUp, Palette, Eye, EyeOff } from 'lucide-react';
 import { ReportsTab } from './HomeserverReports.jsx';
@@ -87,7 +88,7 @@ export default function HomeserversPage({ onDirty, start }) {
       <header className="hsx-head">
         <button type="button" className="btn btn-surface btn-sm" onClick={async () => { if (await leaveOk()) { note(false); setOrigin(null); } }}><ArrowLeft size={14} /> Homeservers</button>
         <HomeserverIcon hs={hs} className="ac-ico" />
-        <div className="sx-row-txt"><b>{hs.name}</b><span className="ac-host"><Globe size={12} /> {hs.domain}{hs.isOwner ? ' - owner' : ' - admin'}</span></div>
+        <div className="sx-row-txt"><b>{hs.name}<HsVerified domain={hs.domain} /></b><span className="ac-host"><Globe size={12} /> {hs.domain}{hs.isOwner ? ' - owner' : ' - admin'}</span></div>
       </header>
       <div className="sx-seg hsx-tabs" role="tablist" aria-label={`${hs.name} settings`}>
         {tabs.map(([id, label, I]) => <button type="button" key={id} role="tab" aria-selected={shown === id} className={shown === id ? 'on' : ''} onClick={() => pick(id)}><I size={14} /> {label}</button>)}
@@ -208,7 +209,7 @@ function MyHomeservers({ admins, onManage }) {
             <div className="sx-list-row ac-inst" key={r.origin}>
               <HomeserverIcon hs={r} className="ac-ico" />
               <div className="sx-row-txt">
-                <b>{r.name}{admin && <i className="hsx-tag">{admin.isOwner ? <><Crown size={11} /> Owner</> : 'Admin'}</i>}</b>
+                <b>{r.name}<HsVerified domain={r.domain} />{admin && <i className="hsx-tag">{admin.isOwner ? <><Crown size={11} /> Owner</> : 'Admin'}</i>}</b>
                 <span className="ac-host"><Globe size={12} /> {r.domain}{r.legacy ? ' - one server on its own' : ''}</span>
                 {r.accounts.length > 1 ? r.accounts.map(a => (
                   <span className="ac-who" key={a.key}><AtSign size={12} /> <Handle handle={a.handle} />{a.active ? ' (in use)' : ''} <button type="button" className="btn btn-surface btn-sm" onClick={() => signOut(r, a)}><LogOut size={12} /> Sign out</button></span>
@@ -380,9 +381,9 @@ function ServersTab({ hs, onDirty }) {
         {!servers && <Loading />}
         {servers && !servers.list.length && <div className="sx-empty"><Server size={28} /><b>{servers.total ? 'None you can see' : 'No servers yet'}</b><span>{servers.total ? "The servers here aren't listed and you aren't in them." : 'Servers made on this homeserver show here.'}</span></div>}
         {servers && servers.list.map(s => (
-          <div className="sx-list-row" key={s.address || s.slug || s.sid}>
+          <div className="sx-list-row" key={s.sid || s.slug || s.name}>
             <HomeserverIcon hs={{ name: s.name, icon_url: s.icon_url || s.icon || null }} className="ac-ico" />
-            <div className="sx-row-txt"><b>{s.name}</b><span>{s.address || s.slug || ''}{s.discoverable === false || s.listed === false ? ' - not listed' : ''}</span></div>
+            <div className="sx-row-txt"><b>{s.name}</b><span>{s.discoverable === false || s.listed === false ? 'Not listed' : 'Listed'}</span></div>
             <div className="sx-row-ctl hsx-count"><Users size={13} /> {Number(s.member_count) || 0}</div>
           </div>
         ))}
