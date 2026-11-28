@@ -5,7 +5,7 @@ import { useChat } from './store.js';
 import { instanceConn, loadServerInfo } from './instances.js';
 import { Card } from './SettingsShell.jsx';
 import { UpdateServerRow } from './UpdateServer.jsx';
-import { restartInstance } from './Instances.jsx';
+import { restartInstance } from './restartInstance.js';
 
 const bytes = n => {
   n = Number(n); if (!Number.isFinite(n) || n < 0) return '-';
